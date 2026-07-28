@@ -1,0 +1,46 @@
+{
+  "name": "@aprovan/patchwork-compiler",
+  "version": "0.2.0",
+  "description": "Patchwork compiler - JSX→ESM compilation, image loading, DOM mounting",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./namespace-types": {
+      "types": "./dist/namespace-types.d.ts",
+      "import": "./dist/namespace-types.js",
+      "require": "./dist/namespace-types.cjs"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "check-types": "tsc --noEmit",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "esbuild-wasm": "^0.27.2",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.3",
+    "vitest": "2.1.5"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

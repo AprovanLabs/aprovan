@@ -1,0 +1,305 @@
+import * as esbuild from "esbuild-wasm";
+import { setCdnBaseUrl as setImageCdnBaseUrl } from "./images/loader.js";
+import { getImageRegistry } from "./images/registry.js";
+import { createHttpProxy } from "./mount/bridge.js";
+import { mountEmbedded, reloadEmbedded } from "./mount/embedded.js";
+import { mountIframe, reloadIframe } from "./mount/iframe.js";
+import { setCdnBaseUrl as setTransformCdnBaseUrl , cdnTransformPlugin } from "./transforms/cdn.js";
+import { namespaceImportPlugin } from "./transforms/namespaces.js";
+import { vfsPlugin } from "./transforms/vfs.js";
+import { createSingleFileProject } from "./vfs/project.js";
+import type {
+  Compiler,
+  CompilerOptions,
+  CompileOptions,
+  CompiledWidget,
+  LoadedImage,
+  Manifest,
+  MountedWidget,
+  MountOptions,
+  Proxy,
+  WidgetTelemetryHook,
+} from "./types.js";
+import type { VirtualProject } from "./vfs/types.js";
+
+// Track esbuild initialization
+let esbuildInitialized = false;
+let esbuildInitPromise: Promise<void> | null = null;
+
+// Pin the wasm binary to the installed host version. An unpinned URL lets
+// unpkg serve a newer "latest" binary than the host JS, which crashes the
+// esbuild service with "Host version does not match binary version" and makes
+// esbuild.build() hang forever (widgets stuck on "Rendering preview...").
+const DEFAULT_ESBUILD_WASM_URL = `https://unpkg.com/esbuild-wasm@${esbuild.version}/esbuild.wasm`;
+
+/**
+ * Initialize esbuild-wasm (must be called before using esbuild)
+ * @param urlOverrides - Optional URL overrides for bundled assets
+ */
+async function initEsbuild(
+  urlOverrides?: Record<string, string>,
+): Promise<void> {
+  if (esbuildInitialized) return;
+  if (esbuildInitPromise) return esbuildInitPromise;
+
+  const wasmUrl =
+    urlOverrides?.["esbuild-wasm/esbuild.wasm"] || DEFAULT_ESBUILD_WASM_URL;
+
+  esbuildInitPromise = (async () => {
+    try {
+      await esbuild.initialize({
+        wasmURL: wasmUrl,
+      });
+      esbuildInitialized = true;
+    } catch (error) {
+      // If already initialized (e.g., HMR or multiple compiler instances)
+      if (error instanceof Error && error.message.includes("initialize")) {
+        esbuildInitialized = true;
+      } else {
+        throw error;
+      }
+    }
+  })();
+
+  return esbuildInitPromise;
+}
+
+const MIN_ES_TARGET = 2022;
+
+/**
+ * Upgrade es20xx targets below es2022 so top-level await always compiles.
+ * Non-es targets (node20, esnext, ...) pass through untouched.
+ */
+function floorTarget(target: string): string {
+  const match = /^es(\d{4})$/i.exec(target);
+  if (match && Number(match[1]) < MIN_ES_TARGET) {
+    return `es${MIN_ES_TARGET}`;
+  }
+  return target;
+}
+
+/**
+ * Generate a content hash for caching
+ */
+function hashContent(content: string): string {
+  // Use Web Crypto API for browser compatibility
+  const encoder = new TextEncoder();
+  const data = encoder.encode(content);
+  // Simple hash for cache key (not cryptographic)
+  let hash = 0;
+  for (let i = 0; i < data.length; i++) {
+    hash = ((hash << 5) - hash + (data[i] ?? 0)) | 0;
+  }
+  return Math.abs(hash).toString(16).padStart(8, "0");
+}
+
+/**
+ * Create a compiler instance
+ */
+export async function createCompiler(
+  options: CompilerOptions,
+): Promise<Compiler> {
+  // Initialize esbuild-wasm
+  await initEsbuild(options.urlOverrides);
+
+  const { image: imageSpec, proxyUrl, cdnBaseUrl, widgetCdnBaseUrl } = options;
+
+  // Set CDN base URLs (can be different for image loading vs widget imports)
+  if (cdnBaseUrl) {
+    setImageCdnBaseUrl(cdnBaseUrl);
+  }
+  // Widget imports use widgetCdnBaseUrl if provided, otherwise fall back to cdnBaseUrl or default
+  if (widgetCdnBaseUrl) {
+    setTransformCdnBaseUrl(widgetCdnBaseUrl);
+  } else if (cdnBaseUrl) {
+    setTransformCdnBaseUrl(cdnBaseUrl);
+  }
+
+  const registry = getImageRegistry();
+
+  // Pre-load the initial image
+  await registry.preload(imageSpec);
+
+  // Create service proxy (telemetry hook observes calls + attributes them)
+  const proxy: Proxy = createHttpProxy(proxyUrl, options.proxyFetch, {
+    hook: options.telemetry,
+    sessionId: options.telemetrySessionId,
+  });
+
+  return new PatchworkCompiler(proxy, registry, options.telemetry);
+}
+
+/**
+ * Patchwork compiler implementation
+ */
+class PatchworkCompiler implements Compiler {
+  private proxy: Proxy;
+  private registry: ReturnType<typeof getImageRegistry>;
+  private telemetry?: WidgetTelemetryHook;
+
+  constructor(
+    proxy: Proxy,
+    registry: ReturnType<typeof getImageRegistry>,
+    telemetry?: WidgetTelemetryHook,
+  ) {
+    this.proxy = proxy;
+    this.registry = registry;
+    this.telemetry = telemetry;
+  }
+
+  /**
+   * Pre-load an image package
+   */
+  async preloadImage(spec: string): Promise<void> {
+    await this.registry.preload(spec);
+  }
+
+  /**
+   * Check if an image is loaded
+   */
+  isImageLoaded(spec: string): boolean {
+    return this.registry.has(spec);
+  }
+
+  /**
+   * Get a loaded image (manifest config, runtime prompt, …)
+   */
+  getImage(spec: string): LoadedImage | undefined {
+    return this.registry.get(spec);
+  }
+
+  /**
+   * Compile widget source to ESM
+   */
+  async compile(
+    source: string | VirtualProject,
+    manifest: Manifest,
+    _options: CompileOptions = {},
+  ): Promise<CompiledWidget> {
+    // Normalize input to VirtualProject (entry defined by project, defaults to main.tsx)
+    const project =
+      typeof source === "string" ? createSingleFileProject(source) : source;
+
+    // Infer loader from entry file extension
+    const entryExt = project.entry.split(".").pop();
+    const loader = entryExt === "ts" || entryExt === "tsx" ? "tsx" : "jsx";
+
+    // Get image from registry based on manifest
+    const image = this.registry.get(manifest.image) || null;
+
+    // Get config from image (with proper typing)
+    const esbuildConfig = image?.config.esbuild || {};
+    const frameworkConfig = image?.config.framework || {};
+
+    // Floor the target at es2022: top-level await is required by workflow
+    // scripts, and older published image configs still pin es2020.
+    const target = floorTarget(esbuildConfig.target || "es2022");
+    const format = esbuildConfig.format || "esm";
+    const jsx = esbuildConfig.jsx ?? "automatic";
+
+    // Collect all packages (image deps + manifest packages)
+    const packages: Record<string, string> = {
+      ...(image?.dependencies || {}),
+      ...(manifest.packages || {}),
+    };
+
+    const globals = frameworkConfig.globals || {};
+
+    // Get dependency version overrides from image config (e.g., { react: '18' })
+    const deps = frameworkConfig.deps || {};
+
+    // Get import path aliases from image config (e.g., { '@/components/ui/*': '@packagedcn/react' })
+    const aliases = image?.config.aliases || {};
+
+    // Get entry file content
+    const entryFile = project.files.get(project.entry);
+    if (!entryFile) {
+      throw new Error(`Entry file not found: ${project.entry}`);
+    }
+
+    // Build with esbuild using image-provided configuration
+    const result = await esbuild.build({
+      stdin: {
+        contents: entryFile.content,
+        loader,
+        sourcefile: project.entry,
+      },
+      bundle: true,
+      format,
+      target,
+      platform: manifest.platform === "cli" ? "node" : "browser",
+      jsx,
+      ...(esbuildConfig.jsxFactory
+        ? { jsxFactory: esbuildConfig.jsxFactory }
+        : {}),
+      ...(esbuildConfig.jsxFragment
+        ? { jsxFragment: esbuildConfig.jsxFragment }
+        : {}),
+      write: false,
+      sourcemap: "inline",
+      plugins: [
+        vfsPlugin(project, { aliases }),
+        // Before the CDN plugin: a bare specifier naming an injected service
+        // namespace is the SDK import, not an npm package. Everything else
+        // still falls through to esm.sh.
+        namespaceImportPlugin({ services: manifest.services }),
+        cdnTransformPlugin({
+          packages,
+          globals,
+          deps,
+          aliases,
+        }),
+      ],
+    });
+
+    const code = result.outputFiles?.[0]?.text || "";
+    const hash = hashContent(code);
+
+    return {
+      code,
+      hash,
+      manifest,
+    };
+  }
+
+  /**
+   * Mount a compiled widget to the DOM
+   */
+  async mount(
+    widget: CompiledWidget,
+    options: MountOptions,
+  ): Promise<MountedWidget> {
+    const image = this.registry.get(widget.manifest.image) || null;
+    if (options.mode === "iframe") {
+      return mountIframe(widget, options, image, this.proxy, this.telemetry);
+    }
+    return mountEmbedded(widget, options, image, this.proxy);
+  }
+
+  /**
+   * Unmount a mounted widget
+   */
+  unmount(mounted: MountedWidget): void {
+    mounted.unmount();
+  }
+
+  /**
+   * Hot reload a mounted widget
+   */
+  async reload(
+    mounted: MountedWidget,
+    source: string | VirtualProject,
+    manifest: Manifest,
+  ): Promise<void> {
+    // Compile new version
+    const widget = await this.compile(source, manifest);
+    const image = this.registry.get(widget.manifest.image) || null;
+
+    // Reload based on mode
+    if (mounted.mode === "iframe") {
+      await reloadIframe(mounted, widget, image, this.proxy, this.telemetry);
+    } else {
+      await reloadEmbedded(mounted, widget, image, this.proxy);
+    }
+  }
+}

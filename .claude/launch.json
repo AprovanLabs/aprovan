@@ -1,0 +1,71 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "patchwork-web",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--filter",
+        "@aprovan/patchwork-web",
+        "dev"
+      ],
+      "port": 5173
+    },
+    {
+      "name": "patchwork-web-offline",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "APROVAN_ENV=off",
+        "pnpm",
+        "--filter",
+        "@aprovan/patchwork-web",
+        "dev"
+      ],
+      "port": 5173
+    },
+    {
+      "name": "gateway-local-scratch",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "APROVAN_ENV=off",
+        "STORE_BACKEND=sqlite",
+        "GATEWAY_PORT=4010",
+        "GATEWAY_DATA_DIR=/tmp/patchwork-gateway-scratch",
+        "pnpm",
+        "--dir",
+        "/Users/jacob/Documents/Code/AprovanLabs/registry/apps/gateway",
+        "exec",
+        "tsx",
+        "src/index.ts"
+      ],
+      "port": 4010
+    },
+    {
+      "name": "patchwork-web-scratch",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "APROVAN_ENV=off",
+        "GATEWAY_URL=http://localhost:4010",
+        "pnpm",
+        "--filter",
+        "@aprovan/patchwork-web",
+        "dev",
+        "--port",
+        "5199"
+      ],
+      "port": 5199
+    },
+    {
+      "name": "patchwork-web-preview",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--filter",
+        "@aprovan/patchwork-web",
+        "preview",
+        "--port",
+        "4173"
+      ],
+      "port": 4173
+    }
+  ]
+}

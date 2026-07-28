@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link
+      rel="icon"
+      type="image/png"
+      href="https://raw.githubusercontent.com/AprovanLabs/aprovan.com/main/docs/assets/social-labs.png"
+    />
+    <link rel="apple-touch-icon" href="/chat/apple-touch-icon.png" />
+    <meta name="theme-color" content="#0a0a0a" />
+    <!-- iOS ignores the manifest's `display: standalone` unless told
+         explicitly to run the home-screen icon chromeless. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Patchwork" />
+    <title>Patchwork</title>
+    <script>
+      // Theme tokens (@aprovan/ui/theme.css) switch on a `.dark` root class;
+      // sync it with the OS scheme before first paint to avoid a flash.
+      const media = window.matchMedia("(prefers-color-scheme: dark)");
+      const apply = () =>
+        document.documentElement.classList.toggle("dark", media.matches);
+      apply();
+      media.addEventListener("change", apply);
+    </script>
+  </head>
+  <body class="min-h-screen bg-background font-sans antialiased">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -1,0 +1,109 @@
+#!/usr/bin/env bash
+#
+# Build the patchwork web app and publish it to aprovan.com/chat.
+#
+# Builds @aprovan/patchwork-web (Vite base /chat/ — set in vite.config.ts),
+# syncs the static output into the chat/ prefix of the shared aprovan.com S3
+# bucket (owned by core's WebStack), and invalidates the CloudFront cache for
+# /chat/*.
+#
+# Cognito / gateway config is baked into the build by client/web/scripts/
+# load-env.ts, which reads the shared identity bundle from SSM
+# /aprovan/<env>/env (VITE_COGNITO_* / VITE_MCP_URL) using the same AWS
+# credentials this script runs with.
+#
+# Usage:
+#   AWS_PROFILE=aprovan scripts/deploy-web.sh          # local
+#   scripts/deploy-web.sh                              # CI (OIDC creds ambient)
+#
+# Config (all optional — resolved from SSM/core infra when unset):
+#   WEB_BUCKET                  target S3 bucket (SSM /aprovan/<env>/web/bucket)
+#   CLOUDFRONT_DISTRIBUTION_ID  aprovan.com distribution (SSM .../web/distribution-id)
+#   SKIP_BUILD=1                reuse an existing client/web/dist
+
+source "$(dirname "${BASH_SOURCE[0]}")/deploy-lib.sh"
+
+resolve WEB_BUCKET "$WEB_REGION" "/aprovan/${ENVIRONMENT}/web/bucket" "web bucket"
+resolve CLOUDFRONT_DISTRIBUTION_ID "$WEB_REGION" \
+  "/aprovan/${ENVIRONMENT}/web/distribution-id" "distribution id"
+
+DIST_DIR="$REPO_ROOT/client/web/dist"
+
+# Pin the gateway URLs for the build. load-env.ts also derives these from the
+# shared SSM env, but a developer's client/web/.env (loaded first via dotenv)
+# can shadow GATEWAY_URL with a localhost value — explicit VITE_* always wins.
+# MCP lives at the origin's /api/mcp; REST stays at GATEWAY_URL (…/api/gateway).
+if [[ -z "${VITE_MCP_URL:-}" || -z "${VITE_GATEWAY_URL:-}" ]]; then
+  GATEWAY_URL="$(shared_env_value GATEWAY_URL)"
+  [[ -n "$GATEWAY_URL" ]] ||
+    die "GATEWAY_URL unresolved (checked SSM /aprovan/${ENVIRONMENT}/env). Set VITE_MCP_URL/VITE_GATEWAY_URL explicitly."
+  ORIGIN="$(printf '%s' "$GATEWAY_URL" | sed -E 's#^(https?://[^/]+).*#\1#')"
+  : "${VITE_MCP_URL:=${ORIGIN}/api/mcp}"
+  : "${VITE_GATEWAY_URL:=${GATEWAY_URL%/}}"
+fi
+log "Gateway MCP URL: $VITE_MCP_URL (REST: $VITE_GATEWAY_URL)"
+
+if [[ "${SKIP_BUILD:-}" != "1" ]]; then
+  log "Building @aprovan/patchwork-web (base /chat, env $ENVIRONMENT)"
+  (
+    cd "$REPO_ROOT"
+    APROVAN_ENV="$ENVIRONMENT" \
+    AWS_REGION="$AWS_REGION" \
+    VITE_MCP_URL="$VITE_MCP_URL" \
+    VITE_GATEWAY_URL="$VITE_GATEWAY_URL" \
+      pnpm --filter "@aprovan/patchwork-web..." build
+  )
+fi
+
+[[ -f "$DIST_DIR/index.html" ]] ||
+  die "$DIST_DIR/index.html missing — build did not produce output."
+
+log "Syncing $DIST_DIR → s3://$WEB_BUCKET/chat/"
+# Fingerprinted assets: long-cache. HTML, the service worker, its workbox
+# runtime chunk, and the manifest: always revalidate so a deploy — and in
+# particular a service worker update — is visible as soon as the invalidation
+# completes. sw.js/workbox-*.js are unfingerprinted (vite-plugin-pwa writes
+# them under fixed names on purpose, so the browser's SW update check has a
+# stable URL to poll); long-caching them would pin clients to a stale worker
+# indefinitely, since the SW itself is what's supposed to tell the browser a
+# new version exists.
+awscli "$WEB_REGION" s3 sync "$DIST_DIR" "s3://$WEB_BUCKET/chat/" \
+  --delete \
+  --exclude "*.html" \
+  --exclude "sw.js" \
+  --exclude "workbox-*.js" \
+  --exclude "manifest.webmanifest" \
+  --cache-control "public,max-age=31536000,immutable"
+awscli "$WEB_REGION" s3 sync "$DIST_DIR" "s3://$WEB_BUCKET/chat/" \
+  --delete \
+  --exclude "*" --include "*.html" \
+  --cache-control "public,max-age=0,must-revalidate" \
+  --content-type "text/html; charset=utf-8"
+awscli "$WEB_REGION" s3 sync "$DIST_DIR" "s3://$WEB_BUCKET/chat/" \
+  --delete \
+  --exclude "*" --include "sw.js" --include "workbox-*.js" \
+  --cache-control "public,max-age=0,must-revalidate" \
+  --content-type "application/javascript; charset=utf-8"
+awscli "$WEB_REGION" s3 sync "$DIST_DIR" "s3://$WEB_BUCKET/chat/" \
+  --delete \
+  --exclude "*" --include "manifest.webmanifest" \
+  --cache-control "public,max-age=0,must-revalidate" \
+  --content-type "application/manifest+json"
+
+# The app is a single-page Vite build, but CloudFront's static rewrite maps
+# /chat/auth/callback → chat/auth/callback/index.html. Publish a copy of the
+# SPA shell at that key so the Cognito redirect lands on the app. (Runs after
+# the --delete syncs, which would otherwise remove it.)
+log "Publishing SPA shell at chat/auth/callback/"
+awscli "$WEB_REGION" s3 cp "$DIST_DIR/index.html" \
+  "s3://$WEB_BUCKET/chat/auth/callback/index.html" \
+  --cache-control "public,max-age=0,must-revalidate" \
+  --content-type "text/html; charset=utf-8"
+
+log "Invalidating CloudFront $CLOUDFRONT_DISTRIBUTION_ID (/chat/*)"
+INVALIDATION_ID="$(awscli "$WEB_REGION" cloudfront create-invalidation \
+  --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" \
+  --paths "/chat/*" \
+  --query 'Invalidation.Id' --output text)"
+
+log "Done. https://aprovan.com/chat/ (invalidation $INVALIDATION_ID)"
