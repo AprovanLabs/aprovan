@@ -4,7 +4,11 @@ import { getImageRegistry } from "./images/registry.js";
 import { createHttpProxy } from "./mount/bridge.js";
 import { mountEmbedded, reloadEmbedded } from "./mount/embedded.js";
 import { mountIframe, reloadIframe } from "./mount/iframe.js";
-import { setCdnBaseUrl as setTransformCdnBaseUrl , cdnTransformPlugin } from "./transforms/cdn.js";
+import {
+  setCdnBaseUrl as setTransformCdnBaseUrl,
+  cdnTransformPlugin,
+  ALIAS_MODULE_NAMESPACE,
+} from "./transforms/cdn.js";
 import { namespaceImportPlugin } from "./transforms/namespaces.js";
 import { vfsPlugin } from "./transforms/vfs.js";
 import { createSingleFileProject } from "./vfs/project.js";
@@ -76,6 +80,32 @@ function floorTarget(target: string): string {
     return `es${MIN_ES_TARGET}`;
   }
   return target;
+}
+
+/**
+ * The available names closest to one that does not exist.
+ *
+ * Prefix and substring matches first — a wrong component name is usually the
+ * right family under a wrong noun (`Spinner` → `Skeleton`/`Slider` is weak,
+ * but `TableHeaderCell` → `TableHead` is exact), and case-insensitive
+ * containment catches those without an edit-distance table. Falls back to a
+ * shared-prefix ranking so there is always something to try.
+ */
+function nearestNames(missing: string, available: readonly string[], limit = 4): string[] {
+  const needle = missing.toLowerCase();
+  const scored = available
+    .map((name) => {
+      const candidate = name.toLowerCase();
+      if (candidate === needle) return { name, score: 0 };
+      if (candidate.startsWith(needle) || needle.startsWith(candidate)) return { name, score: 1 };
+      if (candidate.includes(needle) || needle.includes(candidate)) return { name, score: 2 };
+      let shared = 0;
+      while (shared < candidate.length && candidate[shared] === needle[shared]) shared += 1;
+      return { name, score: shared >= 3 ? 3 : Number.POSITIVE_INFINITY };
+    })
+    .filter((entry) => Number.isFinite(entry.score))
+    .sort((a, b) => a.score - b.score || a.name.length - b.name.length);
+  return scored.slice(0, limit).map((entry) => entry.name);
 }
 
 /**
@@ -174,6 +204,34 @@ class PatchworkCompiler implements Compiler {
   async compile(
     source: string | VirtualProject,
     manifest: Manifest,
+    options: CompileOptions = {},
+  ): Promise<CompiledWidget> {
+    try {
+      return await this.buildWidget(source, manifest, options);
+    } catch (error) {
+      // A failed compile is the single most actionable piece of evidence about
+      // a widget, and until this hook existed it went only to whatever host
+      // component happened to call compile() — into React state, rendered
+      // once, never recorded. It never reached the logs buffer, so
+      // "fix it" prompts shipped without the error that motivated them.
+      // Reported here rather than at each call site so every host (chat, the
+      // editor preview, the live app page, the MCP runtime) gets it from
+      // having wired `telemetry` at all.
+      this.telemetry?.({
+        kind: "error",
+        at: new Date().toISOString(),
+        level: "error",
+        ...(options.sourcePath ? { path: options.sourcePath } : {}),
+        message: `Compile failed: ${error instanceof Error ? error.message : String(error)}`,
+        ...(error instanceof Error && error.stack ? { stack: error.stack } : {}),
+      });
+      throw error;
+    }
+  }
+
+  private async buildWidget(
+    source: string | VirtualProject,
+    manifest: Manifest,
     _options: CompileOptions = {},
   ): Promise<CompiledWidget> {
     // Normalize input to VirtualProject (entry defined by project, defaults to main.tsx)
@@ -211,6 +269,10 @@ class PatchworkCompiler implements Compiler {
     // Get import path aliases from image config (e.g., { '@/components/ui/*': '@packagedcn/react' })
     const aliases = image?.config.aliases || {};
 
+    // What those alias targets actually export, so an unknown component name
+    // fails here with a file and line instead of in the browser at link time.
+    const aliasExports = image?.config.aliasExports || {};
+
     // Get entry file content
     const entryFile = project.files.get(project.entry);
     if (!entryFile) {
@@ -218,7 +280,7 @@ class PatchworkCompiler implements Compiler {
     }
 
     // Build with esbuild using image-provided configuration
-    const result = await esbuild.build({
+    const result = await this.withAliasHints(aliasExports, () => esbuild.build({
       stdin: {
         contents: entryFile.content,
         loader,
@@ -248,9 +310,10 @@ class PatchworkCompiler implements Compiler {
           globals,
           deps,
           aliases,
+          aliasExports,
         }),
       ],
-    });
+    }));
 
     const code = result.outputFiles?.[0]?.text || "";
     const hash = hashContent(code);
@@ -263,6 +326,47 @@ class PatchworkCompiler implements Compiler {
   }
 
   /**
+   * Turn esbuild's "No matching export" into advice.
+   *
+   * esbuild says what is wrong and where, which is most of the job. What it
+   * cannot know is that the module in question is an image's fixed component
+   * inventory, so the fix is never "install it" — it is "use a different
+   * component, or write the markup by hand". Whoever reads this next is
+   * usually a model iterating on its own widget, and the nearest valid names
+   * are the difference between a fix and another guess.
+   */
+  private async withAliasHints<T>(
+    aliasExports: Record<string, string[]>,
+    build: () => Promise<T>,
+  ): Promise<T> {
+    try {
+      return await build();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const missing = [
+        ...message.matchAll(
+          new RegExp(
+            `No matching export in "${ALIAS_MODULE_NAMESPACE}:([^"]+)" for import "([^"]+)"`,
+            "g",
+          ),
+        ),
+      ];
+      if (missing.length === 0) throw error;
+
+      const hints = missing.map(([, pkg, name]) => {
+        const available = aliasExports[pkg ?? ""] ?? [];
+        const near = nearestNames(name ?? "", available);
+        return (
+          `"${name}" is not one of the ${available.length} components this image provides` +
+          (near.length > 0 ? `. Closest available: ${near.join(", ")}` : "") +
+          `. There is no way to add one — use an available component or plain markup.`
+        );
+      });
+      throw new Error(`${message}\n\n${hints.join("\n")}`);
+    }
+  }
+
+  /**
    * Mount a compiled widget to the DOM
    */
   async mount(
@@ -270,10 +374,27 @@ class PatchworkCompiler implements Compiler {
     options: MountOptions,
   ): Promise<MountedWidget> {
     const image = this.registry.get(widget.manifest.image) || null;
-    if (options.mode === "iframe") {
-      return mountIframe(widget, options, image, this.proxy, this.telemetry);
+    try {
+      if (options.mode === "iframe") {
+        return await mountIframe(widget, options, image, this.proxy, this.telemetry);
+      }
+      return await mountEmbedded(widget, options, image, this.proxy);
+    } catch (error) {
+      // Mount is where a CDN module that compiled fine fails to link — the
+      // "does not provide an export named 'X'" class. In iframe mode the
+      // sandbox's own console.error is mirrored out, but embedded mode has no
+      // such mirror and neither path recorded the rejection that the host
+      // actually shows the user. Recording it here covers both.
+      this.telemetry?.({
+        kind: "error",
+        at: new Date().toISOString(),
+        level: "error",
+        ...(options.sourcePath ? { path: options.sourcePath } : {}),
+        message: `Mount failed: ${error instanceof Error ? error.message : String(error)}`,
+        ...(error instanceof Error && error.stack ? { stack: error.stack } : {}),
+      });
+      throw error;
     }
-    return mountEmbedded(widget, options, image, this.proxy);
   }
 
   /**

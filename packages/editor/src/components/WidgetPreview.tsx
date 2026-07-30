@@ -50,6 +50,10 @@ export function WidgetPreview({
 
         const widget = await compiler.compile(code, createManifest(services), {
           typescript: true,
+          // Attribution for the compiler's own error telemetry: a failed
+          // compile is recorded against this file, so it reaches the Logs
+          // panel and the problem digest that "fix it" prompts carry.
+          ...(sourcePath ? { sourcePath } : {}),
         });
 
         if (cancelled || !containerRef.current) return;

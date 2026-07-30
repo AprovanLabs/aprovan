@@ -26,9 +26,17 @@ export interface InputSpec {
   description?: string;
 }
 
-// Compiler options (reserved for future use)
+// Compiler options. Entry point and loader are inferred from
+// VirtualProject.entry.
 export interface CompileOptions {
-  // Entry point and loader are inferred from VirtualProject.entry
+  typescript?: boolean;
+  /**
+   * Workspace path of the source being compiled, for telemetry attribution —
+   * the same role `MountOptions.sourcePath` plays. Without it a compile error
+   * is recorded unattributed, which still reaches every path's problem digest
+   * but cannot be filtered to the file that caused it.
+   */
+  sourcePath?: string;
 }
 
 // Compiled widget output
@@ -99,6 +107,12 @@ export interface ImageConfig {
   };
   /** Import path aliases (e.g., { '@/components/ui/*': '@packagedcn/react' }) */
   aliases?: Record<string, string>;
+  /**
+   * Value exports of each alias-target package, keyed by package name — the
+   * image's component inventory. Generated from the installed package, never
+   * hand-maintained. See CdnTransformOptions.aliasExports for what it buys.
+   */
+  aliasExports?: Record<string, string[]>;
   /**
    * Package-relative path to a markdown prompt describing this runtime for
    * LLMs (allowed imports, styling rules, idioms). Loaded eagerly with the

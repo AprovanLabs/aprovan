@@ -47,6 +47,15 @@ export const AliasesSchema = z.record(z.string(), z.string()).optional();
 
 export type Aliases = z.infer<typeof AliasesSchema>;
 
+// Value exports of each alias-target package, keyed by package name. Lets the
+// compiler turn an unknown component into a compile error instead of a
+// browser link failure; see CdnTransformOptions.aliasExports.
+export const AliasExportsSchema = z
+  .record(z.string(), z.array(z.string()))
+  .optional();
+
+export type AliasExports = z.infer<typeof AliasExportsSchema>;
+
 // Dependencies schema - maps package names to version specifiers
 export const DependenciesSchema = z.record(z.string(), z.string()).optional();
 
@@ -58,12 +67,20 @@ export const ImageConfigSchema = z
     esbuild: EsbuildConfigSchema,
     framework: FrameworkConfigSchema,
     aliases: AliasesSchema,
+    aliasExports: AliasExportsSchema,
     // Package-relative markdown prompt describing this runtime for LLMs
     prompt: z.string().optional(),
     // Named extended docs (lazy-loaded, skills/DESIGN.md-style)
     docs: z.record(z.string(), z.string()).optional(),
   })
-  .strict();
+  // Passthrough, not strict. An image's config is fetched from the CDN at
+  // runtime, so a compiler routinely meets images published after it. Under
+  // `.strict()` one unrecognised field failed the whole parse, and
+  // `loadImage` falls back to DEFAULT_IMAGE_CONFIG on a failed parse — which
+  // silently drops the image's `aliases`, breaking every
+  // `@/components/ui/*` import in every widget. Trading a typo check for
+  // that blast radius was the wrong side of the deal.
+  .passthrough();
 
 export type ImageConfig = z.infer<typeof ImageConfigSchema>;
 
@@ -95,6 +112,7 @@ export type Manifest = z.infer<typeof ManifestSchema>;
 export const CompileOptionsSchema = z
   .object({
     typescript: z.boolean().optional(),
+    sourcePath: z.string().optional(),
   })
   .strict()
   .optional();

@@ -251,7 +251,10 @@ export function CodePreview({
 
       try {
         await withTimeout(
-          compiler.compile(code, createManifest(services), { typescript: true }),
+          compiler.compile(code, createManifest(services), {
+            typescript: true,
+            ...(effectiveFilePath ? { sourcePath: effectiveFilePath } : {}),
+          }),
           COMPILE_TIMEOUT_MS,
           `Compilation timed out after ${COMPILE_TIMEOUT_MS / 1000}s`,
         );
@@ -267,7 +270,7 @@ export function CodePreview({
         console.error = originalError;
       }
     },
-    [canRenderWidget, compiler, services]
+    [canRenderWidget, compiler, services, effectiveFilePath]
   );
 
   const handleRevert = () => {
