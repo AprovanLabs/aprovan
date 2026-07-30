@@ -15,6 +15,12 @@
  * and the collapsed flag are persisted so a reload doesn't undo the user's
  * layout.
  *
+ * It also owns the section's *last* group, "Workspace" — the native surfaces
+ * (registry/docs/native-surfaces.md). That group can't live inside the shared
+ * explorer (published package, apps-only data model), so it renders as a
+ * sibling block below it: same APPS section, one entry point for "things that
+ * aren't files".
+ *
  * Transports are injected, never fetched here — see lib/tools.ts.
  */
 
@@ -22,6 +28,7 @@ import { AppsExplorer } from "@aprovan/registry-ui/apps-panel";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 import type { AppsSelection } from "@aprovan/registry-ui/apps-panel";
+import { NATIVE_SURFACES } from "@/lib/native-surfaces";
 import { invokeAppsTool, invokeWorkflowsTool } from "@/lib/tools";
 import { readFile } from "@/lib/workspace-vfs";
 
@@ -41,6 +48,12 @@ interface SidebarAppsLayout {
    * and hand back the empty-looking widget this explorer replaced.
    */
   expanded?: string[];
+  /**
+   * Whether the Workspace (native surfaces) group is open. Crowding control:
+   * the doc's default is a *collapsed* five-row group, so absent state means
+   * shut — hence a `workspaceOpen` flag rather than a `collapsed` one.
+   */
+  workspaceOpen?: boolean;
 }
 
 function loadLayout(): SidebarAppsLayout {
@@ -54,6 +67,7 @@ function loadLayout(): SidebarAppsLayout {
           ? parsed.height
           : DEFAULT_HEIGHT,
       collapsed: parsed.collapsed === true,
+      workspaceOpen: parsed.workspaceOpen === true,
       ...(Array.isArray(parsed.expanded)
         ? { expanded: parsed.expanded.filter((id): id is string => typeof id === "string") }
         : {}),
@@ -83,6 +97,8 @@ export function SidebarApps({
   onSelectionChange,
   onOpenScript,
   onCreateWorkflow,
+  activeSurfaceId,
+  onSelectSurface,
 }: {
   /** Selection mirrored from the open apps tab, so the two stay in sync. */
   selection: AppsSelection | null;
@@ -92,16 +108,32 @@ export function SidebarApps({
   onOpenScript: (path: string) => void;
   /** Empty states funnel here: prefill chat to describe a new workflow. */
   onCreateWorkflow?: (appName?: string) => void;
+  /** Native surface shown in the main pane, mirrored like `selection`. */
+  activeSurfaceId?: string | null;
+  /** Fired when a Workspace row is picked — the host opens a `native://` tab. */
+  onSelectSurface?: (surfaceId: string) => void;
 }) {
   const [layout, setLayout] = useState<SidebarAppsLayout>(loadLayout);
   const [dragging, setDragging] = useState(false);
   const sectionRef = useRef<HTMLElement | null>(null);
+  // Mirrors `layout` for the drag/keyboard handlers, which persist mid-gesture
+  // and must not drop the fields they don't touch (expanded, workspaceOpen).
+  const layoutRef = useRef(layout);
+  layoutRef.current = layout;
   const heightRef = useRef(layout.height);
   heightRef.current = layout.height;
 
   const setCollapsed = useCallback((collapsed: boolean) => {
     setLayout((prev) => {
       const next = { ...prev, collapsed };
+      saveLayout(next);
+      return next;
+    });
+  }, []);
+
+  const setWorkspaceOpen = useCallback((workspaceOpen: boolean) => {
+    setLayout((prev) => {
+      const next = { ...prev, workspaceOpen };
       saveLayout(next);
       return next;
     });
@@ -144,7 +176,7 @@ export function SidebarApps({
         window.removeEventListener("pointerup", onUp);
         setDragging(false);
         // One write at the end of the gesture, not one per pointer move.
-        saveLayout({ height: heightRef.current, collapsed: false });
+        saveLayout({ ...layoutRef.current, height: heightRef.current, collapsed: false });
       };
       window.addEventListener("pointermove", onMove);
       window.addEventListener("pointerup", onUp);
@@ -169,7 +201,7 @@ export function SidebarApps({
           else if (event.key === "ArrowDown") resizeBy(-16);
           else return;
           event.preventDefault();
-          saveLayout({ height: heightRef.current, collapsed: layout.collapsed });
+          saveLayout({ ...layoutRef.current, height: heightRef.current });
         }}
         className={`h-1 shrink-0 -mt-px transition-colors ${
           layout.collapsed
@@ -215,6 +247,79 @@ export function SidebarApps({
           className="flex-1 min-h-0 px-2 pb-2"
         />
       )}
+
+      {!layout.collapsed && onSelectSurface && (
+        <WorkspaceSurfaces
+          open={layout.workspaceOpen === true}
+          onOpenChange={setWorkspaceOpen}
+          activeSurfaceId={activeSurfaceId ?? null}
+          onSelect={onSelectSurface}
+        />
+      )}
     </section>
+  );
+}
+
+/**
+ * The APPS section's last group: one row per native surface (Data, Agents,
+ * Webhooks, Sync, Activity), each opening a `native://` content tab.
+ *
+ * It sits outside the explorer's scroll box and `shrink-0` deliberately —
+ * five fixed rows shouldn't be something you scroll a hundred-app list to
+ * reach — but inside the same section, so APPS stays the single entry point
+ * for "things that aren't files".
+ */
+function WorkspaceSurfaces({
+  open,
+  onOpenChange,
+  activeSurfaceId,
+  onSelect,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  activeSurfaceId: string | null;
+  onSelect: (surfaceId: string) => void;
+}) {
+  return (
+    <div className="shrink-0 px-2 pb-2">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => onOpenChange(!open)}
+        className="flex w-full items-center gap-1.5 rounded px-1 py-1 text-left transition-colors hover:bg-muted/60"
+        title={open ? "Collapse workspace surfaces" : "Expand workspace surfaces"}
+      >
+        {open ? (
+          <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
+        ) : (
+          <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground" />
+        )}
+        <span className="truncate text-xs font-medium">Workspace</span>
+        <span className="shrink-0 text-[0.65rem] tabular-nums text-muted-foreground">
+          {NATIVE_SURFACES.length}
+        </span>
+      </button>
+
+      {open && (
+        // pl-3 + space-y-0.5 is the explorer's own compact child indent, so
+        // these rows line up with an app's workflows above them.
+        <div className="space-y-0.5 pl-3">
+          {NATIVE_SURFACES.map((surface) => (
+            <button
+              key={surface.id}
+              type="button"
+              onClick={() => onSelect(surface.id)}
+              title={surface.description}
+              className={`flex w-full items-center gap-1.5 rounded px-2 py-1 text-left transition-colors ${
+                surface.id === activeSurfaceId ? "bg-muted" : "hover:bg-muted/60"
+              }`}
+            >
+              <surface.icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              <span className="truncate text-xs">{surface.title}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

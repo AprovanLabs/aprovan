@@ -58,6 +58,7 @@ import { CHAT_PROVIDERS, ProviderModelControls } from "@/components/ProviderPick
 import { ServicesMenu } from "@/components/ServicesMenu";
 import { MergeDialog } from "@/components/MergeDialog";
 import { NotificationsBell } from "@/components/NotificationsBell";
+import { PanelTabs } from "@/components/panels/shell";
 import { SessionBar } from "@/components/SessionBar";
 import SessionControls from "@/components/SessionControls";
 import { SidebarApps } from "@/components/SidebarApps";
@@ -1576,6 +1577,13 @@ export default function ChatPage() {
     [activeTabPath]
   );
 
+  // Same idea for native surfaces: the sidebar's Workspace group highlights
+  // the surface whose `native://` tab is showing.
+  const activeSurfaceId = useMemo(
+    () => (activeTabPath ? parseNativeTabPath(activeTabPath)?.id ?? null : null),
+    [activeTabPath]
+  );
+
   // Read via refs inside prepareSendMessagesRequest so provider/model
   // switches apply to the next send even though useChat holds on to the
   // transport instance.
@@ -2442,9 +2450,10 @@ export default function ChatPage() {
                   />
                 )}
                 {/* Second explorer: apps grouped over the workflows they
-                  export. It owns its own height (drag handle + collapse,
-                  persisted) so the tree above it keeps the remainder instead
-                  of the two lists fighting for one scroll. */}
+                  export, ending in the Workspace group of native surfaces. It
+                  owns its own height (drag handle + collapse, persisted) so the
+                  tree above it keeps the remainder instead of the two lists
+                  fighting for one scroll. */}
                 <SidebarApps
                   selection={activeAppsSelection}
                   onSelectionChange={openAppsTab}
@@ -2453,6 +2462,8 @@ export default function ChatPage() {
                     openWorkspacePreview(path);
                   }}
                   onCreateWorkflow={createWorkflowInChat}
+                  activeSurfaceId={activeSurfaceId}
+                  onSelectSurface={openNativeTab}
                 />
               </MobileDrawer>
 
