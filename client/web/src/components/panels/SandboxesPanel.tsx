@@ -23,10 +23,6 @@
 
 import { AlertTriangle, Box, ChevronRight, Play, RefreshCw, Trash2, Upload } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { invokeNamespaceTool } from "@/lib/tools";
 import {
   PanelEmpty,
   PanelError,
@@ -35,8 +31,13 @@ import {
   PanelTabs,
   relativeTime,
   usePanelData,
+  useScopeFilter,
   type NativePanelProps,
 } from "./shell";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { invokeNamespaceTool } from "@/lib/tools";
 
 // ---------------------------------------------------------------------------
 // Service shapes (gateway `sandboxes` namespace)
@@ -478,10 +479,13 @@ function SandboxRow({
 
 function Environments({
   sandboxes,
+  scopedTo,
   onChanged,
   invoke,
 }: {
   sandboxes: Sandbox[];
+  /** App title/name when the list is narrowed to one app's paths. */
+  scopedTo?: string | undefined;
   onChanged: () => void;
   invoke: ReturnType<typeof invokeNamespaceTool>;
 }) {
@@ -538,12 +542,9 @@ function Environments({
   if (sandboxes.length === 0) {
     return (
       <PanelEmpty>
-        No sandboxes. Start one from chat with{" "}
-        <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">
-          sandboxes.create {'{ image, mounts: [{ path, source }] }'}
-        </code>{" "}
-        — or schedule work for whichever machine is free with{" "}
-        <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">sandboxes.schedule</code>.
+        {scopedTo
+          ? `No sandboxes are working on ${scopedTo}'s files.`
+          : "No sandboxes yet. Ask in chat to start one, or to schedule work for whichever machine is free."}
       </PanelEmpty>
     );
   }
@@ -742,11 +743,7 @@ function Runs({
   if (runs.length === 0) {
     return (
       <PanelEmpty>
-        No scheduled runs. Queue one with{" "}
-        <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">
-          sandboxes.schedule {"{ image, workflow }"}
-        </code>{" "}
-        — it waits for a machine registered for that image.
+        No scheduled runs. Queue one from chat — it waits until a capable machine picks it up.
       </PanelEmpty>
     );
   }
@@ -934,7 +931,8 @@ function Hosts({
 
 type Tab = "environments" | "console" | "runs" | "hosts";
 
-export function SandboxesPanel({ scope }: NativePanelProps) {
+export function SandboxesPanel({ scope: explicitScope }: NativePanelProps) {
+  const { scope, scopeFilter } = useScopeFilter(explicitScope);
   const invoke = useMemo(() => invokeNamespaceTool("sandboxes"), []);
   const [tab, setTab] = useState<Tab>("environments");
 
@@ -952,9 +950,10 @@ export function SandboxesPanel({ scope }: NativePanelProps) {
   });
 
   /**
-   * An app pane shows the sandboxes touching that app's own paths. Scoping is
-   * a filter, not a fork — the service has no app-scoped listing because a
-   * sandbox belongs to the workspace, not to an app.
+   * Scoped to an app — the inspector tab or the header picker — this shows
+   * the sandboxes touching that app's own paths. Scoping is a filter, not a
+   * fork: the service has no app-scoped listing because a sandbox belongs to
+   * the workspace, not to an app.
    */
   const sandboxes = useMemo(() => {
     // A destroyed sandbox is not an environment — the service keeps the record
@@ -978,6 +977,7 @@ export function SandboxesPanel({ scope }: NativePanelProps) {
       icon={Box}
       title="Sandboxes"
       description="Execution environments mounted from your workspace"
+      actions={scopeFilter}
       onRefresh={refresh}
       refreshing={loading}
     >
@@ -996,7 +996,12 @@ export function SandboxesPanel({ scope }: NativePanelProps) {
       ) : error ? (
         <PanelError message={error} />
       ) : tab === "environments" ? (
-        <Environments sandboxes={sandboxes} onChanged={refresh} invoke={invoke} />
+        <Environments
+          sandboxes={sandboxes}
+          scopedTo={scope ? (scope.title ?? scope.name) : undefined}
+          onChanged={refresh}
+          invoke={invoke}
+        />
       ) : tab === "console" ? (
         <Console sandboxes={sandboxes} invoke={invoke} />
       ) : tab === "runs" ? (

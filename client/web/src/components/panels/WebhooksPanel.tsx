@@ -9,10 +9,6 @@
 
 import { Check, Copy, KeyRound, Webhook } from "lucide-react";
 import { useRef, useState } from "react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { GATEWAY_BASE } from "@/lib/gateway";
-import { invokeNamespaceTool } from "@/lib/tools";
 import {
   PanelEmpty,
   PanelError,
@@ -22,6 +18,10 @@ import {
   type NativePanelProps,
   usePanelData,
 } from "./shell";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { GATEWAY_BASE } from "@/lib/gateway";
+import { invokeNamespaceTool } from "@/lib/tools";
 
 interface WebhookRegistration {
   id: string;
@@ -212,11 +212,8 @@ export function WebhooksPanel({ scope: _scope }: NativePanelProps) {
         <PanelLoading />
       ) : webhooks.length === 0 ? (
         <PanelEmpty>
-          No webhooks registered. Register one via chat with{" "}
-          <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">
-            webhooks.register {"{ id, provider, workflows }"}
-          </code>{" "}
-          — you&apos;ll get an inbound URL to paste at the provider.
+          No webhooks yet. Ask in chat to register one — you&apos;ll get an inbound URL to
+          paste at the provider.
         </PanelEmpty>
       ) : (
         <div className="flex flex-col gap-2 p-3">

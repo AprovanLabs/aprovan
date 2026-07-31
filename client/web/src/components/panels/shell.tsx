@@ -1,15 +1,18 @@
 /**
  * Shared chrome for native-surface panels (docs/native-surfaces.md in the
- * registry repo). Every workspace viewer — Data, Agents, Webhooks, Sync,
- * Activity — renders inside the same shell so adding surface #7 is a
- * registry entry, not a UX negotiation.
+ * registry repo). Every workspace viewer — Data, Agents, Webhooks,
+ * Notifications, Sessions, Interfaces, Sync, Sandboxes, Activity — renders
+ * inside the same shell so adding the next surface is a registry entry, not a
+ * UX negotiation.
  *
  * Panels are self-contained: they fetch through `invokeNamespaceTool`,
  * own their loading/error/empty states, and never reach into page state.
  */
 
+import { useSharedAppsCatalog } from "@aprovan/ui/apps-store";
 import { AlertCircle, Loader2, RefreshCw, type LucideIcon } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { invokeAppsTool } from "@/lib/tools";
 
 /** Narrow a panel to one app (the app inspector's contextual tabs). */
 export interface AppScope {
@@ -19,6 +22,91 @@ export interface AppScope {
 
 export interface NativePanelProps {
   scope?: AppScope;
+}
+
+/**
+ * The workspace/app scope picker for panels whose data can narrow to one app
+ * (Notifications, Activity, Sandboxes, Data). One hook, rendered once in the
+ * panel's header `actions`, so every panel gets the identical control.
+ *
+ * - `scope` is what the panel should filter by: the explicit `scope` prop
+ *   when the panel is an app inspector tab, otherwise whichever app the user
+ *   picked here (or `undefined` for the workspace-level default).
+ * - `scopeFilter` is the control itself — `null` when an explicit scope is
+ *   set (the inspector already says which app this is) or when the workspace
+ *   has no apps to pick from.
+ *
+ * The app list comes from the shared apps catalog when a provider is above
+ * (ChatPage wraps the whole tab area in one); without a provider it falls
+ * back to a one-shot `apps.list`. The builtin Personal app is skipped — it
+ * is not an installed app and stamps nothing as its source.
+ */
+export function useScopeFilter(explicit?: AppScope): {
+  scope: AppScope | undefined;
+  scopeFilter: ReactNode;
+} {
+  const shared = useSharedAppsCatalog();
+  const [fetched, setFetched] = useState<AppScope[]>([]);
+  const [selected, setSelected] = useState("");
+
+  const needsFetch = !explicit && shared === null;
+  useEffect(() => {
+    if (!needsFetch) return;
+    let alive = true;
+    invokeAppsTool("list", {})
+      .then((result) => {
+        if (!alive) return;
+        const raw = (result as { apps?: unknown })?.apps;
+        const list = Array.isArray(raw) ? raw : [];
+        setFetched(
+          list
+            .filter(
+              (entry): entry is { name: string; title?: string; builtin?: boolean } =>
+                typeof (entry as { name?: unknown })?.name === "string",
+            )
+            .filter((entry) => entry.builtin !== true)
+            .map((entry) => ({
+              name: entry.name,
+              ...(typeof entry.title === "string" ? { title: entry.title } : {}),
+            })),
+        );
+      })
+      .catch(() => {
+        // No apps namespace (or it errored): the picker just doesn't render.
+      });
+    return () => {
+      alive = false;
+    };
+  }, [needsFetch]);
+
+  const apps: AppScope[] = shared
+    ? shared.apps
+        .filter((app) => app.builtin !== true)
+        .map((app) => ({ name: app.name, ...(app.title ? { title: app.title } : {}) }))
+    : fetched;
+
+  if (explicit) return { scope: explicit, scopeFilter: null };
+
+  const selectedApp = apps.find((app) => app.name === selected);
+  return {
+    scope: selectedApp,
+    scopeFilter:
+      apps.length === 0 ? null : (
+        <select
+          value={selectedApp ? selected : ""}
+          onChange={(event) => setSelected(event.target.value)}
+          title="Show workspace items or one app's"
+          className="h-6 max-w-[10rem] rounded border bg-background px-1 text-xs text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        >
+          <option value="">Workspace</option>
+          {apps.map((app) => (
+            <option key={app.name} value={app.name}>
+              {app.title ?? app.name}
+            </option>
+          ))}
+        </select>
+      ),
+  };
 }
 
 /** Standard pane chrome: icon + title + description, actions, refresh. */
@@ -41,15 +129,15 @@ export function PanelShell({
 }) {
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex items-center gap-2 border-b px-3 py-2 shrink-0">
-        <Icon className="h-4 w-4 text-muted-foreground" />
-        <span className="text-sm font-semibold">{title}</span>
+      <div className="flex items-center gap-2 border-b px-3 py-1.5 shrink-0">
+        <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+        <span className="text-sm font-medium">{title}</span>
         {description && (
           <span className="hidden sm:inline truncate text-xs text-muted-foreground">
             {description}
           </span>
         )}
-        <div className="ml-auto flex items-center gap-1">
+        <div className="ml-auto flex items-center gap-1.5">
           {actions}
           {onRefresh && (
             <button

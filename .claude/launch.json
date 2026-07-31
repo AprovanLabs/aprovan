@@ -28,15 +28,16 @@
       "runtimeExecutable": "env",
       "runtimeArgs": [
         "APROVAN_ENV=off",
-        "STORE_BACKEND=sqlite",
-        "GATEWAY_PORT=4010",
-        "GATEWAY_DATA_DIR=/tmp/patchwork-gateway-scratch",
+        "WORKSPACE_MODE=local",
+        "WORKSPACE_PORT=4010",
+        "WORKSPACE_DATA_DIR=/tmp/patchwork-gateway-scratch",
         "pnpm",
         "--dir",
-        "/Users/jacob/Documents/Code/AprovanLabs/registry/apps/gateway",
+        "/Users/jacob/Documents/Code/AprovanLabs/registry/apps/workspace",
         "exec",
         "tsx",
-        "src/index.ts"
+        "src/cli.ts",
+        "start"
       ],
       "port": 4010
     },
@@ -45,7 +46,7 @@
       "runtimeExecutable": "env",
       "runtimeArgs": [
         "APROVAN_ENV=off",
-        "GATEWAY_URL=http://localhost:4010",
+        "GATEWAY_URL=http://localhost:4010/api/gateway",
         "pnpm",
         "--filter",
         "@aprovan/patchwork-web",

@@ -2449,8 +2449,8 @@ export default function ChatPage() {
                     className="flex-1 min-h-0"
                   />
                 )}
-                {/* Second explorer: apps grouped over the workflows they
-                  export, ending in the Workspace group of native surfaces. It
+                {/* Second explorer: the Workspace section — native surfaces
+                  first, then the Apps sub-group of workflows they export. It
                   owns its own height (drag handle + collapse, persisted) so the
                   tree above it keeps the remainder instead of the two lists
                   fighting for one scroll. */}
@@ -2657,7 +2657,11 @@ export default function ChatPage() {
                                 />
                               </div>
                             )}
-                            {!appsSelection && (
+                            {/* Only real workspace files reach the preview:
+                                a native tab renders its Panel above and must
+                                not also mount CodePreview (whose edit toolbar
+                                makes no sense on a native surface). */}
+                            {!appsSelection && !nativeSurface && (
                               <>
                                 {tab.stale && !tab.loading && (
                                   <div className="shrink-0 px-3 py-1.5 text-xs bg-orange-50 dark:bg-orange-950/40 border-b border-orange-200 dark:border-orange-800 flex items-center gap-2 text-orange-700 dark:text-orange-400">

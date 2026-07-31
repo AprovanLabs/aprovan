@@ -9,9 +9,6 @@
 
 import { ArrowRight, GitCompareArrows, Loader2 } from "lucide-react";
 import { useRef, useState } from "react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { invokeNamespaceTool } from "@/lib/tools";
 import {
   PanelEmpty,
   PanelError,
@@ -21,6 +18,9 @@ import {
   type NativePanelProps,
   usePanelData,
 } from "./shell";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { invokeNamespaceTool } from "@/lib/tools";
 
 interface SyncPipeline {
   name: string;
@@ -178,7 +178,7 @@ export function SyncPanel({ scope: _scope }: NativePanelProps) {
     <PanelShell
       icon={GitCompareArrows}
       title="Sync"
-      description="Source → transform → sink pipelines"
+      description="Pipelines that move data between services and your workspace"
       onRefresh={refresh}
       refreshing={loading}
     >
@@ -188,11 +188,8 @@ export function SyncPanel({ scope: _scope }: NativePanelProps) {
         <PanelLoading />
       ) : syncs.length === 0 ? (
         <PanelEmpty>
-          No sync pipelines yet. Register one via chat with{" "}
-          <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">
-            sync.register {"{ name, source: { tool }, sink: { path, format }, schedule? }"}
-          </code>
-          .
+          No sync pipelines yet. Ask in chat to set one up — pick a source, an optional
+          transform, and where the data should land.
         </PanelEmpty>
       ) : (
         <div className="flex flex-col gap-2 p-3">

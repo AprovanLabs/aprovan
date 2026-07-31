@@ -6,19 +6,32 @@
  * capability = namespace, extended one step: namespace = app surface. The
  * sidebar's Workspace group, the `native://` content tabs, and the app
  * inspector's contextual tabs are all projections of this one list —
- * adding surface #7 is an entry here, not a UX negotiation.
+ * adding the next surface is an entry here, not a UX negotiation.
  */
 
-import { Activity, Bot, Box, Database, GitCompareArrows, Webhook } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
-import type { ComponentType } from "react";
+import {
+  Activity,
+  Bell,
+  Bot,
+  Box,
+  Database,
+  GitBranch,
+  GitCompareArrows,
+  Plug,
+  Webhook,
+} from "lucide-react";
 import { AgentsPanel } from "../components/panels/AgentsPanel";
+import { InterfacesPanel } from "../components/panels/InterfacesPanel";
 import { KeyValuePanel } from "../components/panels/KeyValuePanel";
+import { NotificationsPanel } from "../components/panels/NotificationsPanel";
 import { SandboxesPanel } from "../components/panels/SandboxesPanel";
+import { SessionsPanel } from "../components/panels/SessionsPanel";
 import { SyncPanel } from "../components/panels/SyncPanel";
 import { TelemetryPanel } from "../components/panels/TelemetryPanel";
 import { WebhooksPanel } from "../components/panels/WebhooksPanel";
 import type { NativePanelProps } from "../components/panels/shell";
+import type { LucideIcon } from "lucide-react";
+import type { ComponentType } from "react";
 
 export interface NativeSurfaceDef {
   /** Stable id — used in the `native://<id>` tab key. */
@@ -35,8 +48,9 @@ export interface NativeSurfaceDef {
 /**
  * Order is the sidebar order (docs' inventory table). `appTab` is set only
  * where the panel actually does something with `scope` — Data describes the
- * app's partition, Activity filters traces to the app. Agents, Webhooks and
- * Sync are workspace-level registrations, so they stay off app panes.
+ * app's partition, Activity filters traces to the app, Notifications filters
+ * on the server-stamped emitting app. Agents, Webhooks, Sync, Sessions and
+ * Interfaces are workspace-level configuration, so they stay off app panes.
  *
  * Icons mirror each panel's own header icon so a row and the pane it opens
  * read as the same thing.
@@ -46,7 +60,7 @@ export const NATIVE_SURFACES: NativeSurfaceDef[] = [
     id: "keyvalue",
     title: "Data",
     icon: Database,
-    description: "Workspace key-value records: prefix query, JSON viewer/editor",
+    description: "Browse and edit the records your workspace and workflows store",
     Panel: KeyValuePanel,
     appTab: true,
   },
@@ -54,7 +68,7 @@ export const NATIVE_SURFACES: NativeSurfaceDef[] = [
     id: "agents",
     title: "Agents",
     icon: Bot,
-    description: "Agent profiles, capability grants and their executions",
+    description: "Named profiles workflows can run as, and their executions",
     Panel: AgentsPanel,
   },
   {
@@ -65,10 +79,34 @@ export const NATIVE_SURFACES: NativeSurfaceDef[] = [
     Panel: WebhooksPanel,
   },
   {
+    id: "notifications",
+    title: "Notifications",
+    icon: Bell,
+    description: "The full feed — decisions, warnings and activity, including seen",
+    Panel: NotificationsPanel,
+    // Scoped to an app it filters on the server-stamped `source.app`, so an
+    // app pane answers "what has this app been telling people".
+    appTab: true,
+  },
+  {
+    id: "sessions",
+    title: "Sessions",
+    icon: GitBranch,
+    description: "Chat sessions as branches — staged diffs, merges, archives",
+    Panel: SessionsPanel,
+  },
+  {
+    id: "interfaces",
+    title: "Interfaces",
+    icon: Plug,
+    description: "Choose which service backs each built-in capability",
+    Panel: InterfacesPanel,
+  },
+  {
     id: "sync",
     title: "Sync",
     icon: GitCompareArrows,
-    description: "source → transform → sink lineage, schedules and last runs",
+    description: "Pipelines that move data between services and your workspace",
     Panel: SyncPanel,
   },
   {

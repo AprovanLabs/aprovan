@@ -1,19 +1,14 @@
 /**
  * AgentsPanel — named agent profiles and their executions ("Agents").
  *
- * A profile bundles LLM config (provider/model/prompt) with capability
- * grants — tool patterns and workspace path prefixes. Grants only narrow:
- * an empty list means the runner's full surface. Workflows run under a
- * profile via `workflows.run { name, agent }`; those runs land in the
- * Executions tab.
+ * A profile binds an LLM interface instance (or a cost/speed policy over
+ * candidates), a system prompt, optional VFS mounts, and capability grants.
+ * Workflows run under a profile via `workflows.run { name, agent }`; the
+ * profile's own loop is `agents.run`. Both land in the Executions tab.
  */
 
 import { Bot, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { invokeNamespaceTool } from "@/lib/tools";
 import {
   PanelEmpty,
   PanelError,
@@ -24,6 +19,10 @@ import {
   usePanelData,
   type NativePanelProps,
 } from "./shell";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { invokeNamespaceTool } from "@/lib/tools";
 
 interface PathGrant {
   prefix: string;
@@ -35,13 +34,29 @@ interface AgentGrants {
   paths?: PathGrant[];
 }
 
+interface AgentMount {
+  path: string;
+  source: string | null;
+  mode: "ro" | "rw";
+}
+
+interface AgentPolicy {
+  effort?: string;
+  maxCostUsd?: number;
+  deadlineMs?: number;
+}
+
 interface AgentProfile {
   name: string;
   title?: string;
+  llm?: string;
+  llmCandidates?: string[];
+  policy?: AgentPolicy;
   provider?: string;
   model?: string;
   prompt?: string;
   grants?: AgentGrants;
+  mounts?: AgentMount[];
   createdBy: string;
   createdAt: string;
   updatedAt: string;
@@ -49,9 +64,9 @@ interface AgentProfile {
 
 interface AgentRun {
   id: string;
-  workflow: string;
+  workflow?: string;
   agent: string;
-  status: "running" | "succeeded" | "failed";
+  status: "running" | "succeeded" | "failed" | "cancelled";
   trigger: string;
   startedAt: string;
   durationMs?: number;
@@ -59,36 +74,60 @@ interface AgentRun {
   traceId?: string;
 }
 
-/** Editor draft — grants as editable row lists. */
+/** Editor draft — grants/mounts as editable row lists. */
 interface Draft {
   name: string;
   title: string;
+  llm: string;
+  llmCandidates: string;
+  effort: string;
+  maxCostUsd: string;
+  deadlineMs: string;
   provider: string;
   model: string;
   prompt: string;
   tools: string[];
   paths: PathGrant[];
+  mounts: Array<{ path: string; source: string; mode: "ro" | "rw" }>;
 }
 
 const emptyDraft: Draft = {
   name: "",
   title: "",
+  llm: "llm",
+  llmCandidates: "",
+  effort: "",
+  maxCostUsd: "",
+  deadlineMs: "",
   provider: "",
   model: "",
   prompt: "",
   tools: [],
   paths: [],
+  mounts: [],
 };
 
 function toDraft(agent: AgentProfile): Draft {
   return {
     name: agent.name,
     title: agent.title ?? "",
+    llm: agent.llm ?? "llm",
+    llmCandidates: (agent.llmCandidates ?? []).join(", "),
+    effort: agent.policy?.effort ?? "",
+    maxCostUsd:
+      agent.policy?.maxCostUsd !== undefined ? String(agent.policy.maxCostUsd) : "",
+    deadlineMs:
+      agent.policy?.deadlineMs !== undefined ? String(agent.policy.deadlineMs) : "",
     provider: agent.provider ?? "",
     model: agent.model ?? "",
     prompt: agent.prompt ?? "",
     tools: agent.grants?.tools ? [...agent.grants.tools] : [],
     paths: agent.grants?.paths ? agent.grants.paths.map((p) => ({ ...p })) : [],
+    mounts: (agent.mounts ?? []).map((m) => ({
+      path: m.path,
+      source: m.source ?? "",
+      mode: m.mode,
+    })),
   };
 }
 
@@ -98,11 +137,14 @@ function formatDuration(ms: number): string {
   return `${Math.floor(ms / 60_000)}m ${Math.round((ms % 60_000) / 1000)}s`;
 }
 
-const statusDot: Record<AgentRun["status"], string> = {
+const statusDot: Record<string, string> = {
   succeeded: "bg-emerald-500",
   failed: "bg-red-500",
   running: "bg-amber-500",
+  cancelled: "bg-muted-foreground",
 };
+
+const EFFORTS = ["", "minimal", "low", "medium", "high", "max"] as const;
 
 const fieldLabel = "text-xs font-medium text-muted-foreground";
 const textareaClass =
@@ -152,20 +194,61 @@ function AgentEditor({
           />
         </label>
         <label className="space-y-1">
-          <div className={fieldLabel}>Provider</div>
+          <div className={fieldLabel}>LLM profile</div>
           <Input
-            value={draft.provider}
-            onChange={(e) => set({ provider: e.target.value })}
-            placeholder="synthetic.new"
+            value={draft.llm}
+            onChange={(e) => set({ llm: e.target.value })}
+            placeholder="llm or llm:fast"
             className="h-8 font-mono text-xs"
           />
         </label>
         <label className="space-y-1">
-          <div className={fieldLabel}>Model</div>
+          <div className={fieldLabel}>Candidates</div>
+          <Input
+            value={draft.llmCandidates}
+            onChange={(e) => set({ llmCandidates: e.target.value })}
+            placeholder="llm:fast, llm:deep"
+            className="h-8 font-mono text-xs"
+          />
+        </label>
+        <label className="space-y-1">
+          <div className={fieldLabel}>Effort</div>
+          <select
+            value={draft.effort}
+            onChange={(e) => set({ effort: e.target.value })}
+            className="h-8 w-full rounded-md border bg-background px-2 font-mono text-xs"
+          >
+            {EFFORTS.map((effort) => (
+              <option key={effort || "none"} value={effort}>
+                {effort || "—"}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="space-y-1">
+          <div className={fieldLabel}>Max $/MTok</div>
+          <Input
+            value={draft.maxCostUsd}
+            onChange={(e) => set({ maxCostUsd: e.target.value })}
+            placeholder="5"
+            className="h-8 font-mono text-xs"
+          />
+        </label>
+        <label className="space-y-1">
+          <div className={fieldLabel}>Deadline (ms)</div>
+          <Input
+            value={draft.deadlineMs}
+            onChange={(e) => set({ deadlineMs: e.target.value })}
+            placeholder="30000"
+            className="h-8 font-mono text-xs"
+          />
+        </label>
+        <label className="space-y-1">
+          <div className={fieldLabel}>Model pin (optional)</div>
           <Input
             value={draft.model}
             onChange={(e) => set({ model: e.target.value })}
-            placeholder="model id"
+            placeholder="overrides binding default"
             className="h-8 font-mono text-xs"
           />
         </label>
@@ -261,9 +344,73 @@ function AgentEditor({
           Add path grant
         </Button>
       </div>
+      <div className="space-y-1">
+        <div className={fieldLabel}>Mounts</div>
+        {draft.mounts.map((mount, index) => (
+          <div key={index} className="flex items-center gap-1.5">
+            <Input
+              value={mount.path}
+              onChange={(e) =>
+                set({
+                  mounts: draft.mounts.map((m, i) =>
+                    i === index ? { ...m, path: e.target.value } : m,
+                  ),
+                })
+              }
+              placeholder="skills"
+              className="h-8 w-24 font-mono text-xs"
+            />
+            <Input
+              value={mount.source}
+              onChange={(e) =>
+                set({
+                  mounts: draft.mounts.map((m, i) =>
+                    i === index ? { ...m, source: e.target.value } : m,
+                  ),
+                })
+              }
+              placeholder="skills/"
+              className="h-8 flex-1 font-mono text-xs"
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 w-12 shrink-0 font-mono text-xs"
+              onClick={() =>
+                set({
+                  mounts: draft.mounts.map((m, i) =>
+                    i === index ? { ...m, mode: m.mode === "rw" ? "ro" : "rw" } : m,
+                  ),
+                })
+              }
+            >
+              {mount.mode}
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-8 w-8 shrink-0"
+              onClick={() => set({ mounts: draft.mounts.filter((_, i) => i !== index) })}
+            >
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        ))}
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-7 text-xs"
+          onClick={() =>
+            set({ mounts: [...draft.mounts, { path: "", source: "", mode: "ro" }] })
+          }
+        >
+          <Plus className="mr-1 h-3 w-3" />
+          Add mount
+        </Button>
+      </div>
       <p className="text-xs text-muted-foreground">
-        No tool patterns = every tool the runner may call; no path grants = whole workspace.
-        Grants only narrow.
+        LLM profile comes from Interfaces. Candidates + effort pick by cost/speed.
+        Mounts inject workspace files into the run. Grants only narrow.
       </p>
       {error && <div className="text-xs text-destructive">{error}</div>}
       <div className="flex gap-2">
@@ -319,13 +466,46 @@ export function AgentsPanel({ scope }: NativePanelProps) {
         : editor?.editing
           ? null // Clear grants on update when every row was removed.
           : undefined;
+    const candidates = draft.llmCandidates
+      .split(/[,\s]+/u)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const mounts = draft.mounts
+      .map((m) => ({
+        path: m.path.trim(),
+        source: m.source.trim() || null,
+        mode: m.mode,
+      }))
+      .filter((m) => m.path);
+    const maxCostUsd = Number(draft.maxCostUsd);
+    const deadlineMs = Number(draft.deadlineMs);
+    const policy =
+      draft.effort ||
+      (Number.isFinite(maxCostUsd) && maxCostUsd > 0) ||
+      (Number.isFinite(deadlineMs) && deadlineMs > 0)
+        ? {
+            ...(draft.effort ? { effort: draft.effort } : {}),
+            ...(Number.isFinite(maxCostUsd) && maxCostUsd > 0 ? { maxCostUsd } : {}),
+            ...(Number.isFinite(deadlineMs) && deadlineMs > 0 ? { deadlineMs } : {}),
+          }
+        : editor?.editing
+          ? null
+          : undefined;
     const payload: Record<string, unknown> = {
       name: draft.name.trim(),
       title: draft.title.trim() || undefined,
+      llm: draft.llm.trim() || undefined,
+      llmCandidates: candidates.length
+        ? candidates
+        : editor?.editing
+          ? null
+          : undefined,
+      policy,
       provider: draft.provider.trim() || undefined,
       model: draft.model.trim() || undefined,
       prompt: draft.prompt || undefined,
       grants,
+      mounts: mounts.length ? mounts : editor?.editing ? null : undefined,
     };
     setSaving(true);
     setSaveError(null);
@@ -361,7 +541,7 @@ export function AgentsPanel({ scope }: NativePanelProps) {
     <PanelShell
       icon={Bot}
       title="Agents"
-      description="Named agent profiles: LLM config + capability grants"
+      description="Profiles with an LLM, permissions, and optional mounts — for workflows and agents.run"
       onRefresh={refresh}
       refreshing={loading}
     >
@@ -406,8 +586,8 @@ export function AgentsPanel({ scope }: NativePanelProps) {
           )}
           {data?.agents.length === 0 && !editor ? (
             <PanelEmpty>
-              No agent profiles yet. Create one to give workflows a named LLM identity with
-              narrowed capability grants.
+              No agents yet. Create a profile to give workflows and agents.run a model,
+              permissions, and optional file mounts.
             </PanelEmpty>
           ) : (
             data?.agents.map((agent) => (
@@ -442,12 +622,32 @@ export function AgentsPanel({ scope }: NativePanelProps) {
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-1">
-                  {agent.provider && <Badge variant="secondary">{agent.provider}</Badge>}
+                  {agent.llm && <Badge variant="secondary">{agent.llm}</Badge>}
+                  {agent.llmCandidates?.map((c) => (
+                    <Badge key={c} variant="outline">
+                      {c}
+                    </Badge>
+                  ))}
+                  {agent.policy?.effort && (
+                    <Badge variant="outline">effort:{agent.policy.effort}</Badge>
+                  )}
                   {agent.model && <Badge variant="outline">{agent.model}</Badge>}
                 </div>
                 {agent.prompt && (
                   <p className="line-clamp-2 text-xs text-muted-foreground">{agent.prompt}</p>
                 )}
+                {agent.mounts?.length ? (
+                  <div className="flex flex-wrap gap-1">
+                    {agent.mounts.map((mount) => (
+                      <span
+                        key={`${mount.path}:${mount.source}`}
+                        className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]"
+                      >
+                        {mount.path} ← {mount.source ?? "scratch"} ({mount.mode})
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
                 {(agent.grants?.tools?.length || agent.grants?.paths?.length) ? (
                   <div className="flex flex-wrap gap-1">
                     {agent.grants?.tools?.map((tool) => (
@@ -473,8 +673,8 @@ export function AgentsPanel({ scope }: NativePanelProps) {
             ))
           )}
           <p className="pt-1 text-xs text-muted-foreground">
-            Run a workflow as an agent with{" "}
-            <code className="font-mono">workflows.run {"{ name, agent }"}</code>.
+            Bind LLM profiles in Interfaces, then pick one here. Workflows and agents.run
+            both apply the profile&apos;s grants.
           </p>
         </div>
       ) : (
@@ -504,14 +704,19 @@ export function AgentsPanel({ scope }: NativePanelProps) {
           )}
           {visibleRuns.length === 0 ? (
             <PanelEmpty>
-              No executions yet. Runs appear here when workflows execute with an agent profile.
+              No executions yet. Runs appear when a workflow uses an agent or when
+              agents.run finishes a loop.
             </PanelEmpty>
           ) : (
             <div className="divide-y rounded-md border">
               {visibleRuns.map((run) => (
                 <div key={run.id} className="flex items-center gap-2 px-3 py-1.5 text-xs">
-                  <span className={`h-2 w-2 shrink-0 rounded-full ${statusDot[run.status]}`} />
-                  <span className="truncate font-mono font-medium">{run.workflow}</span>
+                  <span
+                    className={`h-2 w-2 shrink-0 rounded-full ${statusDot[run.status] ?? "bg-muted-foreground"}`}
+                  />
+                  <span className="truncate font-mono font-medium">
+                    {run.workflow ?? "agents.run"}
+                  </span>
                   <Badge variant="secondary" className="shrink-0 font-mono text-[10px]">
                     {run.agent}
                   </Badge>

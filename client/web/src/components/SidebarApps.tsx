@@ -1,11 +1,15 @@
 /**
- * SidebarApps — the chat sidebar's second explorer, below the file tree.
+ * SidebarApps — the chat sidebar's second explorer, below the file tree:
+ * the WORKSPACE section.
  *
- * The content is the shared `AppsExplorer` (`AppsPanel variant="sidebar"` from
- * `@aprovan/registry-ui`): apps grouped over the workflows they export, with a
- * trailing "Workspace" group for workflows no app bundles. Depth plus search
- * plus a capped window is what makes it survive a workspace with hundreds of
- * entries — the flat list it replaces did not.
+ * The section's primary content is the workspace's native surfaces (Data,
+ * Agents, Webhooks, Notifications, Sessions, Interfaces, Sync, Sandboxes,
+ * Activity — see lib/native-surfaces.tsx), one row each, opening `native://`
+ * content tabs. Beneath them sits the "Apps" sub-group: the shared
+ * `AppsExplorer` (`AppsPanel variant="sidebar"` from `@aprovan/registry-ui`),
+ * apps grouped over the workflows they export. Depth plus search plus a
+ * capped window is what makes the explorer survive a workspace with hundreds
+ * of entries — the flat list it replaced did not.
  *
  * What this file actually owns is the *column geometry*, which the shared
  * panel deliberately does not: a sidebar holding two long lists needs a split,
@@ -15,16 +19,11 @@
  * and the collapsed flag are persisted so a reload doesn't undo the user's
  * layout.
  *
- * It also owns the section's *last* group, "Workspace" — the native surfaces
- * (registry/docs/native-surfaces.md). That group can't live inside the shared
- * explorer (published package, apps-only data model), so it renders as a
- * sibling block below it: same APPS section, one entry point for "things that
- * aren't files".
- *
  * Transports are injected, never fetched here — see lib/tools.ts.
  */
 
 import { AppsExplorer } from "@aprovan/registry-ui/apps-panel";
+import { useSharedAppsCatalog } from "@aprovan/ui/apps-store";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 import type { AppsSelection } from "@aprovan/registry-ui/apps-panel";
@@ -49,11 +48,13 @@ interface SidebarAppsLayout {
    */
   expanded?: string[];
   /**
-   * Whether the Workspace (native surfaces) group is open. Crowding control:
-   * the doc's default is a *collapsed* five-row group, so absent state means
-   * shut — hence a `workspaceOpen` flag rather than a `collapsed` one.
+   * Whether the Apps sub-group (the explorer) is open. Absent means open —
+   * the explorer is the section's long tail, but hiding it by default would
+   * make a fresh workspace's sidebar read as empty. (An older `workspaceOpen`
+   * key may linger in storage from when the native surfaces were the
+   * sub-group; it is simply ignored.)
    */
-  workspaceOpen?: boolean;
+  appsOpen?: boolean;
 }
 
 function loadLayout(): SidebarAppsLayout {
@@ -67,7 +68,7 @@ function loadLayout(): SidebarAppsLayout {
           ? parsed.height
           : DEFAULT_HEIGHT,
       collapsed: parsed.collapsed === true,
-      workspaceOpen: parsed.workspaceOpen === true,
+      appsOpen: parsed.appsOpen !== false,
       ...(Array.isArray(parsed.expanded)
         ? { expanded: parsed.expanded.filter((id): id is string => typeof id === "string") }
         : {}),
@@ -110,18 +111,24 @@ export function SidebarApps({
   onCreateWorkflow?: (appName?: string) => void;
   /** Native surface shown in the main pane, mirrored like `selection`. */
   activeSurfaceId?: string | null;
-  /** Fired when a Workspace row is picked — the host opens a `native://` tab. */
+  /** Fired when a surface row is picked — the host opens a `native://` tab. */
   onSelectSurface?: (surfaceId: string) => void;
 }) {
   const [layout, setLayout] = useState<SidebarAppsLayout>(loadLayout);
   const [dragging, setDragging] = useState(false);
   const sectionRef = useRef<HTMLElement | null>(null);
   // Mirrors `layout` for the drag/keyboard handlers, which persist mid-gesture
-  // and must not drop the fields they don't touch (expanded, workspaceOpen).
+  // and must not drop the fields they don't touch (expanded, appsOpen).
   const layoutRef = useRef(layout);
   layoutRef.current = layout;
   const heightRef = useRef(layout.height);
   heightRef.current = layout.height;
+
+  // The Apps sub-group's count badge: how many app groups the shared catalog
+  // holds (the provider sits above this component in ChatPage). Null outside
+  // a provider — the badge simply doesn't render then.
+  const catalog = useSharedAppsCatalog();
+  const appCount = catalog && !catalog.loading ? catalog.groups.length : null;
 
   const setCollapsed = useCallback((collapsed: boolean) => {
     setLayout((prev) => {
@@ -131,9 +138,9 @@ export function SidebarApps({
     });
   }, []);
 
-  const setWorkspaceOpen = useCallback((workspaceOpen: boolean) => {
+  const setAppsOpen = useCallback((appsOpen: boolean) => {
     setLayout((prev) => {
-      const next = { ...prev, workspaceOpen };
+      const next = { ...prev, appsOpen };
       saveLayout(next);
       return next;
     });
@@ -164,7 +171,7 @@ export function SidebarApps({
       const max = maxHeight();
       setDragging(true);
 
-      // Dragging up grows the apps pane; the tree keeps the remainder.
+      // Dragging up grows the workspace pane; the tree keeps the remainder.
       const onMove = (moveEvent: PointerEvent) => {
         setLayout((prev) => ({
           ...prev,
@@ -184,6 +191,8 @@ export function SidebarApps({
     [layout.collapsed, maxHeight]
   );
 
+  const appsOpen = layout.appsOpen !== false;
+
   return (
     <section
       ref={sectionRef}
@@ -193,7 +202,7 @@ export function SidebarApps({
       <div
         role="separator"
         aria-orientation="horizontal"
-        aria-label="Resize apps section"
+        aria-label="Resize workspace section"
         tabIndex={layout.collapsed ? -1 : 0}
         onPointerDown={startDrag}
         onKeyDown={(event) => {
@@ -216,110 +225,101 @@ export function SidebarApps({
         type="button"
         onClick={() => setCollapsed(!layout.collapsed)}
         className="shrink-0 flex items-center gap-1.5 px-2 py-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground"
-        title={layout.collapsed ? "Expand apps" : "Collapse apps"}
+        title={layout.collapsed ? "Expand workspace" : "Collapse workspace"}
       >
         {layout.collapsed ? (
           <ChevronRight className="h-3 w-3" />
         ) : (
           <ChevronDown className="h-3 w-3" />
         )}
-        <span>Apps</span>
+        <span>Workspace</span>
       </button>
 
-      {!layout.collapsed && (
-        <AppsExplorer
-          invoke={invokeWorkflowsTool}
-          invokeApps={invokeAppsTool}
-          loadScript={loadScript}
-          onOpenScript={onOpenScript}
-          selection={selection}
-          onSelectionChange={onSelectionChange}
-          {...(onCreateWorkflow ? { onCreateWorkflow } : {})}
-          {...(layout.expanded ? { expandedGroups: layout.expanded } : {})}
-          onExpandedGroupsChange={(ids) =>
-            setLayout((prev) => {
-              const next = { ...prev, expanded: ids };
-              saveLayout(next);
-              return next;
-            })
-          }
-          title={null}
-          className="flex-1 min-h-0 px-2 pb-2"
-        />
+      {!layout.collapsed && onSelectSurface && (
+        <WorkspaceSurfaces activeSurfaceId={activeSurfaceId ?? null} onSelect={onSelectSurface} />
       )}
 
-      {!layout.collapsed && onSelectSurface && (
-        <WorkspaceSurfaces
-          open={layout.workspaceOpen === true}
-          onOpenChange={setWorkspaceOpen}
-          activeSurfaceId={activeSurfaceId ?? null}
-          onSelect={onSelectSurface}
-        />
+      {!layout.collapsed && (
+        <div className={`flex min-h-0 flex-col px-2 pb-2 ${appsOpen ? "flex-1" : "shrink-0"}`}>
+          <button
+            type="button"
+            aria-expanded={appsOpen}
+            onClick={() => setAppsOpen(!appsOpen)}
+            className="flex w-full shrink-0 items-center gap-1.5 rounded px-1 py-1 text-left transition-colors hover:bg-muted/60"
+            title={appsOpen ? "Collapse apps" : "Expand apps"}
+          >
+            {appsOpen ? (
+              <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
+            ) : (
+              <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground" />
+            )}
+            <span className="truncate text-xs font-medium">Apps</span>
+            {appCount !== null && (
+              <span className="shrink-0 text-[0.65rem] tabular-nums text-muted-foreground">
+                {appCount}
+              </span>
+            )}
+          </button>
+
+          {appsOpen && (
+            <AppsExplorer
+              invoke={invokeWorkflowsTool}
+              invokeApps={invokeAppsTool}
+              loadScript={loadScript}
+              onOpenScript={onOpenScript}
+              selection={selection}
+              onSelectionChange={onSelectionChange}
+              {...(onCreateWorkflow ? { onCreateWorkflow } : {})}
+              {...(layout.expanded ? { expandedGroups: layout.expanded } : {})}
+              onExpandedGroupsChange={(ids) =>
+                setLayout((prev) => {
+                  const next = { ...prev, expanded: ids };
+                  saveLayout(next);
+                  return next;
+                })
+              }
+              title={null}
+              className="flex-1 min-h-0 pl-3"
+            />
+          )}
+        </div>
       )}
     </section>
   );
 }
 
 /**
- * The APPS section's last group: one row per native surface (Data, Agents,
- * Webhooks, Sync, Activity), each opening a `native://` content tab.
+ * The WORKSPACE section's primary rows: one per native surface (Data, Agents,
+ * Webhooks, Notifications, Sessions, Interfaces, Sync, Sandboxes, Activity),
+ * each opening a `native://` content tab.
  *
- * It sits outside the explorer's scroll box and `shrink-0` deliberately —
- * five fixed rows shouldn't be something you scroll a hundred-app list to
- * reach — but inside the same section, so APPS stays the single entry point
- * for "things that aren't files".
+ * `shrink-0` deliberately — a short fixed list shouldn't be something you
+ * scroll a hundred-app explorer to reach. It scrolls on its own once the
+ * list outgrows the space rather than pushing the Apps group off-screen.
  */
 function WorkspaceSurfaces({
-  open,
-  onOpenChange,
   activeSurfaceId,
   onSelect,
 }: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
   activeSurfaceId: string | null;
   onSelect: (surfaceId: string) => void;
 }) {
   return (
-    <div className="shrink-0 px-2 pb-2">
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={() => onOpenChange(!open)}
-        className="flex w-full items-center gap-1.5 rounded px-1 py-1 text-left transition-colors hover:bg-muted/60"
-        title={open ? "Collapse workspace surfaces" : "Expand workspace surfaces"}
-      >
-        {open ? (
-          <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
-        ) : (
-          <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground" />
-        )}
-        <span className="truncate text-xs font-medium">Workspace</span>
-        <span className="shrink-0 text-[0.65rem] tabular-nums text-muted-foreground">
-          {NATIVE_SURFACES.length}
-        </span>
-      </button>
-
-      {open && (
-        // pl-3 + space-y-0.5 is the explorer's own compact child indent, so
-        // these rows line up with an app's workflows above them.
-        <div className="space-y-0.5 pl-3">
-          {NATIVE_SURFACES.map((surface) => (
-            <button
-              key={surface.id}
-              type="button"
-              onClick={() => onSelect(surface.id)}
-              title={surface.description}
-              className={`flex w-full items-center gap-1.5 rounded px-2 py-1 text-left transition-colors ${
-                surface.id === activeSurfaceId ? "bg-muted" : "hover:bg-muted/60"
-              }`}
-            >
-              <surface.icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-              <span className="truncate text-xs">{surface.title}</span>
-            </button>
-          ))}
-        </div>
-      )}
+    <div className="max-h-48 shrink-0 space-y-0.5 overflow-y-auto px-2 pb-1">
+      {NATIVE_SURFACES.map((surface) => (
+        <button
+          key={surface.id}
+          type="button"
+          onClick={() => onSelect(surface.id)}
+          title={surface.description}
+          className={`flex w-full items-center gap-1.5 rounded px-2 py-1 text-left transition-colors ${
+            surface.id === activeSurfaceId ? "bg-muted" : "hover:bg-muted/60"
+          }`}
+        >
+          <surface.icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+          <span className="truncate text-xs">{surface.title}</span>
+        </button>
+      ))}
     </div>
   );
 }

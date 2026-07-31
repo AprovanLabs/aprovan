@@ -9,17 +9,18 @@
 
 import { Database, Plus, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { invokeNamespaceTool } from "@/lib/tools";
 import {
   PanelEmpty,
   PanelError,
   PanelLoading,
   PanelShell,
   usePanelData,
+  useScopeFilter,
   type NativePanelProps,
 } from "./shell";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { invokeNamespaceTool } from "@/lib/tools";
 
 /** Detail-pane mode: viewing an existing key, or drafting a new record. */
 type Detail = { kind: "view"; key: string } | { kind: "create" };
@@ -28,7 +29,8 @@ const textareaClass =
   "w-full min-h-[220px] flex-1 rounded-md border bg-background p-2 font-mono text-xs " +
   "placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
-export function KeyValuePanel({ scope }: NativePanelProps) {
+export function KeyValuePanel({ scope: explicitScope }: NativePanelProps) {
+  const { scope, scopeFilter } = useScopeFilter(explicitScope);
   const kv = useMemo(() => invokeNamespaceTool("keyvalue"), []);
 
   // Prefix filter: live 300ms debounce, Enter commits immediately.
@@ -44,7 +46,7 @@ export function KeyValuePanel({ scope }: NativePanelProps) {
       (await kv("list", committedPrefix ? { prefix: committedPrefix } : {})) as {
         keys: string[];
       },
-    committedPrefix,
+    committedPrefix
   );
   const keys = data?.keys ?? [];
 
@@ -63,7 +65,7 @@ export function KeyValuePanel({ scope }: NativePanelProps) {
       window.clearTimeout(flashTimer.current);
       window.clearTimeout(armTimer.current);
     },
-    [],
+    []
   );
 
   const selectedKey = detail?.kind === "view" ? detail.key : null;
@@ -160,128 +162,132 @@ export function KeyValuePanel({ scope }: NativePanelProps) {
     <PanelShell
       icon={Database}
       title="Data"
-      description="Workspace key-value records"
+      description="Records your workspace and workflows store"
+      actions={scopeFilter}
       onRefresh={refresh}
       refreshing={loading}
     >
-      <div className="flex h-full min-h-0 flex-col">
-        {scope && (
-          <div className="border-b px-3 py-1.5 text-xs text-muted-foreground">
-            App data is partitioned per app user (
-            <code className="font-mono">app#{scope.name}#u#&lt;user&gt;</code>) and isn't
-            browsable from the workspace view.
-          </div>
-        )}
-        <div className="flex items-center gap-2 border-b px-3 py-2">
-          <Input
-            value={prefix}
-            onChange={(event) => setPrefix(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") setCommittedPrefix(prefix);
-            }}
-            placeholder="Filter by prefix…"
-            className="h-8 max-w-xs font-mono text-xs"
-          />
-          <span className="text-xs tabular-nums text-muted-foreground">
-            {keys.length} {keys.length === 1 ? "key" : "keys"}
-          </span>
-          <Button size="sm" variant="outline" className="ml-auto h-8" onClick={openCreate}>
-            <Plus className="mr-1 h-3.5 w-3.5" />
-            New record
-          </Button>
-        </div>
-        {loading && !data ? (
-          <PanelLoading label="Loading keys…" />
-        ) : error ? (
-          <PanelError message={error} />
-        ) : keys.length === 0 && !committedPrefix && !detail ? (
-          <PanelEmpty>
-            No records yet. Widgets and workflows store state here via{" "}
-            <code className="font-mono text-xs">keyvalue.set</code> — records they write will
-            show up in this browser.
-          </PanelEmpty>
-        ) : (
-          <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-            <div className="max-h-56 shrink-0 overflow-y-auto border-b md:max-h-none md:w-64 md:border-b-0 md:border-r">
-              {keys.length === 0 ? (
-                <div className="p-3 text-xs text-muted-foreground">
-                  No keys match this prefix.
-                </div>
-              ) : (
-                keys.map((key) => (
-                  <button
-                    key={key}
-                    onClick={() => setDetail({ kind: "view", key })}
-                    className={`block w-full truncate px-3 py-1.5 text-left font-mono text-xs ${
-                      selectedKey === key
-                        ? "bg-muted text-foreground"
-                        : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                    }`}
-                    title={key}
-                  >
-                    {key}
-                  </button>
-                ))
-              )}
+      {scope && !explicitScope ? (
+        // The gateway keeps each app's data private to that app — there is
+        // nothing the workspace view could list for it.
+        <PanelEmpty>
+          {scope.title ?? scope.name} keeps its own private data, which is only visible inside the
+          app.
+        </PanelEmpty>
+      ) : (
+        <div className="flex h-full min-h-0 flex-col">
+          {explicitScope && (
+            <div className="border-b px-3 py-1.5 text-xs text-muted-foreground">
+              Each app keeps its own private data, which isn&apos;t visible from the workspace view.
             </div>
-            <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2 p-3">
-              {!detail ? (
-                <div className="text-sm text-muted-foreground">
-                  Select a key to inspect its value, or create a new record.
-                </div>
-              ) : (
-                <>
-                  {detail.kind === "create" ? (
-                    <Input
-                      value={newKey}
-                      onChange={(event) => setNewKey(event.target.value)}
-                      placeholder="Key name"
-                      className="h-8 max-w-md font-mono text-xs"
-                      autoFocus
-                    />
-                  ) : (
-                    <div className="truncate font-mono text-sm font-medium" title={detail.key}>
-                      {detail.key}
-                    </div>
-                  )}
-                  {valueLoading ? (
-                    <PanelLoading label="Loading value…" />
-                  ) : (
-                    <textarea
-                      value={editorText}
-                      onChange={(event) => setEditorText(event.target.value)}
-                      placeholder='JSON value, e.g. {"count": 1}'
-                      spellCheck={false}
-                      className={textareaClass}
-                    />
-                  )}
-                  {formError && <div className="text-xs text-destructive">{formError}</div>}
-                  <div className="flex items-center gap-2">
-                    <Button size="sm" className="h-8" onClick={handleSave} disabled={saving}>
-                      Save
-                    </Button>
-                    {detail.kind === "view" && (
-                      <Button
-                        size="sm"
-                        variant={deleteArmed ? "destructive" : "outline"}
-                        className="h-8"
-                        onClick={handleDelete}
-                        disabled={saving}
-                      >
-                        <Trash2 className="mr-1 h-3.5 w-3.5" />
-                        {deleteArmed ? "Confirm delete?" : "Delete"}
-                      </Button>
-                    )}
-                    {savedFlash && (
-                      <span className="text-xs text-muted-foreground">Saved</span>
-                    )}
+          )}
+          <div className="flex items-center gap-2 border-b px-3 py-2">
+            <Input
+              value={prefix}
+              onChange={(event) => setPrefix(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") setCommittedPrefix(prefix);
+              }}
+              placeholder="Filter by prefix…"
+              className="h-8 max-w-xs font-mono text-xs"
+            />
+            <span className="text-xs tabular-nums text-muted-foreground">
+              {keys.length} {keys.length === 1 ? "key" : "keys"}
+            </span>
+            <Button size="sm" variant="outline" className="ml-auto h-8" onClick={openCreate}>
+              <Plus className="mr-1 h-3.5 w-3.5" />
+              New record
+            </Button>
+          </div>
+          {loading && !data ? (
+            <PanelLoading label="Loading keys…" />
+          ) : error ? (
+            <PanelError message={error} />
+          ) : keys.length === 0 && !committedPrefix && !detail ? (
+            <PanelEmpty>
+              No data yet. Records that widgets and workflows save will show up here.
+            </PanelEmpty>
+          ) : (
+            <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+              <div className="max-h-56 shrink-0 overflow-y-auto border-b md:max-h-none md:w-64 md:border-b-0 md:border-r">
+                {keys.length === 0 ? (
+                  <div className="p-3 text-xs text-muted-foreground">
+                    No keys match this prefix.
                   </div>
-                </>
-              )}
+                ) : (
+                  keys.map((key) => (
+                    <button
+                      key={key}
+                      onClick={() => setDetail({ kind: "view", key })}
+                      className={`block w-full truncate px-3 py-1.5 text-left font-mono text-xs ${
+                        selectedKey === key
+                          ? "bg-muted text-foreground"
+                          : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                      }`}
+                      title={key}
+                    >
+                      {key}
+                    </button>
+                  ))
+                )}
+              </div>
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2 p-3">
+                {!detail ? (
+                  <div className="text-sm text-muted-foreground">
+                    Select a key to inspect its value, or create a new record.
+                  </div>
+                ) : (
+                  <>
+                    {detail.kind === "create" ? (
+                      <Input
+                        value={newKey}
+                        onChange={(event) => setNewKey(event.target.value)}
+                        placeholder="Key name"
+                        className="h-8 max-w-md font-mono text-xs"
+                        autoFocus
+                      />
+                    ) : (
+                      <div className="truncate font-mono text-sm font-medium" title={detail.key}>
+                        {detail.key}
+                      </div>
+                    )}
+                    {valueLoading ? (
+                      <PanelLoading label="Loading value…" />
+                    ) : (
+                      <textarea
+                        value={editorText}
+                        onChange={(event) => setEditorText(event.target.value)}
+                        placeholder='JSON value, e.g. {"count": 1}'
+                        spellCheck={false}
+                        className={textareaClass}
+                      />
+                    )}
+                    {formError && <div className="text-xs text-destructive">{formError}</div>}
+                    <div className="flex items-center gap-2">
+                      <Button size="sm" className="h-8" onClick={handleSave} disabled={saving}>
+                        Save
+                      </Button>
+                      {detail.kind === "view" && (
+                        <Button
+                          size="sm"
+                          variant={deleteArmed ? "destructive" : "outline"}
+                          className="h-8"
+                          onClick={handleDelete}
+                          disabled={saving}
+                        >
+                          <Trash2 className="mr-1 h-3.5 w-3.5" />
+                          {deleteArmed ? "Confirm delete?" : "Delete"}
+                        </Button>
+                      )}
+                      {savedFlash && <span className="text-xs text-muted-foreground">Saved</span>}
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      )}
     </PanelShell>
   );
 }

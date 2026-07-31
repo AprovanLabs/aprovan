@@ -4,19 +4,13 @@
  *
  * Traces list newest-first with status/source filter chips; expanding a row
  * lazy-loads its events via `telemetry.query({ traceId })`. When scoped to an
- * app (the app inspector's contextual tab) every call carries `app`, shown as
- * a fixed chip in the filter row. No auto-refresh — the shell button is it.
+ * app — the app inspector's contextual tab, or the header's workspace/app
+ * picker (`useScopeFilter`) — every call carries `app`. No auto-refresh —
+ * the shell button is it.
  */
 
 import { Activity, ChevronRight } from "lucide-react";
 import { useState } from "react";
-import { Badge } from "@/components/ui/badge";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import { invokeNamespaceTool } from "@/lib/tools";
 import {
   PanelEmpty,
   PanelError,
@@ -25,7 +19,15 @@ import {
   relativeTime,
   type NativePanelProps,
   usePanelData,
+  useScopeFilter,
 } from "./shell";
+import { Badge } from "@/components/ui/badge";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { invokeNamespaceTool } from "@/lib/tools";
 
 type SourceType = "tool" | "workflow" | "widget" | "app" | "chat";
 
@@ -188,7 +190,8 @@ function TraceCard({
   );
 }
 
-export function TelemetryPanel({ scope }: NativePanelProps) {
+export function TelemetryPanel({ scope: explicitScope }: NativePanelProps) {
+  const { scope, scopeFilter } = useScopeFilter(explicitScope);
   const [statusFilter, setStatusFilter] = useState<"all" | "error">("all");
   const [sourceFilter, setSourceFilter] = useState<"all" | SourceType>("all");
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -236,7 +239,8 @@ export function TelemetryPanel({ scope }: NativePanelProps) {
     <PanelShell
       icon={Activity}
       title="Activity"
-      description="Workspace telemetry — service calls, widget logs, workflow runs (3-day window)"
+      description="Service calls, widget logs and workflow runs from the last 3 days"
+      actions={scopeFilter}
       onRefresh={refresh}
       refreshing={loading}
     >
@@ -257,9 +261,9 @@ export function TelemetryPanel({ scope }: NativePanelProps) {
             {source === "all" ? "All" : source}
           </FilterChip>
         ))}
-        {scope && (
+        {explicitScope && (
           <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
-            app: {scope.name}
+            {explicitScope.title ?? explicitScope.name}
           </span>
         )}
       </div>
@@ -269,8 +273,9 @@ export function TelemetryPanel({ scope }: NativePanelProps) {
         <PanelLoading />
       ) : traces.length === 0 ? (
         <PanelEmpty>
-          Nothing recorded in the last 3 days. Widget consoles, service calls, and workflow runs
-          land here automatically.
+          {scope
+            ? `Nothing recorded for ${scope.title ?? scope.name} in the last 3 days.`
+            : "Nothing recorded in the last 3 days. Service calls, widget logs and workflow runs land here automatically."}
         </PanelEmpty>
       ) : (
         <div className="flex flex-col gap-1.5 p-3">

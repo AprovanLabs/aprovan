@@ -1,35 +1,46 @@
 /**
  * Header services menu: what the current workspace's widgets can call.
  *
- * Three layers, one dialog:
- *  - Native tool groups (VFS, Key value, Events, Registry meta) — always
- *    available, grouped by type.
+ * Four layers, one dialog:
+ *  - Native services (VFS, Key value, Agents, Sessions, …) — always
+ *    available, no credential.
+ *  - Interfaces (llm, sql, sandbox, and any named instance like
+ *    `sql:analytics`) — one tool contract, a swappable implementation. Each
+ *    row shows which provider it currently resolves to.
  *  - Registry providers — connected ones (a credential exists, so their tools
  *    ride the proxy) expand to their tool list and deep-link back to the
  *    registry catalog page; unconnected catalog providers offer a one-click
  *    "connect" into the registry credentials form.
  *  - Meta tools (registry.providers / registry.search) let widgets discover
  *    UTDK SDK operations at runtime; they appear under Native → Registry.
+ *
+ * Which layer a namespace belongs to is the *gateway's* answer
+ * (`GET /tools/namespaces`, see lib/namespaces.ts), not a list maintained
+ * here. It was a list maintained here, and it was wrong: every core namespace
+ * added after the list was written — sessions, notifications, telemetry,
+ * agents, sandboxes — fell through to "Providers" and rendered as a connected
+ * third-party SaaS with a registry link to a page that does not exist.
  */
 
-import {
-  BookOpen,
-  ChevronRight,
-  Database,
-  ExternalLink,
-  FolderTree,
-  LayoutGrid,
-  Loader2,
-  Plug,
-  Plus,
-  RefreshCw,
-  Radio,
-  Server,
-  Webhook,
-  Workflow,
-  Wrench,
-} from "lucide-react";
+import { ChevronRight, ExternalLink, Loader2, Plus, Server, Wrench } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { ServiceInfo } from "@aprovan/patchwork-editor";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import {
+  fetchNamespaces,
+  groupNamespaces,
+  namespaceIcon,
+  namespaceLabel,
+  type NamespaceInfo,
+} from "@/lib/namespaces";
 import {
   credentialsUrl,
   fetchCatalogProviders,
@@ -40,56 +51,6 @@ import {
   type RegistryProviderSummary,
 } from "@/lib/registry";
 import { invokeRegistryTool } from "@/lib/tools";
-import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import type { ServiceInfo } from "@aprovan/patchwork-editor";
-
-/** Core gateway namespaces get a friendly type label + mark. */
-const NATIVE_GROUPS: Record<
-  string,
-  { label: string; blurb: string; Icon: React.ComponentType<{ className?: string }> }
-> = {
-  vfs: { label: "VFS", blurb: "Workspace files", Icon: FolderTree },
-  keyvalue: { label: "Key value", blurb: "Workspace-scoped KV store", Icon: Database },
-  events: { label: "Events", blurb: "Emit + poll event channels", Icon: Radio },
-  registry: {
-    label: "Registry",
-    blurb: "Look up available SDKs and operations",
-    Icon: BookOpen,
-  },
-  workflows: {
-    label: "Workflows",
-    blurb: "Register + run workspace workflows",
-    Icon: Workflow,
-  },
-  apps: {
-    label: "Apps",
-    blurb: "Publish + manage workspace apps",
-    Icon: LayoutGrid,
-  },
-  webhooks: {
-    label: "Webhooks",
-    blurb: "Register provider webhooks that trigger workflows",
-    Icon: Webhook,
-  },
-  sync: {
-    label: "Sync",
-    blurb: "Source → transform → sink data pipelines",
-    Icon: RefreshCw,
-  },
-  interfaces: {
-    label: "Interfaces",
-    blurb: "Bind generic interfaces (llm, sql) to providers",
-    Icon: Plug,
-  },
-};
 
 function ToolRow({ tool }: { tool: ServiceInfo }) {
   return (
@@ -193,6 +154,9 @@ export function ServicesMenu({ services }: { services: ServiceInfo[] }) {
   // Full catalog JSON — kept around for provider icons only now; the
   // scrollable/searchable list below is paginated separately (see below).
   const [catalog, setCatalog] = useState<CatalogProviderSummary[] | null>(null);
+  // What kind each namespace is — the gateway's answer, fetched with the
+  // panel rather than kept in a list here (see the module comment).
+  const [namespaces, setNamespaces] = useState<NamespaceInfo[] | null>(null);
 
   // Paginated "browse the rest of the catalog" list. Loaded lazily (only
   // once the panel is open) and refetched from page 1 on a debounced search,
@@ -208,6 +172,11 @@ export function ServicesMenu({ services }: { services: ServiceInfo[] }) {
     if (!open || catalog !== null) return;
     void fetchCatalogProviders().then((providers) => setCatalog(providers ?? []));
   }, [open, catalog]);
+
+  useEffect(() => {
+    if (!open || namespaces !== null) return;
+    void fetchNamespaces().then((list) => setNamespaces(list ?? []));
+  }, [open, namespaces]);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedFilter(filter.trim()), BROWSE_SEARCH_DEBOUNCE_MS);
@@ -277,10 +246,19 @@ export function ServicesMenu({ services }: { services: ServiceInfo[] }) {
     return byNamespace;
   }, [services]);
 
-  const nativeNamespaces = [...grouped.keys()].filter((ns) => ns in NATIVE_GROUPS);
-  const connectedProviders = [...grouped.keys()]
-    .filter((ns) => !(ns in NATIVE_GROUPS))
-    .sort();
+  // Classification comes from the gateway. Until it arrives (or if the
+  // gateway predates the route) nothing is claimed to be native — better to
+  // show a namespace as an unlabelled provider for a moment than to assert
+  // the wrong kind. See groupNamespaces in lib/namespaces.
+  const byId = useMemo(
+    () => new Map((namespaces ?? []).map((info) => [info.id, info])),
+    [namespaces],
+  );
+  const {
+    core: nativeNamespaces,
+    interfaces: interfaceNamespaces,
+    providers: connectedProviders,
+  } = useMemo(() => groupNamespaces([...grouped.keys()], namespaces), [grouped, namespaces]);
   const connectedSet = new Set(connectedProviders);
   // Server-side filtering/paging already narrowed this to the current
   // search; only the "already connected" providers need excluding here.
@@ -310,14 +288,19 @@ export function ServicesMenu({ services }: { services: ServiceInfo[] }) {
             </h3>
             {nativeNamespaces.length > 0 ? (
               nativeNamespaces.map((ns) => {
-                const meta = NATIVE_GROUPS[ns];
+                // `info` is absent when the gateway predates the catalog
+                // route — the row still renders, just without the server's
+                // label and icon. See namespaceLabel.
+                const info = byId.get(ns);
+                const Icon = namespaceIcon(info ?? {});
+                const { label, description } = namespaceLabel(ns, info);
                 const tools = grouped.get(ns) ?? [];
                 return (
                   <GroupSection
                     key={ns}
-                    icon={<meta.Icon className="h-4 w-4 shrink-0 text-muted-foreground" />}
-                    title={meta.label}
-                    subtitle={meta.blurb}
+                    icon={<Icon className="h-4 w-4 shrink-0 text-muted-foreground" />}
+                    title={label}
+                    subtitle={description}
                     badge={
                       <Badge variant="secondary" className="text-[0.65rem]">
                         {tools.length}
@@ -333,6 +316,58 @@ export function ServicesMenu({ services }: { services: ServiceInfo[] }) {
               </p>
             )}
           </section>
+
+          {/* Interfaces: one contract, a swappable implementation */}
+          {interfaceNamespaces.length > 0 && (
+            <section className="space-y-1.5">
+              <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Interfaces
+              </h3>
+              {interfaceNamespaces.map((ns) => {
+                const info = byId.get(ns);
+                const Icon = namespaceIcon(info ?? {});
+                const { description } = namespaceLabel(ns, info);
+                const tools = grouped.get(ns) ?? [];
+                // What this namespace resolves to *right now*: the explicit
+                // binding, else the first connected implementation — the same
+                // fallback the gateway applies, spelled out so an unbound
+                // interface doesn't read as a broken one.
+                const fallback = info?.compat?.find((entry) => entry.connected);
+                const provider = info?.binding?.provider ?? fallback?.provider;
+                const providerLabel =
+                  info?.compat?.find((entry) => entry.provider === provider)?.label ?? provider;
+                return (
+                  <GroupSection
+                    key={ns}
+                    icon={<Icon className="h-4 w-4 shrink-0 text-muted-foreground" />}
+                    title={ns}
+                    subtitle={description}
+                    badge={
+                      <>
+                        {providerLabel && (
+                          <span
+                            className="whitespace-nowrap text-[0.65rem] text-muted-foreground"
+                            title={
+                              info?.binding
+                                ? `Bound to ${providerLabel}`
+                                : `No binding — falling back to ${providerLabel}`
+                            }
+                          >
+                            → {providerLabel}
+                            {!info?.binding && <span className="opacity-60"> (auto)</span>}
+                          </span>
+                        )}
+                        <Badge variant="secondary" className="text-[0.65rem]">
+                          {tools.length}
+                        </Badge>
+                      </>
+                    }
+                    tools={tools}
+                  />
+                );
+              })}
+            </section>
+          )}
 
           {/* Connected registry providers */}
           <section className="space-y-1.5">
