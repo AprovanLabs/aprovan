@@ -9,6 +9,10 @@ import type {
 } from "./types";
 import type { VirtualProject } from "@aprovan/patchwork-compiler";
 
+// The compile-error retry recursion was unbounded — a prompt the model can
+// never satisfy looped forever. Two fix attempts, then the error surfaces.
+const MAX_COMPILE_RETRIES = 2;
+
 export interface UseEditSessionOptions {
   originalCode?: string;
   originalProject?: VirtualProject;
@@ -38,9 +42,10 @@ export function useEditSession(
     async (
       currentCode: string,
       prompt: string,
-      isRetry = false,
+      retryCount = 0,
     ): Promise<{ newCode: string; entries: EditHistoryEntry[] }> => {
       const entries: EditHistoryEntry[] = [];
+      const isRetry = retryCount > 0;
 
       const response = await sendEditRequest(
         { code: currentCode, prompt, filePath: state.activeFile },
@@ -59,13 +64,17 @@ export function useEditSession(
 
       if (compile) {
         const compileResult = await compile(response.newCode);
-        if (!compileResult.success && compileResult.error) {
+        if (
+          !compileResult.success &&
+          compileResult.error &&
+          retryCount < MAX_COMPILE_RETRIES
+        ) {
           setStreamingNotes([]);
           const errorPrompt = `Compilation error: ${compileResult.error}\n\nPlease fix this error.`;
           const retryResult = await performEdit(
             response.newCode,
             errorPrompt,
-            true,
+            retryCount + 1,
           );
           return {
             newCode: retryResult.newCode,

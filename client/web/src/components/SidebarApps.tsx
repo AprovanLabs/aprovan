@@ -32,10 +32,19 @@ import { invokeAppsTool, invokeWorkflowsTool } from "@/lib/tools";
 import { readFile } from "@/lib/workspace-vfs";
 
 const LAYOUT_KEY = "patchwork:sidebar-apps";
-const DEFAULT_HEIGHT = 240;
-const MIN_HEIGHT = 120;
+/** Tall enough for native surfaces + a usable Apps list at first paint. */
+const DEFAULT_HEIGHT = 320;
+/** Resize floor — both sub-groups need header + at least one row each. */
+const MIN_HEIGHT = 200;
+/**
+ * Persisted heights below this were saved before the layout fix that
+ * guaranteed Apps visibility; bump them on load.
+ */
+const MIN_PERSISTED_HEIGHT = 280;
 /** Pixels of file tree that must survive any drag. */
 const MIN_TREE_HEIGHT = 140;
+/** Apps sub-group needs header + one row even when the section is short. */
+const MIN_APPS_VISIBLE_HEIGHT = 72;
 
 interface SidebarAppsLayout {
   height: number;
@@ -57,16 +66,19 @@ interface SidebarAppsLayout {
   appsOpen?: boolean;
 }
 
+function normalizeHeight(height: number | undefined): number {
+  if (typeof height !== "number" || height < MIN_HEIGHT) return DEFAULT_HEIGHT;
+  if (height < MIN_PERSISTED_HEIGHT) return DEFAULT_HEIGHT;
+  return height;
+}
+
 function loadLayout(): SidebarAppsLayout {
   try {
     const raw = localStorage.getItem(LAYOUT_KEY);
     if (!raw) return { height: DEFAULT_HEIGHT, collapsed: false };
     const parsed = JSON.parse(raw) as Partial<SidebarAppsLayout>;
     return {
-      height:
-        typeof parsed.height === "number" && parsed.height >= MIN_HEIGHT
-          ? parsed.height
-          : DEFAULT_HEIGHT,
+      height: normalizeHeight(parsed.height),
       collapsed: parsed.collapsed === true,
       appsOpen: parsed.appsOpen !== false,
       ...(Array.isArray(parsed.expanded)
@@ -196,7 +208,7 @@ export function SidebarApps({
   return (
     <section
       ref={sectionRef}
-      className="shrink-0 flex flex-col min-h-0 border-t"
+      className="flex min-h-0 shrink-0 flex-col overflow-hidden border-t"
       style={layout.collapsed ? undefined : { height: layout.height }}
     >
       <div
@@ -235,53 +247,61 @@ export function SidebarApps({
         <span>Workspace</span>
       </button>
 
-      {!layout.collapsed && onSelectSurface && (
-        <WorkspaceSurfaces activeSurfaceId={activeSurfaceId ?? null} onSelect={onSelectSurface} />
-      )}
-
       {!layout.collapsed && (
-        <div className={`flex min-h-0 flex-col px-2 pb-2 ${appsOpen ? "flex-1" : "shrink-0"}`}>
-          <button
-            type="button"
-            aria-expanded={appsOpen}
-            onClick={() => setAppsOpen(!appsOpen)}
-            className="flex w-full shrink-0 items-center gap-1.5 rounded px-1 py-1 text-left transition-colors hover:bg-muted/60"
-            title={appsOpen ? "Collapse apps" : "Expand apps"}
-          >
-            {appsOpen ? (
-              <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
-            ) : (
-              <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground" />
-            )}
-            <span className="truncate text-xs font-medium">Apps</span>
-            {appCount !== null && (
-              <span className="shrink-0 text-[0.65rem] tabular-nums text-muted-foreground">
-                {appCount}
-              </span>
-            )}
-          </button>
-
-          {appsOpen && (
-            <AppsExplorer
-              invoke={invokeWorkflowsTool}
-              invokeApps={invokeAppsTool}
-              loadScript={loadScript}
-              onOpenScript={onOpenScript}
-              selection={selection}
-              onSelectionChange={onSelectionChange}
-              {...(onCreateWorkflow ? { onCreateWorkflow } : {})}
-              {...(layout.expanded ? { expandedGroups: layout.expanded } : {})}
-              onExpandedGroupsChange={(ids) =>
-                setLayout((prev) => {
-                  const next = { ...prev, expanded: ids };
-                  saveLayout(next);
-                  return next;
-                })
-              }
-              title={null}
-              className="flex-1 min-h-0 pl-3"
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          {onSelectSurface && (
+            <WorkspaceSurfaces
+              activeSurfaceId={activeSurfaceId ?? null}
+              onSelect={onSelectSurface}
             />
           )}
+
+          <div
+            className={`flex min-h-0 flex-col px-2 pb-2 ${appsOpen ? "flex-1" : "shrink-0"}`}
+            style={appsOpen ? { minHeight: MIN_APPS_VISIBLE_HEIGHT } : undefined}
+          >
+            <button
+              type="button"
+              aria-expanded={appsOpen}
+              onClick={() => setAppsOpen(!appsOpen)}
+              className="flex w-full shrink-0 items-center gap-1.5 rounded px-1 py-1 text-left transition-colors hover:bg-muted/60"
+              title={appsOpen ? "Collapse apps" : "Expand apps"}
+            >
+              {appsOpen ? (
+                <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
+              ) : (
+                <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground" />
+              )}
+              <span className="truncate text-xs font-medium">Apps</span>
+              {appCount !== null && (
+                <span className="shrink-0 text-[0.65rem] tabular-nums text-muted-foreground">
+                  {appCount}
+                </span>
+              )}
+            </button>
+
+            {appsOpen && (
+              <AppsExplorer
+                invoke={invokeWorkflowsTool}
+                invokeApps={invokeAppsTool}
+                loadScript={loadScript}
+                onOpenScript={onOpenScript}
+                selection={selection}
+                onSelectionChange={onSelectionChange}
+                {...(onCreateWorkflow ? { onCreateWorkflow } : {})}
+                {...(layout.expanded ? { expandedGroups: layout.expanded } : {})}
+                onExpandedGroupsChange={(ids) =>
+                  setLayout((prev) => {
+                    const next = { ...prev, expanded: ids };
+                    saveLayout(next);
+                    return next;
+                  })
+                }
+                title={null}
+                className="min-h-0 flex-1 overflow-y-auto pl-3"
+              />
+            )}
+          </div>
         </div>
       )}
     </section>
@@ -293,9 +313,8 @@ export function SidebarApps({
  * Webhooks, Notifications, Sessions, Interfaces, Sync, Sandboxes, Activity),
  * each opening a `native://` content tab.
  *
- * `shrink-0` deliberately — a short fixed list shouldn't be something you
- * scroll a hundred-app explorer to reach. It scrolls on its own once the
- * list outgrows the space rather than pushing the Apps group off-screen.
+ * Capped height so the Apps sub-group always gets room; scrolls independently
+ * when the native surface list outgrows its allotment.
  */
 function WorkspaceSurfaces({
   activeSurfaceId,
@@ -305,7 +324,7 @@ function WorkspaceSurfaces({
   onSelect: (surfaceId: string) => void;
 }) {
   return (
-    <div className="max-h-48 shrink-0 space-y-0.5 overflow-y-auto px-2 pb-1">
+    <div className="max-h-36 shrink space-y-0.5 overflow-y-auto px-2 pb-1">
       {NATIVE_SURFACES.map((surface) => (
         <button
           key={surface.id}

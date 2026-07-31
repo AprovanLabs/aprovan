@@ -8,10 +8,12 @@ import {
   CodeBlockView,
   WidgetPreview,
   MarkdownEditor,
+  MarkdownPreview,
   EditModal,
   WorkspaceTree,
   buildEditMessages,
   withTimeout,
+  getFileType,
   MobileDrawer,
   type EditTransport,
   type ServiceInfo,
@@ -58,7 +60,7 @@ import { CHAT_PROVIDERS, ProviderModelControls } from "@/components/ProviderPick
 import { ServicesMenu } from "@/components/ServicesMenu";
 import { MergeDialog } from "@/components/MergeDialog";
 import { NotificationsBell } from "@/components/NotificationsBell";
-import { PanelTabs } from "@/components/panels/shell";
+import { PanelHostProvider, PanelTabs } from "@/components/panels/shell";
 import { SessionBar } from "@/components/SessionBar";
 import SessionControls from "@/components/SessionControls";
 import { SidebarApps } from "@/components/SidebarApps";
@@ -212,6 +214,81 @@ const SharedEditSessionCtx = createContext<
 
 const useSharedEditSession = () => useContext(SharedEditSessionCtx);
 
+// -----------------------------------------------------------------------------
+// Widget self-heal plumbing: widgets deep inside a message bubble report
+// compile/mount failures up to the page, which runs a bounded fix loop
+// (see the orchestrator effect near useChat).
+// -----------------------------------------------------------------------------
+
+interface WidgetFailure {
+  path?: string;
+  error: string;
+}
+
+const WidgetErrorReporterCtx = createContext<
+  ((messageId: string, failure: WidgetFailure) => void) | null
+>(null);
+
+/** Max automatic fix follow-ups sent per user message before giving up. */
+const MAX_WIDGET_AUTOFIXES = 2;
+
+// A pathless fence only enters the widget pipeline when its language says
+// executable UI source; everything else renders as data or prose below.
+const WIDGET_FENCE_LANGUAGES = new Set([
+  "tsx",
+  "jsx",
+  "ts",
+  "js",
+  "typescript",
+  "javascript",
+]);
+
+/**
+ * A fenced block that is NOT widget source — JSON, YAML, markdown, config,
+ * arbitrary snippets. Registered renderers (JSON tree, workflow flow, …) get
+ * first pick, markdown renders as prose, and anything else is
+ * syntax-highlighted under the fence's own language. Never compiled.
+ */
+function ChatArtifactBlock({
+  content,
+  language,
+  path,
+}: {
+  content: string;
+  language?: string;
+  path?: string;
+}) {
+  const isMarkdown =
+    language === "md" || language === "markdown" || (path ?? "").endsWith(".md");
+  // A pathless JSON fence still deserves the JSON tree — give the renderer
+  // registry a representative path to match on.
+  const rendererPath = path ?? (language === "json" ? "artifact.json" : undefined);
+
+  let body: React.ReactNode;
+  if (isMarkdown) {
+    body = (
+      <div className="p-3 prose prose-sm dark:prose-invert max-w-none">
+        <MarkdownPreview value={content} />
+      </div>
+    );
+  } else if (resolveRenderer({ path: rendererPath, content })) {
+    body = <WorkspaceFilePreview code={content} filePath={rendererPath} />;
+  } else {
+    body = <CodeBlockView content={content} language={language ?? null} />;
+  }
+
+  return (
+    <div className="not-prose my-2 border rounded-lg overflow-hidden min-w-0">
+      {(path || language) && (
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-muted/50 border-b text-xs text-muted-foreground">
+          {path ? <span className="font-mono">{path}</span> : <span>{language}</span>}
+        </div>
+      )}
+      <div className="bg-muted/30 overflow-auto max-h-[60vh]">{body}</div>
+    </div>
+  );
+}
+
 function ReasoningPart({ text, isStreaming }: { text: string; isStreaming?: boolean }) {
   return (
     <Collapsible defaultOpen={isStreaming}>
@@ -329,7 +406,14 @@ function MessageBubble({ message }: { message: UIMessage }) {
         >
           {message.parts?.map((part, i) => {
             if (part.type === "text") {
-              return <TextPartWithSession key={i} text={part.text} isUser={isUser} />;
+              return (
+                <TextPartWithSession
+                  key={i}
+                  text={part.text}
+                  isUser={isUser}
+                  messageId={message.id}
+                />
+              );
             }
 
             if (part.type === "reasoning") {
@@ -375,10 +459,19 @@ function MessageBubble({ message }: { message: UIMessage }) {
   );
 }
 
-function TextPartWithSession({ text, isUser }: { text: string; isUser: boolean }) {
+function TextPartWithSession({
+  text,
+  isUser,
+  messageId,
+}: {
+  text: string;
+  isUser: boolean;
+  messageId?: string;
+}) {
   const open = useSharedEditSession();
   const compiler = useCompiler();
   const services = useServices();
+  const reportWidgetError = useContext(WidgetErrorReporterCtx);
 
   if (isUser) {
     return (
@@ -421,6 +514,25 @@ function TextPartWithSession({ text, isUser }: { text: string; isUser: boolean }
           );
         }
         if (part.type === "code") {
+          const path = part.attributes?.path;
+          const language = part.language || undefined;
+          // Only genuine widget source reaches the compiler: a pathed fence
+          // must resolve to a compilable file type, a pathless one must carry
+          // a tsx/jsx/ts/js fence language. JSON, YAML, markdown and the rest
+          // render as artifacts instead of being force-compiled as main.tsx.
+          const isWidgetCandidate = path
+            ? getFileType(path).category === "compilable"
+            : language !== undefined && WIDGET_FENCE_LANGUAGES.has(language);
+          if (!isWidgetCandidate) {
+            return (
+              <ChatArtifactBlock
+                key={index}
+                content={part.content}
+                language={language}
+                path={path}
+              />
+            );
+          }
           // Widgets declare their SDK namespaces in the fence `uses`
           // attribute; undeclared widgets fall back to every namespace.
           const declared = parseUsesAttribute(part.attributes?.uses);
@@ -434,12 +546,18 @@ function TextPartWithSession({ text, isUser }: { text: string; isUser: boolean }
                 code={part.content}
                 compiler={compiler}
                 services={declared.length > 0 ? declared.map((d) => d.namespace) : services}
-                filePath={part.attributes?.path}
+                filePath={path}
+                language={language}
                 entrypoint="main.tsx"
                 onOpenEditSession={open ?? undefined}
                 vfs={workspaceWidgetVfs}
                 customPreview={workflowCustomPreview}
                 logsSource={editorLogsSource}
+                onWidgetError={
+                  reportWidgetError && messageId
+                    ? (error) => reportWidgetError(messageId, { path, error })
+                    : undefined
+                }
               />
             </div>
           );
@@ -2110,6 +2228,39 @@ export default function ChatPage() {
   const messageCountRef = useRef(0);
   messageCountRef.current = messages.length;
 
+  // ---------------------------------------------------------------------------
+  // Widget self-heal state. Failures arrive keyed by the message that rendered
+  // the widget; the orchestrator effect below (after sessionReadOnly exists)
+  // turns a failure in the newest assistant turn into one fix request.
+  // Bounds: one auto-fix per assistant message id, at most
+  // MAX_WIDGET_AUTOFIXES consecutive auto-fixes since the user last typed, and
+  // nothing at all until the user has sent a message in this window — widgets
+  // re-rendered from persisted history must never talk to the model.
+  // ---------------------------------------------------------------------------
+  const widgetFailuresRef = useRef(new Map<string, WidgetFailure>());
+  const autoFixRespondedRef = useRef(new Set<string>());
+  const autoFixChainRef = useRef(0);
+  const userSentThisWindowRef = useRef(false);
+  // Failures land asynchronously (compile + iframe mount), often after the
+  // stream has already settled — the tick re-runs the orchestrator then.
+  const [widgetFailureTick, setWidgetFailureTick] = useState(0);
+
+  const reportWidgetError = useCallback((messageId: string, failure: WidgetFailure) => {
+    // First failure per message wins — one fix request covers the turn.
+    if (!widgetFailuresRef.current.has(messageId)) {
+      widgetFailuresRef.current.set(messageId, failure);
+    }
+    setWidgetFailureTick((tick) => tick + 1);
+  }, []);
+
+  // Switching (or opening) a session resets the loop.
+  useEffect(() => {
+    widgetFailuresRef.current.clear();
+    autoFixRespondedRef.current.clear();
+    autoFixChainRef.current = 0;
+    userSentThisWindowRef.current = false;
+  }, [sessionChat]);
+
   // Transcript persistence: once a turn settles (and when the user message
   // first lands), push the tail to the gateway. Append upserts by message id,
   // so re-sending a message that later gained parts just replaces it.
@@ -2309,6 +2460,34 @@ export default function ChatPage() {
   // sessions) their file view stay readable, but the conversation is over.
   const sessionReadOnly = activeSession !== null && activeSession.status !== "open";
 
+  // Widget self-heal orchestrator: once the turn settles, if a widget in the
+  // newest assistant message failed, send one follow-up asking for a fix.
+  useEffect(() => {
+    if (status !== "ready") return;
+    // Only turns produced in this window — never history rendered on load.
+    if (!userSentThisWindowRef.current) return;
+    if (sessionReadOnly || !providerConnected) return;
+    const last = messages[messages.length - 1];
+    if (!last || last.role !== "assistant") return;
+    const failure = widgetFailuresRef.current.get(last.id);
+    if (!failure) return;
+    if (autoFixRespondedRef.current.has(last.id)) return;
+    if (autoFixChainRef.current >= MAX_WIDGET_AUTOFIXES) return;
+    autoFixRespondedRef.current.add(last.id);
+    autoFixChainRef.current += 1;
+    const target = failure.path ?? "the widget in your last message";
+    const digest = failure.path ? recentProblemsDigest(failure.path) : undefined;
+    sendMessage({
+      text:
+        `The widget at ${target} failed to render with:\n` +
+        `\`\`\`\n${failure.error}\n\`\`\`\n` +
+        (digest ? `Recent runtime problems for it:\n\`\`\`\n${digest}\n\`\`\`\n` : "") +
+        `Please fix it — emit a patch fence (or corrected full file) for ${
+          failure.path ?? "the widget"
+        }.`,
+    });
+  }, [status, messages, widgetFailureTick, sendMessage, sessionReadOnly, providerConnected]);
+
   // A tab is genuinely occupying the screen — not just an empty tab strip —
   // only when one is open and the preview isn't collapsed to its tab bar.
   // Only then does the chat need to give up room to it.
@@ -2336,6 +2515,10 @@ export default function ChatPage() {
             pendingCreateRef.current = false;
           });
       }
+      // A real user message arms the self-heal loop for the replies that
+      // follow, and resets its consecutive-auto-fix budget.
+      userSentThisWindowRef.current = true;
+      autoFixChainRef.current = 0;
       sendMessage({ text: input });
       setInput("");
       // Sending while the chat is collapsed to a strip would hide the
@@ -2366,9 +2549,23 @@ export default function ChatPage() {
     });
   }, [messages]);
 
+  // Native panels (e.g. Sessions) are self-contained and don't get page
+  // state, but a few actions only the page can do — switch the chat this
+  // window shows, open a workspace file — are exposed through this one
+  // additive context instead of threading page props through every panel.
+  const panelHostActions = useMemo(
+    () => ({
+      onOpenSession: (id: string) => void openSession(id),
+      onOpenFile: (path: string) => openWorkspacePreview(path),
+    }),
+    [openSession, openWorkspacePreview]
+  );
+
   return (
     <PatchworkCtx.Provider value={patchworkCtx}>
       <SharedEditSessionCtx.Provider value={openSharedEditSession}>
+      <WidgetErrorReporterCtx.Provider value={reportWidgetError}>
+      <PanelHostProvider actions={panelHostActions}>
         {/* Full-bleed app shell: the viewport is the frame, so the preview
             surface gets every pixel the sidebar doesn't need. Prose keeps its
             own readable measure below. */}
@@ -3060,6 +3257,8 @@ export default function ChatPage() {
             previewLoading={!compiler}
           />
         )}
+      </PanelHostProvider>
+      </WidgetErrorReporterCtx.Provider>
       </SharedEditSessionCtx.Provider>
     </PatchworkCtx.Provider>
   );

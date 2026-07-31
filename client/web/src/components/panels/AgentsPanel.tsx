@@ -7,8 +7,8 @@
  * profile's own loop is `agents.run`. Both land in the Executions tab.
  */
 
-import { Bot, Pencil, Plus, Trash2, X } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { Bot, ChevronRight, Pencil, Plus, Trash2, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   PanelEmpty,
   PanelError,
@@ -62,16 +62,108 @@ interface AgentProfile {
   updatedAt: string;
 }
 
+/**
+ * Native `agents.run` loops report the full contract (queued through
+ * suspended); workflow-attributed runs only ever land on running,
+ * succeeded or failed. Kept as one broad union — the panel treats anything
+ * outside the terminal three as "in progress" (see `isTerminalStatus`).
+ */
+type AgentRunStatus =
+  | "queued"
+  | "running"
+  | "awaiting_tools"
+  | "suspended"
+  | "succeeded"
+  | "failed"
+  | "cancelled";
+
 interface AgentRun {
   id: string;
   workflow?: string;
   agent: string;
-  status: "running" | "succeeded" | "failed" | "cancelled";
+  status: AgentRunStatus;
   trigger: string;
   startedAt: string;
   durationMs?: number;
   error?: string;
   traceId?: string;
+}
+
+/** `sandboxes.runs` — scheduled sandbox work, merged into the same list. */
+interface SandboxRunSummary {
+  id: string;
+  image: string;
+  workflow: string;
+  agent?: string;
+  sandboxId?: string;
+  hostId?: string;
+  sessionId?: string;
+  workflowRunId?: string;
+  status: "pending" | "claimed" | "running" | "succeeded" | "failed" | "cancelled";
+  error?: string;
+  requires?: { tools: string[] };
+  createdAt: string;
+  claimedAt?: string;
+  finishedAt?: string;
+}
+
+/** One tool call inside a turn — `agents.getRun` detail. */
+interface AgentToolCall {
+  id: string;
+  name: string;
+  arguments?: unknown;
+  result?: unknown;
+  error?: string;
+  durationMs?: number;
+}
+
+interface AgentTurn {
+  index: number;
+  at: string;
+  kind: "assistant" | "tool" | "thinking";
+  text?: string;
+  toolCalls?: AgentToolCall[];
+}
+
+interface AgentUsage {
+  inputTokens?: number;
+  outputTokens?: number;
+  reasoningTokens?: number;
+  totalTokens?: number;
+  turns?: number;
+  toolCalls?: number;
+  costUsd?: number;
+}
+
+/** Full record from `agents.getRun { id }` — native runs only. */
+interface AgentRunDetail {
+  id: string;
+  status: AgentRunStatus;
+  startedAt: string;
+  finishedAt?: string;
+  durationMs?: number;
+  output?: string;
+  truncated?: boolean;
+  turns?: AgentTurn[];
+  usage?: AgentUsage;
+  stopReason?: string;
+  error?: { message: string; code?: string };
+  effortApplied?: string;
+  agent?: string;
+}
+
+/** One row in the merged Executions list — an agent run or a sandbox run. */
+interface ExecutionRow {
+  kind: "agent" | "sandbox";
+  id: string;
+  workflow?: string;
+  agent?: string;
+  status: string;
+  trigger: string;
+  startedAt: string;
+  durationMs?: number;
+  error?: string;
+  sandboxId?: string;
 }
 
 /** Editor draft — grants/mounts as editable row lists. */
@@ -141,8 +233,98 @@ const statusDot: Record<string, string> = {
   succeeded: "bg-emerald-500",
   failed: "bg-red-500",
   running: "bg-amber-500",
+  queued: "bg-amber-500",
+  awaiting_tools: "bg-amber-500",
+  suspended: "bg-amber-500",
+  pending: "bg-amber-500",
+  claimed: "bg-amber-500",
   cancelled: "bg-muted-foreground",
 };
+
+/** Everything outside these three is still doing something. */
+const TERMINAL_STATUSES = new Set(["succeeded", "failed", "cancelled"]);
+function isTerminalStatus(status: string): boolean {
+  return TERMINAL_STATUSES.has(status);
+}
+
+/** How often to re-poll while at least one execution is non-terminal. */
+const POLL_INTERVAL_MS = 4000;
+
+function normalizeAgentRun(run: AgentRun, sandboxId?: string): ExecutionRow {
+  return {
+    kind: "agent",
+    id: run.id,
+    workflow: run.workflow,
+    agent: run.agent,
+    status: run.status,
+    trigger: run.trigger,
+    startedAt: run.startedAt,
+    durationMs: run.durationMs,
+    error: run.error,
+    sandboxId,
+  };
+}
+
+function normalizeSandboxRun(run: SandboxRunSummary): ExecutionRow {
+  const startedAt = run.claimedAt ?? run.createdAt;
+  const durationMs =
+    run.finishedAt && run.claimedAt
+      ? Date.parse(run.finishedAt) - Date.parse(run.claimedAt)
+      : undefined;
+  return {
+    kind: "sandbox",
+    id: run.id,
+    workflow: run.workflow,
+    agent: run.agent,
+    status: run.status,
+    trigger: "sandbox",
+    startedAt,
+    durationMs,
+    error: run.error,
+    sandboxId: run.sandboxId,
+  };
+}
+
+/** Best-effort JSON preview, truncated — tool args/results can be huge. */
+function jsonPreview(value: unknown, limit = 160): string {
+  if (value === undefined) return "";
+  let text: string;
+  try {
+    text = typeof value === "string" ? value : JSON.stringify(value);
+  } catch {
+    text = String(value);
+  }
+  return text.length > limit ? `${text.slice(0, limit)}…` : text;
+}
+
+/** A pulsing dot for "this is happening right now". */
+function LiveDot() {
+  return (
+    <span className="relative flex h-2 w-2 shrink-0">
+      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
+      <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500" />
+    </span>
+  );
+}
+
+/** Long text (assistant turns, run output) truncated with a show-more toggle. */
+function Expandable({ text, limit = 280 }: { text: string; limit?: number }) {
+  const [open, setOpen] = useState(false);
+  if (text.length <= limit) {
+    return <p className="whitespace-pre-wrap text-xs">{text}</p>;
+  }
+  return (
+    <div>
+      <p className="whitespace-pre-wrap text-xs">{open ? text : `${text.slice(0, limit)}…`}</p>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="text-[11px] text-muted-foreground underline hover:text-foreground"
+      >
+        {open ? "Show less" : "Show more"}
+      </button>
+    </div>
+  );
+}
 
 const EFFORTS = ["", "minimal", "low", "medium", "high", "max"] as const;
 
@@ -425,16 +607,374 @@ function AgentEditor({
   );
 }
 
+/** One assistant/tool/thinking turn inside a run's detail view. */
+function TurnView({ turn }: { turn: AgentTurn }) {
+  return (
+    <div className="rounded border bg-card p-2">
+      <div className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+        <span>{turn.kind}</span>
+        <span className="font-normal normal-case">· {relativeTime(turn.at)}</span>
+      </div>
+      {turn.text && (
+        <div className="mt-1">
+          <Expandable text={turn.text} />
+        </div>
+      )}
+      {turn.toolCalls?.map((call) => (
+        <div key={call.id} className="mt-1.5 rounded bg-muted/40 p-1.5">
+          <div className="flex items-center gap-1.5">
+            <span className="font-mono text-[11px] font-medium">{call.name}</span>
+            <span
+              className={`ml-auto shrink-0 text-[10px] font-medium ${
+                call.error ? "text-destructive" : "text-emerald-500"
+              }`}
+            >
+              {call.error ? "error" : "ok"}
+            </span>
+            {call.durationMs !== undefined && (
+              <span className="shrink-0 text-[10px] text-muted-foreground">
+                {formatDuration(call.durationMs)}
+              </span>
+            )}
+          </div>
+          {call.arguments !== undefined && (
+            <code
+              className="mt-0.5 block truncate text-[10px] text-muted-foreground"
+              title={jsonPreview(call.arguments, 4000)}
+            >
+              {jsonPreview(call.arguments)}
+            </code>
+          )}
+          {call.error && <div className="mt-0.5 text-[10px] text-destructive">{call.error}</div>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Drill-down for an agent-kind execution row: fetches `agents.getRun`,
+ * re-fetching on the same poll cadence while the run is non-terminal.
+ * Workflow-attributed runs 404 here (the native runtime owns `getRun`, not
+ * the workflow tracer) — that is reported inline rather than blanking the
+ * row, since the summary line is still accurate.
+ */
+function AgentRunDetailView({
+  runId,
+  initialNonTerminal,
+  agentProfile,
+  invoke,
+}: {
+  runId: string;
+  initialNonTerminal: boolean;
+  agentProfile: AgentProfile | undefined;
+  invoke: ReturnType<typeof invokeNamespaceTool>;
+}) {
+  const [detail, setDetail] = useState<AgentRunDetail | null>(null);
+  const [detailError, setDetailError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchDetail = useCallback(() => {
+    invoke("getRun", { id: runId })
+      .then((result) => {
+        setDetail(result as AgentRunDetail);
+        setDetailError(null);
+      })
+      .catch((err: unknown) => setDetailError(err instanceof Error ? err.message : String(err)))
+      .finally(() => setLoading(false));
+  }, [invoke, runId]);
+
+  useEffect(() => {
+    setLoading(true);
+    fetchDetail();
+  }, [fetchDetail]);
+
+  const nonTerminal = detail ? !isTerminalStatus(detail.status) : initialNonTerminal;
+  useEffect(() => {
+    if (!nonTerminal) return;
+    const id = window.setInterval(fetchDetail, POLL_INTERVAL_MS);
+    return () => window.clearInterval(id);
+  }, [nonTerminal, fetchDetail]);
+
+  if (loading && !detail) {
+    return <div className="text-xs text-muted-foreground">Loading run…</div>;
+  }
+  if (detailError && !detail) {
+    return (
+      <div className="text-xs text-muted-foreground">
+        Could not load run detail ({detailError}). Workflow-attributed runs don&apos;t carry
+        native turn detail — check the workflow&apos;s own trace instead.
+      </div>
+    );
+  }
+  if (!detail) return null;
+
+  return (
+    <div className="space-y-2.5">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+        <span>started {relativeTime(detail.startedAt)}</span>
+        {detail.finishedAt && <span>finished {relativeTime(detail.finishedAt)}</span>}
+        <span className="tabular-nums">
+          {nonTerminal
+            ? `running ${formatDuration(Date.now() - Date.parse(detail.startedAt))}`
+            : detail.durationMs !== undefined
+              ? formatDuration(detail.durationMs)
+              : null}
+        </span>
+        {detail.stopReason && (
+          <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
+            {detail.stopReason}
+          </Badge>
+        )}
+      </div>
+      {detail.error && <div className="text-xs text-destructive">{detail.error.message}</div>}
+
+      {agentProfile && (
+        <div className="rounded border bg-card p-2">
+          <div className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            Agent config
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {agentProfile.llm && (
+              <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">
+                {agentProfile.llm}
+              </Badge>
+            )}
+            {agentProfile.model && (
+              <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
+                {agentProfile.model}
+              </Badge>
+            )}
+            {agentProfile.policy?.effort && (
+              <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
+                effort:{agentProfile.policy.effort}
+              </Badge>
+            )}
+            {agentProfile.grants?.tools?.map((tool) => (
+              <span key={tool} className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]">
+                {tool}
+              </span>
+            ))}
+            {agentProfile.grants?.paths?.map((path) => (
+              <span
+                key={path.prefix}
+                className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]"
+              >
+                {path.prefix} ({path.access})
+              </span>
+            ))}
+            {agentProfile.mounts?.map((mount) => (
+              <span
+                key={`${mount.path}:${mount.source}`}
+                className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]"
+              >
+                {mount.path} ← {mount.source ?? "scratch"} ({mount.mode})
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+      {detail.effortApplied && (
+        <div className="text-[11px] text-muted-foreground">{detail.effortApplied}</div>
+      )}
+
+      {detail.turns?.length ? (
+        <div className="space-y-1.5">
+          <div className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            Turns
+          </div>
+          {detail.turns.map((turn) => (
+            <TurnView key={turn.index} turn={turn} />
+          ))}
+        </div>
+      ) : null}
+
+      {detail.output && (
+        <div>
+          <div className="mb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+            Output
+          </div>
+          <Expandable text={detail.output} />
+        </div>
+      )}
+
+      {detail.usage && (
+        <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+          {detail.usage.inputTokens !== undefined && <span>in {detail.usage.inputTokens}tok</span>}
+          {detail.usage.outputTokens !== undefined && (
+            <span>out {detail.usage.outputTokens}tok</span>
+          )}
+          {detail.usage.totalTokens !== undefined && (
+            <span>total {detail.usage.totalTokens}tok</span>
+          )}
+          {detail.usage.toolCalls !== undefined && <span>{detail.usage.toolCalls} tool calls</span>}
+          {detail.usage.costUsd !== undefined && <span>${detail.usage.costUsd.toFixed(4)}</span>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Drill-down for a sandbox-kind row — everything's already in the summary. */
+function SandboxRunDetailView({ run }: { run: SandboxRunSummary }) {
+  return (
+    <div className="space-y-2 text-xs">
+      <div className="flex flex-wrap gap-x-3 gap-y-1 text-muted-foreground">
+        <span>queued {relativeTime(run.createdAt)}</span>
+        {run.claimedAt && <span>claimed {relativeTime(run.claimedAt)}</span>}
+        {run.finishedAt && <span>finished {relativeTime(run.finishedAt)}</span>}
+      </div>
+      <div className="flex flex-wrap gap-1">
+        <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
+          {run.image.replace(/^@aprovan\/sandbox-image-/u, "")}
+        </Badge>
+        {run.hostId && (
+          <Badge variant="outline" className="px-1.5 py-0 font-mono text-[10px]">
+            host:{run.hostId}
+          </Badge>
+        )}
+        {run.sandboxId && (
+          <Badge variant="outline" className="px-1.5 py-0 font-mono text-[10px]">
+            box:{run.sandboxId}
+          </Badge>
+        )}
+        {run.sessionId && (
+          <Badge variant="outline" className="px-1.5 py-0 font-mono text-[10px]">
+            session:{run.sessionId}
+          </Badge>
+        )}
+        {run.workflowRunId && (
+          <Badge variant="outline" className="px-1.5 py-0 font-mono text-[10px]">
+            run:{run.workflowRunId.slice(0, 8)}
+          </Badge>
+        )}
+      </div>
+      {run.requires?.tools.length ? (
+        <div className="text-muted-foreground">requires: {run.requires.tools.join(", ")}</div>
+      ) : null}
+      {run.error && <div className="text-destructive">{run.error}</div>}
+    </div>
+  );
+}
+
+/** One executions-list row: summary line + optional inline drill-down. */
+function RunRow({
+  row,
+  expanded,
+  onToggle,
+  now,
+  agentProfile,
+  sandboxRun,
+  invoke,
+}: {
+  row: ExecutionRow;
+  expanded: boolean;
+  onToggle: () => void;
+  now: number;
+  agentProfile: AgentProfile | undefined;
+  sandboxRun: SandboxRunSummary | undefined;
+  invoke: ReturnType<typeof invokeNamespaceTool>;
+}) {
+  const nonTerminal = !isTerminalStatus(row.status);
+  const elapsed = nonTerminal ? now - Date.parse(row.startedAt) : row.durationMs;
+
+  return (
+    <div>
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={onToggle}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onToggle();
+          }
+        }}
+        className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-xs hover:bg-muted/50"
+      >
+        <ChevronRight
+          className={`h-3 w-3 shrink-0 text-muted-foreground transition-transform ${
+            expanded ? "rotate-90" : ""
+          }`}
+        />
+        {nonTerminal ? (
+          <LiveDot />
+        ) : (
+          <span
+            className={`h-2 w-2 shrink-0 rounded-full ${statusDot[row.status] ?? "bg-muted-foreground"}`}
+          />
+        )}
+        <span className="truncate font-mono font-medium">
+          {row.workflow ?? (row.kind === "sandbox" ? "sandbox run" : "agents.run")}
+        </span>
+        {row.agent && (
+          <Badge variant="secondary" className="shrink-0 font-mono text-[10px]">
+            {row.agent}
+          </Badge>
+        )}
+        {row.kind === "sandbox" && (
+          <Badge variant="outline" className="shrink-0 text-[10px]">
+            sandbox
+          </Badge>
+        )}
+        {row.sandboxId && (
+          <Badge
+            variant="outline"
+            className="shrink-0 font-mono text-[10px]"
+            title={`Sandbox ${row.sandboxId}`}
+          >
+            box:{row.sandboxId.slice(0, 8)}
+          </Badge>
+        )}
+        <span className="shrink-0 text-muted-foreground">{row.trigger}</span>
+        <span className="ml-auto shrink-0 tabular-nums text-muted-foreground">
+          {elapsed !== undefined && `${formatDuration(elapsed)} · `}
+          {relativeTime(row.startedAt)}
+        </span>
+        {row.status === "failed" && row.error && (
+          <span className="max-w-[16rem] truncate text-destructive" title={row.error}>
+            {row.error}
+          </span>
+        )}
+      </div>
+      {expanded && (
+        <div className="border-t bg-muted/20 px-3 py-2">
+          {row.kind === "agent" ? (
+            <AgentRunDetailView
+              runId={row.id}
+              initialNonTerminal={nonTerminal}
+              agentProfile={agentProfile}
+              invoke={invoke}
+            />
+          ) : sandboxRun ? (
+            <SandboxRunDetailView run={sandboxRun} />
+          ) : null}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function AgentsPanel({ scope }: NativePanelProps) {
   void scope; // Agents are workspace-level: an app scope never narrows them.
   const agents = useMemo(() => invokeNamespaceTool("agents"), []);
+  const sandboxes = useMemo(() => invokeNamespaceTool("sandboxes"), []);
 
   const { data, error, loading, refresh } = usePanelData(async () => {
-    const [profiles, runs] = await Promise.all([
+    const [profiles, runs, sandboxRuns] = await Promise.all([
       agents("list", {}) as Promise<{ agents: AgentProfile[] }>,
       agents("runs", { limit: 100 }) as Promise<{ runs: AgentRun[] }>,
+      // Sandboxes might not be registered at all in this workspace — a
+      // failure here narrows the executions list, it must not blank it.
+      (sandboxes("runs", { limit: 100 }) as Promise<{ runs: SandboxRunSummary[] }>).catch(
+        () => ({ runs: [] as SandboxRunSummary[] }),
+      ),
     ]);
-    return { agents: profiles.agents ?? [], runs: runs.runs ?? [] };
+    return {
+      agents: profiles.agents ?? [],
+      runs: runs.runs ?? [],
+      sandboxRuns: sandboxRuns.runs ?? [],
+    };
   });
 
   const [tab, setTab] = useState<"profiles" | "executions">("profiles");
@@ -443,17 +983,74 @@ export function AgentsPanel({ scope }: NativePanelProps) {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [deleteArmed, setDeleteArmed] = useState<string | null>(null);
   const [agentFilter, setAgentFilter] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const armTimer = useRef(0);
 
-  const runs = useMemo(
-    () =>
-      [...(data?.runs ?? [])].sort(
-        (a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt),
-      ),
-    [data?.runs],
+  const agentsByName = useMemo(
+    () => new Map((data?.agents ?? []).map((a) => [a.name, a])),
+    [data?.agents],
   );
-  const runAgents = useMemo(() => [...new Set(runs.map((r) => r.agent))], [runs]);
-  const visibleRuns = agentFilter ? runs.filter((r) => r.agent === agentFilter) : runs;
+  const sandboxRunsById = useMemo(
+    () => new Map((data?.sandboxRuns ?? []).map((r) => [r.id, r])),
+    [data?.sandboxRuns],
+  );
+
+  /**
+   * Merge agent-attributed executions with scheduled sandbox runs into one
+   * list. A sandbox run whose workflow already shows up as an agent run
+   * (matched by `workflowRunId`) is folded into that row as a sandbox
+   * badge instead of duplicated — the rest (queued/claimed, not yet tied
+   * to a workflow run) show up as their own "sandbox" rows.
+   */
+  const rows = useMemo(() => {
+    const agentRuns = data?.runs ?? [];
+    const sandboxRuns = data?.sandboxRuns ?? [];
+    const agentRunIds = new Set(agentRuns.map((r) => r.id));
+    const sandboxByWorkflowRunId = new Map(
+      sandboxRuns
+        .filter((r): r is SandboxRunSummary & { workflowRunId: string } => !!r.workflowRunId)
+        .map((r) => [r.workflowRunId, r]),
+    );
+    const combined: ExecutionRow[] = [
+      ...agentRuns.map((run) =>
+        normalizeAgentRun(run, sandboxByWorkflowRunId.get(run.id)?.sandboxId),
+      ),
+      ...sandboxRuns
+        .filter((run) => !run.workflowRunId || !agentRunIds.has(run.workflowRunId))
+        .map(normalizeSandboxRun),
+    ];
+    return combined.sort((a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt));
+  }, [data?.runs, data?.sandboxRuns]);
+
+  const runAgents = useMemo(
+    () => [...new Set(rows.map((r) => r.agent).filter((a): a is string => !!a))],
+    [rows],
+  );
+  const visibleRows = agentFilter ? rows.filter((r) => r.agent === agentFilter) : rows;
+  const inProgressRows = visibleRows.filter((r) => !isTerminalStatus(r.status));
+  const completedRows = visibleRows.filter((r) => isTerminalStatus(r.status));
+  const hasNonTerminal = rows.some((r) => !isTerminalStatus(r.status));
+
+  // Auto-poll the executions list while something is still running and this
+  // tab is on screen; a background browser tab skips ticks rather than
+  // burning gateway calls nobody's watching.
+  useEffect(() => {
+    if (tab !== "executions" || !hasNonTerminal) return;
+    const id = window.setInterval(() => {
+      if (document.visibilityState === "hidden") return;
+      refresh();
+    }, POLL_INTERVAL_MS);
+    return () => window.clearInterval(id);
+  }, [tab, hasNonTerminal, refresh]);
+
+  // Re-render once a second so "elapsed" on in-progress rows keeps ticking
+  // between polls, without waiting on a network round trip to move at all.
+  const [, forceTick] = useState(0);
+  useEffect(() => {
+    if (tab !== "executions" || inProgressRows.length === 0) return;
+    const id = window.setInterval(() => forceTick((t) => t + 1), 1000);
+    return () => window.clearInterval(id);
+  }, [tab, inProgressRows.length]);
 
   const handleSave = async (draft: Draft) => {
     const tools = draft.tools.map((t) => t.trim()).filter(Boolean);
@@ -548,7 +1145,7 @@ export function AgentsPanel({ scope }: NativePanelProps) {
       <PanelTabs
         tabs={[
           { id: "profiles" as const, label: "Profiles" },
-          { id: "executions" as const, label: "Executions", badge: data?.runs.length },
+          { id: "executions" as const, label: "Executions", badge: rows.length },
         ]}
         active={tab}
         onChange={setTab}
@@ -702,36 +1299,58 @@ export function AgentsPanel({ scope }: NativePanelProps) {
               ))}
             </div>
           )}
-          {visibleRuns.length === 0 ? (
+          {visibleRows.length === 0 ? (
             <PanelEmpty>
-              No executions yet. Runs appear when a workflow uses an agent or when
-              agents.run finishes a loop.
+              No executions yet. Runs appear when a workflow uses an agent, when agents.run
+              finishes a loop, or when a sandbox picks up scheduled work.
             </PanelEmpty>
           ) : (
-            <div className="divide-y rounded-md border">
-              {visibleRuns.map((run) => (
-                <div key={run.id} className="flex items-center gap-2 px-3 py-1.5 text-xs">
-                  <span
-                    className={`h-2 w-2 shrink-0 rounded-full ${statusDot[run.status] ?? "bg-muted-foreground"}`}
-                  />
-                  <span className="truncate font-mono font-medium">
-                    {run.workflow ?? "agents.run"}
-                  </span>
-                  <Badge variant="secondary" className="shrink-0 font-mono text-[10px]">
-                    {run.agent}
-                  </Badge>
-                  <span className="shrink-0 text-muted-foreground">{run.trigger}</span>
-                  <span className="ml-auto shrink-0 tabular-nums text-muted-foreground">
-                    {run.durationMs !== undefined && `${formatDuration(run.durationMs)} · `}
-                    {relativeTime(run.startedAt)}
-                  </span>
-                  {run.status === "failed" && run.error && (
-                    <span className="max-w-[16rem] truncate text-destructive" title={run.error}>
-                      {run.error}
-                    </span>
-                  )}
+            <div className="space-y-3">
+              {inProgressRows.length > 0 && (
+                <div>
+                  <div className="mb-1 flex items-center gap-1.5 px-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                    <LiveDot />
+                    In progress ({inProgressRows.length})
+                  </div>
+                  <div className="divide-y rounded-md border">
+                    {inProgressRows.map((row) => (
+                      <RunRow
+                        key={`${row.kind}:${row.id}`}
+                        row={row}
+                        expanded={expandedId === row.id}
+                        onToggle={() => setExpandedId((id) => (id === row.id ? null : row.id))}
+                        now={Date.now()}
+                        agentProfile={row.agent ? agentsByName.get(row.agent) : undefined}
+                        sandboxRun={sandboxRunsById.get(row.id)}
+                        invoke={agents}
+                      />
+                    ))}
+                  </div>
                 </div>
-              ))}
+              )}
+              {completedRows.length > 0 && (
+                <div>
+                  {inProgressRows.length > 0 && (
+                    <div className="mb-1 px-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                      History
+                    </div>
+                  )}
+                  <div className="divide-y rounded-md border">
+                    {completedRows.map((row) => (
+                      <RunRow
+                        key={`${row.kind}:${row.id}`}
+                        row={row}
+                        expanded={expandedId === row.id}
+                        onToggle={() => setExpandedId((id) => (id === row.id ? null : row.id))}
+                        now={Date.now()}
+                        agentProfile={row.agent ? agentsByName.get(row.agent) : undefined}
+                        sandboxRun={sandboxRunsById.get(row.id)}
+                        invoke={agents}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

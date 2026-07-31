@@ -11,7 +11,15 @@
 
 import { useSharedAppsCatalog } from "@aprovan/ui/apps-store";
 import { AlertCircle, Loader2, RefreshCw, type LucideIcon } from "lucide-react";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { invokeAppsTool } from "@/lib/tools";
 
 /** Narrow a panel to one app (the app inspector's contextual tabs). */
@@ -22,6 +30,42 @@ export interface AppScope {
 
 export interface NativePanelProps {
   scope?: AppScope;
+}
+
+/**
+ * Optional host callbacks a panel can reach for without the generic
+ * `invokeNamespaceTool` plumbing knowing about them — e.g. Sessions opening
+ * a chat in the page that's actually hosting it, or a changed file. Panels
+ * are otherwise self-contained (see the module doc above), so this is
+ * deliberately a short, additive list: only what a panel cannot do on its
+ * own via its namespace tools.
+ *
+ * The host (ChatPage) provides these via `PanelHostProvider`; panels read
+ * them with `usePanelHostActions()` and must treat every field as optional
+ * — a panel rendered without a provider (or in a host that doesn't support
+ * an action) just falls back to its own behavior.
+ */
+export interface PanelHostActions {
+  /** Switch the chat this window is showing to this session id. */
+  onOpenSession?: (id: string) => void;
+  /** Open a workspace file (e.g. in the preview pane). */
+  onOpenFile?: (path: string) => void;
+}
+
+const PanelHostContext = createContext<PanelHostActions>({});
+
+export function PanelHostProvider({
+  actions,
+  children,
+}: {
+  actions: PanelHostActions;
+  children: ReactNode;
+}) {
+  return <PanelHostContext.Provider value={actions}>{children}</PanelHostContext.Provider>;
+}
+
+export function usePanelHostActions(): PanelHostActions {
+  return useContext(PanelHostContext);
 }
 
 /**

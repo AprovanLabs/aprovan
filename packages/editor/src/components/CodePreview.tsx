@@ -18,6 +18,15 @@ interface CodePreviewProps {
   services?: string[];
   /** Optional file path from code block attributes (e.g., "components/calculator.tsx") */
   filePath?: string;
+  /**
+   * Fence language of the source block (e.g. "tsx", "json"). When there is no
+   * `filePath`, the preview path — and with it the compile-or-display
+   * decision — derives from this instead of the tsx entrypoint, so a pathless
+   * JSON fence is never treated as compilable widget source.
+   */
+  language?: string;
+  /** Notified when the widget preview fails to compile or mount. */
+  onWidgetError?: (error: string) => void;
   /** Optional callback to open a shared edit session outside this component */
   onOpenEditSession?: (session: {
     projectId: string;
@@ -55,6 +64,46 @@ interface CodePreviewProps {
 // "Applying edits..." spinner.
 const COMPILE_TIMEOUT_MS = 20_000;
 
+/**
+ * Default file name for a pathless block, from its fence language. Unlike the
+ * compiler's `detectMainFile` this never falls back to a compilable
+ * extension: an unknown or data language lands on a text path, so only
+ * genuinely compilable content reaches the widget pipeline.
+ */
+function entryFileForLanguage(language: string): string {
+  switch (language) {
+    case 'tsx':
+    case 'typescript':
+      return 'main.tsx';
+    case 'jsx':
+    case 'javascript':
+      return 'main.jsx';
+    case 'ts':
+      return 'main.ts';
+    case 'js':
+      return 'main.js';
+    case 'json':
+      return 'main.json';
+    case 'md':
+    case 'markdown':
+      return 'main.md';
+    case 'yaml':
+    case 'yml':
+      return 'main.yaml';
+    case 'css':
+      return 'main.css';
+    case 'html':
+      return 'main.html';
+    case 'xml':
+    case 'svg':
+      return 'main.xml';
+    case 'toml':
+      return 'main.toml';
+    default:
+      return 'main.txt';
+  }
+}
+
 function createManifest(services?: string[]): Manifest {
   return {
     name: 'preview',
@@ -70,6 +119,8 @@ export function CodePreview({
   compiler,
   services,
   filePath,
+  language,
+  onWidgetError,
   entrypoint = 'index.ts',
   onOpenEditSession,
   vfs = httpWidgetVfs,
@@ -103,6 +154,11 @@ export function CodePreview({
   // Fence `path` attribute wins; otherwise the user-chosen save path.
   const effectiveFilePath = filePath ?? savePath ?? undefined;
 
+  // Pathless blocks land on a language-appropriate default file: the fence
+  // language (when known) beats the host's entrypoint, which historically
+  // forced everything to main.tsx.
+  const defaultEntryFile = language ? entryFileForLanguage(language) : entrypoint;
+
   // Determine project ID based on the VFS adapter and available path
   const getProjectId = useCallback(async () => {
     if (effectiveFilePath && (await vfs.usePaths())) {
@@ -121,10 +177,10 @@ export function CodePreview({
   const getEntryFile = useCallback(() => {
     if (effectiveFilePath) {
       const parts = effectiveFilePath.split('/');
-      return parts[parts.length - 1] || entrypoint;
+      return parts[parts.length - 1] || defaultEntryFile;
     }
-    return entrypoint;
-  }, [effectiveFilePath, entrypoint]);
+    return defaultEntryFile;
+  }, [effectiveFilePath, defaultEntryFile]);
 
   useEffect(() => {
     currentCodeRef.current = currentCode;
@@ -217,12 +273,12 @@ export function CodePreview({
   // the generated default; later saves reuse the chosen path.
   const handleSave = useCallback(() => {
     if (!effectiveFilePath) {
-      setPathDraft(`${fallbackId}/${entrypoint}`);
+      setPathDraft(`${fallbackId}/${defaultEntryFile}`);
       setPathPromptOpen(true);
       return;
     }
     void saveTo(null);
-  }, [effectiveFilePath, fallbackId, entrypoint, saveTo]);
+  }, [effectiveFilePath, fallbackId, defaultEntryFile, saveTo]);
 
   const confirmSavePath = useCallback(() => {
     const normalized = pathDraft.replace(/^\/+|\/+$/g, '').trim();
@@ -232,9 +288,12 @@ export function CodePreview({
     void saveTo(normalized);
   }, [pathDraft, saveTo]);
 
-  const previewPath = filePath ?? entrypoint;
+  const previewPath = filePath ?? defaultEntryFile;
   const fileType = useMemo(() => getFileType(previewPath), [previewPath]);
   const canRenderWidget = fileType.category === 'compilable';
+  // The fence language (when supplied) is the truth for highlighting; the
+  // extension-derived one covers path-only hosts like the workspace tabs.
+  const displayLanguage = language ?? fileType.language;
 
   const compile: CompileFn = useCallback(
     async (code: string) => {
@@ -292,6 +351,7 @@ export function CodePreview({
           services={services}
           enabled={showPreview && !isEditing}
           sourcePath={effectiveFilePath}
+          onError={onWidgetError}
         />
       );
     }
@@ -317,10 +377,10 @@ export function CodePreview({
     return (
       <CodeBlockView
         content={currentCode}
-        language={fileType.language}
+        language={displayLanguage}
       />
     );
-  }, [canRenderWidget, compiler, currentCode, customPreview, effectiveFilePath, filePath, fileType, isEditing, previewPath, services, showPreview]);
+  }, [canRenderWidget, compiler, currentCode, customPreview, displayLanguage, effectiveFilePath, filePath, fileType, isEditing, onWidgetError, previewPath, services, showPreview]);
 
   const handleOpenEditor = useCallback(async () => {
     if (!onOpenEditSession) {
@@ -443,7 +503,7 @@ export function CodePreview({
           >
             <CodeBlockView
               content={currentCode}
-              language={fileType.language}
+              language={displayLanguage}
             />
           </div>
         )}

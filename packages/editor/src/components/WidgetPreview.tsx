@@ -9,6 +9,13 @@ export interface WidgetPreviewProps {
   enabled?: boolean;
   /** Workspace path of the widget's source, for telemetry attribution. */
   sourcePath?: string;
+  /**
+   * Notified when the preview fails — compile errors, iframe mount failures
+   * (the mount promise rejects on the widget-error postMessage), timeouts.
+   * Lets a host react (e.g. chat's self-heal loop) instead of the error just
+   * sitting in the preview body.
+   */
+  onError?: (error: string) => void;
 }
 
 function createManifest(services?: string[]): Manifest {
@@ -27,11 +34,16 @@ export function WidgetPreview({
   services,
   enabled = true,
   sourcePath,
+  onError,
 }: WidgetPreviewProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const mountedRef = useRef<MountedWidget | null>(null);
+  // Read through a ref so an inline callback prop doesn't retrigger the
+  // compile-and-mount effect on every parent render.
+  const onErrorRef = useRef(onError);
+  onErrorRef.current = onError;
 
   useEffect(() => {
     if (!enabled || !compiler || !containerRef.current) return;
@@ -73,7 +85,9 @@ export function WidgetPreview({
         mountedRef.current = mounted;
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Failed to render preview');
+          const message = err instanceof Error ? err.message : 'Failed to render preview';
+          setError(message);
+          onErrorRef.current?.(message);
         }
       } finally {
         if (!cancelled) {

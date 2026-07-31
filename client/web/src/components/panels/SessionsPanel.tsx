@@ -3,15 +3,15 @@
  *
  * A chat session is a branch (docs/vcs-and-sessions.md): staged sessions keep
  * their file edits in an overlay until someone applies them, auto sessions
- * write through. The session bar drives *the one you are in*; twelve of the
- * namespace's operations had no UI at all, so the workspace's other sessions
- * — what they staged, whether anyone is in them, what is still open — were
- * invisible.
+ * write through. The session bar drives *the one you are in*; this panel is
+ * the log of every other one — what they staged, whether anyone applied it,
+ * what is still open.
  *
- * This is the PR-style log: one row per session with its staged diff and the
- * actions that settle it (sync, apply, archive). Destructive ones are
- * two-click; `delete` is deliberately absent — throwing away someone's
- * transcript should not be a stray click in a list view.
+ * Rows are dense on purpose: a session's title, status and freshness fit on
+ * one line, and the destructive/plain-language actions (see SessionBar's
+ * vocabulary — no Git words) only show once a row is opened. `delete` is
+ * deliberately absent — throwing away someone's transcript should not be a
+ * stray click in a list view.
  *
  * Presence is deliberately NOT shown here even though `sessions.presence`
  * would supply it: that operation is a heartbeat-and-fetch, so reading it
@@ -21,7 +21,7 @@
  * Presence belongs to the window that is actually in a chat.
  */
 
-import { GitBranch, Loader2 } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, ExternalLink, GitBranch, Loader2 } from "lucide-react";
 import { useRef, useState } from "react";
 import {
   PanelEmpty,
@@ -30,11 +30,14 @@ import {
   PanelShell,
   PanelTabs,
   relativeTime,
+  usePanelHostActions,
   type NativePanelProps,
+  type PanelHostActions,
   usePanelData,
 } from "./shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { sessionWindowUrl } from "@/lib/chat-sessions";
 import { invokeNamespaceTool } from "@/lib/tools";
 
 type SessionStatus = "open" | "merged" | "closed";
@@ -45,12 +48,14 @@ interface SessionChanges {
   removed: string[];
 }
 
-interface SessionRow {
+interface SessionRecord {
   id: string;
   title: string;
   status: SessionStatus;
   mode: "auto" | "staged";
   base: string;
+  /** When the base snapshot was taken — rendered as "workspace as of …". */
+  baseAt?: string;
   messageCount: number;
   createdBy: string;
   createdAt: string;
@@ -85,10 +90,12 @@ function ConfirmButton({
   label,
   onConfirm,
   disabled,
+  title,
 }: {
   label: string;
   onConfirm: () => void;
   disabled?: boolean;
+  title?: string;
 }) {
   const [arming, setArming] = useState(false);
   const timer = useRef<number | undefined>(undefined);
@@ -97,7 +104,8 @@ function ConfirmButton({
       variant={arming ? "destructive" : "ghost"}
       size="sm"
       disabled={disabled}
-      className="h-7 px-2 text-xs"
+      className="h-6 px-2 text-[11px]"
+      title={arming ? "Click again to confirm" : title}
       onClick={() => {
         if (arming) {
           window.clearTimeout(timer.current);
@@ -114,39 +122,82 @@ function ConfirmButton({
   );
 }
 
-function ChangeList({ changes }: { changes: SessionChanges }) {
+/** +added ~modified −removed, compact enough for the collapsed row. */
+function ChangeSummary({ changes }: { changes: SessionChanges }) {
+  return (
+    <span className="flex shrink-0 items-center gap-1 font-mono text-[11px] text-muted-foreground">
+      {changes.added.length > 0 && (
+        <span className="text-emerald-600 dark:text-emerald-400">+{changes.added.length}</span>
+      )}
+      {changes.modified.length > 0 && (
+        <span className="text-amber-600 dark:text-amber-400">~{changes.modified.length}</span>
+      )}
+      {changes.removed.length > 0 && (
+        <span className="text-destructive">−{changes.removed.length}</span>
+      )}
+    </span>
+  );
+}
+
+/** The changed-file list shown in the expanded row. Opens a file through the
+ *  host's `onOpenFile` when threaded (SessionBar's pattern); otherwise it's
+ *  a plain, non-interactive list. */
+function ChangeList({
+  changes,
+  onOpenFile,
+}: {
+  changes: SessionChanges;
+  onOpenFile?: (path: string) => void;
+}) {
   const groups: Array<[string, string[], string]> = [
-    ["+", changes.added, "text-emerald-600"],
-    ["~", changes.modified, "text-amber-600"],
+    ["+", changes.added, "text-emerald-600 dark:text-emerald-400"],
+    ["~", changes.modified, "text-amber-600 dark:text-amber-400"],
     ["−", changes.removed, "text-destructive"],
   ];
   return (
-    <div className="mt-2 space-y-0.5">
+    <div className="space-y-0.5">
       {groups.map(([mark, paths, className]) =>
-        paths.map((path) => (
-          <div key={`${mark}${path}`} className="flex items-center gap-1.5 font-mono text-[11px]">
-            <span className={`shrink-0 ${className}`}>{mark}</span>
-            <span className="truncate text-muted-foreground" title={path}>
-              {path}
-            </span>
-          </div>
-        )),
+        paths.map((path) =>
+          onOpenFile ? (
+            <button
+              key={`${mark}${path}`}
+              type="button"
+              onClick={() => onOpenFile(path)}
+              className="flex w-full items-center gap-1.5 rounded px-1 py-0.5 text-left font-mono text-[11px] hover:bg-muted"
+              title={`Open ${path}`}
+            >
+              <span className={`shrink-0 ${className}`}>{mark}</span>
+              <span className="truncate text-muted-foreground">{path}</span>
+            </button>
+          ) : (
+            <div key={`${mark}${path}`} className="flex items-center gap-1.5 px-1 font-mono text-[11px]">
+              <span className={`shrink-0 ${className}`}>{mark}</span>
+              <span className="truncate text-muted-foreground" title={path}>
+                {path}
+              </span>
+            </div>
+          ),
+        ),
       )}
     </div>
   );
 }
 
-function SessionCard({
+function SessionEntry({
   session,
   onChanged,
+  hostActions,
 }: {
-  session: SessionRow;
+  session: SessionRecord;
   onChanged: () => void;
+  hostActions: PanelHostActions;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const staged = changeCount(session.changes);
+  const isOpen = session.status === "open";
+  const isDraft = session.mode === "staged";
 
   const run = (operation: string, args: Record<string, unknown>) => {
     setBusy(operation);
@@ -157,70 +208,117 @@ function SessionCard({
       .finally(() => setBusy(null));
   };
 
+  // Opening a chat: prefer the host's callback (ChatPage switches its own
+  // pane to this session); fall back to navigating this window with
+  // `?session=` if the panel is ever hosted somewhere that can't wire it.
+  const openChat = () => {
+    if (hostActions.onOpenSession) hostActions.onOpenSession(session.id);
+    else window.location.assign(sessionWindowUrl(session.id));
+  };
+
+  const startedFrom = relativeTime(session.baseAt ?? session.createdAt);
+
   return (
-    <div className="rounded-md border bg-card p-3 text-sm">
-      <div className="flex flex-wrap items-center gap-1.5">
-        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${STATUS_DOT[session.status]}`} />
-        <span className="font-medium">{session.title || session.id}</span>
-        <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
-          {session.mode}
-        </Badge>
-        <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">
+    <div>
+      <div className="flex items-center gap-1.5 px-2 py-1.5 text-sm hover:bg-muted/40">
+        <button
+          type="button"
+          onClick={() => setExpanded((open) => !open)}
+          className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-foreground"
+          title={expanded ? "Collapse" : "Details and actions"}
+        >
+          {expanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+        </button>
+        <span
+          className={`h-1.5 w-1.5 shrink-0 rounded-full ${STATUS_DOT[session.status]}`}
+          title={session.status}
+        />
+        <button
+          type="button"
+          onClick={openChat}
+          className="min-w-0 flex-1 truncate text-left font-medium hover:underline"
+          title="Open this chat"
+        >
+          {session.title || session.id}
+        </button>
+        {isDraft && (
+          <Badge variant="outline" className="shrink-0 px-1.5 py-0 text-[10px]">
+            Draft
+          </Badge>
+        )}
+        {session.changes && staged > 0 && <ChangeSummary changes={session.changes} />}
+        <span className="shrink-0 text-[11px] text-muted-foreground">
+          {session.messageCount} msg{session.messageCount === 1 ? "" : "s"}
+        </span>
+        <span className="shrink-0 text-[11px] text-muted-foreground" title={session.updatedAt}>
           {relativeTime(session.updatedAt)}
         </span>
       </div>
 
-      <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-        <span>{session.messageCount} messages</span>
-        <span className="font-mono">base {session.base.slice(0, 8)}</span>
-        {session.mergeCommit && (
-          <span className="font-mono">merged {session.mergeCommit.slice(0, 8)}</span>
-        )}
-        {staged > 0 && (
-          <button
-            type="button"
-            onClick={() => setExpanded((open) => !open)}
-            className="underline hover:text-foreground"
-          >
-            {staged} staged {staged === 1 ? "change" : "changes"}
-          </button>
-        )}
-      </div>
+      {expanded && (
+        <div className="space-y-2 border-t bg-muted/20 px-3 py-2 text-xs">
+          <div className="text-muted-foreground">
+            {startedFrom ? `Started from workspace as of ${startedFrom}` : "Started from the workspace"}
+            {session.mergeCommit && " · applied to the workspace"}
+          </div>
 
-      {expanded && session.changes && <ChangeList changes={session.changes} />}
-      {actionError && <div className="mt-1 text-xs text-destructive">{actionError}</div>}
-
-      {session.status === "open" && (
-        <div className="mt-2 flex flex-wrap items-center gap-2 border-t pt-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-7 px-2 text-xs"
-            disabled={busy !== null}
-            onClick={() => run("sync", {})}
-            title="Rebase this session's base onto the current main head"
-          >
-            {busy === "sync" && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
-            Sync
-          </Button>
-          {staged > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 px-2 text-xs"
-              disabled={busy !== null}
-              onClick={() => run("close", { stage: true })}
-              title="Apply the staged overlay to main as a merge commit"
-            >
-              {busy === "close" && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
-              Apply &amp; close
-            </Button>
+          {session.changes && staged > 0 && (
+            <ChangeList changes={session.changes} onOpenFile={hostActions.onOpenFile} />
           )}
-          <ConfirmButton
-            label="Archive"
-            disabled={busy !== null}
-            onConfirm={() => run("close", { stage: false })}
-          />
+
+          {actionError && <div className="text-destructive">{actionError}</div>}
+
+          <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+            {isOpen && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-6 px-2 text-[11px]"
+                disabled={busy !== null}
+                onClick={() => run("sync", {})}
+                title="Bring this session up to date with the current workspace"
+              >
+                {busy === "sync" && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+                Get latest changes
+              </Button>
+            )}
+            {isOpen && staged > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-6 px-2 text-[11px]"
+                disabled={busy !== null}
+                onClick={() => run("close", { stage: true })}
+                title="Apply this session's changes to your workspace"
+              >
+                {busy === "close" && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
+                <Check className="mr-1 h-3 w-3" />
+                Apply to workspace
+              </Button>
+            )}
+            {isOpen && (
+              <ConfirmButton
+                label="Archive"
+                disabled={busy !== null}
+                onConfirm={() => run("close", { stage: false })}
+                title={
+                  staged > 0
+                    ? "Archive — closes without applying its changes to the workspace"
+                    : "Archive this chat"
+                }
+              />
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="ml-auto h-6 gap-1 px-2 text-[11px]"
+              onClick={() => window.open(sessionWindowUrl(session.id), "_blank")}
+              title="Open this chat in its own window"
+            >
+              <ExternalLink className="h-3 w-3" />
+              Open in new window
+            </Button>
+          </div>
         </div>
       )}
     </div>
@@ -229,8 +327,9 @@ function SessionCard({
 
 export function SessionsPanel({ scope: _scope }: NativePanelProps) {
   const [tab, setTab] = useState<TabId>("open");
+  const hostActions = usePanelHostActions();
   const { data, error, loading, refresh } = usePanelData(
-    async () => (await invokeSessions("list", {})) as { sessions: SessionRow[] },
+    async () => (await invokeSessions("list", {})) as { sessions: SessionRecord[] },
   );
 
   const sessions = data?.sessions ?? [];
@@ -260,9 +359,14 @@ export function SessionsPanel({ scope: _scope }: NativePanelProps) {
       ) : rows.length === 0 ? (
         <PanelEmpty>No {tab} sessions.</PanelEmpty>
       ) : (
-        <div className="flex flex-col gap-2 p-3">
+        <div className="divide-y">
           {rows.map((session) => (
-            <SessionCard key={session.id} session={session} onChanged={refresh} />
+            <SessionEntry
+              key={session.id}
+              session={session}
+              onChanged={refresh}
+              hostActions={hostActions}
+            />
           ))}
         </div>
       )}
