@@ -1,0 +1,26 @@
+schema: sdd
+
+context: |
+  Tech stack (all decisions default to this unless an ADR says otherwise):
+  - TypeScript end-to-end (pnpm workspaces monorepo)
+  - Frontend: React SPA, Vite, Tailwind, shadcn/ui
+  - Backend: Node.js services on AWS
+  - Infra: AWS CDK in TypeScript
+  - Shared contracts: zod schemas in a shared package; components communicate only
+    through contracts declared in tech plans
+
+  Working style:
+  - Concise artifacts, strong abstractions, no speculative flexibility
+  - Durable cross-cutting decisions become ADRs in docs/decisions/
+  - Tasks are written to be delegable to cloud agents with zero conversational
+    context (see the delegate skill)
+
+rules:
+  prd:
+    - Keep under 2 pages; every assumption not confirmed by the user goes in Open Questions
+  tech-plan:
+    - Every decision lists at least one credible rejected alternative and a "Revisit if" condition
+    - Interfaces & Data must be complete enough that two agents can build opposite sides of a seam independently
+  tasks:
+    - Work streams that can run in parallel must not touch overlapping paths
+    - Every work stream has a runnable Verify command
