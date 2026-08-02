@@ -17,12 +17,12 @@
 
 > Depends-on: 1 | Touches: aprovan/client/web/src/components/panels/CredentialsPanel.tsx, aprovan/client/web/src/components/panels/AdminPermissionsPanel.tsx, aprovan/client/web/src/lib/registry.ts, aprovan/client/web/src/lib/credentials.ts, aprovan/client/web/src/components/ServicesMenu.tsx, aprovan/client/web/src/components/ProviderPicker.tsx, aprovan/client/web/src/components/SessionControls.tsx, aprovan/client/web/src/pages/ChatPage.tsx, aprovan/client/web/src/features/tabs/** | Verify: cd ~/Documents/Code/AprovanLabs/aprovan && pnpm --filter @aprovan/patchwork-web build
 
-- [ ] 2.1 Replace CredentialsPanel / AdminPermissionsPanel guts with registry-ui widgets;
+- [x] 2.1 Replace CredentialsPanel / AdminPermissionsPanel guts with registry-ui widgets;
       wire OAuth to existing `/chat/account/oauth-callback` — ux.md credentials/admin.
-- [ ] 2.2 Replace `credentialsUrl()` navigations with `openNativeTab("credentials")` (+
+- [x] 2.2 Replace `credentialsUrl()` navigations with `openNativeTab("credentials")` (+
       provider prefill); add chat deep-link URL helper for external stubs only — specs:
       credential-hosting.
-- [ ] 2.3 Parse `?native=credentials|admin&provider=` on app boot to open the matching tab.
+- [x] 2.3 Parse `?native=credentials|admin&provider=` on app boot to open the matching tab.
 
 ## 3. Registry catalog hosts (standalone + prod stubs)
 

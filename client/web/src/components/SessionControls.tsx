@@ -13,16 +13,22 @@ import { useGatewaySession } from "@aprovan/ui/gateway";
 import { SessionArea, type SessionAreaStatus } from "@aprovan/ui/shell";
 import { useEffect, useRef, useState } from "react";
 import { gateway } from "../lib/gateway";
-import { credentialsUrl } from "../lib/registry";
+import { chatDeepLinkUrl } from "../lib/registry";
 
 interface SessionControlsProps {
   /** Called once with the server's active workspace id (null if unknown). */
   onLoad?: (activeWorkspaceId: string | null) => void;
   /** Called after a workspace switch is confirmed by the gateway. */
   onSwitch: (workspaceId: string) => void;
+  /** Open the in-app credentials native tab. */
+  onOpenCredentials?: () => void;
 }
 
-export default function SessionControls({ onLoad, onSwitch }: SessionControlsProps) {
+export default function SessionControls({
+  onLoad,
+  onSwitch,
+  onOpenCredentials,
+}: SessionControlsProps) {
   const auth = useAuth();
   const session = useGatewaySession(gateway, auth.status === "authenticated");
   const [switching, setSwitching] = useState(false);
@@ -73,7 +79,13 @@ export default function SessionControls({ onLoad, onSwitch }: SessionControlsPro
         void auth.signIn(`${window.location.pathname}${window.location.search}`)
       }
       onSignOut={() => void auth.signOut()}
-      links={[{ label: "Credentials", href: credentialsUrl() }]}
+      links={[
+        {
+          label: "Credentials",
+          href: onOpenCredentials ? "#" : chatDeepLinkUrl("credentials"),
+          onClick: onOpenCredentials,
+        },
+      ]}
     />
   );
 }

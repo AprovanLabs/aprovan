@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AppsSelection } from "@aprovan/registry-ui/apps-panel";
+import { stashCredentialsPrefill } from "@/lib/credentials";
 import { nativeTabPath, parseNativeTabPath } from "@/lib/native-surfaces";
 import { loadWorkspaceFileProject } from "@/lib/workspace-vfs";
 import {
@@ -193,7 +194,10 @@ export function useTabs(args: {
 
   /** Native surfaces open exactly like apps tabs: a pseudo-path content tab. */
   const openNativeTab = useCallback(
-    (surfaceId: string) => {
+    (surfaceId: string, options?: { provider?: string }) => {
+      if (surfaceId === "credentials") {
+        stashCredentialsPrefill(options?.provider);
+      }
       const path = nativeTabPath(surfaceId);
       setOpenTabs((prev) => {
         if (prev.has(path)) return prev;

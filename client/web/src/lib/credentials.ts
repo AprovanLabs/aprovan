@@ -76,3 +76,25 @@ export function loadOAuthPending(): OAuthPending | null {
 export function clearOAuthPending(): void {
   sessionStorage.removeItem(OAUTH_PENDING_KEY);
 }
+
+const CREDENTIALS_PREFILL_KEY = "aprovan:credentials-prefill";
+const CREDENTIALS_MOUNT_KEY = "aprovan:credentials-mount";
+
+/** Stash provider prefill before opening the credentials native tab. */
+export function stashCredentialsPrefill(provider?: string): string {
+  const mountKey = String(Date.now());
+  sessionStorage.setItem(CREDENTIALS_MOUNT_KEY, mountKey);
+  if (provider) sessionStorage.setItem(CREDENTIALS_PREFILL_KEY, provider);
+  else sessionStorage.removeItem(CREDENTIALS_PREFILL_KEY);
+  return mountKey;
+}
+
+export function readCredentialsPrefill(): {
+  mountKey: string;
+  provider?: string;
+} {
+  return {
+    mountKey: sessionStorage.getItem(CREDENTIALS_MOUNT_KEY) ?? "initial",
+    provider: sessionStorage.getItem(CREDENTIALS_PREFILL_KEY) ?? undefined,
+  };
+}

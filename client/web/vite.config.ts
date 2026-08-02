@@ -58,7 +58,7 @@ export default defineConfig(async () => {
           globPatterns: ["**/*.{js,css,html,svg,png,ico,woff,woff2}"],
           // The main chunk is ~2.6MB; Workbox's 2MB default would silently
           // skip precaching it, which defeats the point of offline support.
-          maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
+          maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
           // SPA fallback for client-side routing, but scoped tightly to
           // `/chat/` — this bucket also serves the marketing site and the
           // registry app from sibling prefixes, and a stray fallback match
