@@ -56,7 +56,17 @@ jobs:
               continue
             fi
             echo "Publishing $pkg@$version"
-            pnpm --filter "$pkg" publish --no-git-checks --access public || failed="$failed $pkg"
+            out=$(mktemp)
+            if pnpm --filter "$pkg" publish --no-git-checks --access public >"$out" 2>&1; then
+              cat "$out"
+            else
+              cat "$out"
+              if grep -qE 'previously published versions|cannot publish over the previously published' "$out"; then
+                echo "$pkg@$version already published — treating as success"
+              else
+                failed="$failed $pkg"
+              fi
+            fi
           done
           [ -z "$failed" ] || (echo "Failed:$failed" && exit 1)
         env:
