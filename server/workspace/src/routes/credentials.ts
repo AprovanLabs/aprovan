@@ -12,10 +12,11 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { getCredentialStore, type CredentialInput } from "../credentials.js";
+import { isInterface } from "../interfaces.js";
 import { requireAuth, requireAdmin } from "../middleware/auth.js";
 import { validateBody } from "../middleware/validate.js";
 import { exchangeAuthorizationCode, OAuthExchangeError } from "../oauthTokens.js";
-import { invalidateToolListCache } from "./tools.js";
+import { invalidateToolListCache, shouldListCredentialAsProvider } from "./tools.js";
 
 export const credentialsRouter = new Hono();
 
@@ -60,6 +61,21 @@ credentialsRouter.post("/", requireAdmin, validateBody(credentialSchema), async 
   const workspaceId = principal.workspaceId;
 
   const input: CredentialInput = c.req.valid("json");
+
+  // Interface ids (`llm`, `agent`, …) and interface-only implementations
+  // (`machine`, …) are not registry providers — storing a credential under
+  // those names makes discovery treat the interface as a SaaS provider.
+  // (`machine` credentials are created by sandboxes.registerHost, not this form.)
+  if (isInterface(input.provider) || !shouldListCredentialAsProvider(input.provider)) {
+    return c.json(
+      {
+        error: isInterface(input.provider)
+          ? `Provider "${input.provider}" is an interface, not a credential provider. Use the concrete provider id (e.g. openrouter, anthropic, github).`
+          : `Provider "${input.provider}" is a built-in interface implementation and cannot be added as a credential.`,
+      },
+      400,
+    );
+  }
 
   // Authorization codes are single-use and expire within minutes — exchange
   // for tokens now and store the token set instead of the dead code.

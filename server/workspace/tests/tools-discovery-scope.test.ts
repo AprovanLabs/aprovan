@@ -176,3 +176,72 @@ describe("registry.providers — fast paged discovery", () => {
     expect(filtered.providers[0]?.id).toBe("provider-10");
   });
 });
+
+describe("shouldListCredentialAsProvider / namespaces kind", () => {
+  it("hides interface ids and interface-only implementations", async () => {
+    const { shouldListCredentialAsProvider } = await import("../src/routes/tools.js");
+    expect(shouldListCredentialAsProvider("llm")).toBe(false);
+    expect(shouldListCredentialAsProvider("agent")).toBe(false);
+    expect(shouldListCredentialAsProvider("sandbox")).toBe(false);
+    expect(shouldListCredentialAsProvider("machine")).toBe(false);
+    expect(shouldListCredentialAsProvider("native")).toBe(false);
+    expect(shouldListCredentialAsProvider("openrouter")).toBe(true);
+    expect(shouldListCredentialAsProvider("github")).toBe(true);
+  });
+
+  it("keeps llm as kind interface even when a mis-keyed llm credential exists", async () => {
+    resetToolListCache();
+    const store = getCredentialStore();
+    const bad = await store.create("local", {
+      provider: "llm",
+      label: "openrouter",
+      payload: { type: "api_key", value: "test-key" },
+    });
+    const machine = await store.create("local", {
+      provider: "machine",
+      label: "host",
+      payload: { type: "bearer_token", token: "host-token" },
+    });
+    // A real chat provider makes the llm interface listable; without it the
+    // interface is omitted (nothing can execute it) — which is correct, and
+    // used to leave only the bogus credential `llm` under Providers.
+    const good = await store.create("local", {
+      provider: "openrouter",
+      label: "or",
+      payload: { type: "api_key", value: "or-key" },
+    });
+    try {
+      const res = await createApp().request("/tools/namespaces");
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        namespaces: Array<{ id: string; kind: string }>;
+      };
+      const byId = new Map(body.namespaces.map((n) => [n.id, n]));
+      // Last-write-wins Map bug: credential `llm` used to overwrite the interface.
+      expect(byId.get("llm")?.kind).toBe("interface");
+      expect(body.namespaces.filter((n) => n.id === "llm")).toHaveLength(1);
+      expect(byId.has("machine")).toBe(false);
+      expect(body.namespaces.some((n) => n.kind === "provider" && n.id === "llm")).toBe(false);
+      expect(byId.get("openrouter")?.kind).toBe("llm-alias");
+    } finally {
+      await store.delete("local", bad.id);
+      await store.delete("local", machine.id);
+      await store.delete("local", good.id);
+      resetToolListCache();
+    }
+  });
+
+  it("rejects posting credentials under interface / interface-only provider ids", async () => {
+    for (const provider of ["llm", "agent", "machine", "native"]) {
+      const res = await createApp().request("/credentials", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          provider,
+          payload: { type: "api_key", value: "x" },
+        }),
+      });
+      expect(res.status).toBe(400);
+    }
+  });
+});
