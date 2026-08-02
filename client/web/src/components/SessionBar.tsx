@@ -28,6 +28,7 @@ import {
   X,
 } from "lucide-react";
 import { useState } from "react";
+import { CommitMountedContent } from "@/components/CommitMountedContent";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -142,6 +143,8 @@ export function SessionBar({
   const [listOpen, setListOpen] = useState(false);
   const [changesOpen, setChangesOpen] = useState(false);
   const [peersOpen, setPeersOpen] = useState(false);
+  // Applied-chat commit detail (mounted-content lineage), expanded per chat.
+  const [expandedCommitId, setExpandedCommitId] = useState<string | null>(null);
 
   const changed = session ? changedFileCount(session) : 0;
   const isOpen = session?.status === "open";
@@ -454,7 +457,29 @@ export function SessionBar({
                         {count} file{count === 1 ? "" : "s"} changed
                       </span>
                     )}
+                    {entry.status === "merged" && entry.mergeCommit && (
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setExpandedCommitId((current) =>
+                            current === entry.mergeCommit ? null : (entry.mergeCommit ?? null),
+                          );
+                        }}
+                        className="rounded px-1 py-0.5 hover:bg-muted"
+                        title="What this applied — including the versions of any mounted content at that moment"
+                      >
+                        {expandedCommitId === entry.mergeCommit ? "Hide details" : "Details"}
+                      </button>
+                    )}
                   </span>
+                  {entry.status === "merged" &&
+                    entry.mergeCommit &&
+                    expandedCommitId === entry.mergeCommit && (
+                      <span onClick={(event) => event.stopPropagation()}>
+                        <CommitMountedContent commitId={entry.mergeCommit} />
+                      </span>
+                    )}
                 </div>
               );
             })}
