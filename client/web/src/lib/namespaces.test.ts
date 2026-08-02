@@ -66,8 +66,11 @@ describe("groupNamespaces", () => {
   });
 
   it("still groups known interfaces and their instances when unreachable", () => {
-    const grouped = groupNamespaces(["sql", "sql:analytics", "llm", "linear"], null);
-    expect(grouped.interfaces).toEqual(["llm", "sql", "sql:analytics"]);
+    const grouped = groupNamespaces(
+      ["sql", "sql:analytics", "llm", "agent", "vcs", "linear"],
+      null,
+    );
+    expect(grouped.interfaces).toEqual(["agent", "llm", "sql", "sql:analytics", "vcs"]);
     expect(grouped.providers).toEqual(["linear"]);
   });
 

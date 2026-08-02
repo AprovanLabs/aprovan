@@ -127,7 +127,7 @@ const FALLBACK_CORE = new Set([
 ]);
 
 /** Interfaces predating the catalog, for the same fallback. */
-const FALLBACK_INTERFACES = new Set(["llm", "sql", "sandbox"]);
+const FALLBACK_INTERFACES = new Set(["llm", "sql", "sandbox", "agent", "vcs"]);
 
 /**
  * Split the namespaces a workspace can call into the three sections the

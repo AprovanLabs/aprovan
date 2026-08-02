@@ -22,6 +22,7 @@ import { getAuditStore } from "../audit.js";
 import { mayInvokeTool } from "../authorize.js";
 import { getCredentialStore, resolveCredentialRecord } from "../credentials.js";
 import {
+  isInterface,
   listInstances,
   listInterfaces,
   parseInterfaceNamespace,
@@ -337,6 +338,26 @@ async function interfaceNamespaces(
   return namespaces;
 }
 
+/**
+ * Credentials whose `provider` field is an interface id (`llm`, `agent`, …)
+ * or an interface-only implementation (`machine`, `native`, `bashkit`,
+ * `harness`) must not become top-level provider namespaces. Doing so:
+ *   - overwrites the interface's `kind: "interface"` in `/tools/namespaces`
+ *     when the Map is keyed by id (last write wins), so `llm` lands under
+ *     Providers instead of Interfaces;
+ *   - surfaces sandbox-host client tokens / in-process runners as if they
+ *     were registry SaaS providers.
+ * Real UTDK providers that also appear in a compat list (github, openai, …)
+ * still list normally.
+ */
+const INTERFACE_ONLY_PROVIDERS = new Set(["machine", "native", "bashkit", "harness"]);
+
+export function shouldListCredentialAsProvider(provider: string): boolean {
+  if (isInterface(provider)) return false;
+  if (INTERFACE_ONLY_PROVIDERS.has(provider)) return false;
+  return true;
+}
+
 function llmToolEntries(providerId: string): ToolEntry[] {
   const alias = resolveLlmProvider(providerId);
   return toLlmToolEntries(
@@ -374,6 +395,7 @@ async function discoverTools(workspaceId: string): Promise<ToolEntry[]> {
   }
 
   for (const provider of providers) {
+    if (!shouldListCredentialAsProvider(provider)) continue;
     // LLM chat providers (anthropic, synthetic.new, …) are credential-store
     // aliases onto OpenAI-compatible modules. They surface a curated entry
     // set (chat + model listing); the tool-call route resolves the alias to
@@ -449,6 +471,7 @@ async function discoverConfiguredTools(workspaceId: string): Promise<ToolEntry[]
   }
 
   for (const provider of providers) {
+    if (!shouldListCredentialAsProvider(provider)) continue;
     if (isLlmProvider(provider)) {
       tools.push(...llmToolEntries(provider));
       continue;
@@ -563,6 +586,7 @@ async function describeNamespaces(workspaceId: string): Promise<NamespaceInfo[]>
   }
 
   for (const provider of connected) {
+    if (!shouldListCredentialAsProvider(provider)) continue;
     const alias = resolveLlmProvider(provider);
     namespaces.push(
       alias
