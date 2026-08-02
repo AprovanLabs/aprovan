@@ -151,3 +151,4 @@ hardcopy.yaml
 # E2E visual artifacts
 # Generated widget HTML artifacts
 .artifacts/
+.claude/settings.local.json
