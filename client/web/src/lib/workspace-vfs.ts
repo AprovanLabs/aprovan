@@ -62,45 +62,59 @@ function isStagedScope(): boolean {
 const LIVE_SYNC_INTERVAL_MS = 8_000;
 
 /**
- * Poll the gateway listing (which includes per-file content hashes) and fire
- * the ordinary watchers when anything changed — the same machinery local
- * writes use, so trees refresh and open tabs mark stale no matter *who*
- * made the change. The signature baseline resets whenever the session scope
- * changes so a scope switch never reads as a storm of edits. Polling is the
- * v1 transport; a push/CRDT feed can replace this without touching callers.
+ * Poll the gateway's change feed (`GET /fs/changes`, registry
+ * routes/fs.ts) and fire the ordinary watchers for exactly what changed —
+ * the same machinery local writes use, so trees refresh and open tabs mark
+ * stale no matter *who* made the change. This replaced a full unprefixed
+ * `/fs` listing fetched (and locally hash-diffed) every tick: an idle
+ * workspace now costs the server one in-memory cursor comparison and a 304,
+ * not a full store read, every 8 seconds per visible tab.
+ *
+ * `since`/`If-None-Match` carry the last cursor this tab has seen: 304 means
+ * nothing changed (no-op); a 200 carries exactly the deltas since then. A
+ * `reset` response (first poll, a scope switch, or the server's journal
+ * having lost history — restart or ring overflow) rebaselines the cursor
+ * silently, the same "observe, don't announce" contract the old hash-diff
+ * baseline had. Polling is the v1 transport; a push/CRDT feed can replace
+ * this without touching callers.
  */
 export function startLiveWorkspaceSync(): () => void {
-  let lastScope = activeVfsSession?.staged ? activeVfsSession.id : "";
-  let lastHashes: Map<string, string> | null = null;
+  let scope = activeVfsSession?.staged ? activeVfsSession.id : "";
+  let cursor: number | undefined;
   let stopped = false;
 
   const tick = async (): Promise<void> => {
     if (stopped || document.visibilityState !== "visible" || !GATEWAY_BASE) return;
-    const scope = activeVfsSession?.staged ? activeVfsSession.id : "";
+    const currentScope = activeVfsSession?.staged ? activeVfsSession.id : "";
+    if (currentScope !== scope) {
+      // Scope switch — rebaseline against the new scope's own change feed
+      // rather than diffing across two unrelated cursor spaces.
+      scope = currentScope;
+      cursor = undefined;
+    }
     try {
-      const response = await gatewayFetch(`${GATEWAY_BASE}/fs${stagedSessionQuery()}`);
+      const query = new URLSearchParams();
+      if (cursor !== undefined) query.set("since", String(cursor));
+      if (scope) query.set("session", scope);
+      const headers: Record<string, string> =
+        cursor !== undefined ? { "If-None-Match": `"${cursor}"` } : {};
+      const response = await gatewayFetch(`${GATEWAY_BASE}/fs/changes?${query}`, { headers });
+      if (response.status === 304) return; // Nothing changed — no store read on the server either.
       if (!response.ok) return;
-      const { entries } = (await response.json()) as {
-        entries: Array<{ path: string; hash: string }>;
+      const body = (await response.json()) as {
+        cursor: number;
+        reset: boolean;
+        changes: Array<{ path: string; kind: "update" | "delete" }>;
       };
-      const hashes = new Map(entries.map((entry) => [entry.path, entry.hash]));
-      if (scope !== lastScope || lastHashes === null) {
-        // New baseline (first poll or scope switch) — observe, don't announce.
-        lastScope = scope;
-        lastHashes = hashes;
+      cursor = body.cursor;
+      if (body.reset) {
+        // First poll, or the server's journal couldn't answer — rebaseline
+        // without announcing (avoids a storm of spurious events on restart).
         return;
       }
-      for (const [path, hash] of hashes) {
-        if (lastHashes.get(path) !== hash) {
-          for (const watcher of watchers) watcher("update", path);
-        }
+      for (const change of body.changes) {
+        for (const watcher of watchers) watcher(change.kind, change.path);
       }
-      for (const path of lastHashes.keys()) {
-        if (!hashes.has(path)) {
-          for (const watcher of watchers) watcher("delete", path);
-        }
-      }
-      lastHashes = hashes;
     } catch {
       // Offline / transient — try again next tick.
     }
