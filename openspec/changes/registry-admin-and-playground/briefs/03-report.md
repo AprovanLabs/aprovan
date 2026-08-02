@@ -42,4 +42,4 @@ Stream 1 widgets are merged on aprovan `main` (PR #13) but not yet on npm `@apro
 ## Branch / PR
 
 - Branch: `ws/registry-account-hosts`
-- PR: (see GitHub after push)
+- PR: https://github.com/AprovanLabs/registry/pull/83
