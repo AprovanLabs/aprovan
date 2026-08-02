@@ -77,16 +77,6 @@ interface InterfacesListing {
 
 const invokeInterfaces = invokeNamespaceTool("interfaces");
 
-/** One-line plain-language purpose per interface — the catalog description
- *  is written for module authors, not for this card. */
-const PURPOSE: Record<string, string> = {
-  llm: "Language models",
-  sql: "Databases",
-  sandbox: "Execution sandboxes",
-  agent: "Agent runtimes",
-  vcs: "Git hosting",
-};
-
 interface OptionField {
   key: string;
   placeholder: string;
@@ -460,10 +450,8 @@ function InterfaceCard({
   return (
     <div className="rounded-md border bg-card p-3 text-sm">
       <div className="flex flex-wrap items-center gap-1.5">
-        <code className="font-mono font-semibold">{def.id}</code>
-        <span className="text-xs text-muted-foreground">
-          {PURPOSE[def.id] ?? def.label}
-        </span>
+        <span className="font-semibold">{def.label}</span>
+        <code className="font-mono text-xs text-muted-foreground">{def.id}</code>
         {activeLabel ? (
           <Badge
             variant="outline"
