@@ -57,11 +57,14 @@ log "Workspace image: $PINNED"
 CDK_FLAGS=(--require-approval "${CDK_REQUIRE_APPROVAL:-never}")
 [[ -n "${AWS_PROFILE:-}" ]] && CDK_FLAGS+=(--profile "$AWS_PROFILE")
 
-log "Deploying registry infra (env=$ENVIRONMENT account=$CDK_DEFAULT_ACCOUNT region=$CDK_DEFAULT_REGION)"
+log "Deploying workspace infra (env=$ENVIRONMENT account=$CDK_DEFAULT_ACCOUNT region=$CDK_DEFAULT_REGION)"
 (
-  cd "$REPO_ROOT/infra"
-  pnpm run build
+  cd "$REPO_ROOT"
+  # @aprovan/cdk must be built before infra/workspace tsc can resolve it.
+  pnpm --filter @aprovan/cdk... build
+  pnpm --filter @aprovan/registry-infra build
+  cd "$REPO_ROOT/infra/workspace"
   pnpm exec cdk deploy "${CDK_FLAGS[@]}"
 )
 
-log "Registry infra deploy complete."
+log "Workspace infra deploy complete."
