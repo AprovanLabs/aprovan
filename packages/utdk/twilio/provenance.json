@@ -1,0 +1,24 @@
+{
+  "provider": "twilio",
+  "generatedAt": "2026-05-30T22:05:54.660Z",
+  "generation": 2,
+  "source": {
+    "type": "openapi",
+    "url": "https://raw.githubusercontent.com/twilio/twilio-oai/main/spec/json/twilio_api_v2010.json",
+    "hash": "sha256:611eddb28ff23cc948b8fcf648b5e9cff0e7915439561ab35c992168a6665c6e",
+    "fetchedAt": "2026-05-30T22:05:54.660Z"
+  },
+  "ingestSource": "printing-press",
+  "pipeline": {
+    "research": {
+      "noveltyScore": 4,
+      "competingPackages": 5
+    },
+    "scorecard": {
+      "infrastructure": "fail",
+      "domain": 70
+    },
+    "agentReadiness": "pass"
+  },
+  "bundlerVersion": "0.1.1"
+}

@@ -1,0 +1,51 @@
+{
+  "name": "@utdk/gemini",
+  "version": "0.0.1-20260718.2",
+  "type": "module",
+  "description": "Generated UTDK provider client for Google Gemini API. Google's Gemini models via the Generative Language API: content generation, token counting, and model discovery. Chat surfaces may instead use the OpenAI-compatible endpoint at /v1beta/openai (Authorization: Bearer <api key>).",
+  "homepage": "https://ai.google.dev/gemini-api/docs",
+  "keywords": [
+    "gemini",
+    "generated",
+    "openapi",
+    "utdk"
+  ],
+  "utdk": {
+    "provider": "gemini",
+    "generation": 2,
+    "generatedAt": "2026-07-18T05:49:49.165Z",
+    "auth": {
+      "schemes": [
+        {
+          "id": "ApiKeyAuth",
+          "type": "apiKey",
+          "description": "Google AI Studio API key",
+          "name": "x-goog-api-key",
+          "in": "header"
+        },
+        {
+          "id": "BearerAuth",
+          "type": "http",
+          "description": "API key as a bearer token (used by the OpenAI-compatible surface)",
+          "scheme": "bearer"
+        }
+      ],
+      "operationOverrides": {}
+    },
+    "openapi": {
+      "title": "Google Gemini API",
+      "url": "repo://data/openapi/gemini.json",
+      "version": "v1beta",
+      "termsOfService": "https://ai.google.dev/gemini-api/terms"
+    },
+    "docs": {
+      "manifestPath": "/Users/jacob/Documents/Code/AprovanLabs/registry/.registry/gemini/manifest.json",
+      "indexPath": "/Users/jacob/Documents/Code/AprovanLabs/registry/.registry/gemini/index.md",
+      "docsPath": "/Users/jacob/Documents/Code/AprovanLabs/registry/packages/utdk/gemini/docs",
+      "generatedAt": "2026-07-18T05:49:49.163Z",
+      "sourceCount": 0,
+      "openApiHash": null,
+      "promptHash": "8c3694991a4c289225f05a4e8f1e098cc74d085a088d7dffd82f00d93797b7f8"
+    }
+  }
+}

@@ -1,0 +1,128 @@
+{
+  "provider": "google/tasks",
+  "generatedAt": "2026-07-19T23:49:28.521Z",
+  "noveltyScore": 4,
+  "npmPackages": [
+    {
+      "name": "tasks-sdk",
+      "version": "0.0.1-alpha",
+      "description": "Coming soon (:tm:)...",
+      "category": "community-sdk"
+    },
+    {
+      "name": "@koderlabs/tasks-sdk-rn-reporter",
+      "version": "1.5.0",
+      "description": "In-app bug reporter for React Native — modal + screenshot + shake gesture + screenshot-detection. Pairs with @koderlabs/tasks-sdk-rn.",
+      "category": "community-sdk"
+    },
+    {
+      "name": "@koderlabs/tasks-sdk-rn-native",
+      "version": "1.5.0",
+      "description": "Native crash + ANR capture for @koderlabs/tasks-sdk-rn (Expo module — PLCrashReporter iOS, NDK signal handler + ANR watchdog Android).",
+      "category": "community-sdk"
+    },
+    {
+      "name": "@koderlabs/tasks-sdk",
+      "version": "1.5.0",
+      "description": "InstantTasks SDK — platform-agnostic event + span client.",
+      "category": "community-sdk"
+    },
+    {
+      "name": "@koderlabs/tasks-sdk-types",
+      "version": "1.5.0",
+      "description": "Shared TypeScript types for the InstantTasks SDK suite.",
+      "category": "community-sdk"
+    },
+    {
+      "name": "@huggingface/tasks",
+      "version": "0.21.26",
+      "description": "List of ML tasks for huggingface.co/tasks",
+      "category": "other"
+    },
+    {
+      "name": "@types/undertaker-registry",
+      "version": "1.0.4",
+      "description": "TypeScript definitions for undertaker-registry",
+      "category": "types"
+    },
+    {
+      "name": "lint-staged",
+      "version": "17.1.0",
+      "description": "Lint files staged by git",
+      "category": "other"
+    },
+    {
+      "name": "@moonrepo/types",
+      "version": "2.4.5",
+      "description": "TypeScript types for moon and related packages.",
+      "category": "other"
+    },
+    {
+      "name": "workerpool",
+      "version": "10.0.3",
+      "description": "Offload tasks to a pool of workers on node.js and in the browser",
+      "category": "other"
+    },
+    {
+      "name": "mcp-server-tasks",
+      "version": "1.0.1",
+      "description": "",
+      "category": "mcp-server"
+    },
+    {
+      "name": "@modelcontextprotocol/sdk",
+      "version": "1.29.0",
+      "description": "Model Context Protocol implementation for TypeScript",
+      "category": "other"
+    },
+    {
+      "name": "@mastra/core",
+      "version": "1.51.0",
+      "description": "Mastra is a framework for building AI-powered applications and agents with a modern TypeScript stack.",
+      "category": "other"
+    },
+    {
+      "name": "siftable-mcp-server",
+      "version": "1.2.5",
+      "description": "Siftable MCP server - tasks, knowledge, agents, code context, and automation tools",
+      "category": "mcp-server"
+    },
+    {
+      "name": "@claude-flow/mcp",
+      "version": "3.0.0-alpha.9",
+      "description": "Standalone MCP (Model Context Protocol) server - stdio/http/websocket transports, connection pooling, tool registry",
+      "category": "mcp-server"
+    },
+    {
+      "name": "tasks",
+      "version": "0.0.3",
+      "description": "Queue-based execution and eventing for tasks (ala GCD)",
+      "category": "other"
+    },
+    {
+      "name": "@mediapipe/tasks-vision",
+      "version": "0.10.35",
+      "description": "MediaPipe Vision Tasks",
+      "category": "community-sdk"
+    },
+    {
+      "name": "@google-cloud/tasks",
+      "version": "6.2.3",
+      "description": "Cloud Tasks API client for Node.js",
+      "category": "other"
+    },
+    {
+      "name": "@googleapis/tasks",
+      "version": "12.0.0",
+      "description": "tasks",
+      "category": "community-sdk"
+    }
+  ],
+  "gapAnalysis": {
+    "hasOfficialSdk": false,
+    "hasCommunitySDK": true,
+    "hasTypeDefinitions": true,
+    "hasMcpServer": true,
+    "recommendation": "Community SDKs exist for google/tasks. Evaluate them before generating; focus on filling gaps they do not cover. An MCP server already exists; differentiate by offering better type coverage."
+  }
+}

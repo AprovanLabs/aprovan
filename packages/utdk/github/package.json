@@ -1,0 +1,38 @@
+{
+  "name": "@utdk/github",
+  "version": "1.1.4-20260716.3",
+  "type": "module",
+  "description": "Generated UTDK provider client for GitHub v3 REST API. GitHub's v3 REST API.",
+  "homepage": "https://docs.github.com/rest/",
+  "keywords": [
+    "github",
+    "generated",
+    "openapi",
+    "utdk"
+  ],
+  "license": "MIT",
+  "utdk": {
+    "provider": "github",
+    "generation": 3,
+    "generatedAt": "2026-07-16T07:09:41.024Z",
+    "auth": {
+      "schemes": [],
+      "operationOverrides": {}
+    },
+    "openapi": {
+      "title": "GitHub v3 REST API",
+      "url": "https://raw.githubusercontent.com/github/rest-api-description/main/descriptions/api.github.com/api.github.com.json",
+      "version": "1.1.4",
+      "termsOfService": "https://docs.github.com/articles/github-terms-of-service"
+    },
+    "docs": {
+      "manifestPath": "/Users/jacob/Documents/Code/AprovanLabs/registry/.registry/github/manifest.json",
+      "indexPath": "/Users/jacob/Documents/Code/AprovanLabs/registry/.registry/github/index.md",
+      "docsPath": "/Users/jacob/Documents/Code/AprovanLabs/registry/packages/utdk/github/docs",
+      "generatedAt": "2026-07-16T07:09:41.015Z",
+      "sourceCount": 0,
+      "openApiHash": null,
+      "promptHash": "8c3694991a4c289225f05a4e8f1e098cc74d085a088d7dffd82f00d93797b7f8"
+    }
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "provider": "google/gmail",
+  "generatedAt": "2026-07-19T23:51:29.984Z",
+  "generation": 2,
+  "source": {
+    "type": "openapi",
+    "url": "https://api.apis.guru/v2/specs/googleapis.com/gmail/v1/openapi.json",
+    "hash": "sha256:22c861636434911f4c56567eca6b009a012163bd0d2262575ab9182af3a1d680",
+    "fetchedAt": "2026-07-19T23:51:29.984Z"
+  },
+  "ingestSource": "manual",
+  "pipeline": {
+    "research": {
+      "noveltyScore": 6,
+      "competingPackages": 12
+    },
+    "scorecard": {
+      "infrastructure": "fail",
+      "domain": 80
+    },
+    "agentReadiness": "fail"
+  },
+  "bundlerVersion": "0.1.1"
+}

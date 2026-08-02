@@ -1,0 +1,18 @@
+{
+  "extends": "../../config/tsconfig/react.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    // `react.json` sets no `target` of its own (only `base.json`'s strict
+    // flags), so this package silently built against the compiler default
+    // (ES3) while every sibling — `node.json`, and registry-ui's own
+    // tsconfig — pins ES2022. That mismatch is what TS2802 was catching:
+    // Map/Set iteration needs ES2015+. Bring this package in line with its
+    // siblings rather than rewriting iteration call sites around a stale
+    // default.
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "outDir": "dist",
+    "rootDir": "src"
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx"]
+}

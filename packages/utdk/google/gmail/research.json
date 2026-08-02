@@ -1,0 +1,86 @@
+{
+  "provider": "google/gmail",
+  "generatedAt": "2026-07-19T23:51:18.799Z",
+  "noveltyScore": 6,
+  "npmPackages": [
+    {
+      "name": "nodemailer",
+      "version": "9.0.3",
+      "description": "Easy as cake e-mail sending from your Node.js applications",
+      "category": "other"
+    },
+    {
+      "name": "@googleapis/gmail",
+      "version": "17.0.0",
+      "description": "gmail",
+      "category": "community-sdk"
+    },
+    {
+      "name": "gmail-tester",
+      "version": "1.4.0",
+      "description": "A simple NodeJS gmail client which checks the inbox for specific message existence",
+      "category": "other"
+    },
+    {
+      "name": "@clerk/mcp-tools",
+      "version": "0.6.0",
+      "description": "Tools for writing MCP clients and servers without pain",
+      "category": "mcp-server"
+    },
+    {
+      "name": "tailwindcss-email-variants",
+      "version": "3.0.5",
+      "description": "Tailwind CSS variants for email client CSS targeting hacks",
+      "category": "other"
+    },
+    {
+      "name": "@gongrzhe/server-gmail-autoauth-mcp",
+      "version": "1.1.11",
+      "description": "Gmail MCP server with auto authentication support",
+      "category": "mcp-server"
+    },
+    {
+      "name": "@maxim_mazurok/gapi.client.gmail-v1",
+      "version": "0.3.20260713",
+      "description": "TypeScript typings for Gmail API v1",
+      "category": "community-sdk"
+    },
+    {
+      "name": "mcp-server-gmail",
+      "version": "0.1.5",
+      "description": "Gmail MCP Server - A Model Context Protocol server for Gmail integration",
+      "category": "mcp-server"
+    },
+    {
+      "name": "@micro-x-ai/mcp-google",
+      "version": "0.1.0",
+      "description": "Google MCP server — Gmail, Calendar, and Contacts tools over OAuth2",
+      "category": "mcp-server"
+    },
+    {
+      "name": "@postlab/google-workspace-mcp",
+      "version": "1.0.4",
+      "description": "Google Workspace MCP server (Gmail, Calendar, Drive) - bundled version",
+      "category": "mcp-server"
+    },
+    {
+      "name": "gmail",
+      "version": "0.5.0",
+      "description": "An API for fetching mail from GMail.com",
+      "category": "other"
+    },
+    {
+      "name": "gmail-js",
+      "version": "1.1.16",
+      "description": "JavaScript API for Gmail (useful for chrome extensions)",
+      "category": "other"
+    }
+  ],
+  "gapAnalysis": {
+    "hasOfficialSdk": false,
+    "hasCommunitySDK": true,
+    "hasTypeDefinitions": false,
+    "hasMcpServer": true,
+    "recommendation": "Community SDKs exist for google/gmail. Evaluate them before generating; focus on filling gaps they do not cover. An MCP server already exists; differentiate by offering better type coverage."
+  }
+}

@@ -1,0 +1,92 @@
+<!doctype html>
+<!--
+  Browser validation for @aprovan/sandbox-bashkit — the same driver the
+  gateway dispatches to, running in a tab.
+
+  From the package directory (after `pnpm build`):
+
+      npx serve ..            # or any static server that follows symlinks
+      open http://localhost:3000/sandbox-bashkit/demo/
+
+  Serving the *parent* directory matters: the import map below reaches into
+  node_modules, and pnpm's node_modules are symlinks into the store, which
+  every common static server (serve, http-server, python3 -m http.server)
+  follows. No bundler, no COOP/COEP headers, no SharedArrayBuffer — the wasm
+  build is single-threaded on purpose.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>@aprovan/sandbox-bashkit — browser demo</title>
+    <style>
+      body { font: 14px/1.5 ui-monospace, monospace; max-width: 52rem; margin: 2rem auto; padding: 0 1rem; }
+      h1 { font-size: 1.2rem; }
+      pre { background: #f4f4f5; border-radius: 6px; padding: 0.75rem; white-space: pre-wrap; }
+      .pass { color: #15803d; }
+      .fail { color: #b91c1c; }
+    </style>
+    <script type="importmap">
+      {
+        "imports": {
+          "@everruns/bashkit-wasm": "../node_modules/@everruns/bashkit-wasm/index.js",
+          "@utdk/sandbox": "../node_modules/@utdk/sandbox/dist/index.js"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <h1>@aprovan/sandbox-bashkit — driver in a browser tab</h1>
+    <p>
+      Creates a sandbox, writes a file through the driver, runs a real shell
+      pipeline over it, and lists the manifest back — the same
+      create / writeFile / exec / listFiles surface the gateway's
+      <code>sandboxes.*</code> service dispatches.
+    </p>
+    <pre id="out">loading wasm…</pre>
+    <script type="module">
+      import { createBashkitClient } from "../dist/index.js";
+
+      const out = document.getElementById("out");
+      const lines = [];
+      const log = (line) => {
+        lines.push(line);
+        out.textContent = lines.join("\n");
+      };
+
+      try {
+        const client = await createBashkitClient();
+        const box = await client.create({ mounts: ["app"] });
+        log(`create      → ${box.id} (workdir ${box.workdir})`);
+
+        const written = await client.writeFile({
+          id: box.id,
+          path: "app/greeting.txt",
+          content: "hello from the workspace\n",
+        });
+        log(`writeFile   → sha256 ${written.hash.slice(0, 12)}… (${written.size} bytes)`);
+
+        const exec = await client.exec({
+          id: box.id,
+          command: "tr a-z A-Z < greeting.txt > loud.txt && cat loud.txt",
+          cwd: "app",
+        });
+        log(`exec        → exit ${exec.exitCode}: ${JSON.stringify(exec.stdout)}`);
+
+        const manifest = await client.listFiles({ id: box.id, path: "app" });
+        log(`listFiles   → ${manifest.map((f) => `${f.path} ${f.hash.slice(0, 8)}`).join(", ")}`);
+
+        const read = await client.readFile({ id: box.id, path: "app/loud.txt" });
+        const ok =
+          exec.exitCode === 0 &&
+          read.content === "HELLO FROM THE WORKSPACE\n" &&
+          manifest.length === 2;
+        log("");
+        log(ok ? "PASS — file round-trip and exec verified" : "FAIL — see above");
+        out.className = ok ? "pass" : "fail";
+      } catch (err) {
+        log(`FAIL — ${err?.message ?? err}`);
+        out.className = "fail";
+      }
+    </script>
+  </body>
+</html>

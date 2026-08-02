@@ -1,0 +1,24 @@
+{
+  "provider": "slack",
+  "generatedAt": "2026-05-30T12:25:11.626Z",
+  "generation": 1,
+  "source": {
+    "type": "openapi",
+    "url": "https://api.apis.guru/v2/specs/slack.com/1.7.0/openapi.json",
+    "hash": "sha256:9c307a24ca5997d5a8314eccd1b321fc5155c317b4c2a62d9526a1bd68498cf1",
+    "fetchedAt": "2026-05-30T12:25:11.626Z"
+  },
+  "ingestSource": "composio",
+  "pipeline": {
+    "research": {
+      "noveltyScore": 1,
+      "competingPackages": 16
+    },
+    "scorecard": {
+      "infrastructure": "fail",
+      "domain": 100
+    },
+    "agentReadiness": "pass"
+  },
+  "bundlerVersion": "0.1.1"
+}

@@ -1,0 +1,44 @@
+{
+  "provider": "digitalocean",
+  "generatedAt": "2026-05-30T22:05:43.861Z",
+  "noveltyScore": 8,
+  "npmPackages": [
+    {
+      "name": "@pulumi/digitalocean",
+      "version": "4.68.0",
+      "description": "A Pulumi package for creating and managing DigitalOcean cloud resources.",
+      "category": "other"
+    },
+    {
+      "name": "@digitalocean/mcp",
+      "version": "1.0.58",
+      "description": "DigitalOcean MCP Implementation,",
+      "category": "mcp-server"
+    },
+    {
+      "name": "digitalocean-js",
+      "version": "2.1.2",
+      "description": "JavaScript library for the DigitalOcean API",
+      "category": "other"
+    },
+    {
+      "name": "@aws-sdk/middleware-sdk-s3",
+      "version": "3.972.44",
+      "description": "[![NPM version](https://img.shields.io/npm/v/@aws-sdk/middleware-sdk-s3/latest.svg)](https://www.npmjs.com/package/@aws-sdk/middleware-sdk-s3) [![NPM downloads](https://img.shields.io/npm/dm/@aws-sdk/middleware-sdk-s3.svg)](https://www.npmjs.com/package/@",
+      "category": "other"
+    },
+    {
+      "name": "@aws-sdk/core",
+      "version": "3.974.15",
+      "description": "Core functions & classes shared by multiple AWS SDK clients.",
+      "category": "other"
+    }
+  ],
+  "gapAnalysis": {
+    "hasOfficialSdk": false,
+    "hasCommunitySDK": false,
+    "hasTypeDefinitions": false,
+    "hasMcpServer": true,
+    "recommendation": "No existing TypeScript SDK found for digitalocean. Generating from OpenAPI spec provides high value. An MCP server already exists; differentiate by offering better type coverage."
+  }
+}

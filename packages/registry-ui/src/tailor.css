@@ -1,0 +1,126 @@
+/*
+ * Theme tokens for the Tailor flow renderer (@aprovan/registry-ui/tailor).
+ * Import from the host app's Tailwind v4 entry css:
+ *
+ *   @import "@aprovan/registry-ui/tailor.css";
+ *
+ * Generic surface tokens (background, card, border, muted, …) come from the
+ * host's own theme; these are only the Tailor-specific chip palettes. Every
+ * token is prefixed `tailor-` so it can never collide with a host's semantic
+ * scale (`--color-accent` in particular means "subtle surface" in shadcn but
+ * "the strong ink colour" here).
+ *
+ * Dark mode: the light values live in `@theme` (emitted into `:root` inside
+ * `@layer theme`) and are re-declared unlayered under `.dark`, which both
+ * hosts put on the document root — registry uses
+ * `@custom-variant dark (&:is(.dark *))`, patchwork
+ * `(&:where(.dark, .dark *))`. Unlayered rules beat layered ones regardless
+ * of import order, so the override always wins.
+ */
+
+@theme {
+  /* provider (blue) */
+  --color-tailor-provider-bg: #dbeafe;
+  --color-tailor-provider-border: #93c5fd;
+  --color-tailor-provider-text: #1d4ed8;
+
+  /* block / async (violet) */
+  --color-tailor-block-bg: #ede9fe;
+  --color-tailor-block-border: #c4b5fd;
+  --color-tailor-block-text: #6d28d9;
+
+  /* var local (green) */
+  --color-tailor-var-bg: #dcfce7;
+  --color-tailor-var-border: #86efac;
+  --color-tailor-var-text: #166534;
+
+  /* var outer (orange) */
+  --color-tailor-var-outer-bg: #ffedd5;
+  --color-tailor-var-outer-border: #fdba74;
+  --color-tailor-var-outer-text: #9a3412;
+
+  /* var input (pink) */
+  --color-tailor-var-input-bg: #fce7f3;
+  --color-tailor-var-input-border: #f9a8d4;
+  --color-tailor-var-input-text: #9d174d;
+
+  /* literal chips */
+  --color-tailor-chip-bg: #f5f5f5;
+  --color-tailor-chip-border: #d4d4d4;
+
+  /* run overlay: what a trace says happened at this step */
+  --color-tailor-ok: #15803d;
+  --color-tailor-ok-bg: #f0fdf4;
+  --color-tailor-fail: #b91c1c;
+  --color-tailor-fail-bg: #fef2f2;
+  --color-tailor-skip: #a3a3a3;
+
+  --color-tailor-accent: #171717;
+}
+
+.dark {
+  --color-tailor-provider-bg: #172554;
+  --color-tailor-provider-border: #1e40af;
+  --color-tailor-provider-text: #bfdbfe;
+
+  --color-tailor-block-bg: #2e1065;
+  --color-tailor-block-border: #5b21b6;
+  --color-tailor-block-text: #ddd6fe;
+
+  --color-tailor-var-bg: #052e16;
+  --color-tailor-var-border: #166534;
+  --color-tailor-var-text: #bbf7d0;
+
+  --color-tailor-var-outer-bg: #431407;
+  --color-tailor-var-outer-border: #9a3412;
+  --color-tailor-var-outer-text: #fed7aa;
+
+  --color-tailor-var-input-bg: #500724;
+  --color-tailor-var-input-border: #9d174d;
+  --color-tailor-var-input-text: #fbcfe8;
+
+  --color-tailor-chip-bg: #262626;
+  --color-tailor-chip-border: #404040;
+
+  --color-tailor-ok: #86efac;
+  --color-tailor-ok-bg: #052e16;
+  --color-tailor-fail: #fca5a5;
+  --color-tailor-fail-bg: #450a0a;
+  --color-tailor-skip: #737373;
+
+  --color-tailor-accent: #e5e5e5;
+}
+
+/*
+ * React Flow canvas fills its container. A bare min-height is NOT enough:
+ * React Flow sizes itself with height: 100%, and percentage heights resolve
+ * against the parent's `height` property (auto → 0 → blank canvas +
+ * "container needs a width and a height" warning). Flex stretch gives the
+ * child a definite size instead.
+ */
+/*
+ * The floor is a custom property so a host pane can hand the graph a real
+ * canvas (the workflow detail pane sets ~420px on desktop, more in `fill`
+ * mode) without this stylesheet knowing about any particular host. TailorFlow
+ * sets the variable from its `canvasMinHeight` prop; the fallback keeps the
+ * old floor for hosts that pass nothing.
+ */
+.tailor-canvas {
+  display: flex;
+  flex: 1;
+  min-height: var(--tailor-canvas-min-h, 320px);
+}
+
+.tailor-canvas > .react-flow {
+  flex: 1;
+  min-height: var(--tailor-canvas-min-h, 320px);
+}
+
+/*
+ * React Flow's own stylesheet paints an opaque canvas (#fff light, #141414
+ * dark). Let the host's surface show through instead — TailorFlow already
+ * flips the library's `colorMode` for edge/handle/control colours.
+ */
+.tailor-canvas > .react-flow {
+  --xy-background-color: transparent;
+}

@@ -1,0 +1,35 @@
+{
+  "name": "@utdk/vcs",
+  "version": "0.2.0",
+  "type": "module",
+  "description": "Shared Git-hosting contract for UTDK VCS providers: one repos/pullRequests/branches/files surface over any hosting vendor, normalized PR and review shapes, and unified-diff reads sized for a code-review workflow",
+  "keywords": [
+    "vcs",
+    "git",
+    "pull-request",
+    "code-review",
+    "utdk"
+  ],
+  "utdk": {
+    "contract": "vcs",
+    "handwritten": true
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check-types": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "clean": "rm -rf dist",
+    "test": "vitest run --passWithNoTests"
+  },
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  }
+}

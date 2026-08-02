@@ -1,0 +1,134 @@
+{
+  "provider": "salesforce",
+  "generatedAt": "2026-05-30T12:24:58.018Z",
+  "noveltyScore": 1,
+  "npmPackages": [
+    {
+      "name": "@salesforce/salesforce-sdk",
+      "version": "1.4.1",
+      "description": "Salesforce SDK for Node.js",
+      "category": "official-sdk"
+    },
+    {
+      "name": "@heroku/salesforce-sdk-nodejs",
+      "version": "0.3.4-ea",
+      "description": "Salesforce SDK for Heroku Apps.",
+      "category": "community-sdk"
+    },
+    {
+      "name": "@loadsmart/rn-salesforce-chat",
+      "version": "3.4.1",
+      "description": "React Native wrapper for Salesforce SDK chat",
+      "category": "other"
+    },
+    {
+      "name": "@salesforce/sdk-data",
+      "version": "1.135.0",
+      "description": "Runtime SDK for accessing Salesforce record data via GraphQL and REST from React web apps.",
+      "category": "official-sdk"
+    },
+    {
+      "name": "@salesforce/sdk-chat",
+      "version": "1.135.0",
+      "description": "Chat SDK for participating in conversational flows across Salesforce application surfaces. Provides a unified API for sending messages, executing tools, managing widget state, and reading resources — regardless of whether the host is OpenAI ChatGPT, an MC",
+      "category": "official-sdk"
+    },
+    {
+      "name": "@salesforce/kit",
+      "version": "3.2.6",
+      "description": "Commonly needed utilities for TypeScript and JavaScript",
+      "category": "official-sdk"
+    },
+    {
+      "name": "@types/tough-cookie",
+      "version": "4.0.5",
+      "description": "TypeScript definitions for tough-cookie",
+      "category": "types"
+    },
+    {
+      "name": "@salesforce/types",
+      "version": "1.7.3",
+      "description": "contains typescript types for salesforce objects",
+      "category": "official-sdk"
+    },
+    {
+      "name": "@salesforce/plugin-sobject",
+      "version": "1.4.110",
+      "description": "Create objects, fields, tabs, etc",
+      "category": "official-sdk"
+    },
+    {
+      "name": "@salesforce/ts-types",
+      "version": "2.0.12",
+      "description": "Types and related utilities for TypeScript",
+      "category": "official-sdk"
+    },
+    {
+      "name": "@tsmztech/mcp-server-salesforce",
+      "version": "0.0.6",
+      "description": "A Salesforce connector MCP Server.",
+      "category": "mcp-server"
+    },
+    {
+      "name": "@salesforce/mcp",
+      "version": "0.30.13",
+      "description": "MCP Server for interacting with Salesforce instances",
+      "category": "mcp-server"
+    },
+    {
+      "name": "@starcatmeow/mcp-server-salesforce",
+      "version": "0.0.3",
+      "description": "A Salesforce connector MCP Server. Forked from @tsmztech/mcp-server-salesforce",
+      "category": "mcp-server"
+    },
+    {
+      "name": "@surajadsul02/mcp-server-salesforce",
+      "version": "0.0.2",
+      "description": "A Salesforce connector MCP Server.",
+      "category": "mcp-server"
+    },
+    {
+      "name": "@mindstone-engineering/mcp-server-salesforce",
+      "version": "0.1.1",
+      "description": "Salesforce CRM MCP server — accounts, contacts, opportunities, leads, tasks, and custom objects via Salesforce API",
+      "category": "mcp-server"
+    },
+    {
+      "name": "@salesforce/cli",
+      "version": "2.136.8",
+      "description": "The Salesforce CLI",
+      "category": "official-sdk"
+    },
+    {
+      "name": "@salesforce/plugin-settings",
+      "version": "2.4.82",
+      "description": "configure the Salesforce CLI",
+      "category": "official-sdk"
+    },
+    {
+      "name": "@salesforce/sf-plugins-core",
+      "version": "12.2.22",
+      "description": "Utils for writing Salesforce CLI plugins",
+      "category": "official-sdk"
+    },
+    {
+      "name": "@salesforce/apex-node",
+      "version": "8.4.26",
+      "description": "Salesforce JS library for Apex",
+      "category": "official-sdk"
+    },
+    {
+      "name": "@salesforce/templates",
+      "version": "66.9.0",
+      "description": "Salesforce JS library for templates",
+      "category": "official-sdk"
+    }
+  ],
+  "gapAnalysis": {
+    "hasOfficialSdk": true,
+    "hasCommunitySDK": true,
+    "hasTypeDefinitions": true,
+    "hasMcpServer": true,
+    "recommendation": "An official SDK exists for salesforce. Consider wrapping it or focusing on gaps it does not cover. An MCP server already exists; differentiate by offering better type coverage."
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "extends": "../../config/tsconfig/node.json",
+  "compilerOptions": {
+    "moduleResolution": "Bundler",
+    "outDir": "dist",
+    "rootDir": ".",
+    "declaration": true,
+    "sourceMap": true,
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
+    "module": "ESNext",
+    "noPropertyAccessFromIndexSignature": false
+  },
+  "include": [
+    "./**/*.ts"
+  ],
+  "exclude": [
+    "dist",
+    "node_modules",
+    "**/__tests__/**",
+    "**/*.test.ts"
+  ]
+}

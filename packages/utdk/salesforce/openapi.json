@@ -1,0 +1,756 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Salesforce REST API",
+    "version": "58.0",
+    "description": "The Salesforce REST API provides programmatic access to Salesforce CRM data including accounts, contacts, leads, opportunities, cases, and custom objects. Use it to build integrations that create and update records, run SOQL queries, manage metadata, and handle event-driven updates via streaming.",
+    "contact": {
+      "name": "Salesforce Developer Support",
+      "url": "https://developer.salesforce.com"
+    },
+    "license": {
+      "name": "Salesforce Developer Terms",
+      "url": "https://developer.salesforce.com/terms/dpua"
+    },
+    "x-logo": {
+      "url": "https://www.salesforce.com/content/dam/sfdc-docs/www/logos/logo-salesforce.svg"
+    }
+  },
+  "externalDocs": {
+    "description": "Salesforce REST API Developer Guide",
+    "url": "https://developer.salesforce.com/docs/atlas.en-us.api_rest.meta/api_rest/intro_what_is_rest_api.htm"
+  },
+  "servers": [
+    {
+      "url": "https://{instance}.salesforce.com/services/data/v58.0",
+      "variables": {
+        "instance": {
+          "default": "your-instance",
+          "description": "Your Salesforce instance hostname (e.g. 'na1' or your custom domain)"
+        }
+      }
+    }
+  ],
+  "security": [
+    {
+      "OAuth2": []
+    }
+  ],
+  "paths": {
+    "/sobjects": {
+      "get": {
+        "operationId": "listSObjects",
+        "summary": "List available sObjects",
+        "description": "Returns a list of all available sObjects (standard and custom Salesforce objects) and their metadata, including object names, labels, key prefixes, and feature flags.",
+        "tags": [
+          "sObjects"
+        ],
+        "responses": {
+          "200": {
+            "description": "List of sObjects",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SObjectList"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/sobjects/{sObjectName}": {
+      "get": {
+        "operationId": "describeSObject",
+        "summary": "Describe a sObject",
+        "description": "Returns metadata describing the fields, relationships, and other details of a specific Salesforce object (standard or custom). Use this to understand the structure before querying or updating records.",
+        "tags": [
+          "sObjects"
+        ],
+        "parameters": [
+          {
+            "name": "sObjectName",
+            "in": "path",
+            "required": true,
+            "description": "API name of the Salesforce object (e.g. Account, Contact, Opportunity)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "sObject metadata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SObjectDescribe"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createRecord",
+        "summary": "Create a record",
+        "description": "Create a new record of the specified sObject type. Pass field values in the request body. Returns the ID of the newly created record.",
+        "tags": [
+          "Records"
+        ],
+        "parameters": [
+          {
+            "name": "sObjectName",
+            "in": "path",
+            "required": true,
+            "description": "API name of the Salesforce object",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Field values for the new record"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Record created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/sobjects/{sObjectName}/{id}": {
+      "get": {
+        "operationId": "getRecord",
+        "summary": "Get a record",
+        "description": "Retrieve a specific record by its Salesforce ID. Use the fields query parameter to limit which fields are returned.",
+        "tags": [
+          "Records"
+        ],
+        "parameters": [
+          {
+            "name": "sObjectName",
+            "in": "path",
+            "required": true,
+            "description": "API name of the Salesforce object",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Salesforce record ID (15 or 18 character ID)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fields",
+            "in": "query",
+            "description": "Comma-separated list of fields to return",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Record data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "description": "Record fields and their values"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateRecord",
+        "summary": "Update a record",
+        "description": "Update fields on an existing Salesforce record. Only the fields included in the request body are updated. Returns an empty body on success (HTTP 204).",
+        "tags": [
+          "Records"
+        ],
+        "parameters": [
+          {
+            "name": "sObjectName",
+            "in": "path",
+            "required": true,
+            "description": "API name of the Salesforce object",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Salesforce record ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true,
+                "description": "Field values to update"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Record updated successfully"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteRecord",
+        "summary": "Delete a record",
+        "description": "Permanently delete a specific Salesforce record. For most objects, this moves the record to the Recycle Bin. Recycle Bin records can be restored within 15 days.",
+        "tags": [
+          "Records"
+        ],
+        "parameters": [
+          {
+            "name": "sObjectName",
+            "in": "path",
+            "required": true,
+            "description": "API name of the Salesforce object",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Salesforce record ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Record deleted"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/query": {
+      "get": {
+        "operationId": "query",
+        "summary": "Execute a SOQL query",
+        "description": "Execute a Salesforce Object Query Language (SOQL) SELECT statement to retrieve records. SOQL is similar to SQL but operates on Salesforce objects and their relationships. Supports filtering, sorting, and relationship traversal.",
+        "tags": [
+          "Query"
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "description": "The SOQL query string (e.g. 'SELECT Id, Name FROM Account WHERE CreatedDate = TODAY')",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Query results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueryResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/query/{queryLocator}": {
+      "get": {
+        "operationId": "queryMore",
+        "summary": "Get next page of query results",
+        "description": "Retrieve the next page of results from a paginated SOQL query. Use the nextRecordsUrl from a previous query response to continue fetching records when done=false.",
+        "tags": [
+          "Query"
+        ],
+        "parameters": [
+          {
+            "name": "queryLocator",
+            "in": "path",
+            "required": true,
+            "description": "The query locator identifier from the nextRecordsUrl",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Next page of query results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueryResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/search": {
+      "get": {
+        "operationId": "search",
+        "summary": "Execute a SOSL search",
+        "description": "Execute a Salesforce Object Search Language (SOSL) search across multiple objects at once. SOSL searches text fields in records and can span multiple objects in a single query.",
+        "tags": [
+          "Query"
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "description": "The SOSL search string (e.g. 'FIND {Acme} IN ALL FIELDS RETURNING Account, Contact')",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Search results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/composite/batch": {
+      "post": {
+        "operationId": "compositeBatch",
+        "summary": "Execute composite batch requests",
+        "description": "Execute multiple REST API requests in a single call. Each sub-request is processed independently and results are returned in order. Supports up to 25 sub-requests per call. Useful for bulk operations that are logically independent.",
+        "tags": [
+          "Composite"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Batch results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "OAuth2": {
+        "type": "oauth2",
+        "description": "Salesforce OAuth 2.0 authentication",
+        "flows": {
+          "authorizationCode": {
+            "authorizationUrl": "https://login.salesforce.com/services/oauth2/authorize",
+            "tokenUrl": "https://login.salesforce.com/services/oauth2/token",
+            "scopes": {
+              "api": "Access and manage your data",
+              "full": "Full access to all resources",
+              "refresh_token": "Perform requests at any time"
+            }
+          },
+          "clientCredentials": {
+            "tokenUrl": "https://login.salesforce.com/services/oauth2/token",
+            "scopes": {
+              "api": "Access and manage your data"
+            }
+          }
+        }
+      }
+    },
+    "responses": {
+      "Unauthorized": {
+        "description": "Authentication token is invalid or expired",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorList"
+            }
+          }
+        }
+      },
+      "BadRequest": {
+        "description": "Invalid request — check your SOQL syntax or field values",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorList"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Record or object not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorList"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "SObjectList": {
+        "type": "object",
+        "properties": {
+          "encoding": {
+            "type": "string"
+          },
+          "maxBatchSize": {
+            "type": "integer"
+          },
+          "sobjects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SObjectInfo"
+            }
+          }
+        }
+      },
+      "SObjectInfo": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "API name of the object"
+          },
+          "label": {
+            "type": "string",
+            "description": "Display label"
+          },
+          "labelPlural": {
+            "type": "string"
+          },
+          "keyPrefix": {
+            "type": "string",
+            "description": "3-character ID prefix"
+          },
+          "queryable": {
+            "type": "boolean"
+          },
+          "retrieveable": {
+            "type": "boolean"
+          },
+          "createable": {
+            "type": "boolean"
+          },
+          "updateable": {
+            "type": "boolean"
+          },
+          "deletable": {
+            "type": "boolean"
+          },
+          "custom": {
+            "type": "boolean"
+          },
+          "urls": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "SObjectDescribe": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FieldDescribe"
+            }
+          },
+          "childRelationships": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "childSObject": {
+                  "type": "string"
+                },
+                "field": {
+                  "type": "string"
+                },
+                "relationshipName": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "FieldDescribe": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "length": {
+            "type": "integer"
+          },
+          "nillable": {
+            "type": "boolean"
+          },
+          "createable": {
+            "type": "boolean"
+          },
+          "updateable": {
+            "type": "boolean"
+          }
+        }
+      },
+      "CreateResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Salesforce ID of the created record"
+          },
+          "success": {
+            "type": "boolean"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "QueryResult": {
+        "type": "object",
+        "properties": {
+          "done": {
+            "type": "boolean",
+            "description": "Whether all records have been returned"
+          },
+          "totalSize": {
+            "type": "integer",
+            "description": "Total number of matching records"
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            },
+            "description": "Array of record objects"
+          },
+          "nextRecordsUrl": {
+            "type": "string",
+            "description": "URL to fetch the next page of results (only present when done=false)"
+          }
+        }
+      },
+      "SearchResult": {
+        "type": "object",
+        "properties": {
+          "searchRecords": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "attributes": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "url": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "additionalProperties": true
+            }
+          }
+        }
+      },
+      "BatchRequest": {
+        "type": "object",
+        "properties": {
+          "batchRequests": {
+            "type": "array",
+            "maxItems": 25,
+            "items": {
+              "type": "object",
+              "required": [
+                "method",
+                "url"
+              ],
+              "properties": {
+                "method": {
+                  "type": "string",
+                  "enum": [
+                    "GET",
+                    "POST",
+                    "PATCH",
+                    "DELETE"
+                  ]
+                },
+                "url": {
+                  "type": "string"
+                },
+                "richInput": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "haltOnError": {
+            "type": "boolean",
+            "description": "Stop processing if any sub-request fails"
+          }
+        }
+      },
+      "BatchResponse": {
+        "type": "object",
+        "properties": {
+          "hasErrors": {
+            "type": "boolean"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "statusCode": {
+                  "type": "integer"
+                },
+                "result": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "ErrorList": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/Error"
+        }
+      }
+    }
+  }
+}

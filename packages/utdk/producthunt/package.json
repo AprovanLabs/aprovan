@@ -1,0 +1,27 @@
+{
+  "name": "@utdk/producthunt",
+  "version": "0.0.1-20260530.3",
+  "type": "module",
+  "description": "Generated UTDK provider types and OpenAPI-backed client for https://raw.githubusercontent.com/mvanhorn/cli-printing-press/main/catalog/specs/producthunt-spec.yaml.",
+  "homepage": "https://raw.githubusercontent.com/mvanhorn/cli-printing-press/main/catalog/specs/producthunt-spec.yaml",
+  "keywords": [
+    "producthunt",
+    "generated",
+    "openapi",
+    "utdk"
+  ],
+  "utdk": {
+    "provider": "producthunt",
+    "generation": 3,
+    "generatedAt": "2026-05-30T22:07:57.115Z",
+    "auth": {
+      "schemes": [],
+      "operationOverrides": {}
+    },
+    "openapi": {
+      "url": "https://raw.githubusercontent.com/mvanhorn/cli-printing-press/main/catalog/specs/producthunt-spec.yaml",
+      "version": null,
+      "termsOfService": null
+    }
+  }
+}

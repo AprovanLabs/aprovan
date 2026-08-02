@@ -1,0 +1,1181 @@
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import path from "node:path";
+import {
+  getProviderImportSpecifier,
+  getProviderPackageRootName,
+  normalizeProviderName,
+  resolveRepoPath,
+  splitProviderName,
+  stripProviderToolName,
+} from "./provider.js";
+import { escapeComment, quotePropertyName, schemaToObjectContent, schemaToTypeScriptType, type SchemaRenderContext } from "./schema.js";
+import type { ClientToolDefinition, ToolRuntimeMetadata } from "./client-api.js";
+import type { ProviderPackageDocsMetadata } from "./docs/types.js";
+import type { RegistryProvider } from "./provider.js";
+import type { Tool } from "@utcp/sdk";
+import type { OpenAPIV3 } from "openapi-types";
+
+type PublicToolTypes = {
+  inputType: string;
+  outputType: string;
+  rawResponseSchema?: unknown;
+  docsUrl?: string;
+};
+
+/**
+ * Named-type registry for a provider: every `components.schemas` entry gets a
+ * stable exported TypeScript name so operation signatures can reference
+ * `Repository` instead of inlining a wall of properties. Editor hover then
+ * reveals the shape on demand.
+ */
+export type ProviderSchemaTypes = {
+  /** `$ref` string → exported type name. */
+  refToName: Map<string, string>;
+  schemas: Array<{ key: string; name: string; schema: unknown }>;
+  resolveRef: (ref: string) => unknown;
+};
+
+const SCHEMA_REF_PREFIX = "#/components/schemas/";
+
+function encodeRefSegment(key: string): string {
+  return key.replace(/~/g, "~0").replace(/\//g, "~1");
+}
+
+export function createProviderSchemaTypes(document: OpenAPIV3.Document): ProviderSchemaTypes | null {
+  const definitions = document.components?.schemas ?? {};
+  const entries = Object.entries(definitions);
+
+  if (entries.length === 0) {
+    return null;
+  }
+
+  const usedNames = new Set<string>();
+  const refToName = new Map<string, string>();
+  const schemas: ProviderSchemaTypes["schemas"] = [];
+
+  for (const [key, schema] of entries) {
+    let name = toPascalCase(key) || "Schema";
+    if (usedNames.has(name)) {
+      let suffix = 2;
+      while (usedNames.has(`${name}${suffix}`)) suffix += 1;
+      name = `${name}${suffix}`;
+    }
+    usedNames.add(name);
+    refToName.set(`${SCHEMA_REF_PREFIX}${encodeRefSegment(key)}`, name);
+    schemas.push({ key, name, schema });
+  }
+
+  return {
+    refToName,
+    schemas,
+    resolveRef: (ref: string) => {
+      if (!ref.startsWith("#/")) {
+        return undefined;
+      }
+
+      return ref
+        .slice(2)
+        .split("/")
+        .reduce<unknown>((current, part) => {
+          if (!current || typeof current !== "object") {
+            return undefined;
+          }
+
+          return (current as Record<string, unknown>)[part.replace(/~1/g, "/").replace(/~0/g, "~")];
+        }, document);
+    },
+  };
+}
+
+/**
+ * Plain render context over the named schemas — no usage tracking. Use where
+ * the output is not a module that needs an import line (docs, the public type
+ * map), and `createTrackedContext` where it is.
+ */
+export function createSchemaRenderContext(
+  schemaTypes: ProviderSchemaTypes | null | undefined,
+): SchemaRenderContext | undefined {
+  if (!schemaTypes) {
+    return undefined;
+  }
+
+  return {
+    refTypeName: (ref) => schemaTypes.refToName.get(ref),
+    resolveRef: schemaTypes.resolveRef,
+  };
+}
+
+/** Wrap the schema types in a render context that records which names get used. */
+function createTrackedContext(
+  schemaTypes: ProviderSchemaTypes | null | undefined,
+  usedNames: Set<string>,
+): SchemaRenderContext | undefined {
+  if (!schemaTypes) {
+    return undefined;
+  }
+
+  return {
+    refTypeName: (ref) => {
+      const name = schemaTypes.refToName.get(ref);
+      if (name) {
+        usedNames.add(name);
+      }
+      return name;
+    },
+    resolveRef: schemaTypes.resolveRef,
+  };
+}
+
+function renderSchemaImport(usedNames: Set<string>, ownNames: Set<string>): string | undefined {
+  const imports = [...usedNames].filter((name) => !ownNames.has(name)).sort();
+
+  if (imports.length === 0) {
+    return undefined;
+  }
+
+  return `import type { ${imports.join(", ")} } from "./schemas.js";`;
+}
+
+export function renderProviderSchemas(schemaTypes: ProviderSchemaTypes): string {
+  const context: SchemaRenderContext = {
+    refTypeName: (ref) => schemaTypes.refToName.get(ref),
+    resolveRef: schemaTypes.resolveRef,
+  };
+
+  const blocks = schemaTypes.schemas.map(({ name, schema }) => {
+    const description =
+      schema && typeof schema === "object"
+        ? getNonEmptyString((schema as Record<string, unknown>).description)
+        : undefined;
+    const schemaRecord = schema as { type?: string; properties?: Record<string, unknown> } | undefined;
+    const isObjectSchema = Boolean(
+      schemaRecord &&
+        (schemaRecord.type === "object" || schemaRecord.properties) &&
+        Object.keys(schemaRecord.properties ?? {}).length > 0,
+    );
+    const body = isObjectSchema
+      ? `{\n${schemaToObjectContent(schema, "  ", context)}\n}`
+      : schemaToTypeScriptType(schema, context);
+
+    return [
+      ...(description ? [`/** ${escapeComment(description)} */`] : []),
+      `export type ${name} = ${body};`,
+    ].join("\n");
+  });
+
+  return `${blocks.join("\n\n")}\n`;
+}
+
+type AuthScheme = {
+  id: string;
+  type: string;
+  description?: string;
+  scheme?: string;
+  name?: string;
+  in?: string;
+  flows?: unknown;
+  openIdConnectUrl?: string;
+};
+
+function getStructuredAuth(document: OpenAPIV3.Document): {
+  schemes: AuthScheme[];
+  operationOverrides: Record<string, never>;
+} {
+  const definitions = document.components?.securitySchemes ?? {};
+  const schemes = Object.entries(definitions).flatMap(([id, definition]) => {
+    if ("$ref" in definition) return [];
+    const common = {
+      id,
+      type: definition.type,
+      ...(definition.description
+        ? { description: definition.description }
+        : {}),
+    };
+    if (definition.type === "http") {
+      return [{ ...common, scheme: definition.scheme }];
+    }
+    if (definition.type === "apiKey") {
+      return [{ ...common, name: definition.name, in: definition.in }];
+    }
+    if (definition.type === "oauth2") {
+      return [{ ...common, flows: definition.flows }];
+    }
+    if (definition.type === "openIdConnect") {
+      return [{ ...common, openIdConnectUrl: definition.openIdConnectUrl }];
+    }
+    return [common];
+  });
+  return { schemes, operationOverrides: {} };
+}
+
+type ClientTool = {
+  accessPath: string[];
+  description: string;
+  docsUrl?: string;
+  hasInput: boolean;
+  hasOptions: boolean;
+  inputSchema?: unknown;
+  /** Ref-preserving variant of `inputSchema` for named-type rendering. */
+  rawInputSchema?: unknown;
+  inputType: string;
+  optionsOptional: boolean;
+  optionsType: string;
+  outputSchema?: unknown;
+  /** Ref-preserving response schema for named-type rendering. */
+  rawOutputSchema?: unknown;
+  outputType: string;
+  tags: string[];
+};
+
+const VERSION_SUFFIX_PATTERN = /-(\d{8})\.(\d+)$/u;
+const SEMVER_PATTERN = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/u;
+
+function getNonEmptyString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function getOpenApiLogoUrl(value: unknown): string | undefined {
+  if (!value || typeof value !== "object") {
+    return undefined;
+  }
+
+  return getNonEmptyString((value as Record<string, unknown>).url);
+}
+
+function getProviderOpenApiIcon(
+  provider: Pick<RegistryProvider, "options">,
+  openApiDocument: OpenAPIV3.Document,
+): string | undefined {
+  const providerOverride = provider.options?.openapi?.icon?.trim();
+
+  if (providerOverride) {
+    return providerOverride;
+  }
+
+  const openApiInfo = openApiDocument.info as unknown as Record<string, unknown> | undefined;
+  const openApiDocumentRecord = openApiDocument as unknown as Record<string, unknown>;
+
+  return (
+    getNonEmptyString(openApiInfo?.icon) ??
+    getNonEmptyString(openApiInfo?.["x-icon"]) ??
+    getOpenApiLogoUrl(openApiInfo?.["x-logo"]) ??
+    getNonEmptyString(openApiDocumentRecord.icon) ??
+    getNonEmptyString(openApiDocumentRecord["x-icon"]) ??
+    getOpenApiLogoUrl(openApiDocumentRecord["x-logo"])
+  );
+}
+
+function normalizePackageBaseVersion(rawVersion: string | undefined): string {
+  const version = rawVersion?.replace(/^v(?=\d)/u, "");
+
+  if (!version) {
+    return "0.0.1";
+  }
+
+  if (SEMVER_PATTERN.test(version)) {
+    return version;
+  }
+
+  const majorMinorMatch = version.match(/^(\d+)\.(\d+)$/u);
+
+  if (majorMinorMatch) {
+    const [, major, minor] = majorMinorMatch;
+    return `${major}.${minor}.0`;
+  }
+
+  const majorOnlyMatch = version.match(/^(\d+)$/u);
+
+  if (majorOnlyMatch) {
+    const [, major] = majorOnlyMatch;
+    return `${major}.0.0`;
+  }
+
+  return "0.0.1";
+}
+
+function formatVersionDate(date: Date): string {
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  return `${year}${month}${day}`;
+}
+
+function getNextGeneration(previousPackageJson: string | undefined, dateStamp: string): number {
+  if (!previousPackageJson) {
+    return 1;
+  }
+
+  try {
+    const parsed = JSON.parse(previousPackageJson) as { version?: unknown };
+    const previousVersion = getNonEmptyString(parsed.version);
+    const match = previousVersion?.match(VERSION_SUFFIX_PATTERN);
+
+    if (!match) {
+      return 1;
+    }
+
+    const [, previousDate, previousGeneration] = match;
+    return previousDate === dateStamp ? Number(previousGeneration) + 1 : 1;
+  } catch {
+    return 1;
+  }
+}
+
+function sanitizeIdentifier(name: string): string {
+  return name.replace(/[^a-zA-Z0-9_]/g, "_").replace(/^[0-9]/, "_$&");
+}
+
+function splitIdentifierWords(name: string): string[] {
+  return name
+    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/([A-Za-z])([0-9])/g, "$1 $2")
+    .replace(/([0-9])([A-Za-z])/g, "$1 $2")
+    .replace(/[^a-zA-Z0-9]+/g, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+function toPascalCase(name: string): string {
+  return sanitizeIdentifier(
+    splitIdentifierWords(name)
+      .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1).toLowerCase())
+      .join(""),
+  );
+}
+
+function toCamelCase(name: string): string {
+  const parts = splitIdentifierWords(name);
+
+  if (parts.length === 0) {
+    return "_";
+  }
+
+  const [first = "_", ...rest] = parts;
+  return sanitizeIdentifier(
+    first.toLowerCase() + rest.map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1).toLowerCase()).join(""),
+  );
+}
+
+function toClientTools(
+  provider: Pick<RegistryProvider, "name" | "options">,
+  tools: Tool[],
+  publicTypeMap: Map<string, PublicToolTypes>,
+  clientToolMap: Map<string, ClientToolDefinition>,
+): ClientTool[] {
+  return tools.map((tool) => {
+    const rawToolName = stripProviderToolName(tool.name, provider);
+    const generatedMetadata = clientToolMap.get(tool.name);
+    const publicTypes = publicTypeMap.get(tool.name);
+    const hasPublicType = publicTypeMap.has(tool.name);
+    const inputType = generatedMetadata?.inputType ?? publicTypes?.inputType ?? schemaToTypeScriptType(tool.inputs);
+
+    return {
+      accessPath: generatedMetadata?.accessPath ?? [sanitizeIdentifier(rawToolName)],
+      description: tool.description ?? "",
+      docsUrl: publicTypes?.docsUrl,
+      hasInput: generatedMetadata?.hasInput ?? inputType !== "{}",
+      hasOptions: generatedMetadata?.hasOptions ?? false,
+      inputSchema: generatedMetadata?.inputSchema ?? (hasPublicType ? undefined : tool.inputs),
+      rawInputSchema: generatedMetadata?.rawInputSchema,
+      inputType,
+      optionsOptional: generatedMetadata?.optionsOptional ?? true,
+      optionsType: generatedMetadata?.optionsType ?? "{}",
+      outputSchema: hasPublicType ? undefined : tool.outputs,
+      rawOutputSchema: publicTypes?.rawResponseSchema,
+      outputType: publicTypes?.outputType ?? schemaToTypeScriptType(tool.outputs),
+      tags: tool.tags ?? [],
+    };
+  });
+}
+
+/**
+ * Render one tool as a typed method member (JSDoc + signature). With a schema
+ * render context, signatures reference named component types and the JSDoc is
+ * limited to the operation description plus an optional `@see` docs link.
+ */
+function renderToolMember(tool: ClientTool, depth: number, context?: SchemaRenderContext): string {
+  const indent = "  ".repeat(depth);
+  const propertyIndent = "  ".repeat(depth + 1);
+  const methodName = tool.accessPath[tool.accessPath.length - 1] ?? "call";
+
+  const inputSource = context && tool.rawInputSchema !== undefined ? tool.rawInputSchema : tool.inputSchema;
+  const inputTypeStr =
+    inputSource && isExpandableObjectSchema(inputSource)
+      ? `{\n${schemaToObjectContent(inputSource, propertyIndent, context)}\n${indent}}`
+      : inputSource
+        ? schemaToTypeScriptType(inputSource, context)
+        : tool.inputType;
+
+  const outputSource = context && tool.rawOutputSchema !== undefined ? tool.rawOutputSchema : tool.outputSchema;
+  const outputTypeStr = outputSource !== undefined ? schemaToTypeScriptType(outputSource, context) : tool.outputType;
+
+  const parameters = [
+    tool.hasInput ? `input: ${inputTypeStr}` : undefined,
+    tool.hasOptions ? `options${tool.optionsOptional ? "?" : ""}: ${tool.optionsType}` : undefined,
+  ].filter((parameter): parameter is string => Boolean(parameter));
+
+  const docLines = [
+    ...(tool.description ? [`${indent} * ${escapeComment(tool.description)}`] : []),
+    ...(tool.docsUrl ? [`${indent} * @see ${tool.docsUrl}`] : []),
+  ];
+
+  return [
+    ...(docLines.length > 0 ? [`${indent}/**`, ...docLines, `${indent} */`] : []),
+    `${indent}${quotePropertyName(methodName)}: (${parameters.join(", ")}) => Promise<${outputTypeStr}>;`,
+  ].join("\n");
+}
+
+function isExpandableObjectSchema(schema: unknown): boolean {
+  const s = schema as { type?: string; properties?: Record<string, unknown> } | undefined;
+  if (!s || typeof s !== "object") return false;
+  if (s.type !== "object" && !s.properties) return false;
+  return Object.keys(s.properties ?? {}).length > 0;
+}
+
+function renderProviderTypesFromClientTools(
+  provider: Pick<RegistryProvider, "name" | "options">,
+  clientTools: ClientTool[],
+  context?: SchemaRenderContext,
+): string {
+  const providerTypeName = toPascalCase(provider.name);
+
+  type ClientTreeNode = {
+    children: Map<string, ClientTreeNode>;
+    tool?: ClientTool;
+  };
+
+  function createClientTreeNode(): ClientTreeNode {
+    return {
+      children: new Map(),
+    };
+  }
+
+  function insertClientTool(root: ClientTreeNode, tool: ClientTool): void {
+    let current = root;
+
+    for (const segment of tool.accessPath) {
+      const child = current.children.get(segment) ?? createClientTreeNode();
+      current.children.set(segment, child);
+      current = child;
+    }
+
+    current.tool = tool;
+  }
+
+  function renderClientTree(node: ClientTreeNode, depth: number): string {
+    return [...node.children.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([segment, child]) => {
+        const indent = "  ".repeat(depth);
+
+        if (child.tool) {
+          return renderToolMember(child.tool, depth, context);
+        }
+
+        return [
+          `${indent}${quotePropertyName(segment)}: {`,
+          renderClientTree(child, depth + 1),
+          `${indent}};`,
+        ].join("\n");
+      })
+      .join("\n");
+  }
+
+  const clientTree = createClientTreeNode();
+
+  for (const clientTool of clientTools) {
+    insertClientTool(clientTree, clientTool);
+  }
+
+  const groupTypeEntries = renderClientTree(clientTree, 1);
+
+  return [
+    `export type ${providerTypeName}Client = {`,
+    groupTypeEntries,
+    "};",
+    "",
+  ].join("\n");
+}
+
+export function renderProviderTypes(
+  provider: Pick<RegistryProvider, "name" | "options">,
+  tools: Tool[],
+  publicTypeMap: Map<string, PublicToolTypes>,
+  clientToolMap: Map<string, ClientToolDefinition>,
+  schemaTypes?: ProviderSchemaTypes | null,
+): string {
+  const clientTools = toClientTools(provider, tools, publicTypeMap, clientToolMap);
+  const usedNames = new Set<string>();
+  const context = createTrackedContext(schemaTypes, usedNames);
+  return renderProviderTypesFromClientTools(provider, clientTools, context);
+}
+
+function groupClientToolsByNamespace(clientTools: ClientTool[]): {
+  namespaced: Map<string, ClientTool[]>;
+  toplevel: ClientTool[];
+} {
+  const namespaced = new Map<string, ClientTool[]>();
+  const toplevel: ClientTool[] = [];
+
+  for (const tool of clientTools) {
+    if (tool.accessPath.length > 1) {
+      const namespace = tool.accessPath[0]!;
+      if (!namespaced.has(namespace)) {
+        namespaced.set(namespace, []);
+      }
+      namespaced.get(namespace)!.push(tool);
+    } else {
+      toplevel.push(tool);
+    }
+  }
+
+  return { namespaced, toplevel };
+}
+
+function toTypeName(groupKey: string): string {
+  return toPascalCase(groupKey) + "Operations";
+}
+
+/**
+ * The shared named-types file is always `schemas.ts`; a namespace group that
+ * would collide gets its file suffixed.
+ */
+function groupFileBase(namespace: string): string {
+  return namespace === "schemas" ? "schemas-operations" : namespace;
+}
+
+function renderGroupTypes(
+  groupKey: string,
+  clientTools: ClientTool[],
+  context?: SchemaRenderContext,
+): string {
+  const typeName = toTypeName(groupKey);
+
+  const toolEntries = clientTools.map((tool) => renderToolMember(tool, 1, context)).join("\n\n");
+
+  return [
+    `export type ${typeName} = {`,
+    toolEntries,
+    "};",
+    "",
+  ].join("\n");
+}
+
+export function renderProviderGroupTypes(
+  provider: Pick<RegistryProvider, "name" | "options">,
+  tools: Tool[],
+  publicTypeMap: Map<string, PublicToolTypes>,
+  clientToolMap: Map<string, ClientToolDefinition>,
+  schemaTypes?: ProviderSchemaTypes | null,
+): Map<string, string> {
+  const clientTools = toClientTools(provider, tools, publicTypeMap, clientToolMap);
+  const { namespaced } = groupClientToolsByNamespace(clientTools);
+
+  const output = new Map<string, string>();
+
+  for (const [namespace, groupTools] of namespaced.entries()) {
+    const usedNames = new Set<string>();
+    const context = createTrackedContext(schemaTypes, usedNames);
+    const content = renderGroupTypes(namespace, groupTools, context);
+    const importLine = renderSchemaImport(usedNames, new Set());
+    output.set(
+      `${groupFileBase(namespace)}.ts`,
+      importLine ? `${importLine}\n\n${content}` : content,
+    );
+  }
+
+  if (schemaTypes) {
+    output.set("schemas.ts", renderProviderSchemas(schemaTypes));
+  }
+
+  return output;
+}
+
+export function renderProviderTypesIndex(
+  provider: Pick<RegistryProvider, "name" | "options">,
+  tools: Tool[],
+  publicTypeMap: Map<string, PublicToolTypes>,
+  clientToolMap: Map<string, ClientToolDefinition>,
+  schemaTypes?: ProviderSchemaTypes | null,
+): string {
+  const clientTools = toClientTools(provider, tools, publicTypeMap, clientToolMap);
+  const { namespaced, toplevel } = groupClientToolsByNamespace(clientTools);
+
+  const providerTypeName = toPascalCase(provider.name);
+  const usedNames = new Set<string>();
+  const context = createTrackedContext(schemaTypes, usedNames);
+
+  const namespacedEntries = [...namespaced.keys()]
+    .sort()
+    .map((namespace) => {
+      const typeName = toTypeName(namespace);
+      return `  ${namespace}: ${typeName};`;
+    })
+    .join("\n");
+
+  const toplevelEntries = toplevel
+    .map((tool) => renderToolMember(tool, 1, context))
+    .join("\n\n");
+
+  const groupImports = [...namespaced.keys()]
+    .sort()
+    .map((namespace) => {
+      const typeName = toTypeName(namespace);
+      return `import type { ${typeName} } from "./${groupFileBase(namespace)}.js";`;
+    });
+
+  const schemaImport = renderSchemaImport(usedNames, new Set());
+  const imports = [...groupImports, ...(schemaImport ? [schemaImport] : [])].join("\n");
+
+  const compositionParts = [namespacedEntries, toplevelEntries].filter(Boolean);
+  const composition = compositionParts.join("\n\n");
+
+  const reExports = [
+    ...[...namespaced.keys()].sort().map((namespace) => `export * from "./${groupFileBase(namespace)}.js";`),
+    ...(schemaTypes ? [`export * from "./schemas.js";`] : []),
+  ].join("\n");
+
+  return [
+    imports,
+    "",
+    `export type ${providerTypeName}Client = {`,
+    composition,
+    "};",
+    "",
+    reExports,
+    "",
+  ].join("\n");
+}
+
+export function renderProviderEntry(providerName: string, clientImportPath = "../client.js"): string {
+  const providerTypeName = toPascalCase(providerName);
+
+  return `import { readFile } from "node:fs/promises";
+import type { CreateClientOptions } from ${JSON.stringify(clientImportPath)};
+import { createClient, createLazyClient } from ${JSON.stringify(clientImportPath)};
+import type { ${providerTypeName}Client } from "./types/index.js";
+import { toolMetadata } from "./metadata.js";
+
+export * from "./types/index.js";
+
+export function create${providerTypeName}Client(
+  options: Omit<CreateClientOptions, "name" | "openApiDocument" | "toolMetadata"> = {},
+): Promise<${providerTypeName}Client> {
+  return createClient<${providerTypeName}Client>({
+    ...options,
+    name: ${JSON.stringify(providerName)},
+    // Read + parsed on demand, and deliberately NOT via \`import()\`: either
+    // form of import registers the document in Node's ESM registry, which
+    // pins it for the lifetime of the process. Read from disk, the document
+    // is owned by the client alone, so evicting a cached client actually
+    // returns the memory (12MB for github). \`openapi.json\` ships beside this
+    // module in dist — see copy-assets.mjs — so the module-relative URL holds
+    // wherever the package is staged.
+    openApiDocument: async () => JSON.parse(await readFile(new URL("./openapi.json", import.meta.url), "utf8")),
+    toolMetadata,
+  });
+}
+
+const defaultClient = createLazyClient(() => create${providerTypeName}Client());
+
+export default defaultClient;
+`;
+}
+
+export function renderProviderMetadata(
+  provider: Pick<RegistryProvider, "name" | "options">,
+  clientToolMap: Map<string, ClientToolDefinition>,
+  clientImportPath = "../client.js",
+): string {
+  const toolMetadata = Object.fromEntries(
+    [...clientToolMap.entries()].map(([toolName, definition]) => {
+      return [stripProviderToolName(toolName, provider), definition.runtimeMetadata];
+    }),
+  ) as Record<string, ToolRuntimeMetadata>;
+
+  return `import type { ToolRuntimeMetadataMap } from ${JSON.stringify(clientImportPath)};
+
+export const toolMetadata = ${JSON.stringify(toolMetadata, null, 2)} satisfies ToolRuntimeMetadataMap;
+`;
+}
+
+export function renderRootClient(): string {
+  return readFileSync(resolveRepoPath("packages", "utdk", "client.ts"), "utf8");
+}
+
+export function renderRootPackageEntry(): string {
+  return `export { createClient, createLazyClient } from "./client.js";
+export type { CreateClientOptions } from "./client.js";
+`;
+}
+
+/**
+ * Providers that actually exist in the output tree.
+ *
+ * A directory is a provider iff it has an `index.ts` — which is what
+ * distinguishes `google/docs` (the Google Docs API) from
+ * `google/calendar/docs` (that provider's documentation).
+ */
+function providersOnDisk(outputRoot: string): Set<string> {
+  const found = new Set<string>();
+  // The contract packages (`@utdk/sql`, `@utdk/llm`, …) live in
+  // `packages/contracts/`, so nothing here needs to skip contract names —
+  // the `github/vcs` adapter suite counts as a provider on disk like any
+  // other. `common` stays skipped: it is the nested `@utdk/common` package,
+  // not a provider.
+  const skipTop = new Set(["dist", "node_modules", "common", ".turbo"]);
+  const skipNested = new Set(["dist", "node_modules", "types", "__tests__"]);
+
+  const walk = (relative: string): void => {
+    const absolute = path.join(outputRoot, relative);
+    if (existsSync(path.join(absolute, "index.ts"))) {
+      found.add(relative.split(path.sep).join("/"));
+    }
+    for (const entry of readdirSync(absolute, { withFileTypes: true })) {
+      if (!entry.isDirectory() || skipNested.has(entry.name)) continue;
+      walk(path.join(relative, entry.name));
+    }
+  };
+
+  if (!existsSync(outputRoot)) return found;
+  for (const entry of readdirSync(outputRoot, { withFileTypes: true })) {
+    if (!entry.isDirectory() || skipTop.has(entry.name)) continue;
+    walk(entry.name);
+  }
+
+  return found;
+}
+
+/**
+ * Export entries present in the previous root manifest that this generator does
+ * not produce. Static keys (".", "./client", the JSON wildcards) are emitted
+ * unconditionally, so they are excluded from the carry-over.
+ */
+function getCarriedRootExports(
+  previousPackageJson: string | undefined,
+  providerExports: Record<string, unknown>,
+  outputRoot: string,
+): Record<string, unknown> {
+  if (!previousPackageJson) {
+    return {};
+  }
+
+  let parsed: unknown;
+
+  try {
+    parsed = JSON.parse(previousPackageJson);
+  } catch {
+    return {};
+  }
+
+  const previousExports = (parsed as { exports?: Record<string, unknown> } | null)?.exports;
+
+  if (!previousExports || typeof previousExports !== "object") {
+    return {};
+  }
+
+  const staticKeys = new Set([".", "./client", "./registry.json", "./*/openapi.json", "./*/package.json"]);
+
+  const onDisk = providersOnDisk(outputRoot);
+
+  return Object.fromEntries(
+    Object.entries(previousExports).filter(
+      ([key]) =>
+        !staticKeys.has(key) &&
+        !(key in providerExports) &&
+        key.startsWith("./") &&
+        onDisk.has(key.slice(2)),
+    ),
+  );
+}
+
+export function renderRootPackageJson(
+  providers: RegistryProvider[],
+  previousPackageJson?: string,
+  outputRoot: string = resolveRepoPath("packages", "utdk"),
+): string {
+  // An export must correspond to code that exists. Deriving the map from the
+  // registry alone advertised every one of its ~2,565 source entries, but only
+  // ~50 have ever been generated — so 2,659 subpaths resolved to `dist/...`
+  // files that were never written, and `import("utdk/azure/mysql")` passed
+  // Node's exports check and then failed to load. On-disk presence is the only
+  // honest source of truth, and it covers the hand-written providers
+  // (postgres/snowflake/databricks) for free, since they exist too.
+  //
+  // `justGenerated` exists because the manifest and the provider directory are
+  // written in the same `Promise.all`: a brand-new provider may not be on disk
+  // yet when this runs, and would otherwise be omitted from its own first
+  // manifest.
+  const justGenerated = providers.flatMap((provider) => {
+    const segments = splitProviderName(provider.name);
+    return segments.map((_, index) => segments.slice(0, index + 1).join("/"));
+  });
+  const onDisk = providersOnDisk(outputRoot);
+
+  const providerExports = Object.fromEntries(
+    [...new Set([...onDisk, ...justGenerated.filter((entry) => onDisk.has(entry))])]
+      .sort((left, right) => left.localeCompare(right))
+      .map((providerPath) => [
+        `./${providerPath}`,
+        {
+          types: `./dist/${providerPath}/index.d.ts`,
+          import: `./dist/${providerPath}/index.js`,
+          default: `./dist/${providerPath}/index.js`,
+        },
+      ]),
+  );
+
+  // Carry over anything the walk cannot see. With on-disk presence driving the
+  // map this should normally be empty; it stays as a safety net rather than a
+  // mechanism, and it deliberately no longer resurrects entries whose code is
+  // absent — that was how the phantoms survived regeneration.
+  const carriedExports = getCarriedRootExports(previousPackageJson, providerExports, outputRoot);
+
+  return JSON.stringify(
+    {
+      name: "utdk",
+      version: "0.1.0",
+      type: "module",
+      description: "Generated UTDK provider clients",
+      files: ["dist"],
+      // `build` is the esbuild path (build.mjs transpiles, emit-client-types.mjs
+      // emits the hand-written client's .d.ts). `tsc` over ~50 provider trees
+      // needs a 4GB heap and minutes, so it is reserved for `build:types` /
+      // `prepublishOnly`, where full declarations are actually required.
+      scripts: {
+        build: "node ./build.mjs && node ./emit-client-types.mjs && node ./copy-assets.mjs",
+        "check-types": "NODE_OPTIONS=--max-old-space-size=4096 tsc -p tsconfig.json --noEmit",
+        typecheck: "NODE_OPTIONS=--max-old-space-size=4096 tsc -p tsconfig.json --noEmit",
+        clean: "rm -rf dist",
+        "build:types": "NODE_OPTIONS=--max-old-space-size=4096 tsc -p tsconfig.json && node ./copy-assets.mjs",
+        prepublishOnly: "pnpm run build:types",
+      },
+      dependencies: {
+        "@utcp/http": "^1.1.1",
+        "@utcp/sdk": "^1.1.0",
+        // Hand-written provider packages that live inside this tree but are
+        // excluded from the generated build (see tsconfig `exclude`).
+        "@utdk/sql": "workspace:*",
+        "@utdk/llm": "workspace:*",
+      },
+      exports: {
+        ".": {
+          types: "./dist/index.d.ts",
+          import: "./dist/index.js",
+          default: "./dist/index.js",
+        },
+        "./client": {
+          types: "./dist/client.d.ts",
+          import: "./dist/client.js",
+          default: "./dist/client.js",
+        },
+        // The workspace resolves the provider catalog at runtime
+        // (utdk/registry.json), and mcp-core resolves per-provider
+        // openapi.json/package.json for suite providers (utdk/google/books/...).
+        "./registry.json": "./dist/registry.json",
+        "./*/openapi.json": "./dist/*/openapi.json",
+        "./*/package.json": "./dist/*/package.json",
+        ...providerExports,
+        ...carriedExports,
+      },
+      license: "MIT",
+      publishConfig: {
+        access: "public",
+      },
+      devDependencies: {},
+    },
+    null,
+    2,
+  ).concat("\n");
+}
+
+export function renderRootTsconfig(): string {
+  return JSON.stringify(
+    {
+      extends: "../../tsconfig.json",
+      compilerOptions: {
+        moduleResolution: "Bundler",
+        outDir: "dist",
+        rootDir: ".",
+        declaration: true,
+        sourceMap: true,
+      },
+      include: ["./**/*.ts"],
+      // `llm` and `sql` are hand-written workspace packages that happen to live
+      // inside this tree; they build themselves. Tests never ship.
+      exclude: ["dist", "node_modules", "llm", "sql", "**/__tests__/**", "**/*.test.ts"],
+    },
+    null,
+    2,
+  ).concat("\n");
+}
+
+export function renderCopyAssetsScript(): string {
+  return `import { cp, mkdir, readdir } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const rootDir = path.dirname(fileURLToPath(import.meta.url));
+const distDir = path.join(rootDir, "dist");
+const skippedRootFiles = new Set(["package.json", "tsconfig.json"]);
+
+/**
+ * Mirrors build.mjs's SKIP_DIRS. Without it this walk copies \`llm/package.json\`
+ * and \`sql/package.json\` into dist, creating \`dist/llm\` and \`dist/sql\`
+ * directories that contain manifests and no code — enough to look like
+ * providers to anything enumerating dist, and to fail when imported.
+ */
+const skippedDirs = new Set(["dist", "node_modules", "llm", "sql", "__tests__"]);
+
+async function copyAssets(currentDir, relativeDir = '') {
+  const entries = await readdir(currentDir, { withFileTypes: true });
+
+  for (const entry of entries) {
+    if (skippedDirs.has(entry.name)) {
+      continue;
+    }
+
+    const sourcePath = path.join(currentDir, entry.name);
+    const relativePath = path.join(relativeDir, entry.name);
+
+    if (entry.isDirectory()) {
+      await copyAssets(sourcePath, relativePath);
+      continue;
+    }
+
+    if (!entry.name.endsWith('.json')) {
+      continue;
+    }
+
+    if (relativeDir === '' && skippedRootFiles.has(entry.name)) {
+      continue;
+    }
+
+    const destinationPath = path.join(distDir, relativePath);
+    await mkdir(path.dirname(destinationPath), { recursive: true });
+    await cp(sourcePath, destinationPath);
+  }
+}
+
+await copyAssets(rootDir);
+`;
+}
+
+export function renderProviderReadme(
+  provider: RegistryProvider,
+  options: {
+    generatedReadme?: string;
+    openApiDocument?: OpenAPIV3.Document;
+  } = {},
+): string {
+  if (options.generatedReadme) {
+    return options.generatedReadme.endsWith("\n") ? options.generatedReadme : `${options.generatedReadme}\n`;
+  }
+
+  const openApiDocument = options.openApiDocument;
+
+  if (!openApiDocument) {
+    return `# ${provider.name}\n\nGenerated UTDK provider types and OpenAPI-backed client for ${provider.url}.\n`;
+  }
+
+  const title = getNonEmptyString(openApiDocument.info?.title) ?? provider.name;
+  const description =
+    getNonEmptyString(openApiDocument.info?.description) ??
+    `Generated UTDK provider types and OpenAPI-backed client for ${provider.url}.`;
+  const auth = getStructuredAuth(openApiDocument);
+  const authText =
+    auth.schemes.length > 0
+      ? auth.schemes
+          .map((a) =>
+            a.scheme ? `${a.type}:${a.scheme}` : a.type,
+          )
+          .join(", ")
+      : "None";
+
+  let operationCount = 0;
+  const tagCounts = new Map<string, number>();
+
+  for (const pathItem of Object.values(openApiDocument.paths ?? {})) {
+    if (!pathItem || typeof pathItem !== "object") continue;
+
+    for (const method of ["get", "post", "put", "delete", "patch", "head", "options", "trace"] as const) {
+      const operation = (pathItem as OpenAPIV3.PathItemObject)[method];
+      if (operation && typeof operation === "object" && !("$ref" in operation)) {
+        operationCount++;
+        const tag = operation.tags?.[0];
+        if (tag) {
+          tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1);
+        }
+      }
+    }
+  }
+
+  const topTags = [...tagCounts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, 5)
+    .map(([tag]) => tag);
+
+  return [
+    `# ${title}`,
+    "",
+    description,
+    "",
+    `- **Provider URL**: ${provider.url}`,
+    `- **Operations**: ${operationCount}`,
+    `- **Authentication**: ${authText}`,
+    topTags.length > 0 ? `- **Top capabilities**: ${topTags.join(", ")}` : null,
+    "",
+    "## Quick start",
+    "",
+    "```ts",
+    `import client from "${getProviderImportSpecifier(provider.name)}";`,
+    "",
+    "// Use the typed client to call provider operations",
+    "const result = await client.someOperation({});",
+    "```",
+    "",
+    "## Documentation",
+    "",
+    "Refer to the typed client interface (`types.ts`) for complete operation signatures with TypeScript types.",
+    "",
+  ]
+    .filter((line): line is string => line !== null)
+    .join("\n");
+}
+
+export function renderNamespaceEntry(namespaceSegments: string[], providers: RegistryProvider[]): string {
+  const childExports = new Map<string, string>();
+
+  for (const provider of providers) {
+    const providerSegments = splitProviderName(provider.name);
+    const matchesNamespace = namespaceSegments.every((segment, index) => providerSegments[index] === segment);
+
+    if (!matchesNamespace || providerSegments.length <= namespaceSegments.length) {
+      continue;
+    }
+
+    const childSegment = providerSegments[namespaceSegments.length];
+
+    if (!childSegment) {
+      continue;
+    }
+
+    childExports.set(childSegment, toCamelCase(childSegment));
+  }
+
+  // Only re-export each service's default client. Star re-exports would
+  // collide at the vendor level — sibling services share type names
+  // (e.g. Channel, Comment, Thumbnail across the Google suite). Types stay
+  // importable per service (utdk/<vendor>/<service>).
+  return [...childExports.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([segment, identifier]) => `export { default as ${identifier} } from "./${segment}/index.js";`)
+    .join("\n")
+    .concat("\n");
+}
+
+export function renderNamespacePackageJson(
+  providerName: string,
+  providers: RegistryProvider[],
+  previousPackageJson?: string,
+  generatedAt: Date = new Date(),
+): string {
+  const packageRootName = getProviderPackageRootName(providerName);
+  const dateStamp = formatVersionDate(generatedAt);
+  const generation = getNextGeneration(previousPackageJson, dateStamp);
+  const normalizedProviders = providers.map((provider) => normalizeProviderName(provider.name)).sort((left, right) => left.localeCompare(right));
+
+  return JSON.stringify(
+    {
+      // Vendor namespaces are subpaths of the root "utdk" package
+      // (utdk/google, utdk/google/books), not standalone workspace packages.
+      private: true,
+      version: `0.0.1-${dateStamp}.${generation}`,
+      type: "module",
+      description: `Generated UTDK provider clients for ${packageRootName}.`,
+      keywords: [packageRootName, "generated", "openapi", "utdk"],
+      utdk: {
+        namespace: packageRootName,
+        generation,
+        generatedAt: generatedAt.toISOString(),
+        providers: normalizedProviders,
+      },
+    },
+    null,
+    2,
+  ).concat("\n");
+}
+
+export function renderProviderPackageJson(
+  provider: RegistryProvider,
+  openApiDocument: OpenAPIV3.Document,
+  previousPackageJson?: string,
+  generatedAt: Date = new Date(),
+  options: {
+    includePackageName?: boolean;
+    docsMetadata?: ProviderPackageDocsMetadata;
+  } = {},
+): string {
+  const includePackageName = options.includePackageName ?? true;
+  const sourceVersion = getNonEmptyString(openApiDocument.info?.version);
+  const baseVersion = normalizePackageBaseVersion(sourceVersion);
+  const dateStamp = formatVersionDate(generatedAt);
+  const generation = getNextGeneration(previousPackageJson, dateStamp);
+  const title = getNonEmptyString(openApiDocument.info?.title);
+  const description =
+    getNonEmptyString(openApiDocument.info?.description) ??
+    `Generated UTDK provider types and OpenAPI-backed client for ${provider.url}.`;
+  const packageDescription = title ? `Generated UTDK provider client for ${title}. ${description}` : description;
+  const license = getNonEmptyString(openApiDocument.info?.license?.name);
+  const homepage =
+    getNonEmptyString(provider.branding?.site) ??
+    getNonEmptyString(openApiDocument.externalDocs?.url) ??
+    getNonEmptyString(openApiDocument.info?.contact?.url) ??
+    provider.url;
+  const auth = getStructuredAuth(openApiDocument);
+  const icon = getProviderOpenApiIcon(provider, openApiDocument) ?? getNonEmptyString(provider.branding?.logo);
+
+  const packageJson = {
+    ...(includePackageName ? { name: `@utdk/${provider.name}` } : { private: true }),
+    version: `${baseVersion}-${dateStamp}.${generation}`,
+    type: "module",
+    description: packageDescription,
+    homepage,
+    keywords: [provider.name, "generated", "openapi", "utdk"],
+    ...(license ? { license } : {}),
+    utdk: {
+      provider: provider.name,
+      generation,
+      generatedAt: generatedAt.toISOString(),
+      auth,
+      openapi: {
+        title,
+        url: provider.url,
+        version: sourceVersion ?? null,
+        termsOfService: getNonEmptyString(openApiDocument.info?.termsOfService) ?? null,
+        ...(icon ? { icon } : {}),
+      },
+      // Chain of ownership: always the upstream vendor, never the aggregator
+      // we happened to fetch through (that's provenance.source).
+      ...(provider.provenance ? { provenance: provider.provenance } : {}),
+      ...(provider.branding ? { branding: provider.branding } : {}),
+      ...(options.docsMetadata
+        ? {
+            docs: {
+              manifestPath: options.docsMetadata.manifestPath,
+              indexPath: options.docsMetadata.indexPath,
+              docsPath: options.docsMetadata.docsPath,
+              generatedAt: options.docsMetadata.generatedAt,
+              sourceCount: options.docsMetadata.sourceCount,
+              openApiHash: options.docsMetadata.openApiHash,
+              promptHash: options.docsMetadata.promptHash,
+            },
+          }
+        : {}),
+    },
+  };
+
+  return JSON.stringify(packageJson, null, 2).concat("\n");
+}

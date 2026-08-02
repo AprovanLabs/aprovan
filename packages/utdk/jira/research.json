@@ -1,0 +1,86 @@
+{
+  "provider": "jira",
+  "generatedAt": "2026-05-30T22:05:32.097Z",
+  "noveltyScore": 4,
+  "npmPackages": [
+    {
+      "name": "jira-sdk",
+      "version": "1.0.4",
+      "description": "jira sdk for javascript and typescript.",
+      "category": "community-sdk"
+    },
+    {
+      "name": "jira-client",
+      "version": "8.2.2",
+      "description": "Wrapper for the JIRA API",
+      "category": "community-sdk"
+    },
+    {
+      "name": "jira.js",
+      "version": "5.3.1",
+      "description": "Modern Jira REST API client for JavaScript and TypeScript. Full-featured library for Jira Cloud API v2/v3, Jira Agile API, and Jira Service Desk API. Works in Node.js and browsers with TypeScript support, tree-shaking, and comprehensive type definitions.",
+      "category": "other"
+    },
+    {
+      "name": "@allurereport/plugin-jira",
+      "version": "3.9.0",
+      "description": "Allure Plugin to Report results to Jira",
+      "category": "other"
+    },
+    {
+      "name": "@digitalroute/cz-conventional-changelog-for-jira",
+      "version": "8.0.1",
+      "description": "Commitizen adapter following the conventional-changelog format and also asking for JIRA issue.",
+      "category": "other"
+    },
+    {
+      "name": "@types/jira-client",
+      "version": "7.1.9",
+      "description": "TypeScript definitions for jira-client",
+      "category": "types"
+    },
+    {
+      "name": "@axis-backstage/plugin-jira-dashboard-common",
+      "version": "1.15.1",
+      "description": "Common functionalities for the jira-dashboard plugin",
+      "category": "other"
+    },
+    {
+      "name": "mcp-server-jira-cloud",
+      "version": "1.1.1",
+      "description": "MCP server for JIRA Cloud integration with comprehensive issue management, status tracking, and analytics",
+      "category": "mcp-server"
+    },
+    {
+      "name": "@currents/mcp",
+      "version": "2.3.2",
+      "description": "Currents MCP server",
+      "category": "mcp-server"
+    },
+    {
+      "name": "@atlassian-dc-mcp/jira",
+      "version": "0.19.1",
+      "description": "Community-maintained MCP server for Atlassian Jira Data Center. Not affiliated with Atlassian.",
+      "category": "mcp-server"
+    },
+    {
+      "name": "@nexus2520/jira-mcp-server",
+      "version": "1.2.0",
+      "description": "MCP server for Jira API integration - supports Jira Cloud",
+      "category": "mcp-server"
+    },
+    {
+      "name": "@aashari/mcp-server-atlassian-jira",
+      "version": "3.3.0",
+      "description": "Node.js/TypeScript MCP server for Atlassian Jira. Equips AI systems (LLMs) with tools to list/get projects, search/get issues (using JQL/ID), and view dev info (commits, PRs). Connects AI capabilities directly into Jira project management and issue tracki",
+      "category": "mcp-server"
+    }
+  ],
+  "gapAnalysis": {
+    "hasOfficialSdk": false,
+    "hasCommunitySDK": true,
+    "hasTypeDefinitions": true,
+    "hasMcpServer": true,
+    "recommendation": "Community SDKs exist for jira. Evaluate them before generating; focus on filling gaps they do not cover. An MCP server already exists; differentiate by offering better type coverage."
+  }
+}

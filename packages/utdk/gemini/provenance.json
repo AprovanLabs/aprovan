@@ -1,0 +1,24 @@
+{
+  "provider": "gemini",
+  "generatedAt": "2026-07-18T05:50:01.379Z",
+  "generation": 2,
+  "source": {
+    "type": "openapi",
+    "url": "repo://data/openapi/gemini.json",
+    "hash": "sha256:b4c1becbb50a9c199a39a361046597eec1d74438725185a9073e22260ccedae3",
+    "fetchedAt": "2026-07-18T05:50:01.379Z"
+  },
+  "ingestSource": "manual",
+  "pipeline": {
+    "research": {
+      "noveltyScore": 6,
+      "competingPackages": 17
+    },
+    "scorecard": {
+      "infrastructure": "fail",
+      "domain": 65
+    },
+    "agentReadiness": "fail"
+  },
+  "bundlerVersion": "0.1.1"
+}

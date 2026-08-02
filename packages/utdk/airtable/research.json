@@ -1,0 +1,80 @@
+{
+  "provider": "airtable",
+  "generatedAt": "2026-05-30T12:22:24.681Z",
+  "noveltyScore": 4,
+  "npmPackages": [
+    {
+      "name": "airtable-ts",
+      "version": "1.10.0",
+      "description": "A type-safe Airtable SDK",
+      "category": "other"
+    },
+    {
+      "name": "@singulardesign/airtable",
+      "version": "1.0.4",
+      "description": "A NestJS Airtable SDK",
+      "category": "other"
+    },
+    {
+      "name": "@airtable/blocks",
+      "version": "1.19.0",
+      "description": "Airtable Blocks SDK",
+      "category": "official-sdk"
+    },
+    {
+      "name": "@airtable/blocks-testing",
+      "version": "0.0.6",
+      "description": "Airtable Blocks Testing Library",
+      "category": "official-sdk"
+    },
+    {
+      "name": "airtable",
+      "version": "0.12.2",
+      "description": "The official Airtable JavaScript library.",
+      "category": "other"
+    },
+    {
+      "name": "@airtable/eslint-plugin-blocks",
+      "version": "1.0.4",
+      "description": "An eslint plugin used by Airtable to develop the blocks SDK and our own blocks",
+      "category": "official-sdk"
+    },
+    {
+      "name": "@airtable/blocks-esbuild-bundler",
+      "version": "1.0.1",
+      "description": "Esbuild bundler for @airtable/blocks-cli",
+      "category": "official-sdk"
+    },
+    {
+      "name": "@airtable/blocks-cli",
+      "version": "3.0.3",
+      "description": "Official command line tool for Airtable blocks development",
+      "category": "official-sdk"
+    },
+    {
+      "name": "mcp-server-airtable",
+      "version": "0.0.1",
+      "description": "MCP server for airtable integration",
+      "category": "mcp-server"
+    },
+    {
+      "name": "@felores/airtable-mcp-server",
+      "version": "0.3.0",
+      "description": "An Airtable Model Context Protocol Server",
+      "category": "mcp-server"
+    },
+    {
+      "name": "airtable-mcp-server",
+      "version": "1.13.0",
+      "description": "A Model Context Protocol server that provides read and write access to Airtable databases. This server enables LLMs to inspect database schemas, then read and write records.",
+      "category": "mcp-server"
+    }
+  ],
+  "gapAnalysis": {
+    "hasOfficialSdk": true,
+    "hasCommunitySDK": false,
+    "hasTypeDefinitions": false,
+    "hasMcpServer": true,
+    "recommendation": "An official SDK exists for airtable. Consider wrapping it or focusing on gaps it does not cover. An MCP server already exists; differentiate by offering better type coverage."
+  }
+}

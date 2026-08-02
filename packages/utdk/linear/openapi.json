@@ -1,0 +1,777 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Linear API",
+    "version": "1.0.0",
+    "description": "Linear is a modern project management tool for high-performance software teams. This API provides REST endpoints for webhooks, OAuth, and attachment management alongside the primary GraphQL API.",
+    "contact": {
+      "name": "Linear Developer Support",
+      "url": "https://developers.linear.app"
+    },
+    "license": {
+      "name": "MIT"
+    },
+    "x-logo": {
+      "url": "https://linear.app/static/favicon.svg"
+    }
+  },
+  "externalDocs": {
+    "description": "Linear Developer Documentation",
+    "url": "https://developers.linear.app"
+  },
+  "servers": [
+    {
+      "url": "https://api.linear.app",
+      "description": "Linear API"
+    }
+  ],
+  "security": [
+    {
+      "BearerAuth": []
+    }
+  ],
+  "paths": {
+    "/graphql": {
+      "post": {
+        "operationId": "executeGraphQL",
+        "summary": "Execute a GraphQL query or mutation",
+        "description": "Execute a GraphQL query or mutation against the Linear API. This is the primary interface for interacting with issues, projects, teams, cycles, and all Linear data.",
+        "tags": [
+          "GraphQL"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GraphQLRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "GraphQL response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphQLResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/oauth/token": {
+      "post": {
+        "operationId": "exchangeOAuthToken",
+        "summary": "Exchange authorization code for access token",
+        "description": "Exchange an OAuth 2.0 authorization code for an access token and refresh token. Used in the OAuth authorization code flow.",
+        "tags": [
+          "OAuth"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/TokenRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OAuth token response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/oauth/revoke": {
+      "post": {
+        "operationId": "revokeOAuthToken",
+        "summary": "Revoke an OAuth access token",
+        "description": "Revoke an OAuth access token, invalidating it immediately. Use this when a user disconnects their Linear account.",
+        "tags": [
+          "OAuth"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "access_token"
+                ],
+                "properties": {
+                  "access_token": {
+                    "type": "string",
+                    "description": "The access token to revoke"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Token revoked successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/webhooks": {
+      "get": {
+        "operationId": "listWebhooks",
+        "summary": "List webhooks",
+        "description": "Returns a list of all webhooks configured for the authenticated workspace. Webhooks allow you to receive real-time notifications when issues, comments, cycles, or other resources change.",
+        "tags": [
+          "Webhooks"
+        ],
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "Pagination cursor for fetching the next page of results",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of webhooks to return (1-250)",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 250,
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of webhooks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookList"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createWebhook",
+        "summary": "Create a webhook",
+        "description": "Create a new webhook to receive real-time notifications for issue updates, comment creation, project changes, and other events in your Linear workspace.",
+        "tags": [
+          "Webhooks"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateWebhookRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Webhook created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Webhook"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/webhooks/{webhookId}": {
+      "get": {
+        "operationId": "getWebhook",
+        "summary": "Get a webhook",
+        "description": "Retrieve details of a specific webhook by its ID, including its URL, enabled status, and resource types it listens for.",
+        "tags": [
+          "Webhooks"
+        ],
+        "parameters": [
+          {
+            "name": "webhookId",
+            "in": "path",
+            "required": true,
+            "description": "The unique identifier of the webhook",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Webhook details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Webhook"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateWebhook",
+        "summary": "Update a webhook",
+        "description": "Update the configuration of an existing webhook. You can change the URL, secret, enabled status, or the resource types the webhook listens for.",
+        "tags": [
+          "Webhooks"
+        ],
+        "parameters": [
+          {
+            "name": "webhookId",
+            "in": "path",
+            "required": true,
+            "description": "The unique identifier of the webhook",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateWebhookRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Webhook updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Webhook"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteWebhook",
+        "summary": "Delete a webhook",
+        "description": "Permanently delete a webhook. Once deleted, the webhook will no longer receive event notifications.",
+        "tags": [
+          "Webhooks"
+        ],
+        "parameters": [
+          {
+            "name": "webhookId",
+            "in": "path",
+            "required": true,
+            "description": "The unique identifier of the webhook to delete",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Webhook deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "lastSyncId": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/attachment": {
+      "post": {
+        "operationId": "createAttachment",
+        "summary": "Create an attachment on an issue",
+        "description": "Create an attachment on a Linear issue to link external resources such as Figma designs, GitHub PRs, Sentry issues, or custom URLs. Attachments are displayed in the issue sidebar.",
+        "tags": [
+          "Attachments"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAttachmentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Attachment created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttachmentPayload"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Linear API personal access token or OAuth 2.0 access token"
+      }
+    },
+    "responses": {
+      "Unauthorized": {
+        "description": "Authentication required",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "BadRequest": {
+        "description": "Invalid request parameters",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Resource not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "GraphQLRequest": {
+        "type": "object",
+        "required": [
+          "query"
+        ],
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "The GraphQL query or mutation string"
+          },
+          "variables": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Variables to pass to the GraphQL query"
+          },
+          "operationName": {
+            "type": "string",
+            "description": "Name of the operation to execute (for multi-operation documents)"
+          }
+        }
+      },
+      "GraphQLResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "The response data"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GraphQLError"
+            }
+          }
+        }
+      },
+      "GraphQLError": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "locations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "line": {
+                  "type": "integer"
+                },
+                "column": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "path": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "TokenRequest": {
+        "type": "object",
+        "required": [
+          "code",
+          "redirect_uri",
+          "client_id",
+          "client_secret",
+          "grant_type"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Authorization code received from the OAuth callback"
+          },
+          "redirect_uri": {
+            "type": "string",
+            "description": "Redirect URI used in the authorization request"
+          },
+          "client_id": {
+            "type": "string",
+            "description": "Application client ID"
+          },
+          "client_secret": {
+            "type": "string",
+            "description": "Application client secret"
+          },
+          "grant_type": {
+            "type": "string",
+            "enum": [
+              "authorization_code"
+            ],
+            "description": "OAuth grant type"
+          }
+        }
+      },
+      "TokenResponse": {
+        "type": "object",
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "description": "OAuth access token"
+          },
+          "token_type": {
+            "type": "string",
+            "description": "Token type (always 'Bearer')"
+          },
+          "expires_in": {
+            "type": "integer",
+            "description": "Token expiration time in seconds"
+          },
+          "refresh_token": {
+            "type": "string",
+            "description": "Refresh token for obtaining new access tokens"
+          },
+          "scope": {
+            "type": "string",
+            "description": "Granted OAuth scopes"
+          }
+        }
+      },
+      "Webhook": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique webhook identifier"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "The URL that receives webhook event payloads"
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether the webhook is active"
+          },
+          "secret": {
+            "type": "string",
+            "description": "HMAC secret for validating webhook signatures"
+          },
+          "resourceTypes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Resource types this webhook listens to (e.g. Issue, Comment, Project)"
+          },
+          "teamId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Team this webhook is scoped to (null for workspace-wide)"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "WebhookList": {
+        "type": "object",
+        "properties": {
+          "nodes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Webhook"
+            }
+          },
+          "pageInfo": {
+            "$ref": "#/components/schemas/PageInfo"
+          }
+        }
+      },
+      "PageInfo": {
+        "type": "object",
+        "properties": {
+          "hasNextPage": {
+            "type": "boolean"
+          },
+          "hasPreviousPage": {
+            "type": "boolean"
+          },
+          "startCursor": {
+            "type": "string"
+          },
+          "endCursor": {
+            "type": "string"
+          }
+        }
+      },
+      "CreateWebhookRequest": {
+        "type": "object",
+        "required": [
+          "url"
+        ],
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL to receive webhook event payloads"
+          },
+          "secret": {
+            "type": "string",
+            "description": "HMAC secret for signing webhook payloads"
+          },
+          "enabled": {
+            "type": "boolean",
+            "default": true,
+            "description": "Whether to enable the webhook immediately"
+          },
+          "resourceTypes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Resource types to subscribe to"
+          },
+          "teamId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Team to scope this webhook to (omit for workspace-wide)"
+          }
+        }
+      },
+      "UpdateWebhookRequest": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "New URL for the webhook"
+          },
+          "secret": {
+            "type": "string",
+            "description": "New HMAC secret"
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Enable or disable the webhook"
+          },
+          "resourceTypes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Updated list of resource types to subscribe to"
+          }
+        }
+      },
+      "CreateAttachmentRequest": {
+        "type": "object",
+        "required": [
+          "issueId",
+          "url",
+          "title"
+        ],
+        "properties": {
+          "issueId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "ID of the issue to attach to"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL of the external resource"
+          },
+          "title": {
+            "type": "string",
+            "description": "Display title for the attachment"
+          },
+          "subtitle": {
+            "type": "string",
+            "description": "Optional subtitle shown below the title"
+          },
+          "iconUrl": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL of the attachment icon"
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Additional metadata for the attachment"
+          }
+        }
+      },
+      "AttachmentPayload": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "lastSyncId": {
+            "type": "number"
+          },
+          "attachment": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "url": {
+                "type": "string",
+                "format": "uri"
+              },
+              "title": {
+                "type": "string"
+              },
+              "subtitle": {
+                "type": "string"
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "extensions": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      }
+    }
+  }
+}

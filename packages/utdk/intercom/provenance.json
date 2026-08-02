@@ -1,0 +1,24 @@
+{
+  "provider": "intercom",
+  "generatedAt": "2026-05-30T12:26:07.709Z",
+  "generation": 1,
+  "source": {
+    "type": "openapi",
+    "url": "https://raw.githubusercontent.com/intercom/Intercom-OpenAPI/main/descriptions/2.15/api.intercom.io.yaml",
+    "hash": "sha256:869e22e01e97de0ea679cd68aa8fa629c1b64fb0e8f84448269cb014216e498e",
+    "fetchedAt": "2026-05-30T12:26:07.709Z"
+  },
+  "ingestSource": "composio",
+  "pipeline": {
+    "research": {
+      "noveltyScore": 2,
+      "competingPackages": 8
+    },
+    "scorecard": {
+      "infrastructure": "fail",
+      "domain": 100
+    },
+    "agentReadiness": "pass"
+  },
+  "bundlerVersion": "0.1.1"
+}

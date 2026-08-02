@@ -1,0 +1,24 @@
+{
+  "provider": "linear",
+  "generatedAt": "2026-05-30T12:22:15.091Z",
+  "generation": 1,
+  "source": {
+    "type": "openapi",
+    "url": "repo://data/openapi/linear.json",
+    "hash": "sha256:d2eec16f71a7f3b6931159e83934c040021cccaf2e5b8d4611a4221997ad73b1",
+    "fetchedAt": "2026-05-30T12:22:15.091Z"
+  },
+  "ingestSource": "composio",
+  "pipeline": {
+    "research": {
+      "noveltyScore": 2,
+      "competingPackages": 17
+    },
+    "scorecard": {
+      "infrastructure": "fail",
+      "domain": 100
+    },
+    "agentReadiness": "pass"
+  },
+  "bundlerVersion": "0.1.1"
+}

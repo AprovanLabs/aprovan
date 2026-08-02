@@ -169,7 +169,7 @@ export default function ChatPage() {
         <div className="flex flex-col h-dvh overflow-hidden bg-background">
           <AppHeader
             className="static shrink-0 border-b bg-transparent backdrop-blur-none"
-            homeHref="https://aprovan.com/"
+            homeHref="https://aprovan.com/chat"
             leading={
               <button
                 onClick={() => setSidebarOpen((open) => !open)}
@@ -185,7 +185,6 @@ export default function ChatPage() {
               (link) => link.label === "Apps" || link.label === "Registry"
             )}
             logo={<img src={APROVAN_LOGO} alt="Aprovan" className="h-7 w-7 rounded-full" />}
-            name="patchwork"
           >
             <NotificationsBell
               workspaceId={explorer.activeWorkspaceId}

@@ -17,10 +17,14 @@ import {
   Database,
   GitBranch,
   GitCompareArrows,
+  KeyRound,
   Plug,
+  Shield,
   Webhook,
 } from "lucide-react";
+import { AdminPermissionsPanel } from "../components/panels/AdminPermissionsPanel";
 import { AgentsPanel } from "../components/panels/AgentsPanel";
+import { CredentialsPanel } from "../components/panels/CredentialsPanel";
 import { InterfacesPanel } from "../components/panels/InterfacesPanel";
 import { KeyValuePanel } from "../components/panels/KeyValuePanel";
 import { NotificationsPanel } from "../components/panels/NotificationsPanel";
@@ -126,6 +130,20 @@ export const NATIVE_SURFACES: NativeSurfaceDef[] = [
     description: "Workspace traces with status and source filters",
     Panel: TelemetryPanel,
     appTab: true,
+  },
+  {
+    id: "credentials",
+    title: "Credentials",
+    icon: KeyRound,
+    description: "Provider tokens and OAuth connections for tool calls",
+    Panel: CredentialsPanel,
+  },
+  {
+    id: "admin",
+    title: "Admin",
+    icon: Shield,
+    description: "Members, groups, invites, and audit log",
+    Panel: AdminPermissionsPanel,
   },
 ];
 

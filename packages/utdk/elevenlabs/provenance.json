@@ -1,0 +1,24 @@
+{
+  "provider": "elevenlabs",
+  "generatedAt": "2026-05-30T18:16:06.458Z",
+  "generation": 2,
+  "source": {
+    "type": "openapi",
+    "url": "https://api.elevenlabs.io/openapi.json",
+    "hash": "sha256:daa58ddb7cf25bf2b84d94a67055815aabd8dc4e907e5a2f58a2b9e0b3744e7b",
+    "fetchedAt": "2026-05-30T18:16:06.458Z"
+  },
+  "ingestSource": "printing-press",
+  "pipeline": {
+    "research": {
+      "noveltyScore": 4,
+      "competingPackages": 6
+    },
+    "scorecard": {
+      "infrastructure": "fail",
+      "domain": 100
+    },
+    "agentReadiness": "pass"
+  },
+  "bundlerVersion": "0.1.1"
+}

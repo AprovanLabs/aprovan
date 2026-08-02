@@ -1,0 +1,8 @@
+Local workspace state lands here: workspace.db, written by
+`scripts/image.sh run` and by the compose stack in this directory.
+
+The directory is committed but its contents are not — Docker cannot reliably
+create a missing bind-mount source (it fails with a chown permission error
+under Rancher Desktop), so the mount point has to exist in a fresh checkout.
+
+Safe to delete everything except this file; the workspace recreates it.

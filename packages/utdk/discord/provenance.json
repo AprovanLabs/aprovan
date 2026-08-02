@@ -1,0 +1,24 @@
+{
+  "provider": "discord",
+  "generatedAt": "2026-05-30T18:16:06.505Z",
+  "generation": 2,
+  "source": {
+    "type": "openapi",
+    "url": "https://raw.githubusercontent.com/discord/discord-api-spec/main/specs/openapi.json",
+    "hash": "sha256:c28a5f9a9cd3729e625bc72688a04004d54dee96ceef911c6333bb0ed7000679",
+    "fetchedAt": "2026-05-30T18:16:06.505Z"
+  },
+  "ingestSource": "printing-press",
+  "pipeline": {
+    "research": {
+      "noveltyScore": 4,
+      "competingPackages": 15
+    },
+    "scorecard": {
+      "infrastructure": "fail",
+      "domain": 85
+    },
+    "agentReadiness": "pass"
+  },
+  "bundlerVersion": "0.1.1"
+}

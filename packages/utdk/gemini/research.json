@@ -1,0 +1,116 @@
+{
+  "provider": "gemini",
+  "generatedAt": "2026-07-18T05:49:50.485Z",
+  "noveltyScore": 6,
+  "npmPackages": [
+    {
+      "name": "gemini-ai",
+      "version": "2.2.1",
+      "description": "The simpler JavaScript Gemini SDK",
+      "category": "other"
+    },
+    {
+      "name": "@makaio/adapter-gemini-sdk",
+      "version": "1.0.0-dev-1779051654000",
+      "description": "Gemini SDK adapter for Makaio AI framework",
+      "category": "community-sdk"
+    },
+    {
+      "name": "@aigne/gemini",
+      "version": "0.14.16",
+      "description": "AIGNE Gemini SDK for integrating with Google's Gemini AI models",
+      "category": "other"
+    },
+    {
+      "name": "sec-gemini",
+      "version": "1.1.11",
+      "description": "Sec-Gemini SDK",
+      "category": "other"
+    },
+    {
+      "name": "gemini-ai-sdk",
+      "version": "1.0.2",
+      "description": "The simpler Google Gemini SDK",
+      "category": "community-sdk"
+    },
+    {
+      "name": "@google/genai",
+      "version": "2.12.0",
+      "description": "[![NPM Downloads](https://img.shields.io/npm/dw/%40google%2Fgenai)](https://www.npmjs.com/package/@google/genai) [![Node Current](https://img.shields.io/node/v/%40google%2Fgenai)](https://www.npmjs.com/package/@google/genai)",
+      "category": "other"
+    },
+    {
+      "name": "@google/generative-ai",
+      "version": "0.24.1",
+      "description": "Google AI JavaScript SDK",
+      "category": "other"
+    },
+    {
+      "name": "@google/gemini-cli",
+      "version": "0.51.0",
+      "description": "Gemini CLI",
+      "category": "other"
+    },
+    {
+      "name": "gemini-zod",
+      "version": "0.1.2",
+      "description": "Gemini AI Schema to Zod Adapter",
+      "category": "other"
+    },
+    {
+      "name": "@gemini-wallet/core",
+      "version": "0.3.2",
+      "description": "Core SDK for Gemini Wallet integration with popup communication",
+      "category": "other"
+    },
+    {
+      "name": "mcp-server-gemini",
+      "version": "0.0.1",
+      "description": "MCP server for gemini (coming soon)",
+      "category": "mcp-server"
+    },
+    {
+      "name": "@dondonudonjp/vertexai-imagen-mcp-server",
+      "version": "0.10.0",
+      "description": "[DEPRECATED] MCP Server for Vertex AI Imagen image generation. Imagen endpoints shut down 2026-06-30; migrate to the nanoBanana MCP Server (Gemini image models).",
+      "category": "mcp-server"
+    },
+    {
+      "name": "@lkbaba/mcp-server-gemini",
+      "version": "2.1.0",
+      "description": "MCP server for Gemini 3.1 Pro focused on UI generation and frontend development",
+      "category": "mcp-server"
+    },
+    {
+      "name": "@anzchy/mcp-server-gemini",
+      "version": "0.5.1",
+      "description": "State-of-the-art MCP server for Google Gemini API with all latest features",
+      "category": "mcp-server"
+    },
+    {
+      "name": "@iflow-mcp/mcp-server-gemini",
+      "version": "4.2.3",
+      "description": "State-of-the-art MCP server for Google Gemini API with all latest features",
+      "category": "mcp-server"
+    },
+    {
+      "name": "gemini",
+      "version": "7.5.2",
+      "description": "UI Screenshot testing utility",
+      "category": "other"
+    },
+    {
+      "name": "@google/gemini-cli-core",
+      "version": "0.51.0",
+      "description": "Gemini CLI Core",
+      "category": "other"
+    }
+  ],
+  "gapAnalysis": {
+    "hasOfficialSdk": false,
+    "hasCommunitySDK": true,
+    "hasTypeDefinitions": false,
+    "hasMcpServer": true,
+    "recommendation": "Community SDKs exist for gemini. Evaluate them before generating; focus on filling gaps they do not cover. An MCP server already exists; differentiate by offering better type coverage."
+  }
+}

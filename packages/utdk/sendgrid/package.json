@@ -1,0 +1,44 @@
+{
+  "name": "@utdk/sendgrid",
+  "version": "1.0.0-20260727.1",
+  "type": "module",
+  "description": "Generated UTDK provider client for Email Activity (beta). The Beta endpoints for the new Email Activity APIs - functionality is subject to change without notice. You may not have access to this Beta endpoint.\n\nEmail Activity offers filtering and search by event type for two days worth of data. There is an optional add-on to store 60 days worth of data. This add-on also gives you access to the ability to download a CSV of the 60 days worth of email event data. The Beta endpoints for the new Email Activity APIs - functionality is subject to change without notice. You may not have access to this Beta endpoint.\n\nEmail Activity offers filtering and search by event type for two days worth of data. There is an optional add-on to store 60 days worth of data. This add-on also gives you access to the ability to download a CSV of the 60 days worth of email event data.",
+  "homepage": "https://docs.sendgrid.com",
+  "keywords": [
+    "sendgrid",
+    "generated",
+    "openapi",
+    "utdk"
+  ],
+  "utdk": {
+    "provider": "sendgrid",
+    "generation": 1,
+    "generatedAt": "2026-07-27T03:15:32.495Z",
+    "auth": {
+      "schemes": [
+        {
+          "id": "Authorization",
+          "type": "apiKey",
+          "name": "Authorization",
+          "in": "header"
+        }
+      ],
+      "operationOverrides": {}
+    },
+    "openapi": {
+      "title": "Email Activity (beta)",
+      "url": "https://api.apis.guru/v2/specs/sendgrid.com/1.0.0/openapi.json",
+      "version": "1.0.0",
+      "termsOfService": null,
+      "icon": "https://api.apis.guru/v2/cache/logo/https_user-images.githubusercontent.com_21603_27865240-b4c0da22-6189-11e7-9f2c-f35f4c6fa57c.png"
+    },
+    "provenance": {
+      "source": "composio",
+      "originDomain": "docs.sendgrid.com",
+      "originSpecUrl": "https://api.apis.guru/v2/specs/sendgrid.com/1.0.0/openapi.json"
+    },
+    "branding": {
+      "site": "https://docs.sendgrid.com"
+    }
+  }
+}

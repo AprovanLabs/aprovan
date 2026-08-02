@@ -1,0 +1,24 @@
+{
+  "provider": "google/youtube",
+  "generatedAt": "2026-07-19T23:51:58.368Z",
+  "generation": 2,
+  "source": {
+    "type": "openapi",
+    "url": "https://api.apis.guru/v2/specs/googleapis.com/youtube/v3/openapi.json",
+    "hash": "sha256:f4dc90f6849ea9cb8721d6a947288696e505f688a19b0ca93ab87815b0d7955e",
+    "fetchedAt": "2026-07-19T23:51:58.368Z"
+  },
+  "ingestSource": "manual",
+  "pipeline": {
+    "research": {
+      "noveltyScore": 4,
+      "competingPackages": 19
+    },
+    "scorecard": {
+      "infrastructure": "fail",
+      "domain": 80
+    },
+    "agentReadiness": "fail"
+  },
+  "bundlerVersion": "0.1.1"
+}

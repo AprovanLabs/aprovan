@@ -1,0 +1,74 @@
+{
+  "provider": "jira",
+  "generatedAt": "2026-07-20T00:07:29.375Z",
+  "sourceHash": "4b679f5bc444b27ecc01f257391575b617904cb22890084ddfd8d602490c1b74",
+  "model": "zai-org/GLM-5.2",
+  "webhooks": {
+    "supported": true,
+    "summary": "Jira Cloud exposes dynamic webhook management via REST API (/rest/api/3/webhook). The provided OpenAPI content includes webhook management operations but does NOT enumerate specific event names, signature headers, or verification schemes — those collections remain empty below.",
+    "configMethods": [
+      "api"
+    ],
+    "events": [],
+    "managementEndpoints": [
+      {
+        "method": "POST",
+        "path": "/rest/api/3/webhook",
+        "description": "Register dynamic webhooks (Connect or OAuth 2.0 apps only)."
+      },
+      {
+        "method": "GET",
+        "path": "/rest/api/3/webhook",
+        "description": "List webhooks registered by the calling app (paginated)."
+      },
+      {
+        "method": "DELETE",
+        "path": "/rest/api/3/webhook",
+        "description": "Delete webhooks by ID (only those owned by the calling app)."
+      },
+      {
+        "method": "GET",
+        "path": "/rest/api/3/webhook/failed",
+        "description": "Cursor-paginated list of recently failed webhook deliveries (failures expire after 72 hours)."
+      },
+      {
+        "method": "PUT",
+        "path": "/rest/api/3/webhook/refresh",
+        "description": "Extend webhook life. REST-registered webhooks expire after 30 days; call this to keep them alive."
+      }
+    ],
+    "signature": {
+      "header": null,
+      "scheme": null,
+      "detail": "No signature header or verification scheme is named in the provided OpenAPI fragment."
+    },
+    "payloadFormat": null,
+    "docsUrl": "http://www.atlassian.com",
+    "setupSteps": [
+      {
+        "title": "Obtain your registry inbound hook URL",
+        "detail": "From your package-registry workspace, copy the stable inbound hook URL that will receive Jira events."
+      },
+      {
+        "title": "Provision Connect or OAuth 2.0 app credentials",
+        "detail": "Dynamic webhook registration requires Connect or OAuth 2.0 authentication. See https://developer.atlassian.com/cloud/jira/platform/#connect-apps and https://developer.atlassian.com/cloud/jira/platform/oauth-2-3lo-apps referenced in the OpenAPI descriptions."
+      },
+      {
+        "title": "Register the dynamic webhook via REST API",
+        "detail": "POST /rest/api/3/webhook with a registration payload that includes the inbound hook URL as the destination and the Jira events you wish to subscribe to. (Event names are not enumerated in the supplied OpenAPI; consult Jira webhook documentation for the canonical list.)"
+      },
+      {
+        "title": "Confirm registration",
+        "detail": "GET /rest/api/3/webhook to verify the webhook is registered to your app."
+      },
+      {
+        "title": "Plan refresh before expiry",
+        "detail": "Webhooks registered via the REST API expire after 30 days. Schedule PUT /rest/api/3/webhook/refresh to extend their lifetime, and use GET /rest/api/3/webhook/failed to detect delivery failures within the 72-hour retention window."
+      },
+      {
+        "title": "Register the hook URL in the registry webhooks area",
+        "detail": "With the Jira dynamic webhook pointed at your inbound hook URL, finalize the association by registering that hook URL in the registry webhooks area so incoming Jira deliveries trigger the intended workflow."
+      }
+    ]
+  }
+}

@@ -1,0 +1,391 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Google Gemini API",
+    "version": "v1beta",
+    "description": "Google's Gemini models via the Generative Language API: content generation, token counting, and model discovery. Chat surfaces may instead use the OpenAI-compatible endpoint at /v1beta/openai (Authorization: Bearer <api key>).",
+    "contact": {
+      "url": "https://ai.google.dev/gemini-api/docs"
+    },
+    "termsOfService": "https://ai.google.dev/gemini-api/terms"
+  },
+  "servers": [
+    {
+      "url": "https://generativelanguage.googleapis.com"
+    }
+  ],
+  "security": [
+    {
+      "ApiKeyAuth": []
+    },
+    {
+      "BearerAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Models",
+      "description": "Model discovery"
+    },
+    {
+      "name": "Generation",
+      "description": "Content generation and token counting"
+    }
+  ],
+  "paths": {
+    "/v1beta/models": {
+      "get": {
+        "operationId": "listModels",
+        "tags": [
+          "Models"
+        ],
+        "summary": "List models",
+        "description": "List models available through the Gemini API.",
+        "parameters": [
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000
+            }
+          },
+          {
+            "name": "pageToken",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated model list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "models": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Model"
+                      }
+                    },
+                    "nextPageToken": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1beta/models/{model}": {
+      "get": {
+        "operationId": "getModel",
+        "tags": [
+          "Models"
+        ],
+        "summary": "Get a model",
+        "parameters": [
+          {
+            "name": "model",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Model name without the models/ prefix, e.g. gemini-2.5-flash"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Model details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Model"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1beta/models/{model}:generateContent": {
+      "post": {
+        "operationId": "generateContent",
+        "tags": [
+          "Generation"
+        ],
+        "summary": "Generate content",
+        "description": "Generate a model response given an input conversation.",
+        "parameters": [
+          {
+            "name": "model",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Model name without the models/ prefix, e.g. gemini-2.5-flash"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateContentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Generated content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerateContentResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1beta/models/{model}:countTokens": {
+      "post": {
+        "operationId": "countTokens",
+        "tags": [
+          "Generation"
+        ],
+        "summary": "Count tokens",
+        "parameters": [
+          {
+            "name": "model",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "contents": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/Content"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Token count",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "totalTokens": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-goog-api-key",
+        "description": "Google AI Studio API key"
+      },
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "API key as a bearer token (used by the OpenAI-compatible surface)"
+      }
+    },
+    "schemas": {
+      "Part": {
+        "type": "object",
+        "description": "A content part (text, inlineData, functionCall, ...).",
+        "properties": {
+          "text": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "Content": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "user",
+              "model"
+            ]
+          },
+          "parts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Part"
+            }
+          }
+        },
+        "required": [
+          "parts"
+        ]
+      },
+      "GenerationConfig": {
+        "type": "object",
+        "properties": {
+          "temperature": {
+            "type": "number"
+          },
+          "topP": {
+            "type": "number"
+          },
+          "topK": {
+            "type": "integer"
+          },
+          "maxOutputTokens": {
+            "type": "integer"
+          },
+          "stopSequences": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "responseMimeType": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "GenerateContentRequest": {
+        "type": "object",
+        "properties": {
+          "contents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Content"
+            }
+          },
+          "systemInstruction": {
+            "$ref": "#/components/schemas/Content"
+          },
+          "generationConfig": {
+            "$ref": "#/components/schemas/GenerationConfig"
+          },
+          "safetySettings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          }
+        },
+        "required": [
+          "contents"
+        ]
+      },
+      "Candidate": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "$ref": "#/components/schemas/Content"
+          },
+          "finishReason": {
+            "type": "string"
+          },
+          "index": {
+            "type": "integer"
+          }
+        }
+      },
+      "GenerateContentResponse": {
+        "type": "object",
+        "properties": {
+          "candidates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Candidate"
+            }
+          },
+          "usageMetadata": {
+            "type": "object",
+            "properties": {
+              "promptTokenCount": {
+                "type": "integer"
+              },
+              "candidatesTokenCount": {
+                "type": "integer"
+              },
+              "totalTokenCount": {
+                "type": "integer"
+              }
+            }
+          },
+          "modelVersion": {
+            "type": "string"
+          }
+        }
+      },
+      "Model": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Resource name, e.g. models/gemini-2.5-flash"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "inputTokenLimit": {
+            "type": "integer"
+          },
+          "outputTokenLimit": {
+            "type": "integer"
+          },
+          "supportedGenerationMethods": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "name"
+        ]
+      }
+    }
+  }
+}

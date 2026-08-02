@@ -1,0 +1,43 @@
+{
+  "name": "@utdk/mercury",
+  "version": "1.0.0-20260727.1",
+  "type": "module",
+  "description": "Generated UTDK provider client for Mercury API. Streamline financial tasks with secure account management and transaction processing. Enables user registration, balance tracking, and payment handling.",
+  "homepage": "https://docs.mercury.com",
+  "keywords": [
+    "mercury",
+    "generated",
+    "openapi",
+    "utdk"
+  ],
+  "utdk": {
+    "provider": "mercury",
+    "generation": 1,
+    "generatedAt": "2026-07-27T03:15:30.648Z",
+    "auth": {
+      "schemes": [
+        {
+          "id": "bearerAuth",
+          "type": "http",
+          "description": "Bearer token authentication for Mercury API.\n\nUse your API token in the Authorization header:\n`Authorization: Bearer TOKEN`\n\nExample:\n`Authorization: Bearer secret-token:REDACTED`\n\nYour Mercury API token should include the 'secret-token:' prefix.\nTokens can be generated from your Mercury dashboard settings.\n",
+          "scheme": "bearer"
+        }
+      ],
+      "operationOverrides": {}
+    },
+    "openapi": {
+      "title": "Mercury API",
+      "url": "https://dash.readme.com/api/v1/api-registry/ilz81omom1n4vx",
+      "version": "1.0.0",
+      "termsOfService": null
+    },
+    "provenance": {
+      "source": "printing-press",
+      "originDomain": "docs.mercury.com",
+      "originSpecUrl": "https://dash.readme.com/api/v1/api-registry/ilz81omom1n4vx"
+    },
+    "branding": {
+      "site": "https://docs.mercury.com"
+    }
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "name": "@utdk/telegram",
+  "version": "5.0.0-20260727.1",
+  "type": "module",
+  "description": "Generated UTDK provider client for Telegram Bot API. Auto-generated OpenAPI schema",
+  "homepage": "https://core.telegram.org",
+  "keywords": [
+    "telegram",
+    "generated",
+    "openapi",
+    "utdk"
+  ],
+  "utdk": {
+    "provider": "telegram",
+    "generation": 1,
+    "generatedAt": "2026-07-27T03:18:15.952Z",
+    "auth": {
+      "schemes": [],
+      "operationOverrides": {}
+    },
+    "openapi": {
+      "title": "Telegram Bot API",
+      "url": "https://api.apis.guru/v2/specs/telegram.org/5.0.0/openapi.json",
+      "version": "5.0.0",
+      "termsOfService": null,
+      "icon": "https://api.apis.guru/v2/cache/logo/https_apis.guru_assets_images_no-logo.svg"
+    },
+    "provenance": {
+      "source": "printing-press",
+      "originDomain": "core.telegram.org",
+      "originSpecUrl": "https://api.apis.guru/v2/specs/telegram.org/5.0.0/openapi.json"
+    },
+    "branding": {
+      "site": "https://core.telegram.org"
+    }
+  }
+}

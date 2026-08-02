@@ -1,0 +1,23 @@
+{
+  "name": "@utdk/snowflake",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Snowflake provider: sql queries via the SQL API v2. Credential: a bearer_token holding a programmatic access token; connection args carry account/database/warehouse/role.",
+  "homepage": "https://docs.snowflake.com/en/developer-guide/sql-api/index",
+  "keywords": ["snowflake", "sql", "warehouse", "utdk"],
+  "utdk": {
+    "provider": "snowflake",
+    "handwritten": true,
+    "interface": "sql",
+    "auth": {
+      "schemes": [
+        {
+          "id": "pat",
+          "type": "http",
+          "scheme": "bearer",
+          "description": "Programmatic access token (or key-pair JWT with token_type: KEYPAIR_JWT)"
+        }
+      ]
+    }
+  }
+}

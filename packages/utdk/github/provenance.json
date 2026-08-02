@@ -1,0 +1,24 @@
+{
+  "provider": "github",
+  "generatedAt": "2026-07-16T07:04:33.329Z",
+  "generation": 2,
+  "source": {
+    "type": "openapi",
+    "url": "https://raw.githubusercontent.com/github/rest-api-description/main/descriptions/api.github.com/api.github.com.json",
+    "hash": "sha256:1597b17d4e91736ce2cd10ab03463afc7c4a4e534210d4227ffdedc5cd4914e4",
+    "fetchedAt": "2026-07-16T07:04:33.329Z"
+  },
+  "ingestSource": "manual",
+  "pipeline": {
+    "research": {
+      "noveltyScore": 4,
+      "competingPackages": 20
+    },
+    "scorecard": {
+      "infrastructure": "fail",
+      "domain": 100
+    },
+    "agentReadiness": "pass"
+  },
+  "bundlerVersion": "0.1.1"
+}

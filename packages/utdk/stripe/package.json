@@ -1,0 +1,49 @@
+{
+  "name": "@utdk/stripe",
+  "version": "0.0.1-20260727.1",
+  "type": "module",
+  "description": "Generated UTDK provider client for Stripe API. The Stripe REST API. Please see https://stripe.com/docs/api for more details.",
+  "homepage": "https://stripe.com",
+  "keywords": [
+    "stripe",
+    "generated",
+    "openapi",
+    "utdk"
+  ],
+  "utdk": {
+    "provider": "stripe",
+    "generation": 1,
+    "generatedAt": "2026-07-27T03:53:50.166Z",
+    "auth": {
+      "schemes": [
+        {
+          "id": "basicAuth",
+          "type": "http",
+          "description": "Basic HTTP authentication. Allowed headers-- Authorization: Basic <api_key> | Authorization: Basic <base64 hash of `api_key:`>",
+          "scheme": "basic"
+        },
+        {
+          "id": "bearerAuth",
+          "type": "http",
+          "description": "Bearer HTTP authentication. Allowed headers-- Authorization: Bearer <api_key>",
+          "scheme": "bearer"
+        }
+      ],
+      "operationOverrides": {}
+    },
+    "openapi": {
+      "title": "Stripe API",
+      "url": "https://raw.githubusercontent.com/stripe/openapi/master/openapi/spec3.json",
+      "version": "2026-05-27.dahlia",
+      "termsOfService": "https://stripe.com/us/terms/"
+    },
+    "provenance": {
+      "source": "printing-press",
+      "originDomain": "stripe.com",
+      "originSpecUrl": "https://raw.githubusercontent.com/stripe/openapi/master/openapi/spec3.json"
+    },
+    "branding": {
+      "site": "https://stripe.com"
+    }
+  }
+}
