@@ -469,6 +469,10 @@ export function AppsList({
   const hidden = rows.length - shown.length;
 
   const compact = variant === "sidebar";
+  const authDefer =
+    Boolean(createWorkflowHref) &&
+    Boolean(catalog.error) &&
+    /401|403|unauthorized|forbidden/iu.test(catalog.error ?? "");
 
   return (
     <div className={mergeClasses("flex min-h-0 flex-col gap-1.5", className)}>
@@ -483,7 +487,13 @@ export function AppsList({
         {actions}
       </div>
 
-      <ErrorLine error={catalog.error} />
+      {authDefer ? (
+        <CreateWorkflowEmpty createWorkflowHref={createWorkflowHref} onCreateWorkflow={onCreateWorkflow}>
+          Sign in to the product app to manage apps and workflows here.
+        </CreateWorkflowEmpty>
+      ) : (
+        <ErrorLine error={catalog.error} />
+      )}
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {catalog.loading && rows.length === 0 ? (
