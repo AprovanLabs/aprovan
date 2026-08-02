@@ -9,14 +9,14 @@ registry root docker-compose backends are up: `docker compose -f ../registry/doc
 
 > Depends-on: - | Touches: ../registry/apps/workspace/src/change-journal.ts, ../registry/apps/workspace/src/routes/fs.ts, ../registry/apps/workspace/tests/change-feed.test.ts | Verify: pnpm --filter @aprovan/workspace test tests/change-feed.test.ts && pnpm --filter @aprovan/workspace typecheck
 
-- [ ] 1.1 Implement the per-workspace change journal (monotonic cursor, ≥1,000-entry
+- [x] 1.1 Implement the per-workspace change journal (monotonic cursor, ≥1,000-entry
       ring, reset semantics) in `src/change-journal.ts`, recording mutations via a
       store-wrapping facade the FS routes/service layer register (spec: change-feed /
       "Workspace change journal"; tech-plan D2).
-- [ ] 1.2 Add `GET /fs/changes?since=` with ETag/`If-None-Match` 304 fast path,
+- [x] 1.2 Add `GET /fs/changes?since=` with ETag/`If-None-Match` 304 fast path,
       session-scope support, and `.services/**` exclusion (spec: "Change endpoint with
       ETag fast path").
-- [ ] 1.3 Tests: cursor advance on every mutation kind (write/remove/removePrefix/
+- [x] 1.3 Tests: cursor advance on every mutation kind (write/remove/removePrefix/
       completeUpload/staged shadow), 304 issues zero store reads (assert via store
       spy), delta correctness, ring-overflow → `reset: true` full listing, service-path
       invisibility.
@@ -25,25 +25,25 @@ registry root docker-compose backends are up: `docker compose -f ../registry/doc
 
 > Depends-on: 1 | Touches: client/web/src/lib/workspace-vfs.ts | Verify: pnpm --filter @aprovan/patchwork-web build
 
-- [ ] 2.1 Rewrite `startLiveWorkspaceSync` to poll `/fs/changes` with
+- [x] 2.1 Rewrite `startLiveWorkspaceSync` to poll `/fs/changes` with
       `If-None-Match`/`since`: 304 → no-op, delta → per-path watcher events, `reset`
       or scope switch → silent rebaseline; keep the 8s visibility-gated cadence (spec:
       change-feed / "Client live-sync consumes the change feed").
-- [ ] 2.2 Remove the full unprefixed `/fs` listing from the tick path entirely (the
+- [x] 2.2 Remove the full unprefixed `/fs` listing from the tick path entirely (the
       full listing remains only behind `reset` handling and explicit list calls).
 
 ## 3. Request caches (Phase A)
 
 > Depends-on: - | Touches: ../registry/apps/workspace/src/middleware/auth.ts, ../registry/apps/workspace/src/auth-cache.ts, ../registry/apps/workspace/src/vcs/mounts.ts, ../registry/apps/workspace/tests/auth-cache.test.ts | Verify: pnpm --filter @aprovan/workspace test tests/auth-cache.test.ts tests/vfs-mounts.test.ts && pnpm --filter @aprovan/workspace typecheck
 
-- [ ] 3.1 Per-(token, workspace) principal cache (TTL 60s, configurable) in front of
+- [x] 3.1 Per-(token, workspace) principal cache (TTL 60s, configurable) in front of
       the `oidcPrincipal` triple-read, with `invalidatePrincipal(sub | workspaceId)`
       exported and called from membership/group-membership/current-workspace mutation
       paths (spec: identity-store / "Per-token auth resolution cache"; tech-plan D6).
-- [ ] 3.2 Per-workspace `readMounts` cache (TTL 30s) invalidated synchronously by
+- [x] 3.2 Per-workspace `readMounts` cache (TTL 30s) invalidated synchronously by
       `addMount`/mount removal (spec: record-store / "Cached mounts read" — cache now,
       record-backed storage lands in stream 5).
-- [ ] 3.3 Tests: cache hit performs zero identity reads (store spy), revocation
+- [x] 3.3 Tests: cache hit performs zero identity reads (store spy), revocation
       invalidates immediately, workspace-switch keying, mounts hot path ≤1 backing
       read per TTL window.
 
@@ -51,13 +51,13 @@ registry root docker-compose backends are up: `docker compose -f ../registry/doc
 
 > Depends-on: - | Touches: ../registry/apps/workspace/src/fs-store.ts, ../registry/apps/workspace/scripts/gc-blobs.ts, ../registry/apps/workspace/tests/fs.test.ts, ../registry/apps/workspace/tests/fs-s3.test.ts | Verify: pnpm --filter @aprovan/workspace test tests/fs.test.ts tests/fs-s3.test.ts && pnpm --filter @aprovan/workspace typecheck
 
-- [ ] 4.1 Add `FsWriteOptions { versioned?: boolean }` to `IFsStore.write`, defaulted
+- [x] 4.1 Add `FsWriteOptions { versioned?: boolean }` to `IFsStore.write`, defaulted
       by `isServicePath`; unversioned writes update only the latest pointer in both
       backends (spec: fs-metadata-store / "Unversioned service-path writes").
-- [ ] 4.2 `scripts/gc-blobs.ts` mark-and-sweep (live-hash set from latest+version
+- [x] 4.2 `scripts/gc-blobs.ts` mark-and-sweep (live-hash set from latest+version
       rows, 7-day safety age, `--dry-run`, counts report) plus a leader-leased
       schedule hook (spec: "S3 blob garbage collection"; tech-plan D7).
-- [ ] 4.3 Tests: 50 service writes leave one pointer row and no version accumulation;
+- [x] 4.3 Tests: 50 service writes leave one pointer row and no version accumulation;
       authored writes still version; GC deletes an aged orphan, spares referenced and
       fresh-unregistered blobs (MinIO-backed).
 
