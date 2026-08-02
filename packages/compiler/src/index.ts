@@ -131,20 +131,15 @@ export type {
 
 // VFS
 export {
-  VFSStore,
   createProjectFromFiles,
   createSingleFileProject,
   resolveEntry,
   detectMainFile,
-  IndexedDBBackend,
-  HttpBackend,
 } from "./vfs/index.js";
 export type {
   VirtualFile,
   VirtualProject,
   ChangeRecord,
-  HttpBackendConfig,
-  VFSStoreOptions,
   WatchCallback,
   WatchEventType,
 } from "./vfs/index.js";

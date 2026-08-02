@@ -1,13 +1,26 @@
 import { createSingleFileProject } from '@aprovan/patchwork-compiler';
 import { Code, Eye, Pencil, RotateCcw, MessageSquare } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { httpWidgetVfs, type WidgetVfs } from '../lib/vfs';
 import { withTimeout } from '../lib/utils';
 import { EditModal, type CompileFn, type EditorLogsSource, CodeBlockView, MediaPreview, getFileType } from './edit';
 import { MarkdownPreview } from './MarkdownPreview';
 import { SaveStatusButton, type SaveStatus } from './SaveStatusButton';
 import { WidgetPreview } from './WidgetPreview';
 import type { Compiler, Manifest , VirtualProject } from '@aprovan/patchwork-compiler';
+
+/**
+ * Storage adapter widgets save to / reload from. `CodePreview` talks to the
+ * VFS only through this interface so hosts can supply their own backend
+ * (e.g. the patchwork web app's gateway workspace FS).
+ */
+export interface WidgetVfs {
+  /** Whether fence `path` attributes map to real VFS paths (dir = project id). */
+  usePaths(): Promise<boolean>;
+  saveProject(project: VirtualProject): Promise<void>;
+  readFile(path: string): Promise<string>;
+  /** Watch for external changes. Returns unsubscribe. */
+  subscribe(callback: (record: { path: string; type: string }) => void): () => void;
+}
 
 interface CodePreviewProps {
   code: string;
@@ -35,8 +48,8 @@ interface CodePreviewProps {
     initialCode: string;
     initialProject: VirtualProject;
   }) => void;
-  /** Storage adapter for save/reload (default: the dev-server HTTP `/vfs`). */
-  vfs?: WidgetVfs;
+  /** Storage adapter for save/reload. */
+  vfs: WidgetVfs;
   /**
    * Stretch to the parent instead of sizing to the content. Inline in a chat
    * message the preview caps itself at 60vh; in a dedicated preview pane the
@@ -123,7 +136,7 @@ export function CodePreview({
   onWidgetError,
   entrypoint = 'index.ts',
   onOpenEditSession,
-  vfs = httpWidgetVfs,
+  vfs,
   customPreview,
   fill = false,
   logsSource,
