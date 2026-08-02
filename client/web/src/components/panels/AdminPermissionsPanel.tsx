@@ -6,7 +6,7 @@ import { Shield } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import {
   PanelEmpty,
-  PanelError,
+  PanelErrorWithRetry,
   PanelLoading,
   PanelShell,
   type NativePanelProps,
@@ -54,7 +54,11 @@ export function AdminPermissionsPanel(_props: NativePanelProps) {
   if (forbidden) {
     return (
       <PanelShell icon={Shield} title="Admin" description="Members, groups, and invites">
-        <PanelError message="You do not have permission to manage this workspace." />
+        <PanelErrorWithRetry
+          message="You do not have permission to manage this workspace."
+          onRetry={() => void load()}
+          retrying={loading}
+        />
       </PanelShell>
     );
   }
@@ -70,7 +74,7 @@ export function AdminPermissionsPanel(_props: NativePanelProps) {
   if (error && !members) {
     return (
       <PanelShell icon={Shield} title="Admin" description="Members, groups, and invites">
-        <PanelError message={error} />
+        <PanelErrorWithRetry message={error} onRetry={() => void load()} retrying={loading} />
       </PanelShell>
     );
   }
@@ -78,7 +82,16 @@ export function AdminPermissionsPanel(_props: NativePanelProps) {
   const list = members ?? [];
 
   return (
-    <PanelShell icon={Shield} title="Admin" description="Members, groups, and invites">
+    <PanelShell
+      description="Members, groups, and invites"
+      icon={Shield}
+      onRefresh={() => void load()}
+      refreshing={loading}
+      title="Admin"
+    >
+      {error ? (
+        <PanelErrorWithRetry message={error} onRetry={() => void load()} retrying={loading} />
+      ) : null}
       {list.length === 0 ? (
         <PanelEmpty>No members yet.</PanelEmpty>
       ) : (

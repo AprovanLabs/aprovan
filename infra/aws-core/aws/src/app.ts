@@ -31,7 +31,7 @@ new WebStack(app, names.global("web"), {
 
 const deployRepositories = (
   process.env["DEPLOY_REPOSITORIES"] ??
-  "AprovanLabs/registry,AprovanLabs/patchwork"
+  "AprovanLabs/aprovan,AprovanLabs/registry"
 )
   .split(",")
   .map((repo) => repo.trim())

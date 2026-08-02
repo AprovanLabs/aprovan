@@ -20,6 +20,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { Button } from "@/components/ui/button";
 import { invokeAppsTool } from "@/lib/tools";
 
 /** Narrow a panel to one app (the app inspector's contextual tabs). */
@@ -245,6 +246,27 @@ export function PanelError({ message }: { message: string }) {
     <div className="flex items-center gap-2 p-4 text-sm text-destructive">
       <AlertCircle className="h-4 w-4 shrink-0" />
       <span>{message}</span>
+    </div>
+  );
+}
+
+/** Error state with an explicit retry action (ux.md credentials/admin panels). */
+export function PanelErrorWithRetry({
+  message,
+  onRetry,
+  retrying,
+}: {
+  message: string;
+  onRetry: () => void;
+  retrying?: boolean;
+}) {
+  return (
+    <div className="flex flex-col gap-3 p-4">
+      <PanelError message={message} />
+      <Button disabled={retrying} onClick={onRetry} size="sm" variant="outline">
+        {retrying ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+        Retry
+      </Button>
     </div>
   );
 }

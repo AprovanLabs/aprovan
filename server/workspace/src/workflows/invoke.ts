@@ -1,10 +1,9 @@
 /**
  * In-process tool dispatch for workflow scripts — the server-side twin of
- * `POST /tools/:provider/:operation`, minus HTTP. Core services are called
- * directly; provider operations resolve workspace credentials and execute in
- * the isolate; LLM chat-provider aliases resolve to their OpenAI-compatible
- * module. Used by the workflow runner so a script's `github.repos.get(...)`
- * behaves identically to a widget's proxied call.
+ * `POST /tools/:provider/:operation`, minus HTTP. On durable backends
+ * (sqlite locally, dsql in cloud) contract-addressed calls route through the
+ * embedded `@aprovan/registry-server` dispatch pipeline; the interim dynamo
+ * backend keeps the legacy bespoke path until `STORE_BACKEND=dsql`.
  */
 
 import { mayInvokeTool } from "../authorize.js";
@@ -20,9 +19,17 @@ import { isLlmProvider, resolveLlmProvider } from "../llm.js";
 import { getMembership } from "../memberships.js";
 import { getAuthMode } from "../middleware/auth.js";
 import { OAuthExchangeError, resolveToInjectable } from "../oauthTokens.js";
+import { registryDispatch } from "../registry-embed.js";
+import { storeBackend } from "../runtime/config.js";
 import { getCoreService, ServiceError } from "../service-kernel.js";
+import { ensureTenantForWorkspace } from "../tenant-registry.js";
 import { listUserGroupIds } from "../userGroups.js";
 import type { ServiceContext } from "../service-kernel.js";
+
+/** Interface dispatch routes through the embed on dsql (unified credential/profile store). */
+function usesEmbedInterfaceDispatch(): boolean {
+  return storeBackend() === "dsql";
+}
 
 /**
  * Per-user tool authorization for in-process dispatch — the same gate the
@@ -54,6 +61,61 @@ async function assertProviderAllowed(
 }
 
 /**
+ * Map product interface namespaces (colon syntax, per-run redirects) to the
+ * embed API's base namespace + profile pin.
+ */
+function resolveEmbedTarget(
+  ctx: ServiceContext,
+  namespace: string,
+  profile?: string,
+  overrideProvider?: string,
+): { namespace: string; profile?: string } {
+  if (overrideProvider) {
+    return { namespace: overrideProvider };
+  }
+
+  const parsed = parseInterfaceNamespace(namespace);
+  if (!parsed) {
+    return { namespace, profile };
+  }
+
+  const { interfaceId, name } = parsed;
+
+  const bindingOverride = ctx.interfaceBindings?.[interfaceId];
+  if (bindingOverride) {
+    return { namespace: bindingOverride, profile };
+  }
+
+  if (name !== undefined) {
+    return { namespace: interfaceId, profile: name };
+  }
+
+  const redirected = ctx.interfaceInstances?.[interfaceId];
+  if (redirected) {
+    const redir = parseInterfaceNamespace(redirected);
+    if (redir) {
+      return {
+        namespace: redir.interfaceId,
+        profile: redir.name ?? profile,
+      };
+    }
+  }
+
+  return { namespace: interfaceId, profile };
+}
+
+async function dispatchThroughEmbed(
+  ctx: ServiceContext,
+  namespace: string,
+  operation: string,
+  args: Record<string, unknown>,
+  opts?: { profile?: string },
+): Promise<unknown> {
+  await ensureTenantForWorkspace(ctx.workspaceId);
+  return registryDispatch(ctx, namespace, operation, args, opts);
+}
+
+/**
  * `profile` is the script-side `client(name)` pin (docs/interfaces.md;
  * formerly `getClient({ profile })`). It means two things, by namespace
  * kind, and the two
@@ -81,6 +143,7 @@ export async function invokeTool(
   // checked before any dispatch branch so native, interface, and provider
   // calls all answer to the same list.
   assertToolGranted(ctx.grants, namespace, procedure);
+
   const core = getCoreService(namespace);
   if (core) {
     if (profile !== undefined) {
@@ -92,9 +155,6 @@ export async function invokeTool(
     return core.call(ctx, procedure, args);
   }
 
-  // Generic interfaces (llm, sql, sandbox, …) resolve to their bound
-  // implementation and dispatch as that concrete provider — same call,
-  // swappable backend.
   const parsed = parseInterfaceNamespace(namespace);
   if (parsed) {
     let target = namespace;
@@ -120,7 +180,7 @@ export async function invokeTool(
     finalArgs = { ...finalArgs, model: llmAlias.defaultModel };
   }
 
-  return dispatchProvider(ctx, {
+  return dispatchProviderLegacy(ctx, {
     credentialProvider: namespace,
     ...(profile !== undefined ? { credentialProfile: profile } : {}),
     module: llmAlias?.module ?? namespace,
@@ -152,10 +212,18 @@ export async function dispatchInterface(
   args: Record<string, unknown>,
   overrideProvider?: string,
 ): Promise<unknown> {
+  if (usesEmbedInterfaceDispatch()) {
+    const { namespace: ns, profile } = resolveEmbedTarget(
+      ctx,
+      namespace,
+      undefined,
+      overrideProvider,
+    );
+    return dispatchThroughEmbed(ctx, ns, procedure, args, profile ? { profile } : undefined);
+  }
+
   const parsed = parseInterfaceNamespace(namespace);
   const interfaceId = parsed?.interfaceId ?? namespace;
-  // An agent's instance redirection applies only to the *default* namespace:
-  // a script that explicitly said `llm:billing` meant `llm:billing`.
   const instance =
     parsed && parsed.name === undefined
       ? (ctx.interfaceInstances?.[interfaceId] ?? namespace)
@@ -165,10 +233,6 @@ export async function dispatchInterface(
     instance,
     overrideProvider ?? ctx.interfaceBindings?.[interfaceId],
   );
-  // A declared-but-unbuilt implementation must not reach the isolate: the
-  // loader's error names a package subpath, not the thing that is actually
-  // missing. Same guard, same text as the HTTP twin (routes/tools.ts) — a
-  // workflow script and a proxied widget call must fail identically.
   if (resolved.compat.unavailable) {
     throw new ServiceError(
       `${resolved.instance} resolves to ${resolved.compat.provider}: ${resolved.compat.unavailable}`,
@@ -178,18 +242,11 @@ export async function dispatchInterface(
   const withDefaults = resolved.def.defaultsFor.includes(procedure)
     ? { ...resolved.options, ...args }
     : args;
-  // The gateway's own agent runtime executes in this process, so dispatch
-  // short-circuits straight into the loop instead of importing a module —
-  // the `machine` sandbox short-circuit (sandboxes/service.ts), for the same
-  // reason: the implementation IS this process, and the compat entry's
-  // `module: "native"` exists only to complete the resolution tuple.
-  // Dynamic import because the runner dispatches its loop's LLM and tool
-  // calls back through this module.
   if (resolved.def.id === "agent" && resolved.compat.provider === "native") {
     const { dispatchNativeAgentOp } = await import("../agents/runner.js");
     return dispatchNativeAgentOp(ctx, procedure, withDefaults);
   }
-  return dispatchProvider(ctx, {
+  return dispatchProviderLegacy(ctx, {
     credentialProvider: resolved.compat.provider,
     ...(resolved.credentialId ? { credentialId: resolved.credentialId } : {}),
     module: resolved.compat.module,
@@ -205,21 +262,15 @@ export async function dispatchInterface(
 }
 
 interface ProviderDispatch {
-  /** Credential-store key (the concrete provider id). */
   credentialProvider: string;
-  /** Pin to one specific credential (an interface instance's binding). */
   credentialId?: string;
-  /** Pin by credential label (a script's `client(name)`). */
   credentialProfile?: string;
-  /** UTDK module executed in the isolate (also names the client factory). */
   module: string;
-  /** Import specifier, when the module is not in the UTDK catalogue. */
   moduleSpecifier?: string;
   baseUrl?: string;
   procedure: string;
   args: Record<string, unknown>;
   timeout: number;
-  /** Human-readable name for error messages (e.g. "llm→anthropic"). */
   label: string;
 }
 
@@ -259,7 +310,8 @@ async function resolveProviderCredentials(
   }
 }
 
-async function dispatchProvider(
+/** Interim dynamo-backend provider dispatch (removed at STORE_BACKEND=dsql). */
+async function dispatchProviderLegacy(
   ctx: ServiceContext,
   dispatch: ProviderDispatch,
 ): Promise<unknown> {
