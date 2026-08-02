@@ -10,5 +10,6 @@ declared but unused here and are out of scope. Subpath imports
 (`@aprovan/ui/auth`, `/gateway`, `/shell`, `/apps-store`) provide
 non-duplicated functionality and remain fine.
 
-Mechanical check: `grep -rn 'from "@aprovan/ui"' client/web/src` must return
-zero results.
+Mechanical check: grepping `client/web/src` for an import from the bare
+`@aprovan/ui` root specifier (the quoted specifier with no subpath) must
+return zero results.
