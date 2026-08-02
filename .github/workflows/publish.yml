@@ -23,6 +23,8 @@ jobs:
           node-version: 22.12.0
           registry-url: https://registry.npmjs.org
       - run: pnpm install
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       - run: |
           pnpm \
             --filter @aprovan/ui \
@@ -57,3 +59,5 @@ jobs:
             pnpm --filter "$pkg" publish --no-git-checks --access public || failed="$failed $pkg"
           done
           [ -z "$failed" ] || (echo "Failed:$failed" && exit 1)
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
