@@ -41,11 +41,11 @@
 
 > Depends-on: - | Touches: registry/apps/registry/src/components/ScriptPlayground.tsx, registry/apps/registry/src/lib/playground.ts, registry/apps/registry/src/pages/playground.astro, registry/apps/registry/src/components/TryItPanel.tsx, registry/apps/registry/src/pages/providers/**, aprovan/packages/registry-ui/src/run-view.tsx, aprovan/packages/registry-ui/src/apps-panel.tsx, aprovan/client/web/src/lib/native-surfaces.tsx, aprovan/client/web/src/components/panels/PlaygroundPanel.tsx | Verify: cd ~/Documents/Code/AprovanLabs/registry && pnpm --filter @aprovan/registry-site build; cd ~/Documents/Code/AprovanLabs/aprovan && pnpm --filter @aprovan/patchwork-web build
 
-- [ ] 4.1 Restore catalog playground gateway transport + provider Try-it console wiring
+- [x] 4.1 Restore catalog playground gateway transport + provider Try-it console wiring
       (anonymous sample still works without Cognito) — specs: registry-playground.
-- [ ] 4.2 Add chat `native://playground` panel composing shared ScriptPlayground/RunView
+- [x] 4.2 Add chat `native://playground` panel composing shared ScriptPlayground/RunView
       with session auth — specs: registry-playground "Chat authenticated playground".
-- [ ] 4.3 Ensure AppsHost / apps panel either authenticates for standalone or clearly
+- [x] 4.3 Ensure AppsHost / apps panel either authenticates for standalone or clearly
       defers "manage in app" without a hollow broken state.
 
 **Path conflict note:** stream 4 may touch `aprovan/packages/registry-ui/src/run-view.tsx`
