@@ -8,7 +8,9 @@
  * low-level authorized fetch used by the chat transport.
  */
 
+import { GatewayClient as RegistryGatewayClient } from "@aprovan/registry-main";
 import { createGatewayClient } from "@aprovan/ui/gateway";
+import { ACTIVE_WORKSPACE_KEY } from "@/features/tabs/useTabs";
 import { getAccessTokenSync } from "./auth";
 import type { GatewayClient } from "@aprovan/ui/gateway";
 
@@ -24,5 +26,14 @@ export const GATEWAY_BASE =
 
 export const gateway: GatewayClient = createGatewayClient({
   baseUrl: GATEWAY_BASE,
-  getToken: getAccessTokenSync,
+  getToken: () => getAccessTokenSync() ?? undefined,
 });
+
+/** Gateway client for `@aprovan/registry-ui` credential/admin widgets. */
+export function createRegistryGatewayClient(): RegistryGatewayClient {
+  return new RegistryGatewayClient({
+    baseUrl: GATEWAY_BASE,
+    getToken: () => getAccessTokenSync() ?? undefined,
+    getWorkspaceId: () => localStorage.getItem(ACTIVE_WORKSPACE_KEY) ?? undefined,
+  });
+}

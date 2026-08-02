@@ -23,6 +23,28 @@ export function credentialsUrl(provider?: string): string {
   return registryUrl(`/account/credentials/${query}`);
 }
 
+const CHAT_BASE = (
+  (import.meta.env["VITE_CHAT_URL"] as string | undefined) ??
+  (import.meta.env.DEV
+    ? `${typeof window !== "undefined" ? window.location.origin : ""}/chat`
+    : "https://aprovan.com/chat")
+).replace(/\/$/, "");
+
+/**
+ * Deep-link URL for external stubs (e.g. catalog MovedNotice) into chat native
+ * surfaces. In-app CTAs should call `openNativeTab` instead.
+ */
+export function chatDeepLinkUrl(
+  native: "credentials" | "admin",
+  provider?: string,
+): string {
+  const params = new URLSearchParams({ native });
+  if (provider && native === "credentials") {
+    params.set("provider", provider);
+  }
+  return `${CHAT_BASE}/?${params.toString()}`;
+}
+
 /** Provider detail page in the registry catalog. */
 export function providerUrl(provider: string): string {
   return registryUrl(`/providers/?p=${encodeURIComponent(provider)}`);

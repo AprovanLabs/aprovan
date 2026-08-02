@@ -42,7 +42,7 @@ import {
   type NamespaceInfo,
 } from "@/lib/namespaces";
 import {
-  credentialsUrl,
+  chatDeepLinkUrl,
   fetchCatalogProviders,
   fetchRegistryProviders,
   providerUrl,
@@ -147,7 +147,13 @@ const BROWSE_PAGE_LIMIT = 20;
 /** Search-box debounce before it drives a network request. */
 const BROWSE_SEARCH_DEBOUNCE_MS = 300;
 
-export function ServicesMenu({ services }: { services: ServiceInfo[] }) {
+export function ServicesMenu({
+  services,
+  onOpenCredentials,
+}: {
+  services: ServiceInfo[];
+  onOpenCredentials?: (provider?: string) => void;
+}) {
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState("");
   const [debouncedFilter, setDebouncedFilter] = useState("");
@@ -375,15 +381,24 @@ export function ServicesMenu({ services }: { services: ServiceInfo[] }) {
               <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Providers
               </h3>
-              <a
-                href={credentialsUrl()}
-                target="_blank"
-                rel="noreferrer"
-                className="ml-auto flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-              >
-                <Plus className="h-3 w-3" />
-                add credential
-              </a>
+              {onOpenCredentials ? (
+                <button
+                  type="button"
+                  onClick={() => onOpenCredentials()}
+                  className="ml-auto flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  <Plus className="h-3 w-3" />
+                  add credential
+                </button>
+              ) : (
+                <a
+                  href={chatDeepLinkUrl("credentials")}
+                  className="ml-auto flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  <Plus className="h-3 w-3" />
+                  add credential
+                </a>
+              )}
             </div>
             {connectedProviders.length > 0 ? (
               connectedProviders.map((provider) => {
@@ -465,15 +480,23 @@ export function ServicesMenu({ services }: { services: ServiceInfo[] }) {
                           {provider.description}
                         </span>
                       )}
-                      <a
-                        href={credentialsUrl(provider.id)}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="ml-auto flex shrink-0 items-center gap-1 whitespace-nowrap text-[0.65rem] uppercase tracking-wide hover:text-foreground"
-                      >
-                        connect
-                        <ExternalLink className="h-3 w-3" />
-                      </a>
+                      {onOpenCredentials ? (
+                        <button
+                          type="button"
+                          onClick={() => onOpenCredentials(provider.id)}
+                          className="ml-auto flex shrink-0 items-center gap-1 whitespace-nowrap text-[0.65rem] uppercase tracking-wide hover:text-foreground"
+                        >
+                          connect
+                        </button>
+                      ) : (
+                        <a
+                          href={chatDeepLinkUrl("credentials", provider.id)}
+                          className="ml-auto flex shrink-0 items-center gap-1 whitespace-nowrap text-[0.65rem] uppercase tracking-wide hover:text-foreground"
+                        >
+                          connect
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      )}
                     </div>
                   ))}
                 </div>

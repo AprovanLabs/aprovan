@@ -28,13 +28,13 @@
 
 > Depends-on: 1 | Touches: registry/apps/registry/src/pages/account/**, registry/apps/registry/src/pages/admin/**, registry/apps/registry/src/components/MovedNotice.astro, registry/apps/registry/src/components/credentials/**, registry/apps/registry/src/components/shell/**, registry/apps/registry/src/components/AdminPanel.tsx | Verify: cd ~/Documents/Code/AprovanLabs/registry && pnpm --filter @aprovan/registry-site build
 
-- [ ] 3.1 Restore live `/account/credentials` and `/admin/permissions` pages that compose
+- [x] 3.1 Restore live `/account/credentials` and `/admin/permissions` pages that compose
       registry-ui widgets when `PUBLIC_ACCOUNT_HOST=local` (or equivalent) — specs:
       credential-hosting "Registry-standalone".
-- [ ] 3.2 Keep production stubs as MovedNotice; CTAs deep-link to
+- [x] 3.2 Keep production stubs as MovedNotice; CTAs deep-link to
       `https://aprovan.com/chat/?native=credentials` / `?native=admin` (+ provider when
       present) — specs: credential-hosting "Production catalog stubs".
-- [ ] 3.3 Remove duplicate local credential form sources once widgets are consumed; bump
+- [x] 3.3 Remove duplicate local credential form sources once widgets are consumed; bump
       `@aprovan/registry-ui` dep as needed.
 
 ## 4. Playground restore (registry + chat)

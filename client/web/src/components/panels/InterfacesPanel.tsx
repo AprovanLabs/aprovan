@@ -27,11 +27,11 @@ import {
   PanelShell,
   type NativePanelProps,
   usePanelData,
+  usePanelHostActions,
 } from "./shell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { credentialsUrl } from "@/lib/registry";
 import { invokeNamespaceTool } from "@/lib/tools";
 
 interface InterfaceCompat {
@@ -197,6 +197,7 @@ function BindingForm({
   saving: boolean;
 }) {
   const fields = OPTION_FIELDS[interfaceId] ?? [];
+  const { onOpenCredentials } = usePanelHostActions();
   const [nextProvider, setNextProvider] = useState(provider);
   const [nextCredential, setNextCredential] = useState(credentialId ?? "");
   const [nextOptions, setNextOptions] = useState<Record<string, string>>(() =>
@@ -259,14 +260,17 @@ function BindingForm({
         <p className="text-xs text-muted-foreground">
           {selected.label} has no credential in this workspace — binding will
           resolve but calls will fail until you{" "}
-          <a
-            href={credentialsUrl(selected.provider)}
-            target="_blank"
-            rel="noreferrer"
-            className="underline hover:text-foreground"
-          >
-            add one
-          </a>
+          {onOpenCredentials ? (
+            <button
+              type="button"
+              onClick={() => onOpenCredentials(selected.provider)}
+              className="underline hover:text-foreground"
+            >
+              add one
+            </button>
+          ) : (
+            <span className="font-medium">add a credential</span>
+          )}
           .
         </p>
       )}

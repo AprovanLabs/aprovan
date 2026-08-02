@@ -340,6 +340,7 @@ export interface SessionUser {
 export interface SessionLink {
   label: string;
   href: string;
+  onClick?: () => void;
 }
 
 export interface UserMenuProps {
@@ -394,11 +395,24 @@ export function UserMenu({
           {links.length > 0 && (
             <>
               <DropdownMenu.Separator className="my-1 h-px bg-border" />
-              {links.map((link) => (
-                <DropdownMenu.Item asChild className={dropdownItemClass} key={link.href}>
-                  <a href={link.href}>{link.label}</a>
-                </DropdownMenu.Item>
-              ))}
+              {links.map((link) =>
+                link.onClick ? (
+                  <DropdownMenu.Item
+                    className={dropdownItemClass}
+                    key={link.label}
+                    onSelect={(event) => {
+                      event.preventDefault();
+                      link.onClick?.();
+                    }}
+                  >
+                    {link.label}
+                  </DropdownMenu.Item>
+                ) : (
+                  <DropdownMenu.Item asChild className={dropdownItemClass} key={link.href}>
+                    <a href={link.href}>{link.label}</a>
+                  </DropdownMenu.Item>
+                ),
+              )}
             </>
           )}
           {onSignOut && (

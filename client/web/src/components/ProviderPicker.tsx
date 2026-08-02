@@ -13,7 +13,7 @@ import claudeSvg from "@lobehub/icons-static-svg/icons/claude.svg?raw";
 import geminiSvg from "@lobehub/icons-static-svg/icons/gemini.svg?raw";
 import openaiSvg from "@lobehub/icons-static-svg/icons/openai.svg?raw";
 import { Check, ChevronDown, ExternalLink, Loader2 } from "lucide-react";
-import { credentialsUrl } from "@/lib/registry";
+import { chatDeepLinkUrl } from "@/lib/registry";
 import type { LlmProviderInfo } from "@/lib/llm";
 
 export interface ChatProvider {
@@ -111,6 +111,7 @@ export function ProviderModelControls({
   model,
   onSelectModel,
   loadModels,
+  onConnectProvider,
 }: {
   /** Gateway provider list; null while loading (fall back to static list). */
   providers: LlmProviderInfo[] | null;
@@ -121,6 +122,8 @@ export function ProviderModelControls({
   onSelectModel: (model: string) => void;
   /** Fetch the model ids for a connected provider. */
   loadModels: (providerId: string) => Promise<string[]>;
+  /** Open credentials with an optional provider prefill. */
+  onConnectProvider?: (providerId: string) => void;
 }) {
   const [providerOpen, setProviderOpen] = useState(false);
   const [modelOpen, setModelOpen] = useState(false);
@@ -178,21 +181,27 @@ export function ProviderModelControls({
         {list.map((provider) => {
           const isActive = provider.id === active;
           if (!provider.connected) {
+            const connect = (event: React.MouseEvent) => {
+              if (onConnectProvider) {
+                event.preventDefault();
+                onConnectProvider(provider.id);
+                setProviderOpen(false);
+              }
+            };
             return (
               <a
                 key={provider.id}
-                href={credentialsUrl(provider.id)}
-                target="_blank"
-                rel="noreferrer"
+                href={onConnectProvider ? "#" : chatDeepLinkUrl("credentials", provider.id)}
+                onClick={connect}
                 className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground"
-                title={`${provider.label} is not connected — set up a credential in the registry`}
+                title={`${provider.label} is not connected — add a credential`}
               >
                 <ProviderMark className="h-3.5 w-3.5 shrink-0 opacity-60" id={provider.id} />
                 <span className="flex-1 truncate text-left">{provider.label}</span>
                 <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
                 <span className="flex shrink-0 items-center gap-1 whitespace-nowrap text-[0.65rem] uppercase tracking-wide">
                   add key
-                  <ExternalLink className="h-3 w-3" />
+                  {!onConnectProvider && <ExternalLink className="h-3 w-3" />}
                 </span>
               </a>
             );

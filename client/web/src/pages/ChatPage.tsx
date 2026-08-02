@@ -3,7 +3,7 @@ import { AppsCatalogProvider } from "@aprovan/registry-ui/apps-panel";
 import "@aprovan/registry-ui/tailor";
 import { AppHeader, aprovanApps } from "@aprovan/ui/shell";
 import { PanelLeft } from "lucide-react";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { NotificationsBell } from "@/components/NotificationsBell";
 import { PanelHostProvider } from "@/components/panels/shell";
 import { ServicesMenu } from "@/components/ServicesMenu";
@@ -27,6 +27,7 @@ import { useTabs } from "@/features/tabs/useTabs";
 import { loadWorkflowScript, workflowCustomPreview } from "@/features/widgets/ChatWorkflowPreview";
 import { NotificationPathWidget } from "@/features/widgets/NotificationPathWidget";
 import { useCompilerBootstrap } from "@/features/widgets/useCompilerBootstrap";
+import { stashCredentialsPrefill } from "@/lib/credentials";
 import { invokeAppsTool, invokeWorkflowsTool } from "@/lib/tools";
 
 /** Composition root: wires the feature hooks together, provides the shared
@@ -46,6 +47,23 @@ export default function ChatPage() {
     onWorkspacePathActivated: explorer.setWorkspaceActivePath,
     closeSidebar,
   });
+
+  // Deep-link boot: `?native=credentials|admin&provider=` opens the matching tab once.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const native = params.get("native");
+    if (native !== "credentials" && native !== "admin") return;
+
+    const provider = params.get("provider") ?? undefined;
+    if (native === "credentials" && provider) stashCredentialsPrefill(provider);
+    tabs.openNativeTab(native, provider ? { provider } : undefined);
+
+    params.delete("native");
+    params.delete("provider");
+    const query = params.toString();
+    const next = `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`;
+    window.history.replaceState(null, "", next);
+  }, [tabs.openNativeTab]);
 
   const bootstrap = useCompilerBootstrap({ refreshWorkspace: explorer.refreshWorkspace });
   const providers = useChatProviders();
@@ -155,8 +173,10 @@ export default function ChatPage() {
     () => ({
       onOpenSession: (id: string) => void session.openSession(id),
       onOpenFile: (path: string) => tabs.openWorkspacePreview(path),
+      onOpenCredentials: (provider?: string) =>
+        tabs.openNativeTab("credentials", provider ? { provider } : undefined),
     }),
-    [session.openSession, tabs.openWorkspacePreview]
+    [session.openSession, tabs.openWorkspacePreview, tabs.openNativeTab]
   );
 
   return (
@@ -193,10 +213,14 @@ export default function ChatPage() {
                 <NotificationPathWidget path={path} data={data} compiler={bootstrap.compiler} services={bootstrap.namespaces} />
               )}
             />
-            <ServicesMenu services={bootstrap.services} />
+            <ServicesMenu
+              services={bootstrap.services}
+              onOpenCredentials={(provider) => tabs.openNativeTab("credentials", { provider })}
+            />
             <SessionControls
               onLoad={explorer.handleWorkspaceLoad}
               onSwitch={explorer.handleWorkspaceSwitch}
+              onOpenCredentials={() => tabs.openNativeTab("credentials")}
             />
           </AppHeader>
 
@@ -274,6 +298,9 @@ export default function ChatPage() {
                   openWorkspacePreview={tabs.openWorkspacePreview}
                   keepEditDrafts={editDraft.keepEditDrafts}
                   onKeepEditDraftsChange={editDraft.handleKeepEditDraftsChange}
+                  onOpenCredentials={(provider) =>
+                    tabs.openNativeTab("credentials", provider ? { provider } : undefined)
+                  }
                 />
               </div>
             </div>

@@ -51,6 +51,8 @@ export interface PanelHostActions {
   onOpenSession?: (id: string) => void;
   /** Open a workspace file (e.g. in the preview pane). */
   onOpenFile?: (path: string) => void;
+  /** Open the credentials native surface, optionally prefilling a provider. */
+  onOpenCredentials?: (provider?: string) => void;
 }
 
 const PanelHostContext = createContext<PanelHostActions>({});
