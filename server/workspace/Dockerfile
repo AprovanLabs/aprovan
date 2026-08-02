@@ -3,21 +3,12 @@
 # Build from the aprovan repo root:
 #   docker buildx build -f server/workspace/Dockerfile -t workspace .
 #
-# utdk stays in the registry repo (unscoped name cannot publish to npm). The
-# builder vendors packages/utdk (+ contract deps) from a pinned registry SHA.
+# utdk / registry-server / contract packages are vendored under packages/ in this
+# monorepo (unscoped `utdk` cannot publish to npm). Do not overwrite them from a
+# registry git SHA at build time — that desyncs pnpm-lock.yaml.
 
 ARG NODE_VERSION=22.12.0
 ARG PNPM_VERSION=9.15.9
-ARG REGISTRY_SHA=99e8cc5a08b61d702d1a2e770375d795f793829c
-
-FROM node:${NODE_VERSION}-bookworm-slim AS registry-vendor
-ARG REGISTRY_SHA
-RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates && rm -rf /var/lib/apt/lists/*
-WORKDIR /registry
-RUN git init . \
-  && git remote add origin https://github.com/AprovanLabs/registry.git \
-  && git fetch --depth 1 origin "${REGISTRY_SHA}" \
-  && git checkout FETCH_HEAD
 
 FROM node:${NODE_VERSION}-bookworm-slim AS builder
 ARG PNPM_VERSION
@@ -30,13 +21,6 @@ COPY package.json pnpm-workspace.yaml pnpm-lock.yaml turbo.json tsconfig.json .p
 COPY config ./config
 COPY packages ./packages
 COPY server/workspace ./server/workspace
-COPY --from=registry-vendor /registry/packages/utdk ./packages/utdk
-COPY --from=registry-vendor /registry/packages/contracts ./packages/contracts
-COPY --from=registry-vendor /registry/packages/mcp-core ./packages/mcp-core
-COPY --from=registry-vendor /registry/packages/mcp ./packages/mcp
-COPY --from=registry-vendor /registry/packages/bundler ./packages/bundler
-COPY --from=registry-vendor /registry/packages/runtime ./packages/runtime
-COPY --from=registry-vendor /registry/packages/registry-server ./packages/registry-server
 
 RUN pnpm install --frozen-lockfile --filter @aprovan/workspace...
 RUN pnpm --filter @aprovan/workspace... run build
