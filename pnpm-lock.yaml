@@ -1085,20 +1085,20 @@ importers:
         specifier: ^1.28.0
         version: 1.43.0
       '@utdk/agent':
-        specifier: ^0.2.0
-        version: 0.2.0
+        specifier: workspace:*
+        version: link:../../packages/contracts/agent
       '@utdk/common':
         specifier: workspace:*
         version: link:../../packages/utdk/common
       '@utdk/llm':
-        specifier: ^0.2.0
-        version: 0.2.0
+        specifier: workspace:*
+        version: link:../../packages/contracts/llm
       '@utdk/mcp-core':
         specifier: workspace:*
         version: link:../../packages/mcp-core
       '@utdk/sandbox':
-        specifier: ^0.2.0
-        version: 0.2.0
+        specifier: workspace:*
+        version: link:../../packages/contracts/sandbox
       aws-jwt-verify:
         specifier: ^4.0.1
         version: 4.0.1
@@ -4747,12 +4747,6 @@ packages:
 
   '@utcp/sdk@1.1.2':
     resolution: {integrity: sha512-YOBhcOK5kbD27d3emuXNAb8gBb8nH2kr7BuqjrvmSGyUi9379jzusYeTuZDsAxyy5da9VZPnfC/cNCpTVkEtUw==}
-
-  '@utdk/agent@0.2.0':
-    resolution: {integrity: sha512-uiLFqBOVUVGNO0NAHIfFEU7XlPQfKjY2Ck0l0ig159bY5KzU9+70/braU8W8RreZYLN8iUwOhBLjZpwc/d0fiw==}
-
-  '@utdk/llm@0.2.0':
-    resolution: {integrity: sha512-eAmwtys+TYgaqpoP8Tmhfm8FZPw4hmNcZC5VY7XSohyS2U0NRmbWcbVoByKfNCcTROkSB7f21J9t+iYWWcei7g==}
 
   '@utdk/sandbox@0.2.0':
     resolution: {integrity: sha512-2XFiBwHdWIN0mSEntzWgQCg5YolY3JWFR3A0FP+Al6l2ah+cUvQCCL/0pbvmcUpNtnK8N9SuwHH/mz4+XR2NEw==}
@@ -12834,10 +12828,6 @@ snapshots:
     dependencies:
       dotenv: 17.4.2
       zod: 3.25.76
-
-  '@utdk/agent@0.2.0': {}
-
-  '@utdk/llm@0.2.0': {}
 
   '@utdk/sandbox@0.2.0': {}
 
