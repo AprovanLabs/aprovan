@@ -47,60 +47,31 @@ export function useGateway(): GatewayContextValue {
   return value;
 }
 
-export function CredentialManager(): React.ReactElement {
-  const { client } = useGateway();
-  const [credentials, setCredentials] = useState<unknown[]>([]);
-  const refresh = () =>
-    void client
-      .request<{ credentials: unknown[] }>("/credentials")
-      .then((result) => setCredentials(result.credentials));
-  useEffect(refresh, [client]);
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Connections</CardTitle>
-      </CardHeader>
-      <CardContent>
-        {credentials.length === 0 ? (
-          <p>No provider credentials configured.</p>
-        ) : (
-          <pre>{JSON.stringify(credentials, null, 2)}</pre>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
+export {
+  AddCredentialForm,
+  CredentialManager,
+  clearOAuthPending,
+  generateState,
+  initiateOAuthFlow,
+  loadOAuthPending,
+  saveOAuthPending,
+  validateProviderId,
+  type AddCredentialFormProps,
+  type CatalogProviderSummary,
+  type CredentialInput,
+  type CredentialManagerProps,
+  type CredentialRecord,
+  type CredentialType,
+  type OAuthPendingState,
+} from "./credentials";
 
-export function AddCredentialForm({
-  provider,
-}: {
-  provider: string;
-}): React.ReactElement {
-  const { client } = useGateway();
-  const [token, setToken] = useState("");
-  return (
-    <form
-      onSubmit={(event) => {
-        event.preventDefault();
-        void client.request("/credentials", true, {
-          method: "POST",
-          body: JSON.stringify({
-            provider,
-            payload: { type: "bearer_token", token },
-          }),
-        });
-      }}
-    >
-      <Input
-        aria-label={`${provider} token`}
-        onChange={(event) => setToken(event.target.value)}
-        type="password"
-        value={token}
-      />
-      <Button type="submit">Connect {provider}</Button>
-    </form>
-  );
-}
+export {
+  AdminPanel,
+  type AdminPanelProps,
+  type Group,
+  type Member,
+  type PermissionGrant,
+} from "./admin";
 
 // ---------------------------------------------------------------------------
 // Try-it console

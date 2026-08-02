@@ -4,13 +4,13 @@
 
 > Depends-on: - | Touches: aprovan/packages/registry-ui/src/index.tsx, aprovan/packages/registry-ui/src/credentials/**, aprovan/packages/registry-ui/src/admin/**, aprovan/packages/registry-ui/package.json | Verify: cd ~/Documents/Code/AprovanLabs/aprovan && pnpm --filter @aprovan/registry-ui build && pnpm --filter @aprovan/registry-ui test
 
-- [ ] 1.1 Port full CredentialManager + AddCredentialForm (bearer, api_key, oauth2_client,
+- [x] 1.1 Port full CredentialManager + AddCredentialForm (bearer, api_key, oauth2_client,
       oauth2_authcode) into `@aprovan/registry-ui`, driven by an injected GatewayClient;
       reject interface / interface-only provider ids in the form — specs:
       credential-admin-widgets.
-- [ ] 1.2 Port AdminPanel (or equivalent) covering members/groups list+edit and tool-grant
+- [x] 1.2 Port AdminPanel (or equivalent) covering members/groups list+edit and tool-grant
       visibility; not-authorized state for non-admins — specs: credential-admin-widgets.
-- [ ] 1.3 Export widgets from the package entry; add unit tests for validation + happy-path
+- [x] 1.3 Export widgets from the package entry; add unit tests for validation + happy-path
       client calls (mocked fetch).
 
 ## 2. Chat hosting & deep links
