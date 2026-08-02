@@ -1,0 +1,24 @@
+{
+  "provider": "zendesk",
+  "generatedAt": "2026-05-30T12:26:11.920Z",
+  "generation": 2,
+  "source": {
+    "type": "openapi",
+    "url": "repo://data/openapi/zendesk.json",
+    "hash": "sha256:f4df6f0e86268a673663a17110c2e08d6fe1827e5cb69b55628568b724a32f75",
+    "fetchedAt": "2026-05-30T12:26:11.920Z"
+  },
+  "ingestSource": "composio",
+  "pipeline": {
+    "research": {
+      "noveltyScore": 1,
+      "competingPackages": 16
+    },
+    "scorecard": {
+      "infrastructure": "fail",
+      "domain": 100
+    },
+    "agentReadiness": "pass"
+  },
+  "bundlerVersion": "0.1.1"
+}

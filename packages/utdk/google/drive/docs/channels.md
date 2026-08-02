@@ -1,0 +1,58 @@
+# Channels
+
+1 operation · `utdk/google/drive`
+
+```ts
+import drive from "utdk/google/drive";
+```
+
+## `drive.driveChannelsStop`
+
+Stop watching resources through this channel — [Provider docs](https://developers.google.com/drive/)
+
+```ts
+drive.driveChannelsStop(input: {
+  /** The address where notifications are delivered for this channel. */
+  address?: string;
+  /** Date and time of notification channel expiration, expressed as a Unix timestamp, in milliseconds. Optional. */
+  expiration?: string;
+  /** A UUID or similar unique string that identifies this channel. */
+  id?: string;
+  /** Identifies this as a notification channel used to watch for changes to a resource, which is "api#channel". */
+  kind?: string;
+  /** Additional parameters controlling delivery channel behavior. Optional. */
+  params?: { [key: string]: string | undefined };
+  /** A Boolean value to indicate whether payload is wanted. Optional. */
+  payload?: boolean;
+  /** An opaque ID that identifies the resource being watched on this channel. Stable across different API versions. */
+  resourceId?: string;
+  /** A version-specific identifier for the watched resource. */
+  resourceUri?: string;
+  /** An arbitrary string delivered to the target address with each notification delivered over this channel. Optional. */
+  token?: string;
+  /** The type of delivery mechanism used for this channel. Valid values are "web_hook" (or "webhook"). Both values refer to a channel where Http requests are used to deliver messages. */
+  type?: string;
+  /** Data format for the response. */
+  alt?: "json";
+  /** Selector specifying which fields to include in a partial response. */
+  fields?: string;
+  /** API key. Your API key identifies your project and provides you with API access, quota, and reports. Required unless you provide an OAuth 2.0 token. */
+  key?: string;
+  /** OAuth 2.0 token for the current user. */
+  oauth_token?: string;
+  /** Returns response with indentations and line breaks. */
+  prettyPrint?: boolean;
+  /** An opaque string that represents a user for quota purposes. Must not exceed 40 characters. */
+  quotaUser?: string;
+  /** Deprecated. Please use quotaUser instead. */
+  userIp?: string;
+}): Promise<unknown>
+```
+
+<sub>`POST /channels/stop` · `drive.channels.stop`</sub>
+
+Named result types are exported from the package — hover them in your editor, or browse `types/schemas.ts`.
+
+<!-- prompt-hash:
+8c3694991a4c289225f05a4e8f1e098cc74d085a088d7dffd82f00d93797b7f8
+-->

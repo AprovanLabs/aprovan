@@ -1,0 +1,86 @@
+{
+  "provider": "google-cloud-run",
+  "generatedAt": "2026-05-30T22:05:32.095Z",
+  "noveltyScore": 8,
+  "npmPackages": [
+    {
+      "name": "firebase",
+      "version": "12.14.0",
+      "description": "Firebase JavaScript library for web and Node.js",
+      "category": "other"
+    },
+    {
+      "name": "@google-cloud/firestore",
+      "version": "8.6.0",
+      "description": "Firestore Client Library for Node.js",
+      "category": "other"
+    },
+    {
+      "name": "@firebase/firestore-compat",
+      "version": "0.4.10",
+      "description": "The Cloud Firestore component of the Firebase JS SDK.",
+      "category": "other"
+    },
+    {
+      "name": "@firebase/firestore",
+      "version": "4.15.0",
+      "description": "The Cloud Firestore component of the Firebase JS SDK.",
+      "category": "other"
+    },
+    {
+      "name": "@google-cloud/vertexai",
+      "version": "1.12.0",
+      "description": "Vertex Generative AI client for Node.js",
+      "category": "other"
+    },
+    {
+      "name": "@google-cloud/run",
+      "version": "3.2.1",
+      "description": "Cloud Run Admin API",
+      "category": "other"
+    },
+    {
+      "name": "google-auth-library",
+      "version": "10.6.2",
+      "description": "Google APIs Authentication Client Library for Node.js",
+      "category": "other"
+    },
+    {
+      "name": "@google-cloud/storage",
+      "version": "7.19.0",
+      "description": "Cloud Storage Client Library for Node.js",
+      "category": "other"
+    },
+    {
+      "name": "@google-cloud/promisify",
+      "version": "5.0.0",
+      "description": "A simple utility for promisifying functions and classes.",
+      "category": "other"
+    },
+    {
+      "name": "@google-cloud/paginator",
+      "version": "6.0.0",
+      "description": "A result paging utility used by Google node.js modules",
+      "category": "other"
+    },
+    {
+      "name": "@google-cloud/functions-framework",
+      "version": "5.0.2",
+      "description": "FaaS (Function as a service) framework for writing portable Node.js functions",
+      "category": "other"
+    },
+    {
+      "name": "@google-cloud/observability-mcp",
+      "version": "0.2.3",
+      "description": "MCP Server for GCP environment for interacting with various Observability APIs.",
+      "category": "mcp-server"
+    }
+  ],
+  "gapAnalysis": {
+    "hasOfficialSdk": false,
+    "hasCommunitySDK": false,
+    "hasTypeDefinitions": false,
+    "hasMcpServer": true,
+    "recommendation": "No existing TypeScript SDK found for google-cloud-run. Generating from OpenAPI spec provides high value. An MCP server already exists; differentiate by offering better type coverage."
+  }
+}

@@ -1,0 +1,1200 @@
+{
+  "provider": "github",
+  "generatedAt": "2026-07-20T00:06:10.223Z",
+  "sourceHash": "886bc55b4edec60d766eb045359ded60517055c220f793b79d0afc3be7630fc2",
+  "model": "zai-org/GLM-5.2",
+  "webhooks": {
+    "supported": true,
+    "summary": "GitHub exposes a large catalog of webhook events delivered via HTTP POST to a URL you control. Webhooks can be configured at the repository, organization, or GitHub App level. Each delivery includes an HMAC-SHA256 signature in the `X-Hub-Signature-256` header for payload verification.",
+    "configMethods": [
+      "api",
+      "console"
+    ],
+    "events": [
+      {
+        "name": "branch-protection-configuration-disabled",
+        "description": "All branch protections were disabled for a repository."
+      },
+      {
+        "name": "branch-protection-configuration-enabled",
+        "description": "All branch protections were enabled for a repository."
+      },
+      {
+        "name": "branch-protection-rule-created",
+        "description": "A branch protection rule was created."
+      },
+      {
+        "name": "branch-protection-rule-deleted",
+        "description": "A branch protection rule was deleted."
+      },
+      {
+        "name": "branch-protection-rule-edited",
+        "description": "A branch protection rule was edited."
+      },
+      {
+        "name": "check-run-completed",
+        "description": "A check run was completed, and a conclusion is available."
+      },
+      {
+        "name": "check-run-created",
+        "description": "A new check run was created."
+      },
+      {
+        "name": "check-run-requested-action",
+        "description": "A check run completed, and someone requested a followup action that your app provides."
+      },
+      {
+        "name": "check-run-rerequested",
+        "description": "Someone requested to re-run a check run."
+      },
+      {
+        "name": "check-suite-completed",
+        "description": "All check runs in a check suite have completed, and a conclusion is available."
+      },
+      {
+        "name": "check-suite-requested",
+        "description": "Someone requested to run a check suite."
+      },
+      {
+        "name": "check-suite-rerequested",
+        "description": "Someone requested to re-run the check runs in a check suite."
+      },
+      {
+        "name": "code-scanning-alert-appeared-in-branch",
+        "description": "A previously created code scanning alert appeared in another branch."
+      },
+      {
+        "name": "code-scanning-alert-closed-by-user",
+        "description": "Someone closed a code scanning alert."
+      },
+      {
+        "name": "code-scanning-alert-created",
+        "description": "A new code scanning alert was created."
+      },
+      {
+        "name": "code-scanning-alert-fixed",
+        "description": "A code scanning alert was fixed."
+      },
+      {
+        "name": "code-scanning-alert-reopened",
+        "description": "A code scanning alert was reopened."
+      },
+      {
+        "name": "code-scanning-alert-reopened-by-user",
+        "description": "A code scanning alert was reopened by a user."
+      },
+      {
+        "name": "code-scanning-alert-updated-assignment",
+        "description": "A code scanning alert assignment was updated."
+      },
+      {
+        "name": "commit-comment-created",
+        "description": "A commit comment was created."
+      },
+      {
+        "name": "create",
+        "description": "A branch or tag was created."
+      },
+      {
+        "name": "custom-property-created",
+        "description": "A custom property was created."
+      },
+      {
+        "name": "custom-property-deleted",
+        "description": "A custom property was deleted."
+      },
+      {
+        "name": "custom-property-promoted-to-enterprise",
+        "description": "A custom property was promoted to enterprise level."
+      },
+      {
+        "name": "custom-property-updated",
+        "description": "A custom property was updated."
+      },
+      {
+        "name": "custom-property-values-updated",
+        "description": "Custom property values were updated."
+      },
+      {
+        "name": "delete",
+        "description": "A branch or tag was deleted."
+      },
+      {
+        "name": "dependabot-alert-assignees-changed",
+        "description": "Dependabot alert assignees changed."
+      },
+      {
+        "name": "dependabot-alert-auto-dismissed",
+        "description": "A Dependabot alert was auto-dismissed."
+      },
+      {
+        "name": "dependabot-alert-auto-reopened",
+        "description": "A Dependabot alert was auto-reopened."
+      },
+      {
+        "name": "dependabot-alert-created",
+        "description": "A new Dependabot alert was created."
+      },
+      {
+        "name": "dependabot-alert-dismissed",
+        "description": "A Dependabot alert was dismissed."
+      },
+      {
+        "name": "dependabot-alert-fixed",
+        "description": "A Dependabot alert was fixed."
+      },
+      {
+        "name": "dependabot-alert-reintroduced",
+        "description": "A Dependabot alert was reintroduced."
+      },
+      {
+        "name": "dependabot-alert-reopened",
+        "description": "A Dependabot alert was reopened."
+      },
+      {
+        "name": "deploy-key-created",
+        "description": "A deploy key was created."
+      },
+      {
+        "name": "deploy-key-deleted",
+        "description": "A deploy key was deleted."
+      },
+      {
+        "name": "deployment-created",
+        "description": "A deployment was created."
+      },
+      {
+        "name": "deployment-protection-rule-requested",
+        "description": "A deployment protection rule was requested."
+      },
+      {
+        "name": "deployment-review-approved",
+        "description": "A deployment review was approved."
+      },
+      {
+        "name": "deployment-review-rejected",
+        "description": "A deployment review was rejected."
+      },
+      {
+        "name": "deployment-review-requested",
+        "description": "A deployment review was requested."
+      },
+      {
+        "name": "deployment-status-created",
+        "description": "A deployment status was created."
+      },
+      {
+        "name": "discussion-answered",
+        "description": "A discussion was answered."
+      },
+      {
+        "name": "discussion-category-changed",
+        "description": "A discussion category was changed."
+      },
+      {
+        "name": "discussion-closed",
+        "description": "A discussion was closed."
+      },
+      {
+        "name": "discussion-comment-created",
+        "description": "A discussion comment was created."
+      },
+      {
+        "name": "discussion-comment-deleted",
+        "description": "A discussion comment was deleted."
+      },
+      {
+        "name": "discussion-comment-edited",
+        "description": "A discussion comment was edited."
+      },
+      {
+        "name": "discussion-created",
+        "description": "A discussion was created."
+      },
+      {
+        "name": "discussion-deleted",
+        "description": "A discussion was deleted."
+      },
+      {
+        "name": "discussion-edited",
+        "description": "A discussion was edited."
+      },
+      {
+        "name": "discussion-labeled",
+        "description": "A discussion was labeled."
+      },
+      {
+        "name": "discussion-locked",
+        "description": "A discussion was locked."
+      },
+      {
+        "name": "discussion-pinned",
+        "description": "A discussion was pinned."
+      },
+      {
+        "name": "discussion-reopened",
+        "description": "A discussion was reopened."
+      },
+      {
+        "name": "discussion-transferred",
+        "description": "A discussion was transferred."
+      },
+      {
+        "name": "discussion-unanswered",
+        "description": "A discussion was unanswered."
+      },
+      {
+        "name": "discussion-unlabeled",
+        "description": "A discussion was unlabeled."
+      },
+      {
+        "name": "discussion-unlocked",
+        "description": "A discussion was unlocked."
+      },
+      {
+        "name": "discussion-unpinned",
+        "description": "A discussion was unpinned."
+      },
+      {
+        "name": "fork",
+        "description": "A repository was forked."
+      },
+      {
+        "name": "github-app-authorization-revoked",
+        "description": "A GitHub App authorization was revoked."
+      },
+      {
+        "name": "gollum",
+        "description": "A wiki page was created or updated."
+      },
+      {
+        "name": "installation-created",
+        "description": "A GitHub App installation was created."
+      },
+      {
+        "name": "installation-deleted",
+        "description": "A GitHub App installation was deleted."
+      },
+      {
+        "name": "installation-new-permissions-accepted",
+        "description": "New permissions for a GitHub App installation were accepted."
+      },
+      {
+        "name": "installation-repositories-added",
+        "description": "Repositories were added to a GitHub App installation."
+      },
+      {
+        "name": "installation-repositories-removed",
+        "description": "Repositories were removed from a GitHub App installation."
+      },
+      {
+        "name": "installation-suspend",
+        "description": "A GitHub App installation was suspended."
+      },
+      {
+        "name": "installation-target-renamed",
+        "description": "A GitHub App installation target was renamed."
+      },
+      {
+        "name": "installation-unsuspend",
+        "description": "A GitHub App installation was unsuspended."
+      },
+      {
+        "name": "issue-comment-created",
+        "description": "An issue comment was created."
+      },
+      {
+        "name": "issue-comment-deleted",
+        "description": "An issue comment was deleted."
+      },
+      {
+        "name": "issue-comment-edited",
+        "description": "An issue comment was edited."
+      },
+      {
+        "name": "issue-comment-pinned",
+        "description": "An issue comment was pinned."
+      },
+      {
+        "name": "issue-comment-unpinned",
+        "description": "An issue comment was unpinned."
+      },
+      {
+        "name": "issue-dependencies-blocked-by-added",
+        "description": "An issue dependency blocked-by was added."
+      },
+      {
+        "name": "issue-dependencies-blocked-by-removed",
+        "description": "An issue dependency blocked-by was removed."
+      },
+      {
+        "name": "issue-dependencies-blocking-added",
+        "description": "An issue dependency blocking was added."
+      },
+      {
+        "name": "issue-dependencies-blocking-removed",
+        "description": "An issue dependency blocking was removed."
+      },
+      {
+        "name": "issues-assigned",
+        "description": "An issue was assigned."
+      },
+      {
+        "name": "issues-closed",
+        "description": "An issue was closed."
+      },
+      {
+        "name": "issues-deleted",
+        "description": "An issue was deleted."
+      },
+      {
+        "name": "issues-demilestoned",
+        "description": "An issue was removed from a milestone."
+      },
+      {
+        "name": "issues-edited",
+        "description": "An issue was edited."
+      },
+      {
+        "name": "issues-field-added",
+        "description": "An issue field was added."
+      },
+      {
+        "name": "issues-field-removed",
+        "description": "An issue field was removed."
+      },
+      {
+        "name": "issues-labeled",
+        "description": "An issue was labeled."
+      },
+      {
+        "name": "issues-locked",
+        "description": "An issue was locked."
+      },
+      {
+        "name": "issues-milestoned",
+        "description": "An issue was added to a milestone."
+      },
+      {
+        "name": "issues-opened",
+        "description": "An issue was opened."
+      },
+      {
+        "name": "issues-pinned",
+        "description": "An issue was pinned."
+      },
+      {
+        "name": "issues-reopened",
+        "description": "An issue was reopened."
+      },
+      {
+        "name": "issues-transferred",
+        "description": "An issue was transferred."
+      },
+      {
+        "name": "issues-typed",
+        "description": "An issue type was set."
+      },
+      {
+        "name": "issues-unassigned",
+        "description": "An issue was unassigned."
+      },
+      {
+        "name": "issues-unlabeled",
+        "description": "An issue was unlabeled."
+      },
+      {
+        "name": "issues-unlocked",
+        "description": "An issue was unlocked."
+      },
+      {
+        "name": "issues-unpinned",
+        "description": "An issue was unpinned."
+      },
+      {
+        "name": "issues-untyped",
+        "description": "An issue type was removed."
+      },
+      {
+        "name": "label-created",
+        "description": "A label was created."
+      },
+      {
+        "name": "label-deleted",
+        "description": "A label was deleted."
+      },
+      {
+        "name": "label-edited",
+        "description": "A label was edited."
+      },
+      {
+        "name": "marketplace-purchase-cancelled",
+        "description": "A marketplace purchase was cancelled."
+      },
+      {
+        "name": "marketplace-purchase-changed",
+        "description": "A marketplace purchase was changed."
+      },
+      {
+        "name": "marketplace-purchase-pending-change",
+        "description": "A marketplace purchase has a pending change."
+      },
+      {
+        "name": "marketplace-purchase-pending-change-cancelled",
+        "description": "A pending marketplace purchase change was cancelled."
+      },
+      {
+        "name": "marketplace-purchase-purchased",
+        "description": "A marketplace purchase was made."
+      },
+      {
+        "name": "member-added",
+        "description": "A member was added to a repository."
+      },
+      {
+        "name": "member-edited",
+        "description": "A member's role was edited."
+      },
+      {
+        "name": "member-removed",
+        "description": "A member was removed from a repository."
+      },
+      {
+        "name": "membership-added",
+        "description": "A membership was added to a team."
+      },
+      {
+        "name": "membership-removed",
+        "description": "A membership was removed from a team."
+      },
+      {
+        "name": "merge-group-checks-requested",
+        "description": "Checks were requested for a merge group."
+      },
+      {
+        "name": "merge-group-destroyed",
+        "description": "A merge group was destroyed."
+      },
+      {
+        "name": "meta-deleted",
+        "description": "Meta information was deleted."
+      },
+      {
+        "name": "milestone-closed",
+        "description": "A milestone was closed."
+      },
+      {
+        "name": "milestone-created",
+        "description": "A milestone was created."
+      },
+      {
+        "name": "milestone-deleted",
+        "description": "A milestone was deleted."
+      },
+      {
+        "name": "milestone-edited",
+        "description": "A milestone was edited."
+      },
+      {
+        "name": "milestone-opened",
+        "description": "A milestone was opened."
+      },
+      {
+        "name": "org-block-blocked",
+        "description": "A user was blocked from an organization."
+      },
+      {
+        "name": "org-block-unblocked",
+        "description": "A user was unblocked from an organization."
+      },
+      {
+        "name": "organization-deleted",
+        "description": "An organization was deleted."
+      },
+      {
+        "name": "organization-member-added",
+        "description": "A member was added to an organization."
+      },
+      {
+        "name": "organization-member-invited",
+        "description": "A member was invited to an organization."
+      },
+      {
+        "name": "organization-member-removed",
+        "description": "A member was removed from an organization."
+      },
+      {
+        "name": "organization-renamed",
+        "description": "An organization was renamed."
+      },
+      {
+        "name": "package-published",
+        "description": "A package was published."
+      },
+      {
+        "name": "package-updated",
+        "description": "A package was updated."
+      },
+      {
+        "name": "page-build",
+        "description": "A GitHub Pages site was built."
+      },
+      {
+        "name": "personal-access-token-request-approved",
+        "description": "A personal access token request was approved."
+      },
+      {
+        "name": "personal-access-token-request-cancelled",
+        "description": "A personal access token request was cancelled."
+      },
+      {
+        "name": "personal-access-token-request-created",
+        "description": "A personal access token request was created."
+      },
+      {
+        "name": "personal-access-token-request-denied",
+        "description": "A personal access token request was denied."
+      },
+      {
+        "name": "ping",
+        "description": "A ping event sent when a webhook is first registered."
+      },
+      {
+        "name": "project-card-converted",
+        "description": "A project card was converted."
+      },
+      {
+        "name": "project-card-created",
+        "description": "A project card was created."
+      },
+      {
+        "name": "project-card-deleted",
+        "description": "A project card was deleted."
+      },
+      {
+        "name": "project-card-edited",
+        "description": "A project card was edited."
+      },
+      {
+        "name": "project-card-moved",
+        "description": "A project card was moved."
+      },
+      {
+        "name": "project-closed",
+        "description": "A project was closed."
+      },
+      {
+        "name": "project-column-created",
+        "description": "A project column was created."
+      },
+      {
+        "name": "project-column-deleted",
+        "description": "A project column was deleted."
+      },
+      {
+        "name": "project-column-edited",
+        "description": "A project column was edited."
+      },
+      {
+        "name": "project-column-moved",
+        "description": "A project column was moved."
+      },
+      {
+        "name": "project-created",
+        "description": "A project was created."
+      },
+      {
+        "name": "project-deleted",
+        "description": "A project was deleted."
+      },
+      {
+        "name": "project-edited",
+        "description": "A project was edited."
+      },
+      {
+        "name": "project-reopened",
+        "description": "A project was reopened."
+      },
+      {
+        "name": "projects-v2-closed",
+        "description": "A Projects v2 was closed."
+      },
+      {
+        "name": "projects-v2-created",
+        "description": "A Projects v2 was created."
+      },
+      {
+        "name": "projects-v2-deleted",
+        "description": "A Projects v2 was deleted."
+      },
+      {
+        "name": "projects-v2-edited",
+        "description": "A Projects v2 was edited."
+      },
+      {
+        "name": "projects-v2-item-archived",
+        "description": "A Projects v2 item was archived."
+      },
+      {
+        "name": "projects-v2-item-converted",
+        "description": "A Projects v2 item was converted."
+      },
+      {
+        "name": "projects-v2-item-created",
+        "description": "A Projects v2 item was created."
+      },
+      {
+        "name": "projects-v2-item-deleted",
+        "description": "A Projects v2 item was deleted."
+      },
+      {
+        "name": "projects-v2-item-edited",
+        "description": "A Projects v2 item was edited."
+      },
+      {
+        "name": "projects-v2-item-reordered",
+        "description": "A Projects v2 item was reordered."
+      },
+      {
+        "name": "projects-v2-item-restored",
+        "description": "A Projects v2 item was restored."
+      },
+      {
+        "name": "projects-v2-reopened",
+        "description": "A Projects v2 was reopened."
+      },
+      {
+        "name": "projects-v2-status-update-created",
+        "description": "A Projects v2 status update was created."
+      },
+      {
+        "name": "projects-v2-status-update-deleted",
+        "description": "A Projects v2 status update was deleted."
+      },
+      {
+        "name": "projects-v2-status-update-edited",
+        "description": "A Projects v2 status update was edited."
+      },
+      {
+        "name": "public",
+        "description": "A repository was made public."
+      },
+      {
+        "name": "pull-request-assigned",
+        "description": "A pull request was assigned."
+      },
+      {
+        "name": "pull-request-auto-merge-disabled",
+        "description": "Auto-merge was disabled for a pull request."
+      },
+      {
+        "name": "pull-request-auto-merge-enabled",
+        "description": "Auto-merge was enabled for a pull request."
+      },
+      {
+        "name": "pull-request-closed",
+        "description": "A pull request was closed."
+      },
+      {
+        "name": "pull-request-converted-to-draft",
+        "description": "A pull request was converted to draft."
+      },
+      {
+        "name": "pull-request-demilestoned",
+        "description": "A pull request was removed from a milestone."
+      },
+      {
+        "name": "pull-request-dequeued",
+        "description": "A pull request was dequeued from a merge queue."
+      },
+      {
+        "name": "pull-request-edited",
+        "description": "A pull request was edited."
+      },
+      {
+        "name": "pull-request-enqueued",
+        "description": "A pull request was enqueued to a merge queue."
+      },
+      {
+        "name": "pull-request-labeled",
+        "description": "A pull request was labeled."
+      },
+      {
+        "name": "pull-request-locked",
+        "description": "A pull request was locked."
+      },
+      {
+        "name": "pull-request-milestoned",
+        "description": "A pull request was added to a milestone."
+      },
+      {
+        "name": "pull-request-opened",
+        "description": "A pull request was opened."
+      },
+      {
+        "name": "pull-request-ready-for-review",
+        "description": "A pull request became ready for review."
+      },
+      {
+        "name": "pull-request-reopened",
+        "description": "A pull request was reopened."
+      },
+      {
+        "name": "pull-request-review-comment-created",
+        "description": "A pull request review comment was created."
+      },
+      {
+        "name": "pull-request-review-comment-deleted",
+        "description": "A pull request review comment was deleted."
+      },
+      {
+        "name": "pull-request-review-comment-edited",
+        "description": "A pull request review comment was edited."
+      },
+      {
+        "name": "pull-request-review-dismissed",
+        "description": "A pull request review was dismissed."
+      },
+      {
+        "name": "pull-request-review-edited",
+        "description": "A pull request review was edited."
+      },
+      {
+        "name": "pull-request-review-request-removed",
+        "description": "A pull request review request was removed."
+      },
+      {
+        "name": "pull-request-review-requested",
+        "description": "A pull request review was requested."
+      },
+      {
+        "name": "pull-request-review-submitted",
+        "description": "A pull request review was submitted."
+      },
+      {
+        "name": "pull-request-review-thread-resolved",
+        "description": "A pull request review thread was resolved."
+      },
+      {
+        "name": "pull-request-review-thread-unresolved",
+        "description": "A pull request review thread was unresolved."
+      },
+      {
+        "name": "pull-request-stacked",
+        "description": "A pull request was stacked."
+      },
+      {
+        "name": "pull-request-synchronize",
+        "description": "A pull request was synchronized."
+      },
+      {
+        "name": "pull-request-unassigned",
+        "description": "A pull request was unassigned."
+      },
+      {
+        "name": "pull-request-unlabeled",
+        "description": "A pull request was unlabeled."
+      },
+      {
+        "name": "pull-request-unlocked",
+        "description": "A pull request was unlocked."
+      },
+      {
+        "name": "push",
+        "description": "A push occurred to a repository."
+      },
+      {
+        "name": "registry-package-published",
+        "description": "A registry package was published."
+      },
+      {
+        "name": "registry-package-updated",
+        "description": "A registry package was updated."
+      },
+      {
+        "name": "release-created",
+        "description": "A release was created."
+      },
+      {
+        "name": "release-deleted",
+        "description": "A release was deleted."
+      },
+      {
+        "name": "release-edited",
+        "description": "A release was edited."
+      },
+      {
+        "name": "release-prereleased",
+        "description": "A release was prereleased."
+      },
+      {
+        "name": "release-published",
+        "description": "A release was published."
+      },
+      {
+        "name": "release-released",
+        "description": "A release was released."
+      },
+      {
+        "name": "release-unpublished",
+        "description": "A release was unpublished."
+      },
+      {
+        "name": "repository-advisory-published",
+        "description": "A repository advisory was published."
+      },
+      {
+        "name": "repository-advisory-reported",
+        "description": "A repository advisory was reported."
+      },
+      {
+        "name": "repository-archived",
+        "description": "A repository was archived."
+      },
+      {
+        "name": "repository-created",
+        "description": "A repository was created."
+      },
+      {
+        "name": "repository-deleted",
+        "description": "A repository was deleted."
+      },
+      {
+        "name": "repository-dispatch-sample.collected",
+        "description": "A repository dispatch sample was collected."
+      },
+      {
+        "name": "repository-edited",
+        "description": "A repository was edited."
+      },
+      {
+        "name": "repository-import",
+        "description": "A repository was imported."
+      },
+      {
+        "name": "repository-privatized",
+        "description": "A repository was privatized."
+      },
+      {
+        "name": "repository-publicized",
+        "description": "A repository was publicized."
+      },
+      {
+        "name": "repository-renamed",
+        "description": "A repository was renamed."
+      },
+      {
+        "name": "repository-ruleset-created",
+        "description": "A repository ruleset was created."
+      },
+      {
+        "name": "repository-ruleset-deleted",
+        "description": "A repository ruleset was deleted."
+      },
+      {
+        "name": "repository-ruleset-edited",
+        "description": "A repository ruleset was edited."
+      },
+      {
+        "name": "repository-transferred",
+        "description": "A repository was transferred."
+      },
+      {
+        "name": "repository-unarchived",
+        "description": "A repository was unarchived."
+      },
+      {
+        "name": "repository-vulnerability-alert-create",
+        "description": "A repository vulnerability alert was created."
+      },
+      {
+        "name": "repository-vulnerability-alert-dismiss",
+        "description": "A repository vulnerability alert was dismissed."
+      },
+      {
+        "name": "repository-vulnerability-alert-reopen",
+        "description": "A repository vulnerability alert was reopened."
+      },
+      {
+        "name": "repository-vulnerability-alert-resolve",
+        "description": "A repository vulnerability alert was resolved."
+      },
+      {
+        "name": "secret-scanning-alert-assigned",
+        "description": "A secret scanning alert was assigned."
+      },
+      {
+        "name": "secret-scanning-alert-created",
+        "description": "A secret scanning alert was created."
+      },
+      {
+        "name": "secret-scanning-alert-location-created",
+        "description": "A secret scanning alert location was created."
+      },
+      {
+        "name": "secret-scanning-alert-metadata-created",
+        "description": "Secret scanning alert metadata was created."
+      },
+      {
+        "name": "secret-scanning-alert-metadata-removed",
+        "description": "Secret scanning alert metadata was removed."
+      },
+      {
+        "name": "secret-scanning-alert-publicly-leaked",
+        "description": "A secret scanning alert was publicly leaked."
+      },
+      {
+        "name": "secret-scanning-alert-reopened",
+        "description": "A secret scanning alert was reopened."
+      },
+      {
+        "name": "secret-scanning-alert-resolved",
+        "description": "A secret scanning alert was resolved."
+      },
+      {
+        "name": "secret-scanning-alert-unassigned",
+        "description": "A secret scanning alert was unassigned."
+      },
+      {
+        "name": "secret-scanning-alert-validated",
+        "description": "A secret scanning alert was validated."
+      },
+      {
+        "name": "secret-scanning-scan-completed",
+        "description": "A secret scanning scan completed."
+      },
+      {
+        "name": "security-advisory-published",
+        "description": "A security advisory was published."
+      },
+      {
+        "name": "security-advisory-updated",
+        "description": "A security advisory was updated."
+      },
+      {
+        "name": "security-advisory-withdrawn",
+        "description": "A security advisory was withdrawn."
+      },
+      {
+        "name": "security-and-analysis",
+        "description": "Security and analysis settings changed."
+      },
+      {
+        "name": "sponsorship-cancelled",
+        "description": "A sponsorship was cancelled."
+      },
+      {
+        "name": "sponsorship-created",
+        "description": "A sponsorship was created."
+      },
+      {
+        "name": "sponsorship-edited",
+        "description": "A sponsorship was edited."
+      },
+      {
+        "name": "sponsorship-pending-cancellation",
+        "description": "A sponsorship has a pending cancellation."
+      },
+      {
+        "name": "sponsorship-pending-tier-change",
+        "description": "A sponsorship has a pending tier change."
+      },
+      {
+        "name": "sponsorship-tier-changed",
+        "description": "A sponsorship tier was changed."
+      },
+      {
+        "name": "star-created",
+        "description": "A star was created."
+      },
+      {
+        "name": "star-deleted",
+        "description": "A star was deleted."
+      },
+      {
+        "name": "status",
+        "description": "A commit status changed."
+      },
+      {
+        "name": "sub-issues-parent-issue-added",
+        "description": "A parent issue was added to a sub-issue."
+      },
+      {
+        "name": "sub-issues-parent-issue-removed",
+        "description": "A parent issue was removed from a sub-issue."
+      },
+      {
+        "name": "sub-issues-sub-issue-added",
+        "description": "A sub-issue was added."
+      },
+      {
+        "name": "sub-issues-sub-issue-removed",
+        "description": "A sub-issue was removed."
+      },
+      {
+        "name": "team-add",
+        "description": "A team was added to a repository."
+      },
+      {
+        "name": "team-added-to-repository",
+        "description": "A team was added to a repository."
+      },
+      {
+        "name": "team-created",
+        "description": "A team was created."
+      },
+      {
+        "name": "team-deleted",
+        "description": "A team was deleted."
+      },
+      {
+        "name": "team-edited",
+        "description": "A team was edited."
+      },
+      {
+        "name": "team-removed-from-repository",
+        "description": "A team was removed from a repository."
+      },
+      {
+        "name": "watch-started",
+        "description": "Someone started watching a repository."
+      },
+      {
+        "name": "workflow-dispatch",
+        "description": "A workflow was dispatched."
+      },
+      {
+        "name": "workflow-job-completed",
+        "description": "A workflow job completed."
+      },
+      {
+        "name": "workflow-job-in-progress",
+        "description": "A workflow job is in progress."
+      },
+      {
+        "name": "workflow-job-queued",
+        "description": "A workflow job was queued."
+      },
+      {
+        "name": "workflow-job-waiting",
+        "description": "A workflow job is waiting."
+      },
+      {
+        "name": "workflow-run-completed",
+        "description": "A workflow run completed."
+      },
+      {
+        "name": "workflow-run-in-progress",
+        "description": "A workflow run is in progress."
+      },
+      {
+        "name": "workflow-run-requested",
+        "description": "A workflow run was requested."
+      }
+    ],
+    "managementEndpoints": [
+      {
+        "method": "POST",
+        "path": "/repos/{owner}/{repo}/hooks",
+        "description": "Create a repository webhook"
+      },
+      {
+        "method": "GET",
+        "path": "/repos/{owner}/{repo}/hooks",
+        "description": "List repository webhooks"
+      },
+      {
+        "method": "GET",
+        "path": "/repos/{owner}/{repo}/hooks/{hook_id}",
+        "description": "Get a repository webhook"
+      },
+      {
+        "method": "PATCH",
+        "path": "/repos/{owner}/{repo}/hooks/{hook_id}",
+        "description": "Update a repository webhook"
+      },
+      {
+        "method": "DELETE",
+        "path": "/repos/{owner}/{repo}/hooks/{hook_id}",
+        "description": "Delete a repository webhook"
+      },
+      {
+        "method": "POST",
+        "path": "/repos/{owner}/{repo}/hooks/{hook_id}/tests",
+        "description": "Test the push event delivery of a repository webhook"
+      },
+      {
+        "method": "POST",
+        "path": "/repos/{owner}/{repo}/hooks/{hook_id}/pings",
+        "description": "Ping a repository webhook"
+      },
+      {
+        "method": "POST",
+        "path": "/orgs/{org}/hooks",
+        "description": "Create an organization webhook"
+      },
+      {
+        "method": "GET",
+        "path": "/orgs/{org}/hooks",
+        "description": "List organization webhooks"
+      },
+      {
+        "method": "GET",
+        "path": "/orgs/{org}/hooks/{hook_id}",
+        "description": "Get an organization webhook"
+      },
+      {
+        "method": "PATCH",
+        "path": "/orgs/{org}/hooks/{hook_id}",
+        "description": "Update an organization webhook"
+      },
+      {
+        "method": "DELETE",
+        "path": "/orgs/{org}/hooks/{hook_id}",
+        "description": "Delete an organization webhook"
+      },
+      {
+        "method": "POST",
+        "path": "/orgs/{org}/hooks/{hook_id}/pings",
+        "description": "Ping an organization webhook"
+      }
+    ],
+    "signature": {
+      "header": "X-Hub-Signature-256",
+      "scheme": "hmac-sha256",
+      "detail": "GitHub computes `HMAC-SHA256(webhook_secret, raw_request_body)` and sends the hex digest in the `X-Hub-Signature-256` header prefixed with `sha256=`. To verify, recompute the HMAC using the same secret and the raw (unmodified) request body, then compare against the header value using a constant-time comparison. If no secret is configured when creating the webhook, the signature header will be absent. An older `X-Hub-Signature` header (SHA-1) may also be present but `X-Hub-Signature-256` is the recommended primary verification mechanism."
+    },
+    "payloadFormat": "json",
+    "docsUrl": "https://docs.github.com/webhooks/webhook-events-and-payloads",
+    "setupSteps": [
+      {
+        "title": "Obtain the inbound hook URL from your registry workspace",
+        "detail": "Copy the stable inbound hook URL provided by your package registry workspace. This is the target GitHub will POST event payloads to."
+      },
+      {
+        "title": "Generate a webhook secret",
+        "detail": "Generate a random, high-entropy secret string (e.g., 32+ bytes). This secret will be used by GitHub to sign each delivery and by your receiver to verify the `X-Hub-Signature-256` header. Store it securely."
+      },
+      {
+        "title": "Prepare your receiver endpoint",
+        "detail": "Ensure your server is publicly reachable over HTTPS, accepts POST requests at the hook URL path, reads the raw request body (do not re-serialize or modify it), and responds with HTTP 200 to acknowledge receipt."
+      },
+      {
+        "title": "Implement signature verification",
+        "detail": "On every incoming request, read the raw body bytes and the `X-Hub-Signature-256` header. Compute `HMAC-SHA256(secret, raw_body)` and compare the hex digest to the header value (after the `sha256=` prefix) using a constant-time comparison. Reject requests that do not match. Also inspect the `X-Github-Event` header to route the payload to the correct handler."
+      },
+      {
+        "title": "Create the webhook via the GitHub REST API",
+        "detail": "POST to `https://api.github.com/repos/{owner}/{repo}/hooks` for a repository webhook, or `https://api.github.com/orgs/{org}/hooks` for an organization webhook. The request body must include: `config.url` set to your inbound hook URL, `config.content_type` set to `json`, `config.secret` set to the secret from step 2, and `events` set to an array of event names you wish to subscribe to (e.g., `[\"push\", \"registry-package-published\", \"package-published\"]`). Authenticate with a token that has admin access to the repository or organization. Reference: https://docs.github.com/rest/"
+      },
+      {
+        "title": "Verify the ping event",
+        "detail": "GitHub automatically sends a `ping` event (`X-Github-Event: ping`) immediately after webhook creation. Confirm your endpoint receives it, verifies the signature, and responds with HTTP 200."
+      },
+      {
+        "title": "Register the hook URL in the registry webhooks area",
+        "detail": "Within your package registry workspace's webhooks settings area, confirm or register the same inbound hook URL so that registry-internal workflows triggered by GitHub events are properly wired. Ensure the configured events match the ones you selected when creating the GitHub webhook."
+      }
+    ]
+  }
+}

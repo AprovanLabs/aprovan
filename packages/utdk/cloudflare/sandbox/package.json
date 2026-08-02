@@ -1,0 +1,28 @@
+{
+  "name": "@utdk/cloudflare-sandbox",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Cloudflare Sandbox provider: run sandboxes through your deployed sandbox Worker (Containers + Durable Objects). Credential: a bearer_token the Worker checks.",
+  "keywords": [
+    "sandbox",
+    "cloudflare",
+    "workers",
+    "containers",
+    "utdk"
+  ],
+  "utdk": {
+    "provider": "cloudflare/sandbox",
+    "handwritten": true,
+    "interface": "sandbox",
+    "auth": {
+      "schemes": [
+        {
+          "id": "worker_token",
+          "type": "http",
+          "scheme": "bearer",
+          "description": "Token your sandbox Worker validates. The Worker's origin rides the sandbox interface binding as `baseUrl`."
+        }
+      ]
+    }
+  }
+}

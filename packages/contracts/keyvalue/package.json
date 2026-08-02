@@ -1,0 +1,37 @@
+{
+  "name": "@utdk/keyvalue",
+  "version": "0.2.0",
+  "type": "module",
+  "description": "Shared key-value contract for UTDK storage providers: get/set/delete/list over flat JSON-valued keys, TTL semantics, and tool-discovery helpers",
+  "keywords": [
+    "keyvalue",
+    "kv",
+    "storage",
+    "utdk"
+  ],
+  "utdk": {
+    "contract": "keyvalue",
+    "handwritten": true
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check-types": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "clean": "rm -rf dist",
+    "test": "vitest run"
+  },
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "vitest": "2.1.5"
+  }
+}

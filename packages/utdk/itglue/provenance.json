@@ -1,0 +1,24 @@
+{
+  "provider": "itglue",
+  "generatedAt": "2026-05-30T18:16:06.571Z",
+  "generation": 2,
+  "source": {
+    "type": "openapi",
+    "url": "https://raw.githubusercontent.com/mvanhorn/cli-printing-press/main/catalog/specs/itglue-openapi.yaml",
+    "hash": "sha256:a716f6bf30ecf0f1d168f951d233049bfb03a4e5d131014e2a426bd471329e57",
+    "fetchedAt": "2026-05-30T18:16:06.571Z"
+  },
+  "ingestSource": "printing-press",
+  "pipeline": {
+    "research": {
+      "noveltyScore": 8,
+      "competingPackages": 15
+    },
+    "scorecard": {
+      "infrastructure": "fail",
+      "domain": 85
+    },
+    "agentReadiness": "pass"
+  },
+  "bundlerVersion": "0.1.1"
+}

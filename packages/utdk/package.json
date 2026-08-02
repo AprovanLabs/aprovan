@@ -1,0 +1,338 @@
+{
+  "name": "utdk",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Generated UTDK provider clients",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "node ./build.mjs && node ./emit-client-types.mjs && node ./copy-assets.mjs",
+    "check-types": "NODE_OPTIONS=--max-old-space-size=4096 tsc -p tsconfig.json --noEmit",
+    "typecheck": "NODE_OPTIONS=--max-old-space-size=4096 tsc -p tsconfig.json --noEmit",
+    "clean": "rm -rf dist",
+    "build:types": "NODE_OPTIONS=--max-old-space-size=4096 tsc -p tsconfig.json && node ./copy-assets.mjs",
+    "prepublishOnly": "pnpm run build:types"
+  },
+  "dependencies": {
+    "@utcp/http": "^1.1.1",
+    "@utcp/sdk": "^1.1.0",
+    "@utdk/llm": "workspace:*",
+    "@utdk/sandbox": "workspace:*",
+    "@utdk/sql": "workspace:*",
+    "@utdk/vcs": "workspace:*"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./client": {
+      "types": "./dist/client.d.ts",
+      "import": "./dist/client.js",
+      "default": "./dist/client.js"
+    },
+    "./registry.json": "./dist/registry.json",
+    "./*/openapi.json": "./dist/*/openapi.json",
+    "./*/package.json": "./dist/*/package.json",
+    "./airtable": {
+      "types": "./dist/airtable/index.d.ts",
+      "import": "./dist/airtable/index.js",
+      "default": "./dist/airtable/index.js"
+    },
+    "./anthropic": {
+      "types": "./dist/anthropic/index.d.ts",
+      "import": "./dist/anthropic/index.js",
+      "default": "./dist/anthropic/index.js"
+    },
+    "./asana": {
+      "types": "./dist/asana/index.d.ts",
+      "import": "./dist/asana/index.js",
+      "default": "./dist/asana/index.js"
+    },
+    "./cloudflare": {
+      "types": "./dist/cloudflare/index.d.ts",
+      "import": "./dist/cloudflare/index.js",
+      "default": "./dist/cloudflare/index.js"
+    },
+    "./cloudflare/sandbox": {
+      "types": "./dist/cloudflare/sandbox/index.d.ts",
+      "import": "./dist/cloudflare/sandbox/index.js",
+      "default": "./dist/cloudflare/sandbox/index.js"
+    },
+    "./databricks": {
+      "types": "./dist/databricks/index.d.ts",
+      "import": "./dist/databricks/index.js",
+      "default": "./dist/databricks/index.js"
+    },
+    "./datadog": {
+      "types": "./dist/datadog/index.d.ts",
+      "import": "./dist/datadog/index.js",
+      "default": "./dist/datadog/index.js"
+    },
+    "./digitalocean": {
+      "types": "./dist/digitalocean/index.d.ts",
+      "import": "./dist/digitalocean/index.js",
+      "default": "./dist/digitalocean/index.js"
+    },
+    "./discord": {
+      "types": "./dist/discord/index.d.ts",
+      "import": "./dist/discord/index.js",
+      "default": "./dist/discord/index.js"
+    },
+    "./elevenlabs": {
+      "types": "./dist/elevenlabs/index.d.ts",
+      "import": "./dist/elevenlabs/index.js",
+      "default": "./dist/elevenlabs/index.js"
+    },
+    "./figma": {
+      "types": "./dist/figma/index.d.ts",
+      "import": "./dist/figma/index.js",
+      "default": "./dist/figma/index.js"
+    },
+    "./fly": {
+      "types": "./dist/fly/index.d.ts",
+      "import": "./dist/fly/index.js",
+      "default": "./dist/fly/index.js"
+    },
+    "./fly/sprites": {
+      "types": "./dist/fly/sprites/index.d.ts",
+      "import": "./dist/fly/sprites/index.js",
+      "default": "./dist/fly/sprites/index.js"
+    },
+    "./front": {
+      "types": "./dist/front/index.d.ts",
+      "import": "./dist/front/index.js",
+      "default": "./dist/front/index.js"
+    },
+    "./gemini": {
+      "types": "./dist/gemini/index.d.ts",
+      "import": "./dist/gemini/index.js",
+      "default": "./dist/gemini/index.js"
+    },
+    "./github": {
+      "types": "./dist/github/index.d.ts",
+      "import": "./dist/github/index.js",
+      "default": "./dist/github/index.js"
+    },
+    "./github/vcs": {
+      "types": "./dist/github/vcs/index.d.ts",
+      "import": "./dist/github/vcs/index.js",
+      "default": "./dist/github/vcs/index.js"
+    },
+    "./google": {
+      "types": "./dist/google/index.d.ts",
+      "import": "./dist/google/index.js",
+      "default": "./dist/google/index.js"
+    },
+    "./google-cloud-run": {
+      "types": "./dist/google-cloud-run/index.d.ts",
+      "import": "./dist/google-cloud-run/index.js",
+      "default": "./dist/google-cloud-run/index.js"
+    },
+    "./google/books": {
+      "types": "./dist/google/books/index.d.ts",
+      "import": "./dist/google/books/index.js",
+      "default": "./dist/google/books/index.js"
+    },
+    "./google/calendar": {
+      "types": "./dist/google/calendar/index.d.ts",
+      "import": "./dist/google/calendar/index.js",
+      "default": "./dist/google/calendar/index.js"
+    },
+    "./google/docs": {
+      "types": "./dist/google/docs/index.d.ts",
+      "import": "./dist/google/docs/index.js",
+      "default": "./dist/google/docs/index.js"
+    },
+    "./google/drive": {
+      "types": "./dist/google/drive/index.d.ts",
+      "import": "./dist/google/drive/index.js",
+      "default": "./dist/google/drive/index.js"
+    },
+    "./google/forms": {
+      "types": "./dist/google/forms/index.d.ts",
+      "import": "./dist/google/forms/index.js",
+      "default": "./dist/google/forms/index.js"
+    },
+    "./google/gmail": {
+      "types": "./dist/google/gmail/index.d.ts",
+      "import": "./dist/google/gmail/index.js",
+      "default": "./dist/google/gmail/index.js"
+    },
+    "./google/people": {
+      "types": "./dist/google/people/index.d.ts",
+      "import": "./dist/google/people/index.js",
+      "default": "./dist/google/people/index.js"
+    },
+    "./google/sheets": {
+      "types": "./dist/google/sheets/index.d.ts",
+      "import": "./dist/google/sheets/index.js",
+      "default": "./dist/google/sheets/index.js"
+    },
+    "./google/slides": {
+      "types": "./dist/google/slides/index.d.ts",
+      "import": "./dist/google/slides/index.js",
+      "default": "./dist/google/slides/index.js"
+    },
+    "./google/tasks": {
+      "types": "./dist/google/tasks/index.d.ts",
+      "import": "./dist/google/tasks/index.js",
+      "default": "./dist/google/tasks/index.js"
+    },
+    "./google/youtube": {
+      "types": "./dist/google/youtube/index.d.ts",
+      "import": "./dist/google/youtube/index.js",
+      "default": "./dist/google/youtube/index.js"
+    },
+    "./hubspot": {
+      "types": "./dist/hubspot/index.d.ts",
+      "import": "./dist/hubspot/index.js",
+      "default": "./dist/hubspot/index.js"
+    },
+    "./intercom": {
+      "types": "./dist/intercom/index.d.ts",
+      "import": "./dist/intercom/index.js",
+      "default": "./dist/intercom/index.js"
+    },
+    "./itglue": {
+      "types": "./dist/itglue/index.d.ts",
+      "import": "./dist/itglue/index.js",
+      "default": "./dist/itglue/index.js"
+    },
+    "./jira": {
+      "types": "./dist/jira/index.d.ts",
+      "import": "./dist/jira/index.js",
+      "default": "./dist/jira/index.js"
+    },
+    "./launchdarkly": {
+      "types": "./dist/launchdarkly/index.d.ts",
+      "import": "./dist/launchdarkly/index.js",
+      "default": "./dist/launchdarkly/index.js"
+    },
+    "./linear": {
+      "types": "./dist/linear/index.d.ts",
+      "import": "./dist/linear/index.js",
+      "default": "./dist/linear/index.js"
+    },
+    "./mercury": {
+      "types": "./dist/mercury/index.d.ts",
+      "import": "./dist/mercury/index.js",
+      "default": "./dist/mercury/index.js"
+    },
+    "./notion": {
+      "types": "./dist/notion/index.d.ts",
+      "import": "./dist/notion/index.js",
+      "default": "./dist/notion/index.js"
+    },
+    "./openai": {
+      "types": "./dist/openai/index.d.ts",
+      "import": "./dist/openai/index.js",
+      "default": "./dist/openai/index.js"
+    },
+    "./openrouteservice": {
+      "types": "./dist/openrouteservice/index.d.ts",
+      "import": "./dist/openrouteservice/index.js",
+      "default": "./dist/openrouteservice/index.js"
+    },
+    "./petstore": {
+      "types": "./dist/petstore/index.d.ts",
+      "import": "./dist/petstore/index.js",
+      "default": "./dist/petstore/index.js"
+    },
+    "./pipedrive": {
+      "types": "./dist/pipedrive/index.d.ts",
+      "import": "./dist/pipedrive/index.js",
+      "default": "./dist/pipedrive/index.js"
+    },
+    "./plaid": {
+      "types": "./dist/plaid/index.d.ts",
+      "import": "./dist/plaid/index.js",
+      "default": "./dist/plaid/index.js"
+    },
+    "./postgres": {
+      "types": "./dist/postgres/index.d.ts",
+      "import": "./dist/postgres/index.js",
+      "default": "./dist/postgres/index.js"
+    },
+    "./posthog": {
+      "types": "./dist/posthog/index.d.ts",
+      "import": "./dist/posthog/index.js",
+      "default": "./dist/posthog/index.js"
+    },
+    "./postman-explore": {
+      "types": "./dist/postman-explore/index.d.ts",
+      "import": "./dist/postman-explore/index.js",
+      "default": "./dist/postman-explore/index.js"
+    },
+    "./producthunt": {
+      "types": "./dist/producthunt/index.d.ts",
+      "import": "./dist/producthunt/index.js",
+      "default": "./dist/producthunt/index.js"
+    },
+    "./salesforce": {
+      "types": "./dist/salesforce/index.d.ts",
+      "import": "./dist/salesforce/index.js",
+      "default": "./dist/salesforce/index.js"
+    },
+    "./sendgrid": {
+      "types": "./dist/sendgrid/index.d.ts",
+      "import": "./dist/sendgrid/index.js",
+      "default": "./dist/sendgrid/index.js"
+    },
+    "./sentry": {
+      "types": "./dist/sentry/index.d.ts",
+      "import": "./dist/sentry/index.js",
+      "default": "./dist/sentry/index.js"
+    },
+    "./slack": {
+      "types": "./dist/slack/index.d.ts",
+      "import": "./dist/slack/index.js",
+      "default": "./dist/slack/index.js"
+    },
+    "./snowflake": {
+      "types": "./dist/snowflake/index.d.ts",
+      "import": "./dist/snowflake/index.js",
+      "default": "./dist/snowflake/index.js"
+    },
+    "./spotify": {
+      "types": "./dist/spotify/index.d.ts",
+      "import": "./dist/spotify/index.js",
+      "default": "./dist/spotify/index.js"
+    },
+    "./stripe": {
+      "types": "./dist/stripe/index.d.ts",
+      "import": "./dist/stripe/index.js",
+      "default": "./dist/stripe/index.js"
+    },
+    "./stytch": {
+      "types": "./dist/stytch/index.d.ts",
+      "import": "./dist/stytch/index.js",
+      "default": "./dist/stytch/index.js"
+    },
+    "./telegram": {
+      "types": "./dist/telegram/index.d.ts",
+      "import": "./dist/telegram/index.js",
+      "default": "./dist/telegram/index.js"
+    },
+    "./twilio": {
+      "types": "./dist/twilio/index.d.ts",
+      "import": "./dist/twilio/index.js",
+      "default": "./dist/twilio/index.js"
+    },
+    "./zendesk": {
+      "types": "./dist/zendesk/index.d.ts",
+      "import": "./dist/zendesk/index.js",
+      "default": "./dist/zendesk/index.js"
+    }
+  },
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.6",
+    "@types/node": "^25.5.0"
+  }
+}

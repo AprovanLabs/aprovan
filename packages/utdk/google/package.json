@@ -1,0 +1,30 @@
+{
+  "private": true,
+  "version": "0.0.1-20260719.11",
+  "type": "module",
+  "description": "Generated UTDK provider clients for google.",
+  "keywords": [
+    "google",
+    "generated",
+    "openapi",
+    "utdk"
+  ],
+  "utdk": {
+    "namespace": "google",
+    "generation": 11,
+    "generatedAt": "2026-07-19T23:51:45.966Z",
+    "providers": [
+      "google/books",
+      "google/calendar",
+      "google/docs",
+      "google/drive",
+      "google/forms",
+      "google/gmail",
+      "google/people",
+      "google/sheets",
+      "google/slides",
+      "google/tasks",
+      "google/youtube"
+    ]
+  }
+}

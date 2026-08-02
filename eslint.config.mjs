@@ -1,4 +1,4 @@
-import baseConfig from '@aprovan/eslint-config';
+import baseConfig from './config/eslint-config/base.mjs';
 import tsdocPlugin from 'eslint-plugin-tsdoc';
 import globals from 'globals';
 

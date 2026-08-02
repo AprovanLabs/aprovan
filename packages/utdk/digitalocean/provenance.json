@@ -1,0 +1,24 @@
+{
+  "provider": "digitalocean",
+  "generatedAt": "2026-05-30T22:05:54.649Z",
+  "generation": 1,
+  "source": {
+    "type": "openapi",
+    "url": "https://raw.githubusercontent.com/digitalocean/openapi/main/specification/DigitalOcean-public.v2.yaml",
+    "hash": "sha256:9fac4b70219d9e28ab368c954c3c4e4ffc92ea4e2dfdb0c151d2ca7bbe9e46c9",
+    "fetchedAt": "2026-05-30T22:05:54.649Z"
+  },
+  "ingestSource": "printing-press",
+  "pipeline": {
+    "research": {
+      "noveltyScore": 8,
+      "competingPackages": 5
+    },
+    "scorecard": {
+      "infrastructure": "fail",
+      "domain": 70
+    },
+    "agentReadiness": "pass"
+  },
+  "bundlerVersion": "0.1.1"
+}

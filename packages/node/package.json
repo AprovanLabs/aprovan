@@ -1,0 +1,35 @@
+{
+  "name": "@aprovan/node",
+  "version": "0.1.1",
+  "description": "Shared Aprovan environment loading and utilities",
+  "type": "module",
+  "bin": {
+    "aprovan-env": "./dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@aws-sdk/client-ssm": "^3.848.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.13",
+    "eslint": "^9.31.0",
+    "tsup": "^8.5.0",
+    "typescript": "^5.8.3"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

@@ -1,0 +1,91 @@
+{
+  "provider": "datadog",
+  "generatedAt": "2026-07-20T00:08:20.535Z",
+  "sourceHash": "6c6224df498951ff2498a0c1b1c3085b4c0f5276b2f82f9519ce2f60e37e7e20",
+  "model": "zai-org/GLM-5.2",
+  "webhooks": {
+    "supported": true,
+    "summary": "The provided Datadog OpenAPI content includes webhook-management operations for two distinct surfaces: (1) Microsoft Teams 'Workflows webhook handles' and (2) the Webhooks integration's OAuth2 client-credentials auth methods. However, the source material does NOT define any inbound webhook event names (webhookEventNames is an empty array), provides no webhook payload/definition sample, declares no operation callbacks, and documents no signature headers or verification scheme. As a result, event names, signature headers, and verification schemes are reported as empty/unknown below — no values are inferred.",
+    "configMethods": [
+      "api"
+    ],
+    "events": [],
+    "managementEndpoints": [
+      {
+        "method": "GET",
+        "path": "/api/v2/integration/ms-teams/configuration/workflows-webhook-handles",
+        "description": "Get all Workflows webhook handles (Datadog Microsoft Teams integration)."
+      },
+      {
+        "method": "POST",
+        "path": "/api/v2/integration/ms-teams/configuration/workflows-webhook-handles",
+        "description": "Create a Workflows webhook handle (Datadog Microsoft Teams integration)."
+      },
+      {
+        "method": "DELETE",
+        "path": "/api/v2/integration/ms-teams/configuration/workflows-webhook-handles/{handle_id}",
+        "description": "Delete a Workflows webhook handle (Datadog Microsoft Teams integration)."
+      },
+      {
+        "method": "GET",
+        "path": "/api/v2/integration/ms-teams/configuration/workflows-webhook-handles/{handle_id}",
+        "description": "Get a Workflows webhook handle (Datadog Microsoft Teams integration)."
+      },
+      {
+        "method": "PATCH",
+        "path": "/api/v2/integration/ms-teams/configuration/workflows-webhook-handles/{handle_id}",
+        "description": "Update a Workflows webhook handle (Datadog Microsoft Teams integration)."
+      },
+      {
+        "method": "GET",
+        "path": "/api/v2/integration/webhooks/configuration/auth-method",
+        "description": "Get all auth methods configured for the Webhooks integration."
+      },
+      {
+        "method": "POST",
+        "path": "/api/v2/integration/webhooks/configuration/auth-method/oauth2-client-credentials",
+        "description": "Create an OAuth2 client-credentials auth method for the Webhooks integration (client_secret is stored securely and never returned)."
+      },
+      {
+        "method": "DELETE",
+        "path": "/api/v2/integration/webhooks/configuration/auth-method/oauth2-client-credentials/{auth_method_id}",
+        "description": "Delete an OAuth2 client-credentials auth method by ID."
+      },
+      {
+        "method": "GET",
+        "path": "/api/v2/integration/webhooks/configuration/auth-method/oauth2-client-credentials/{auth_method_id}",
+        "description": "Get a single OAuth2 client-credentials auth method by ID."
+      },
+      {
+        "method": "PATCH",
+        "path": "/api/v2/integration/webhooks/configuration/auth-method/oauth2-client-credentials/{auth_method_id}",
+        "description": "Update an existing OAuth2 client-credentials auth method."
+      }
+    ],
+    "signature": {
+      "header": null,
+      "scheme": null,
+      "detail": "The source OpenAPI material does not document a signature header or a verification scheme for inbound webhook deliveries. Only the operations above are present; no callback objects or webhook definition samples are included."
+    },
+    "payloadFormat": "Not specified in the provided source material (webhookDefinitionsSample is empty and operationCallbacks is empty).",
+    "docsUrl": null,
+    "setupSteps": [
+      {
+        "title": "Retrieve Datadog API/APP key credentials",
+        "detail": "Obtain a valid Datadog API key and Application key for authenticating calls to /api/v2/integration/... endpoints."
+      },
+      {
+        "title": "Register an OAuth2 client-credentials auth method (only if your inbound target requires OAuth2)",
+        "detail": "POST /api/v2/integration/webhooks/configuration/auth-method/oauth2-client-credentials with the client credentials Datadog should use when calling your webhook URL. Persist the returned auth_method_id."
+      },
+      {
+        "title": "Manage Microsoft Teams Workflows webhook handles (only for the MS Teams integration surface)",
+        "detail": "POST /api/v2/integration/ms-teams/configuration/workflows-webhook-handles to create a Workflows webhook handle, or GET/PATCH the collection to inspect and update handles."
+      },
+      {
+        "title": "Register the inbound hook URL in the Datadog Webhooks integration",
+        "detail": "The provided source material does NOT include the endpoint that creates or registers an actual webhook target URL for the generic Datadog Webhooks integration (only auth-method and MS Teams handle management operations are present). Without that endpoint visible in the source, this final registration step cannot be made actionable from the supplied OpenAPI content alone — complete it in the Datadog Webhooks configuration area once the webhook-creation endpoint is available."
+      }
+    ]
+  }
+}

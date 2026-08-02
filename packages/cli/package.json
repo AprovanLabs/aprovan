@@ -1,0 +1,48 @@
+{
+  "name": "@aprovan/cli",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Offer this machine to an Aprovan workspace as a sandbox host",
+  "keywords": [
+    "aprovan",
+    "sandbox",
+    "cli",
+    "executor"
+  ],
+  "license": "MIT",
+  "bin": {
+    "aprovan": "./dist/bin.js"
+  },
+  "main": "./dist/cli.js",
+  "types": "./dist/cli.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/cli.d.ts",
+      "import": "./dist/cli.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check-types": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "clean": "rm -rf dist",
+    "test": "vitest run --passWithNoTests"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "typescript": "^5.7.3",
+    "vitest": "2.1.5"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@aprovan/sandbox-host": "workspace:*"
+  }
+}

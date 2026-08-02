@@ -1,0 +1,86 @@
+{
+  "private": true,
+  "version": "1.0.0-20260719.2",
+  "type": "module",
+  "description": "Generated UTDK provider client for Google Docs API. Reads and writes Google Docs documents.",
+  "homepage": "https://developers.google.com/docs/",
+  "keywords": [
+    "google/docs",
+    "generated",
+    "openapi",
+    "utdk"
+  ],
+  "license": "Creative Commons Attribution 3.0",
+  "utdk": {
+    "provider": "google/docs",
+    "generation": 2,
+    "generatedAt": "2026-07-19T23:50:14.361Z",
+    "auth": {
+      "schemes": [
+        {
+          "id": "Oauth2",
+          "type": "oauth2",
+          "description": "Oauth 2.0 implicit authentication",
+          "flows": {
+            "implicit": {
+              "authorizationUrl": "https://accounts.google.com/o/oauth2/auth",
+              "scopes": {
+                "https://www.googleapis.com/auth/documents": "See, edit, create, and delete all your Google Docs documents",
+                "https://www.googleapis.com/auth/documents.readonly": "See all your Google Docs documents",
+                "https://www.googleapis.com/auth/drive": "See, edit, create, and delete all of your Google Drive files",
+                "https://www.googleapis.com/auth/drive.file": "See, edit, create, and delete only the specific Google Drive files you use with this app",
+                "https://www.googleapis.com/auth/drive.readonly": "See and download all your Google Drive files"
+              }
+            }
+          }
+        },
+        {
+          "id": "Oauth2c",
+          "type": "oauth2",
+          "description": "Oauth 2.0 authorizationCode authentication",
+          "flows": {
+            "authorizationCode": {
+              "authorizationUrl": "https://accounts.google.com/o/oauth2/auth",
+              "scopes": {
+                "https://www.googleapis.com/auth/documents": "See, edit, create, and delete all your Google Docs documents",
+                "https://www.googleapis.com/auth/documents.readonly": "See all your Google Docs documents",
+                "https://www.googleapis.com/auth/drive": "See, edit, create, and delete all of your Google Drive files",
+                "https://www.googleapis.com/auth/drive.file": "See, edit, create, and delete only the specific Google Drive files you use with this app",
+                "https://www.googleapis.com/auth/drive.readonly": "See and download all your Google Drive files"
+              },
+              "tokenUrl": "https://accounts.google.com/o/oauth2/token"
+            }
+          }
+        }
+      ],
+      "operationOverrides": {}
+    },
+    "openapi": {
+      "title": "Google Docs API",
+      "url": "https://api.apis.guru/v2/specs/googleapis.com/docs/v1/openapi.json",
+      "version": "v1",
+      "termsOfService": "https://developers.google.com/terms/",
+      "icon": "https://api.apis.guru/v2/cache/logo/https_www.google.com_images_branding_googlelogo_2x_googlelogo_color_272x92dp.png"
+    },
+    "provenance": {
+      "source": "apis-guru",
+      "originDomain": "googleapis.com",
+      "originSpecUrl": "https://docs.googleapis.com/$discovery/rest?version=v1",
+      "service": "docs",
+      "retrievedAt": "2026-07-16T06:53:02.488Z"
+    },
+    "branding": {
+      "logo": "https://api.apis.guru/v2/cache/logo/https_www.google.com_images_branding_googlelogo_2x_googlelogo_color_272x92dp.png",
+      "site": "https://developers.google.com/docs/"
+    },
+    "docs": {
+      "manifestPath": "/Users/jacob/Documents/Code/AprovanLabs/registry/.registry/google/docs/manifest.json",
+      "indexPath": "/Users/jacob/Documents/Code/AprovanLabs/registry/.registry/google/docs/index.md",
+      "docsPath": "/Users/jacob/Documents/Code/AprovanLabs/registry/packages/utdk/google/docs/docs",
+      "generatedAt": "2026-07-19T23:50:14.360Z",
+      "sourceCount": 0,
+      "openApiHash": null,
+      "promptHash": "8c3694991a4c289225f05a4e8f1e098cc74d085a088d7dffd82f00d93797b7f8"
+    }
+  }
+}

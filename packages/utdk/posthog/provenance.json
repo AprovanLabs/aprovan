@@ -1,0 +1,24 @@
+{
+  "provider": "posthog",
+  "generatedAt": "2026-07-12T21:24:25.211Z",
+  "generation": 4,
+  "source": {
+    "type": "openapi",
+    "url": "https://us.posthog.com/api/schema/",
+    "hash": "sha256:d07fd37c77d3871204cba7a05131d370f2a61b73eeb5848aa8a9b6ba3ad6b572",
+    "fetchedAt": "2026-07-12T21:24:25.211Z"
+  },
+  "ingestSource": "manual",
+  "pipeline": {
+    "research": {
+      "noveltyScore": 2,
+      "competingPackages": 11
+    },
+    "scorecard": {
+      "infrastructure": "fail",
+      "domain": 45
+    },
+    "agentReadiness": "fail"
+  },
+  "bundlerVersion": "0.1.1"
+}

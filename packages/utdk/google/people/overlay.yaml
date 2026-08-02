@@ -1,0 +1,23 @@
+# Spec enrichment overlay for google/people
+# Edit this file to add corrections, pagination hints, and auth hints.
+# This overlay is applied during regeneration to enrich the generated package.
+# Keys under 'descriptions', 'paginationHints', and 'authHints' are keyed by operationId.
+#
+# Example description correction:
+#   descriptions:
+#     listRepos: "List all repositories the authenticated user has access to."
+#
+# Example pagination hint:
+#   paginationHints:
+#     listRepos:
+#       type: cursor
+#       cursorParam: page
+#       limitParam: per_page
+#       resultsKey: items
+
+provider: google/people
+specUrl: https://api.apis.guru/v2/specs/googleapis.com/people/v1/openapi.json
+generatedAt: 2026-07-19T23:50:41.163Z
+descriptions: {}
+paginationHints: {}
+authHints: {}

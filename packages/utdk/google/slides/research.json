@@ -1,0 +1,104 @@
+{
+  "provider": "google/slides",
+  "generatedAt": "2026-07-19T23:50:01.840Z",
+  "noveltyScore": 6,
+  "npmPackages": [
+    {
+      "name": "pptxgenjs",
+      "version": "4.0.1",
+      "description": "Create JavaScript PowerPoint Presentations",
+      "category": "other"
+    },
+    {
+      "name": "@googleapis/slides",
+      "version": "5.0.1",
+      "description": "slides",
+      "category": "community-sdk"
+    },
+    {
+      "name": "reveal.js",
+      "version": "6.0.1",
+      "description": "The HTML Presentation Framework",
+      "category": "other"
+    },
+    {
+      "name": "asposeslidescloud",
+      "version": "26.6.0",
+      "description": "Aspose.Slides Cloud SDK for Node.js",
+      "category": "other"
+    },
+    {
+      "name": "@office-kit/pptx",
+      "version": "0.11.1",
+      "description": "Generate and edit .pptx (OOXML PresentationML) files from TypeScript, in Node and the browser.",
+      "category": "other"
+    },
+    {
+      "name": "pptx-automizer",
+      "version": "0.8.2",
+      "description": "A template based pptx generator",
+      "category": "other"
+    },
+    {
+      "name": "@maxim_mazurok/gapi.client.slides-v1",
+      "version": "0.2.20260713",
+      "description": "TypeScript typings for Google Slides API v1",
+      "category": "community-sdk"
+    },
+    {
+      "name": "@piotr-agier/google-drive-mcp",
+      "version": "2.5.0",
+      "description": "Google Drive MCP Server - Model Context Protocol server providing secure access to Google Drive, Docs, Sheets, and Slides through MCP clients e.g. Claude Desktop",
+      "category": "mcp-server"
+    },
+    {
+      "name": "mcp-proxy",
+      "version": "6.5.4",
+      "description": "A TypeScript SSE proxy for MCP servers that use stdio transport.",
+      "category": "mcp-server"
+    },
+    {
+      "name": "@modelcontextprotocol/sdk",
+      "version": "1.29.0",
+      "description": "Model Context Protocol implementation for TypeScript",
+      "category": "other"
+    },
+    {
+      "name": "@playwright/mcp",
+      "version": "0.0.78",
+      "description": "Playwright Tools for MCP",
+      "category": "mcp-server"
+    },
+    {
+      "name": "slides",
+      "version": "0.0.0",
+      "description": "Slideshow for geeks",
+      "category": "other"
+    },
+    {
+      "name": "@slidev/cli",
+      "version": "52.18.0",
+      "description": "Presentation slides for developers",
+      "category": "other"
+    },
+    {
+      "name": "@univerjs/slides",
+      "version": "0.25.1",
+      "description": "Core presentation model and services for Univer Slides.",
+      "category": "other"
+    },
+    {
+      "name": "@univerjs/slides-ui",
+      "version": "0.25.1",
+      "description": "Presentation editor UI layer for Univer Slides.",
+      "category": "other"
+    }
+  ],
+  "gapAnalysis": {
+    "hasOfficialSdk": false,
+    "hasCommunitySDK": true,
+    "hasTypeDefinitions": false,
+    "hasMcpServer": true,
+    "recommendation": "Community SDKs exist for google/slides. Evaluate them before generating; focus on filling gaps they do not cover. An MCP server already exists; differentiate by offering better type coverage."
+  }
+}

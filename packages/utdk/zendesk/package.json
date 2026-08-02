@@ -1,0 +1,44 @@
+{
+  "name": "@utdk/zendesk",
+  "version": "2.0.0-20260727.1",
+  "type": "module",
+  "description": "Generated UTDK provider client for Zendesk Support API. The Zendesk Support API lets you access, create, update, and delete help desk tickets (called 'tickets'), users, organizations, and groups. Build integrations that automate support workflows, sync customer data, and extend the Zendesk platform.",
+  "homepage": "https://developer.zendesk.com",
+  "keywords": [
+    "zendesk",
+    "generated",
+    "openapi",
+    "utdk"
+  ],
+  "license": "Apache 2.0",
+  "utdk": {
+    "provider": "zendesk",
+    "generation": 1,
+    "generatedAt": "2026-07-27T03:18:18.213Z",
+    "auth": {
+      "schemes": [
+        {
+          "id": "BearerAuth",
+          "type": "http",
+          "description": "Zendesk API token in format 'email@example.com/token:{api_token}' encoded as Bearer token, or OAuth 2.0 access token",
+          "scheme": "bearer"
+        }
+      ],
+      "operationOverrides": {}
+    },
+    "openapi": {
+      "title": "Zendesk Support API",
+      "url": "repo://data/openapi/zendesk.json",
+      "version": "2.0.0",
+      "termsOfService": null,
+      "icon": "https://d1eipm3vz40hy0.cloudfront.net/images/logos/zendesk-logo.svg"
+    },
+    "provenance": {
+      "source": "composio",
+      "originDomain": "developer.zendesk.com"
+    },
+    "branding": {
+      "site": "https://developer.zendesk.com"
+    }
+  }
+}

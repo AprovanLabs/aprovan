@@ -1,0 +1,43 @@
+{
+  "name": "@utdk/posthog",
+  "version": "1.0.0-20260712.5",
+  "type": "module",
+  "description": "Generated UTDK provider client for PostHog API. Generated UTDK provider types and OpenAPI-backed client for https://us.posthog.com/api/schema/.",
+  "homepage": "https://us.posthog.com/api/schema/",
+  "keywords": [
+    "posthog",
+    "generated",
+    "openapi",
+    "utdk"
+  ],
+  "utdk": {
+    "provider": "posthog",
+    "generation": 5,
+    "generatedAt": "2026-07-12T21:26:44.549Z",
+    "auth": {
+      "schemes": [
+        {
+          "id": "PersonalAPIKeyAuth",
+          "type": "http",
+          "scheme": "bearer"
+        }
+      ],
+      "operationOverrides": {}
+    },
+    "openapi": {
+      "title": "PostHog API",
+      "url": "https://us.posthog.com/api/schema/",
+      "version": "1.0.0",
+      "termsOfService": null
+    },
+    "docs": {
+      "manifestPath": "/Users/jacob/Documents/Code/AprovanLabs/registry/.registry/posthog/manifest.json",
+      "indexPath": "/Users/jacob/Documents/Code/AprovanLabs/registry/.registry/posthog/index.md",
+      "docsPath": "/Users/jacob/Documents/Code/AprovanLabs/registry/packages/utdk/posthog/docs",
+      "generatedAt": "2026-07-12T21:26:44.534Z",
+      "sourceCount": 1,
+      "openApiHash": "07bcb085c8cc4650bbb32f753e534b111653f19687be6df2642bda5c1ec899c7",
+      "promptHash": "8c3694991a4c289225f05a4e8f1e098cc74d085a088d7dffd82f00d93797b7f8"
+    }
+  }
+}

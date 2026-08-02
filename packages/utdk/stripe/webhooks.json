@@ -1,0 +1,71 @@
+{
+  "provider": "stripe",
+  "generatedAt": "2026-07-20T00:08:55.595Z",
+  "sourceHash": "c6a3248fe09b4abbb913b0bd59d2111dfcd10d653c98bd8c653666b69045f5e4",
+  "model": "zai-org/GLM-5.2",
+  "webhooks": {
+    "supported": true,
+    "summary": "Stripe exposes a webhook endpoint management API under /v1/webhook_endpoints that lets you register, list, retrieve, update, and delete outbound webhook endpoints. Endpoints require a url and an enabled_events list, and optionally a connect flag to receive events from all connected accounts. The OpenAPI content provided does not enumerate specific event names, signature headers, or verification schemes.",
+    "configMethods": [
+      "api",
+      "console"
+    ],
+    "events": [],
+    "managementEndpoints": [
+      {
+        "method": "POST",
+        "path": "/v1/webhook_endpoints",
+        "description": "Create a webhook endpoint; requires url and enabled_events, optional connect"
+      },
+      {
+        "method": "GET",
+        "path": "/v1/webhook_endpoints",
+        "description": "List all webhook endpoints"
+      },
+      {
+        "method": "GET",
+        "path": "/v1/webhook_endpoints/{webhook_endpoint}",
+        "description": "Retrieve a webhook endpoint by ID"
+      },
+      {
+        "method": "POST",
+        "path": "/v1/webhook_endpoints/{webhook_endpoint}",
+        "description": "Update url, enabled_events, or status of a webhook endpoint"
+      },
+      {
+        "method": "DELETE",
+        "path": "/v1/webhook_endpoints/{webhook_endpoint}",
+        "description": "Delete a webhook endpoint"
+      }
+    ],
+    "signature": {
+      "header": null,
+      "scheme": null,
+      "detail": "The supplied OpenAPI content does not specify a signature header or verification scheme."
+    },
+    "payloadFormat": null,
+    "docsUrl": "https://stripe.com/docs/api",
+    "setupSteps": [
+      {
+        "title": "Obtain the registry inbound hook URL",
+        "detail": "In the package registry workspace, copy the stable inbound hook URL that will receive Stripe events."
+      },
+      {
+        "title": "Decide account vs Connect scope",
+        "detail": "Choose whether to receive account events only (connect=false or omitted) or events from all connected accounts (connect=true)."
+      },
+      {
+        "title": "Select event types for enabled_events",
+        "detail": "Prepare the list of enabled_events to subscribe to; the provided OpenAPI does not enumerate the available event names, so consult Stripe's event reference for the exact identifiers."
+      },
+      {
+        "title": "Create the webhook endpoint via the Stripe API",
+        "detail": "POST /v1/webhook_endpoints with body fields url=<registry inbound hook URL>, enabled_events=[...], and optionally connect=true|false. Store the returned endpoint ID and signing secret for later verification."
+      },
+      {
+        "title": "Confirm registration",
+        "detail": "GET /v1/webhook_endpoints (or GET /v1/webhook_endpoints/{id}) to verify the endpoint is active and points at the registry hook URL. The Stripe dashboard webhooks area at https://dashboard.stripe.com/account/webhooks can also be used to register the hook URL instead of the API."
+      }
+    ]
+  }
+}

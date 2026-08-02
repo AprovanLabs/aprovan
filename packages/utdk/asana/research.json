@@ -1,0 +1,80 @@
+{
+  "provider": "asana",
+  "generatedAt": "2026-05-30T22:05:32.076Z",
+  "noveltyScore": 4,
+  "npmPackages": [
+    {
+      "name": "@pliancy/asana-sdk",
+      "version": "1.1.1",
+      "description": "Wrapper around the Asana node SDK",
+      "category": "community-sdk"
+    },
+    {
+      "name": "asana",
+      "version": "3.1.11",
+      "description": "This_is_the_interface_for_interacting_with_the__Asana_Platform_httpsdevelopers_asana_com__Our_API_reference_is_generated_from_our__OpenAPI_spec__httpsraw_githubusercontent_comAsanaopenapimasterdefsasana_oas_yaml_",
+      "category": "other"
+    },
+    {
+      "name": "@types/asana",
+      "version": "0.18.17",
+      "description": "TypeScript definitions for asana",
+      "category": "types"
+    },
+    {
+      "name": "@types/react-dom",
+      "version": "19.2.3",
+      "description": "TypeScript definitions for react-dom",
+      "category": "types"
+    },
+    {
+      "name": "asana-phrase",
+      "version": "0.0.8",
+      "description": "Random error phrase generator used by Asana",
+      "category": "other"
+    },
+    {
+      "name": "@types/react",
+      "version": "19.2.15",
+      "description": "TypeScript definitions for react",
+      "category": "types"
+    },
+    {
+      "name": "@types/sax",
+      "version": "1.2.7",
+      "description": "TypeScript definitions for sax",
+      "category": "types"
+    },
+    {
+      "name": "@types/jest",
+      "version": "30.0.0",
+      "description": "TypeScript definitions for jest",
+      "category": "types"
+    },
+    {
+      "name": "@roychri/mcp-server-asana",
+      "version": "1.8.0",
+      "description": "MCP Server for Asana",
+      "category": "mcp-server"
+    },
+    {
+      "name": "@cristip73/mcp-server-asana",
+      "version": "2.0.0",
+      "description": "MCP Server for Asana API",
+      "category": "mcp-server"
+    },
+    {
+      "name": "@panchopoliti/mcp-server-asana",
+      "version": "1.8.8",
+      "description": "MCP Server for Asana (fork with transaction logging, rollback, and safety guards)",
+      "category": "mcp-server"
+    }
+  ],
+  "gapAnalysis": {
+    "hasOfficialSdk": false,
+    "hasCommunitySDK": true,
+    "hasTypeDefinitions": true,
+    "hasMcpServer": true,
+    "recommendation": "Community SDKs exist for asana. Evaluate them before generating; focus on filling gaps they do not cover. An MCP server already exists; differentiate by offering better type coverage."
+  }
+}

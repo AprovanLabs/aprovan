@@ -1,0 +1,24 @@
+{
+  "provider": "hubspot",
+  "generatedAt": "2026-05-30T22:05:43.102Z",
+  "generation": 2,
+  "source": {
+    "type": "openapi",
+    "url": "https://raw.githubusercontent.com/HubSpot/HubSpot-public-api-spec-collection/main/PublicApiSpecs/CRM/Contacts/Rollouts/424/v3/contacts.json",
+    "hash": "sha256:42f4fa952ef515822dd0e7ac7b8242c82599e41b38a6dee250b9cc58a07b0998",
+    "fetchedAt": "2026-05-30T22:05:43.102Z"
+  },
+  "ingestSource": "printing-press",
+  "pipeline": {
+    "research": {
+      "noveltyScore": 2,
+      "competingPackages": 15
+    },
+    "scorecard": {
+      "infrastructure": "fail",
+      "domain": 100
+    },
+    "agentReadiness": "pass"
+  },
+  "bundlerVersion": "0.1.1"
+}

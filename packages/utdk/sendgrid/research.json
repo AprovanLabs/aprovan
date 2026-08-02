@@ -1,0 +1,74 @@
+{
+  "provider": "sendgrid",
+  "generatedAt": "2026-05-30T12:25:58.835Z",
+  "noveltyScore": 2,
+  "npmPackages": [
+    {
+      "name": "@sendgrid/helpers",
+      "version": "8.0.0",
+      "description": "Twilio SendGrid NodeJS internal helpers",
+      "category": "official-sdk"
+    },
+    {
+      "name": "@sendgrid/mail",
+      "version": "8.1.6",
+      "description": "Twilio SendGrid NodeJS mail service",
+      "category": "official-sdk"
+    },
+    {
+      "name": "@sendgrid/client",
+      "version": "8.1.6",
+      "description": "Twilio SendGrid NodeJS API client",
+      "category": "official-sdk"
+    },
+    {
+      "name": "sendgrid-rest",
+      "version": "2.6.1",
+      "description": "HTTP REST client, simplified for Node.js.",
+      "category": "other"
+    },
+    {
+      "name": "smtpapi",
+      "version": "1.4.7",
+      "description": "Build SendGrid X-SMTPAPI headers in nodejs.",
+      "category": "other"
+    },
+    {
+      "name": "@types/nodemailer-sendgrid",
+      "version": "1.0.3",
+      "description": "TypeScript definitions for nodemailer-sendgrid",
+      "category": "types"
+    },
+    {
+      "name": "mcp-proxy",
+      "version": "6.5.1",
+      "description": "A TypeScript SSE proxy for MCP servers that use stdio transport.",
+      "category": "mcp-server"
+    },
+    {
+      "name": "cloudflare",
+      "version": "6.3.0",
+      "description": "The official TypeScript library for the Cloudflare API",
+      "category": "other"
+    },
+    {
+      "name": "nodemailer-sendgrid",
+      "version": "1.0.3",
+      "description": "SendGrid transport object for Nodemailer.",
+      "category": "other"
+    },
+    {
+      "name": "@sendgrid/eventwebhook",
+      "version": "8.0.0",
+      "description": "Twilio SendGrid NodeJS Event Webhook",
+      "category": "official-sdk"
+    }
+  ],
+  "gapAnalysis": {
+    "hasOfficialSdk": true,
+    "hasCommunitySDK": false,
+    "hasTypeDefinitions": true,
+    "hasMcpServer": true,
+    "recommendation": "An official SDK exists for sendgrid. Consider wrapping it or focusing on gaps it does not cover. An MCP server already exists; differentiate by offering better type coverage."
+  }
+}

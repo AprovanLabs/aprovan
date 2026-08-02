@@ -1,5 +1,5 @@
 {
-  "extends": "@aprovan/tsconfig/react.json",
+  "extends": "../../config/tsconfig/react.json",
   "compilerOptions": {
     "target": "ES2020",
     "useDefineForClassFields": true,

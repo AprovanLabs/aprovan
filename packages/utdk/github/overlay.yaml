@@ -1,0 +1,180 @@
+# Spec enrichment overlay for github
+# Edit this file to add corrections, pagination hints, and auth hints.
+# This overlay is applied during regeneration to enrich the generated package.
+# Keys under 'descriptions', 'paginationHints', and 'authHints' are keyed by operationId.
+#
+# GitHub REST API uses page-based pagination with RFC 5988 Link headers.
+# Each paginated response includes a `Link` header of the form:
+#   Link: <https://api.github.com/...?page=2>; rel="next", <...>; rel="last"
+# Consumers should follow the `rel="next"` URL until it is absent.
+# Reference: https://docs.github.com/en/rest/using-the-rest-api/using-pagination-in-the-rest-api
+
+provider: github
+specUrl: >-
+  https://raw.githubusercontent.com/github/rest-api-description/main/descriptions/api.github.com/api.github.com.json
+generatedAt: "2026-05-30T00:00:00.000Z"
+descriptions: {}
+authHints: {}
+
+paginationHints:
+  # ── Repositories ──────────────────────────────────────────────────────────
+  repos/list-for-authenticated-user:
+    type: page
+    pageParam: page
+    limitParam: per_page
+    linkHeader: true
+
+  repos/list-for-user:
+    type: page
+    pageParam: page
+    limitParam: per_page
+    linkHeader: true
+
+  repos/list-for-org:
+    type: page
+    pageParam: page
+    limitParam: per_page
+    linkHeader: true
+
+  repos/list-public:
+    type: page
+    pageParam: page
+    limitParam: per_page
+    linkHeader: true
+
+  # ── Issues ────────────────────────────────────────────────────────────────
+  issues/list:
+    type: page
+    pageParam: page
+    limitParam: per_page
+    linkHeader: true
+
+  issues/list-for-repo:
+    type: page
+    pageParam: page
+    limitParam: per_page
+    linkHeader: true
+
+  issues/list-for-authenticated-user:
+    type: page
+    pageParam: page
+    limitParam: per_page
+    linkHeader: true
+
+  # ── Pull Requests ─────────────────────────────────────────────────────────
+  pulls/list:
+    type: page
+    pageParam: page
+    limitParam: per_page
+    linkHeader: true
+
+  pulls/list-commits:
+    type: page
+    pageParam: page
+    limitParam: per_page
+    linkHeader: true
+
+  pulls/list-files:
+    type: page
+    pageParam: page
+    limitParam: per_page
+    linkHeader: true
+
+  # ── Commits ───────────────────────────────────────────────────────────────
+  repos/list-commits:
+    type: page
+    pageParam: page
+    limitParam: per_page
+    linkHeader: true
+
+  repos/list-contributors:
+    type: page
+    pageParam: page
+    limitParam: per_page
+    linkHeader: true
+
+  # ── Search ────────────────────────────────────────────────────────────────
+  # GitHub search uses offset-style pagination (page + per_page), but also
+  # signals truncation via the `incomplete_results` response field.
+  search/repos:
+    type: page
+    pageParam: page
+    limitParam: per_page
+    resultsKey: items
+    linkHeader: true
+
+  search/issues-and-pull-requests:
+    type: page
+    pageParam: page
+    limitParam: per_page
+    resultsKey: items
+    linkHeader: true
+
+  search/commits:
+    type: page
+    pageParam: page
+    limitParam: per_page
+    resultsKey: items
+    linkHeader: true
+
+  search/users:
+    type: page
+    pageParam: page
+    limitParam: per_page
+    resultsKey: items
+    linkHeader: true
+
+  search/code:
+    type: page
+    pageParam: page
+    limitParam: per_page
+    resultsKey: items
+    linkHeader: true
+
+  # ── Actions ───────────────────────────────────────────────────────────────
+  actions/list-workflow-runs-for-repo:
+    type: page
+    pageParam: page
+    limitParam: per_page
+    resultsKey: workflow_runs
+    linkHeader: true
+
+  actions/list-jobs-for-workflow-run:
+    type: page
+    pageParam: page
+    limitParam: per_page
+    resultsKey: jobs
+    linkHeader: true
+
+  actions/list-artifacts-for-repo:
+    type: page
+    pageParam: page
+    limitParam: per_page
+    resultsKey: artifacts
+    linkHeader: true
+
+  # ── Users / Orgs ──────────────────────────────────────────────────────────
+  orgs/list-members:
+    type: page
+    pageParam: page
+    limitParam: per_page
+    linkHeader: true
+
+  orgs/list-for-authenticated-user:
+    type: page
+    pageParam: page
+    limitParam: per_page
+    linkHeader: true
+
+  users/list:
+    type: page
+    pageParam: since
+    limitParam: per_page
+    linkHeader: true
+
+  # ── Notifications ─────────────────────────────────────────────────────────
+  activity/list-notifications-for-authenticated-user:
+    type: page
+    pageParam: page
+    limitParam: per_page
+    linkHeader: true

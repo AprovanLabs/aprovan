@@ -1,0 +1,57 @@
+{
+  "provider": "elevenlabs",
+  "generatedAt": "2026-07-20T00:07:54.510Z",
+  "sourceHash": "58173f740d5878c3569246366c39832c65ddaf49d1cd63158f3c79daba1ba9d1",
+  "model": "zai-org/GLM-5.2",
+  "webhooks": {
+    "supported": true,
+    "summary": "ElevenLabs supports webhooks via a Workspace Webhooks API, allowing you to create, list, update, and delete webhook configurations. However, the provided OpenAPI content does not specify the supported event names, signature headers, or detailed verification schemes.",
+    "configMethods": [
+      "api"
+    ],
+    "events": [],
+    "managementEndpoints": [
+      {
+        "method": "GET",
+        "path": "/v1/workspace/webhooks",
+        "description": "List all webhooks for a workspace"
+      },
+      {
+        "method": "POST",
+        "path": "/v1/workspace/webhooks",
+        "description": "Create a new webhook for the workspace with the specified authentication type."
+      },
+      {
+        "method": "PATCH",
+        "path": "/v1/workspace/webhooks/{webhook_id}",
+        "description": "Update the specified workspace webhook"
+      },
+      {
+        "method": "DELETE",
+        "path": "/v1/workspace/webhooks/{webhook_id}",
+        "description": "Delete the specified workspace webhook"
+      }
+    ],
+    "signature": {
+      "header": null,
+      "scheme": null,
+      "detail": "The OpenAPI content indicates that webhooks can be created with a 'specified authentication type', but does not detail the signature headers or verification schemes."
+    },
+    "payloadFormat": "not_specified",
+    "docsUrl": null,
+    "setupSteps": [
+      {
+        "title": "Obtain API Key",
+        "detail": "Retrieve your ElevenLabs API key from the dashboard at https://elevenlabs.io/app/settings/api-keys."
+      },
+      {
+        "title": "Prepare Webhook URL",
+        "detail": "Have the stable inbound hook URL (provided by your registry workspace) ready to receive events."
+      },
+      {
+        "title": "Register the Hook URL",
+        "detail": "Send a POST request to the /v1/workspace/webhooks endpoint to register the hook URL in the ElevenLabs webhooks area, specifying your URL and the chosen authentication type."
+      }
+    ]
+  }
+}

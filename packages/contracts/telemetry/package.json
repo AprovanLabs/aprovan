@@ -1,0 +1,38 @@
+{
+  "name": "@utdk/telemetry",
+  "version": "0.2.0",
+  "type": "module",
+  "description": "Shared telemetry-export contract for UTDK observability providers: one export operation over the OTLP/HTTP JSON encoding for spans and logs, with aprovan.* attribution helpers",
+  "keywords": [
+    "telemetry",
+    "otlp",
+    "spans",
+    "logs",
+    "utdk"
+  ],
+  "utdk": {
+    "contract": "telemetry",
+    "handwritten": true
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check-types": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "clean": "rm -rf dist",
+    "test": "vitest run"
+  },
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "vitest": "2.1.5"
+  }
+}

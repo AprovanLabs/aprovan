@@ -1,0 +1,104 @@
+{
+  "provider": "discord",
+  "generatedAt": "2026-05-30T18:15:59.043Z",
+  "noveltyScore": 4,
+  "npmPackages": [
+    {
+      "name": "discord-sdk",
+      "version": "1.0.0",
+      "description": "",
+      "category": "community-sdk"
+    },
+    {
+      "name": "@collabland/discord",
+      "version": "0.30.4",
+      "description": "CollabLand Discord SDK",
+      "category": "other"
+    },
+    {
+      "name": "@osiris-ai/discord-sdk",
+      "version": "0.1.2",
+      "description": "Osiris Discord SDK",
+      "category": "community-sdk"
+    },
+    {
+      "name": "@microfox/discord",
+      "version": "1.4.0",
+      "description": "Discord SDK for Microfox",
+      "category": "other"
+    },
+    {
+      "name": "loopbot-discord-sdk",
+      "version": "1.0.7",
+      "description": "Official Loop Discord SDK - Build Discord bots without websockets",
+      "category": "community-sdk"
+    },
+    {
+      "name": "@types/discord-rpc",
+      "version": "4.0.10",
+      "description": "TypeScript definitions for discord-rpc",
+      "category": "types"
+    },
+    {
+      "name": "discord-api-types",
+      "version": "0.38.48",
+      "description": "Discord API typings that are kept up to date for use in bot library creation.",
+      "category": "community-sdk"
+    },
+    {
+      "name": "@discordjs/rest",
+      "version": "2.6.1",
+      "description": "The REST API for discord.js",
+      "category": "other"
+    },
+    {
+      "name": "zustand",
+      "version": "5.0.14",
+      "description": "🐻 Bear necessities for state management in React",
+      "category": "other"
+    },
+    {
+      "name": "@scalar/openapi-types",
+      "version": "0.9.0",
+      "description": "Modern OpenAPI types",
+      "category": "other"
+    },
+    {
+      "name": "mcp-server-discord",
+      "version": "1.2.8",
+      "description": "[![smithery badge](https://smithery.ai/badge/@barryyip0625/mcp-discord)](https://smithery.ai/server/@barryyip0625/mcp-discord) ![](https://badge.mcpx.dev?type=server 'MCP Server')",
+      "category": "mcp-server"
+    },
+    {
+      "name": "@mcp-ui/client",
+      "version": "7.1.1",
+      "description": "mcp-ui Client SDK",
+      "category": "mcp-server"
+    },
+    {
+      "name": "@mcp-ui/server",
+      "version": "6.1.0",
+      "description": "mcp-ui Server SDK",
+      "category": "mcp-server"
+    },
+    {
+      "name": "prisma",
+      "version": "7.8.0",
+      "description": "Prisma is an open-source database toolkit. It includes a JavaScript/TypeScript ORM for Node.js, migrations and a modern GUI to view and edit the data in your database. You can use Prisma in new projects or add it to an existing one.",
+      "category": "other"
+    },
+    {
+      "name": "playwright",
+      "version": "1.60.0",
+      "description": "A high-level API to automate web browsers",
+      "category": "other"
+    }
+  ],
+  "gapAnalysis": {
+    "hasOfficialSdk": false,
+    "hasCommunitySDK": true,
+    "hasTypeDefinitions": true,
+    "hasMcpServer": true,
+    "recommendation": "Community SDKs exist for discord. Evaluate them before generating; focus on filling gaps they do not cover. An MCP server already exists; differentiate by offering better type coverage."
+  }
+}

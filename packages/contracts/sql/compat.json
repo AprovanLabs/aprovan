@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "interface": {
+    "id": "sql",
+    "label": "SQL",
+    "description": "Uniform SQL queries over relational backends; scripts call sql.query({ sql, params }). Each backend is a handwritten UTDK provider module built on @utdk/sql. Secrets live in the provider credential (Snowflake/Databricks token, Postgres connection string); connection config (account, host, warehouse_id, database) rides the binding options.",
+    "timeoutMs": 60000,
+    "defaultsFor": ["query"]
+  },
+  "compat": [
+    { "provider": "postgres", "label": "PostgreSQL", "module": "postgres" },
+    { "provider": "snowflake", "label": "Snowflake", "module": "snowflake" },
+    { "provider": "databricks", "label": "Databricks", "module": "databricks" }
+  ]
+}

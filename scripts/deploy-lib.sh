@@ -1,8 +1,8 @@
 # shellcheck shell=bash
-# Shared helpers for the patchwork deploy scripts.
+# Shared helpers for the registry deploy scripts.
 #
-# Sourced by deploy-web.sh / deploy.sh so the same logic runs locally (using an
-# AWS_PROFILE) and in GitHub Actions (using OIDC credentials).
+# Sourced by deploy-web.sh / deploy-infra.sh / deploy.sh so the same logic runs
+# locally (using an AWS_PROFILE) and in GitHub Actions (using OIDC credentials).
 #
 # Configuration resolves in this order for every value: explicit environment
 # variable → SSM parameter published by the core infra → hard default. That lets
@@ -11,10 +11,10 @@
 set -euo pipefail
 
 # --- Environment ------------------------------------------------------------
-# Deployment environment (matches core CDK naming, e.g. "prd").
+# Deployment environment (matches core/registry CDK naming, e.g. "prd").
 ENVIRONMENT="${ENVIRONMENT:-prd}"
 
-# Region of the shared identity SSM param (regional core stack).
+# Region of the registry gateway stack / shared identity SSM param (regional).
 AWS_REGION="${AWS_REGION:-us-east-2}"
 
 # Region of the shared aprovan.com web bucket + CloudFront (a global us-east-1
@@ -23,9 +23,9 @@ WEB_REGION="${WEB_REGION:-us-east-1}"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-log() { printf '\033[1;34m[patchwork-deploy]\033[0m %s\n' "$*"; }
+log() { printf '\033[1;34m[registry-deploy]\033[0m %s\n' "$*"; }
 die() {
-  printf '\033[1;31m[patchwork-deploy] error:\033[0m %s\n' "$*" >&2
+  printf '\033[1;31m[registry-deploy] error:\033[0m %s\n' "$*" >&2
   exit 1
 }
 

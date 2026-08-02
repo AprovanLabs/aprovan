@@ -1,0 +1,128 @@
+{
+  "provider": "google/youtube",
+  "generatedAt": "2026-07-19T23:51:47.667Z",
+  "noveltyScore": 4,
+  "npmPackages": [
+    {
+      "name": "youtube-sdk",
+      "version": "0.2.0",
+      "description": "Youtube Data API Driver for NodeJS",
+      "category": "community-sdk"
+    },
+    {
+      "name": "react-native-youtube-sdk",
+      "version": "1.0.12",
+      "description": "YouTube SDK for react native",
+      "category": "community-sdk"
+    },
+    {
+      "name": "@microfox/youtube",
+      "version": "4.0.0",
+      "description": "YouTube SDK for Microfox",
+      "category": "other"
+    },
+    {
+      "name": "@microfox/youtube-sdk",
+      "version": "1.0.2",
+      "description": "YouTube SDK for Microfox",
+      "category": "community-sdk"
+    },
+    {
+      "name": "@bison.digital/youtube-sdk",
+      "version": "1.0.1",
+      "description": "Generated TypeScript SDK for YouTube Data API v3 with Live Chat support",
+      "category": "community-sdk"
+    },
+    {
+      "name": "@types/youtube",
+      "version": "0.3.0",
+      "description": "TypeScript definitions for youtube",
+      "category": "types"
+    },
+    {
+      "name": "@types/youtube-player",
+      "version": "5.5.11",
+      "description": "TypeScript definitions for youtube-player",
+      "category": "types"
+    },
+    {
+      "name": "@types/youtube-dl",
+      "version": "3.0.5",
+      "description": "TypeScript definitions for youtube-dl",
+      "category": "types"
+    },
+    {
+      "name": "@types/youtube-captions-scraper",
+      "version": "1.0.0",
+      "description": "TypeScript definitions for youtube-captions-scraper",
+      "category": "types"
+    },
+    {
+      "name": "remark-directive",
+      "version": "4.0.0",
+      "description": "remark plugin to support directives",
+      "category": "other"
+    },
+    {
+      "name": "mcp-server-youtube",
+      "version": "0.0.1",
+      "description": "MCP server for youtube API integration",
+      "category": "mcp-server"
+    },
+    {
+      "name": "@kimtaeyoon83/mcp-server-youtube-transcript",
+      "version": "0.1.1",
+      "description": "This is an MCP server that allows you to directly download transcripts of YouTube videos.",
+      "category": "mcp-server"
+    },
+    {
+      "name": "@deepsrt/deepsrt-mcp",
+      "version": "0.1.9",
+      "description": "DeepSRT MCP Server - YouTube video summarization and transcript extraction",
+      "category": "mcp-server"
+    },
+    {
+      "name": "@jordanchoi/mcp-server-youtube-transcript",
+      "version": "0.3.0",
+      "description": "MCP server that returns YouTube video transcripts via yt-dlp, with SponsorBlock-based ad filtering and per-sentence timestamps. Forked from @kimtaeyoon83/mcp-server-youtube-transcript.",
+      "category": "mcp-server"
+    },
+    {
+      "name": "@iflow-mcp/deepsrt-deepsrt-mcp",
+      "version": "0.1.10",
+      "description": "DeepSRT MCP Server - YouTube video summarization and transcript extraction",
+      "category": "mcp-server"
+    },
+    {
+      "name": "youtube",
+      "version": "0.1.0",
+      "description": "YouTube upload API",
+      "category": "other"
+    },
+    {
+      "name": "youtube-player",
+      "version": "5.6.0",
+      "description": "YouTube IFrame Player API abstraction.",
+      "category": "other"
+    },
+    {
+      "name": "react-youtube",
+      "version": "10.1.0",
+      "description": "React.js powered YouTube player component",
+      "category": "other"
+    },
+    {
+      "name": "@googleapis/youtube",
+      "version": "33.0.0",
+      "description": "youtube",
+      "category": "community-sdk"
+    }
+  ],
+  "gapAnalysis": {
+    "hasOfficialSdk": false,
+    "hasCommunitySDK": true,
+    "hasTypeDefinitions": true,
+    "hasMcpServer": true,
+    "recommendation": "Community SDKs exist for google/youtube. Evaluate them before generating; focus on filling gaps they do not cover. An MCP server already exists; differentiate by offering better type coverage."
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "interface": {
+    "id": "agent",
+    "label": "Agent runtime",
+    "description": "The agent loop itself: run/get/cancel against whichever runtime executes an agent's turns. Each backend is a handwritten UTDK provider module built on @utdk/agent. The default is the gateway's own in-process runner, which needs no credential; vendor runtimes (OpenAI Assistants, a relayed harness) are bound like any other implementation. Profiles, instruction layers, grants, mounts and entrypoints live in the `agents` core service — see docs/agent-interface.md.",
+    "timeoutMs": 900000,
+    "defaultsFor": ["run"]
+  },
+  "compat": [
+    {
+      "provider": "native",
+      "label": "Aprovan runner (in-process)",
+      "module": "native",
+      "credentialless": true
+    },
+    {
+      "provider": "openai",
+      "label": "OpenAI Assistants",
+      "module": "openai/assistants",
+      "unavailable": "The OpenAI Assistants adapter module is not built yet. The vendor surface exists (utdk/openai generates createThreadAndRun/getRun/cancelRun); the run/get/cancel mapping does not."
+    },
+    {
+      "provider": "harness",
+      "label": "Relayed harness",
+      "module": "harness",
+      "moduleSpecifier": "@aprovan/agent-host",
+      "unavailable": "@aprovan/agent-host is not built yet."
+    }
+  ]
+}

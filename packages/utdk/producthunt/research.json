@@ -1,0 +1,92 @@
+{
+  "provider": "producthunt",
+  "generatedAt": "2026-05-30T22:07:58.212Z",
+  "noveltyScore": 6,
+  "npmPackages": [
+    {
+      "name": "fdir",
+      "version": "6.5.0",
+      "description": "The fastest directory crawler & globbing alternative to glob, fast-glob, & tiny-glob. Crawls 1m files in < 1s",
+      "category": "other"
+    },
+    {
+      "name": "lingo.dev",
+      "version": "0.136.0",
+      "description": "Lingo.dev CLI",
+      "category": "other"
+    },
+    {
+      "name": "@types/chai-enzyme",
+      "version": "0.6.14",
+      "description": "TypeScript definitions for chai-enzyme",
+      "category": "types"
+    },
+    {
+      "name": "@aws-sdk/middleware-sdk-s3",
+      "version": "3.972.44",
+      "description": "[![NPM version](https://img.shields.io/npm/v/@aws-sdk/middleware-sdk-s3/latest.svg)](https://www.npmjs.com/package/@aws-sdk/middleware-sdk-s3) [![NPM downloads](https://img.shields.io/npm/dm/@aws-sdk/middleware-sdk-s3.svg)](https://www.npmjs.com/package/@",
+      "category": "other"
+    },
+    {
+      "name": "chai-enzyme",
+      "version": "1.0.0-beta.1",
+      "description": "Chai.js assertions for enzyme",
+      "category": "other"
+    },
+    {
+      "name": "undici-types",
+      "version": "8.3.0",
+      "description": "A stand-alone types package for Undici",
+      "category": "other"
+    },
+    {
+      "name": "mcp-proxy",
+      "version": "6.5.1",
+      "description": "A TypeScript SSE proxy for MCP servers that use stdio transport.",
+      "category": "mcp-server"
+    },
+    {
+      "name": "cloudflare",
+      "version": "6.3.0",
+      "description": "The official TypeScript library for the Cloudflare API",
+      "category": "other"
+    },
+    {
+      "name": "@modelcontextprotocol/sdk",
+      "version": "1.29.0",
+      "description": "Model Context Protocol implementation for TypeScript",
+      "category": "other"
+    },
+    {
+      "name": "producthunt",
+      "version": "0.3.0",
+      "description": "node.js wrapper for the Product Hunt API",
+      "category": "other"
+    },
+    {
+      "name": "@orbit-love/producthunt",
+      "version": "0.3.1",
+      "description": "Integrate Product Hunt votes into Orbit workspaces",
+      "category": "other"
+    },
+    {
+      "name": "@hyper.fun/tabler-brand-producthunt",
+      "version": "1.3.0",
+      "description": "👉  https://hyper.fun/c/tabler-brand-producthunt/1.3.0",
+      "category": "other"
+    },
+    {
+      "name": "phcli",
+      "version": "0.1.0",
+      "description": "ProductHunt as a command line tool",
+      "category": "other"
+    }
+  ],
+  "gapAnalysis": {
+    "hasOfficialSdk": false,
+    "hasCommunitySDK": false,
+    "hasTypeDefinitions": true,
+    "hasMcpServer": true,
+    "recommendation": "No existing TypeScript SDK found for producthunt. Generating from OpenAPI spec provides high value. An MCP server already exists; differentiate by offering better type coverage."
+  }
+}

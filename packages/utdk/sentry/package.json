@@ -1,0 +1,48 @@
+{
+  "name": "@utdk/sentry",
+  "version": "0.0.0-20260727.1",
+  "type": "module",
+  "description": "Generated UTDK provider client for API Reference. Sentry Public API",
+  "homepage": "https://docs.sentry.io",
+  "keywords": [
+    "sentry",
+    "generated",
+    "openapi",
+    "utdk"
+  ],
+  "license": "Apache 2.0",
+  "utdk": {
+    "provider": "sentry",
+    "generation": 1,
+    "generatedAt": "2026-07-27T03:15:33.220Z",
+    "auth": {
+      "schemes": [
+        {
+          "id": "auth_token",
+          "type": "http",
+          "scheme": "bearer"
+        },
+        {
+          "id": "dsn",
+          "type": "http",
+          "scheme": "DSN"
+        }
+      ],
+      "operationOverrides": {}
+    },
+    "openapi": {
+      "title": "API Reference",
+      "url": "https://raw.githubusercontent.com/getsentry/sentry-api-schema/main/openapi-derefed.json",
+      "version": "v0",
+      "termsOfService": "http://sentry.io/terms/"
+    },
+    "provenance": {
+      "source": "printing-press",
+      "originDomain": "docs.sentry.io",
+      "originSpecUrl": "https://raw.githubusercontent.com/getsentry/sentry-api-schema/main/openapi-derefed.json"
+    },
+    "branding": {
+      "site": "https://docs.sentry.io"
+    }
+  }
+}

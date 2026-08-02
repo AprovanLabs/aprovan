@@ -1,0 +1,122 @@
+{
+  "provider": "anthropic",
+  "generatedAt": "2026-07-18T05:49:26.077Z",
+  "noveltyScore": 6,
+  "npmPackages": [
+    {
+      "name": "@makaio/adapter-anthropic-sdk",
+      "version": "1.0.0-dev-1779051654000",
+      "description": "Anthropic SDK adapter using the official @anthropic-ai/sdk streaming API.",
+      "category": "community-sdk"
+    },
+    {
+      "name": "@aigne/anthropic",
+      "version": "0.14.16",
+      "description": "AIGNE Anthropic SDK for integrating with Claude AI models",
+      "category": "other"
+    },
+    {
+      "name": "@warlock.js/ai-anthropic",
+      "version": "4.7.0",
+      "description": "Anthropic SDK adapter for @warlock.js/ai",
+      "category": "other"
+    },
+    {
+      "name": "acptoapi",
+      "version": "1.0.157",
+      "description": "Anthropic SDK to multi-provider streaming bridge  - converts Anthropic message format and tool calls to Gemini, OpenAI-compatible APIs",
+      "category": "other"
+    },
+    {
+      "name": "@loomfsm/provider-anthropic-sdk",
+      "version": "0.3.9",
+      "description": "Direct Anthropic provider for loom — runs agents through the Anthropic SDK with prompt caching and idempotent spawns.",
+      "category": "community-sdk"
+    },
+    {
+      "name": "@ai-sdk/anthropic",
+      "version": "4.0.16",
+      "description": "The **[Anthropic provider](https://ai-sdk.dev/providers/ai-sdk-providers/anthropic)** for the [AI SDK](https://ai-sdk.dev/docs) contains language model support for the [Anthropic Messages API](https://docs.anthropic.com/claude/reference/messages_post).",
+      "category": "community-sdk"
+    },
+    {
+      "name": "@anthropic-ai/claude-code-linux-x64",
+      "version": "2.1.214",
+      "description": "Native binary for Claude Code on linux-x64",
+      "category": "other"
+    },
+    {
+      "name": "@anthropic-ai/sdk",
+      "version": "0.112.3",
+      "description": "The official TypeScript library for the Anthropic API",
+      "category": "community-sdk"
+    },
+    {
+      "name": "@adaline/anthropic",
+      "version": "1.14.1",
+      "description": "Adaline Anthropic",
+      "category": "other"
+    },
+    {
+      "name": "@anthropic-ai/claude-agent-sdk-linux-x64-musl",
+      "version": "0.3.214",
+      "description": "Native CLI binary for @anthropic-ai/claude-agent-sdk on linux-x64-musl",
+      "category": "community-sdk"
+    },
+    {
+      "name": "mcp-server-anthropic",
+      "version": "0.0.1",
+      "description": "MCP server for anthropic integration",
+      "category": "mcp-server"
+    },
+    {
+      "name": "mcp-proxy",
+      "version": "6.5.4",
+      "description": "A TypeScript SSE proxy for MCP servers that use stdio transport.",
+      "category": "mcp-server"
+    },
+    {
+      "name": "@anthropic-ai/sandbox-runtime",
+      "version": "0.0.66",
+      "description": "Anthropic Sandbox Runtime (ASRT) - A general-purpose tool for wrapping security boundaries around arbitrary processes",
+      "category": "other"
+    },
+    {
+      "name": "@langchain/mcp-adapters",
+      "version": "1.1.3",
+      "description": "LangChain.js adapters for Model Context Protocol (MCP)",
+      "category": "mcp-server"
+    },
+    {
+      "name": "@anthropic-ai/mcpb",
+      "version": "2.1.2",
+      "description": "Tools for building MCP Bundles",
+      "category": "mcp-server"
+    },
+    {
+      "name": "anthropic",
+      "version": "0.0.0",
+      "description": "",
+      "category": "other"
+    },
+    {
+      "name": "@traceloop/instrumentation-anthropic",
+      "version": "0.27.0",
+      "description": "Anthropic Instrumentaion",
+      "category": "other"
+    },
+    {
+      "name": "@langchain/anthropic",
+      "version": "1.5.1",
+      "description": "Anthropic integrations for LangChain.js",
+      "category": "other"
+    }
+  ],
+  "gapAnalysis": {
+    "hasOfficialSdk": false,
+    "hasCommunitySDK": true,
+    "hasTypeDefinitions": false,
+    "hasMcpServer": true,
+    "recommendation": "Community SDKs exist for anthropic. Evaluate them before generating; focus on filling gaps they do not cover. An MCP server already exists; differentiate by offering better type coverage."
+  }
+}

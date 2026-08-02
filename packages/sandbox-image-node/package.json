@@ -1,0 +1,78 @@
+{
+  "name": "@aprovan/sandbox-image-node",
+  "version": "0.1.0",
+  "description": "Sandbox image: Node.js 22 with npm and git — the reference descriptor for the Aprovan sandbox image system",
+  "keywords": [
+    "aprovan",
+    "sandbox",
+    "image",
+    "node"
+  ],
+  "license": "MIT",
+  "files": [
+    "package.json",
+    "PROMPT.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "sandbox": {
+    "platform": "linux/amd64",
+    "workdir": "/work",
+    "base": {
+      "fly/sprites": "managed",
+      "cloudflare/sandbox": "docker.io/cloudflare/sandbox:0.12.4",
+      "machine": {
+        "require": [
+          "node",
+          "npm",
+          "git"
+        ]
+      }
+    },
+    "tools": [
+      {
+        "name": "node",
+        "version": ">=22",
+        "check": "node --version",
+        "description": "Node.js runtime"
+      },
+      {
+        "name": "npm",
+        "version": ">=10",
+        "check": "npm --version",
+        "description": "Package installs"
+      },
+      {
+        "name": "npx",
+        "check": "npx --version",
+        "description": "One-off package execution"
+      },
+      {
+        "name": "git",
+        "check": "git --version",
+        "description": "Version control"
+      },
+      {
+        "name": "corepack",
+        "check": "corepack --version",
+        "description": "Enables pnpm/yarn: `corepack enable`"
+      }
+    ],
+    "namespaces": [
+      "vfs",
+      "keyvalue",
+      "telemetry"
+    ],
+    "env": {
+      "CI": "1",
+      "NPM_CONFIG_FUND": "false",
+      "NPM_CONFIG_AUDIT": "false"
+    },
+    "resources": {
+      "cpus": 2,
+      "memoryMb": 2048
+    },
+    "prompt": "./PROMPT.md"
+  }
+}

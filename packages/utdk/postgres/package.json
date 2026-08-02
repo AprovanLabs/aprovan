@@ -1,0 +1,22 @@
+{
+  "name": "@utdk/postgres",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "PostgreSQL provider: sql queries over the wire protocol. Credential: a bearer_token holding the connection string (postgres://user:pass@host:5432/db?sslmode=require).",
+  "keywords": ["postgres", "postgresql", "sql", "utdk"],
+  "utdk": {
+    "provider": "postgres",
+    "handwritten": true,
+    "interface": "sql",
+    "auth": {
+      "schemes": [
+        {
+          "id": "connection_string",
+          "type": "http",
+          "scheme": "bearer",
+          "description": "Connection string stored as the bearer token, e.g. postgres://user:pass@host:5432/db?sslmode=require"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "name": "@aprovan/registry-server",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "The Aprovan registry server — multi-tenant execution plane: profiles, credentials, provider dispatch, QuickJS sandbox, MCP surface. Embeddable library + standalone server.",
+  "license": "MIT",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./standalone": {
+      "types": "./dist/standalone.d.ts",
+      "import": "./dist/standalone.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check-types": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "start": "node dist/standalone.js",
+    "test": "vitest run",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13.7",
+    "@jitl/quickjs-wasmfile-debug-asyncify": "0.32.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.57.0",
+    "@opentelemetry/resources": "^1.30.0",
+    "@opentelemetry/sdk-trace-base": "^1.30.0",
+    "@opentelemetry/sdk-trace-node": "^1.30.0",
+    "@utdk/agent": "workspace:*",
+    "@utdk/common": "workspace:*",
+    "@utdk/llm": "workspace:*",
+    "@utdk/mcp-core": "workspace:*",
+    "better-sqlite3": "^12.11.1",
+    "hono": "^4.6.20",
+    "jose": "^5.9.6",
+    "quickjs-emscripten-core": "0.32.0",
+    "utdk": "workspace:*"
+  },
+  "optionalDependencies": {
+    "@aws-sdk/client-kms": "^3.1077.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^25.5.0",
+    "typescript": "^5.7.3",
+    "vitest": "2.1.5"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
