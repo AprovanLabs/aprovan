@@ -60,8 +60,8 @@ CDK_FLAGS=(--require-approval "${CDK_REQUIRE_APPROVAL:-never}")
 log "Deploying workspace infra (env=$ENVIRONMENT account=$CDK_DEFAULT_ACCOUNT region=$CDK_DEFAULT_REGION)"
 (
   cd "$REPO_ROOT"
-  # @aprovan/cdk must be built before infra/workspace tsc can resolve it.
-  pnpm --filter @aprovan/cdk... build
+  # Workspace CDK deps must be built before infra/workspace tsc can resolve them.
+  pnpm --filter @aprovan/cdk... --filter @aprovan/node... build
   pnpm --filter @aprovan/registry-infra build
   cd "$REPO_ROOT/infra/workspace"
   pnpm exec cdk deploy "${CDK_FLAGS[@]}"
