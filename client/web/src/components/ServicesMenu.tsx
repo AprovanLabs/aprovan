@@ -340,7 +340,7 @@ export function ServicesMenu({ services }: { services: ServiceInfo[] }) {
                   <GroupSection
                     key={ns}
                     icon={<Icon className="h-4 w-4 shrink-0 text-muted-foreground" />}
-                    title={ns}
+                    title={info?.label ?? ns}
                     subtitle={description}
                     badge={
                       <>

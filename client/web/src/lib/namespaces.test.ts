@@ -139,4 +139,22 @@ describe("namespaceLabel", () => {
     });
     expect(namespaceLabel("sql:analytics", undefined).label).toBe("Sql");
   });
+
+  it("shows Agent runtime for the agent interface, distinct from core Agents", () => {
+    const agentInterface = namespaceLabel("agent", {
+      id: "agent",
+      kind: "interface",
+      label: "Agent runtime",
+      description: "The agent loop itself",
+    });
+    const agentsCore = namespaceLabel("agents", {
+      id: "agents",
+      kind: "core",
+      label: "Agents",
+      description: "Profiles and grants",
+    });
+    expect(agentInterface.label).toBe("Agent runtime");
+    expect(agentsCore.label).toBe("Agents");
+    expect(agentInterface.label).not.toBe(agentsCore.label);
+  });
 });
