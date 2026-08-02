@@ -173,8 +173,10 @@ export default function ChatPage() {
     () => ({
       onOpenSession: (id: string) => void session.openSession(id),
       onOpenFile: (path: string) => tabs.openWorkspacePreview(path),
+      onOpenCredentials: (provider?: string) =>
+        tabs.openNativeTab("credentials", provider ? { provider } : undefined),
     }),
-    [session.openSession, tabs.openWorkspacePreview]
+    [session.openSession, tabs.openWorkspacePreview, tabs.openNativeTab]
   );
 
   return (
@@ -296,6 +298,9 @@ export default function ChatPage() {
                   openWorkspacePreview={tabs.openWorkspacePreview}
                   keepEditDrafts={editDraft.keepEditDrafts}
                   onKeepEditDraftsChange={editDraft.handleKeepEditDraftsChange}
+                  onOpenCredentials={(provider) =>
+                    tabs.openNativeTab("credentials", provider ? { provider } : undefined)
+                  }
                 />
               </div>
             </div>

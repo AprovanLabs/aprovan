@@ -9,7 +9,6 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { fetchLlmModels } from "@/lib/llm";
-import { credentialsUrl } from "@/lib/registry";
 import type { useSessionOrchestration } from "@/features/sessions/useSessionOrchestration";
 import { APROVAN_LOGO, MessageBubble } from "./MessageParts";
 import type { useChatProviders } from "./useChatSubmit";
@@ -169,6 +168,7 @@ export function ChatDock({
   openWorkspacePreview,
   keepEditDrafts,
   onKeepEditDraftsChange,
+  onOpenCredentials,
 }: {
   hasContentTab: boolean;
   layout: ChatDockLayoutApi;
@@ -184,6 +184,7 @@ export function ChatDock({
   openWorkspacePreview: (path: string) => void;
   keepEditDrafts: boolean;
   onKeepEditDraftsChange: (keep: boolean) => void;
+  onOpenCredentials?: (provider?: string) => void;
 }) {
   const { chatPanel, chatDragging, chatDockRef, toggleChatExpanded, resizeChatBy, startChatDrag } =
     layout;
@@ -401,14 +402,17 @@ export function ChatDock({
                 <span>
                   Chat requires an LLM provider credential. {providers.chatProviderLabel} is not
                   connected to this workspace —{" "}
-                  <a
-                    href={credentialsUrl(providers.chatProvider)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="underline hover:no-underline font-medium"
-                  >
-                    add a credential
-                  </a>{" "}
+                  {onOpenCredentials ? (
+                    <button
+                      type="button"
+                      onClick={() => onOpenCredentials(providers.chatProvider)}
+                      className="underline hover:no-underline font-medium"
+                    >
+                      add a credential
+                    </button>
+                  ) : (
+                    <span className="font-medium">add a credential</span>
+                  )}{" "}
                   or switch providers above.
                 </span>
               </div>
