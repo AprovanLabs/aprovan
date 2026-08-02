@@ -7,8 +7,6 @@ import {
   basename,
   join,
 } from "../vfs/core/utils.js";
-import { hashContent } from "../vfs/sync/differ.js";
-import { resolveConflict } from "../vfs/sync/resolver.js";
 import type {
   FileStats,
   DirEntry,
@@ -17,7 +15,6 @@ import type {
   SyncStatus,
   SyncEventType,
 } from "../vfs/core/types.js";
-import type { ConflictResolutionInput } from "../vfs/sync/resolver.js";
 
 describe("vfs/core/types", () => {
   describe("FileStats (via createFileStats)", () => {
@@ -151,109 +148,6 @@ describe("vfs/core/utils", () => {
 
     it("normalizes the result", () => {
       expect(join("foo/", "/bar")).toBe("foo/bar");
-    });
-  });
-});
-
-describe("vfs/sync/differ", () => {
-  describe("hashContent", () => {
-    it("produces deterministic hashes", () => {
-      expect(hashContent("hello")).toBe(hashContent("hello"));
-    });
-
-    it("produces different hashes for different content", () => {
-      expect(hashContent("hello")).not.toBe(hashContent("world"));
-    });
-
-    it("returns 8-character hex string", () => {
-      const hash = hashContent("test");
-      expect(hash).toMatch(/^[0-9a-f]{8}$/);
-    });
-
-    it("handles empty string", () => {
-      const hash = hashContent("");
-      expect(hash).toMatch(/^[0-9a-f]{8}$/);
-    });
-  });
-});
-
-describe("vfs/sync/resolver", () => {
-  describe("resolveConflict", () => {
-    const baseInput = {
-      path: "src/app.tsx",
-      changeMtime: new Date("2025-01-01T00:00:00Z"),
-      remoteMtime: new Date("2025-01-02T00:00:00Z"),
-      strategy: "local-wins" as ConflictStrategy,
-    };
-
-    it("returns null when remote is not newer", () => {
-      const input: ConflictResolutionInput = {
-        ...baseInput,
-        remoteMtime: new Date("2024-12-31T00:00:00Z"),
-      };
-      expect(resolveConflict(input)).toBeNull();
-    });
-
-    it("returns null when checksums match", () => {
-      const input: ConflictResolutionInput = {
-        ...baseInput,
-        localChecksum: "abc12345",
-        remoteChecksum: "abc12345",
-      };
-      expect(resolveConflict(input)).toBeNull();
-    });
-
-    it("resolves local-wins strategy", () => {
-      const result = resolveConflict(baseInput);
-      expect(result).not.toBeNull();
-      expect(result!.resolved).toBe("local");
-    });
-
-    it("resolves remote-wins strategy", () => {
-      const input: ConflictResolutionInput = {
-        ...baseInput,
-        strategy: "remote-wins",
-      };
-      const result = resolveConflict(input);
-      expect(result).not.toBeNull();
-      expect(result!.resolved).toBe("remote");
-    });
-
-    it("resolves newest-wins with remote newer", () => {
-      const input: ConflictResolutionInput = {
-        ...baseInput,
-        strategy: "newest-wins",
-      };
-      const result = resolveConflict(input);
-      expect(result).not.toBeNull();
-      expect(result!.resolved).toBe("remote");
-    });
-
-    it("returns null for newest-wins when local is newer", () => {
-      const input: ConflictResolutionInput = {
-        path: "src/app.tsx",
-        changeMtime: new Date("2025-01-03T00:00:00Z"),
-        remoteMtime: new Date("2025-01-02T00:00:00Z"),
-        strategy: "newest-wins",
-      };
-      expect(resolveConflict(input)).toBeNull();
-    });
-
-    it("leaves manual conflicts unresolved", () => {
-      const input: ConflictResolutionInput = {
-        ...baseInput,
-        strategy: "manual",
-      };
-      const result = resolveConflict(input);
-      expect(result).not.toBeNull();
-      expect(result!.resolved).toBeUndefined();
-    });
-
-    it("includes conflict metadata", () => {
-      const result = resolveConflict(baseInput);
-      expect(result!.path).toBe("src/app.tsx");
-      expect(result!.localMtime).toEqual(baseInput.changeMtime);
-      expect(result!.remoteMtime).toEqual(baseInput.remoteMtime);
     });
   });
 });

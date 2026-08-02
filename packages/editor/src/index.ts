@@ -3,13 +3,12 @@ export {
   buildEditMessages,
   type EditMessage,
 } from "./lib/edit-prompt";
-export { CodeBlockExtension } from "./components/CodeBlockExtension";
-export { CodePreview } from "./components/CodePreview";
+export { CodePreview, type WidgetVfs } from "./components/CodePreview";
 export { WidgetPreview } from "./components/WidgetPreview";
 export { MobileDrawer, type MobileDrawerProps } from "./components/MobileDrawer";
 export { MarkdownEditor } from "./components/MarkdownEditor";
 export { MarkdownPreview } from "./components/MarkdownPreview";
-export { ServicesInspector, type ServiceInfo } from "./components/ServicesInspector";
+export type { ServiceInfo } from "./components/ServicesInspector";
 
 // Edit components — intentional public API boundary (see components/edit/index.ts)
 export {
@@ -85,18 +84,6 @@ export {
   type DiffBlock,
   type ParsedEditResponse,
 } from "./lib/diff";
-
-export {
-  getVFSConfig,
-  getVFSStore,
-  saveProject,
-  loadProject,
-  listProjects,
-  saveFile,
-  isVFSAvailable,
-  httpWidgetVfs,
-  type WidgetVfs,
-} from "./lib/vfs";
 
 export { resolvePatchesInText } from "./lib/patch";
 

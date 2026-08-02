@@ -1,4 +1,3 @@
-import { Bobbin, serializeChangesToYAML, type Change } from '@aprovan/bobbin';
 import {
   Code,
   Eye,
@@ -10,7 +9,6 @@ import {
   Send,
   FolderTree,
   FileCode,
-  Wand2,
 } from 'lucide-react';
 import { useState, useCallback, useMemo, useRef, useEffect, type ReactNode } from 'react';
 import { MarkdownEditor } from '../MarkdownEditor';
@@ -103,8 +101,6 @@ export function EditModal({
   // as before).
   const [mobileTreeOpen, setMobileTreeOpen] = useState(false);
   const [editInput, setEditInput] = useState('');
-  const [bobbinChanges, setBobbinChanges] = useState<Change[]>([]);
-  const [previewContainer, setPreviewContainer] = useState<HTMLDivElement | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
@@ -137,24 +133,11 @@ export function EditModal({
   const isMarkdown = isMarkdownFile(session.activeFile);
   const showPreviewToggle = isCompilableFile || isMarkdown;
 
-  const handleBobbinChanges = useCallback((changes: Change[]) => {
-    setBobbinChanges(changes);
-  }, []);
-
   const handleSubmit = () => {
-    if ((!editInput.trim() && bobbinChanges.length === 0) || session.isApplying) return;
-    
-    // Convert bobbin changes to YAML context
-    let promptWithContext = editInput;
-    
-    if (bobbinChanges.length > 0) {
-      const bobbinYaml = serializeChangesToYAML(bobbinChanges, []);
-      promptWithContext = `${editInput}\n\n---\nVisual Changes (apply these styles/modifications):\n\`\`\`yaml\n${bobbinYaml}\n\`\`\``;
-    }
-    
-    session.submitEdit(promptWithContext);
+    if (!editInput.trim() || session.isApplying) return;
+
+    session.submitEdit(editInput);
     setEditInput('');
-    setBobbinChanges([]);
   };
 
   const hasSaveHandler = onSave || onSaveProject;
@@ -390,7 +373,7 @@ export function EditModal({
           )}
           <div className="flex-1 min-w-0 overflow-auto">
             {fileType.category === 'compilable' && showPreview ? (
-              <div className="bg-card h-full relative" ref={setPreviewContainer}>
+              <div className="bg-card h-full relative">
                 {previewError && renderError ? (
                   renderError(previewError)
                 ) : previewError ? (
@@ -408,15 +391,6 @@ export function EditModal({
                 ) : (
                   <div className="p-4" key={hashCode(code)}>{renderPreview(code)}</div>
                 )}
-                {/* Scoped to the preview surface — the widget it edits, not
-                    the modal chrome around it. */}
-                {!renderLoading && !renderError && !previewLoading && <Bobbin
-                  container={previewContainer}
-                  defaultActive={false}
-                  showInspector
-                  onChanges={handleBobbinChanges}
-                  exclude={['.bobbin-pill', '[data-bobbin]']}
-                />}
               </div>
             ) : fileType.category === 'compilable' && !showPreview ? (
               <CodeBlockView
@@ -481,25 +455,6 @@ export function EditModal({
           </div>
         )}
 
-        {bobbinChanges.length > 0 && (
-          <div className="px-4 py-2 border-t shrink-0 flex items-center gap-2 text-sm">
-            <span
-              className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 text-primary px-2.5 py-1 font-medium"
-              title="These direct edits will be sent with your next prompt"
-            >
-              <Wand2 className="h-3.5 w-3.5" />
-              <span className="tabular-nums">{bobbinChanges.length}</span>
-              visual change{bobbinChanges.length !== 1 ? 's' : ''} will be included
-            </span>
-            <button
-              onClick={() => setBobbinChanges([])}
-              className="ml-auto text-xs text-muted-foreground hover:text-foreground"
-            >
-              Clear
-            </button>
-          </div>
-        )}
-
         <div className="p-4 border-t bg-primary/5 shrink-0 space-y-2">
           {/* Host controls (LLM/model picker) sit with the composer, where
               their popovers have room to open upward. */}
@@ -516,7 +471,7 @@ export function EditModal({
           </div>
           <button
             onClick={handleSubmit}
-            disabled={(!editInput.trim() && bobbinChanges.length === 0) || session.isApplying}
+            disabled={!editInput.trim() || session.isApplying}
             className="px-3 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 flex items-center gap-1 shrink-0"
           >
             {session.isApplying ? (

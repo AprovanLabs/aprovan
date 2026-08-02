@@ -8,7 +8,6 @@ export default defineConfig({
   external: [
     "react",
     "react-dom",
-    "@aprovan/bobbin",
     "@aprovan/patchwork-compiler",
   ],
   treeshake: true,

@@ -17,7 +17,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@aprovan/bobbin": "workspace:*",
     "@aprovan/patchwork-compiler": "workspace:*",
     "@pierre/trees": "1.0.0-beta.5",
     "@tiptap/core": "^3.19.0",
