@@ -17,24 +17,24 @@
 
 > Depends-on: 1 | Touches: aprovan/client/web/src/components/panels/CredentialsPanel.tsx, aprovan/client/web/src/components/panels/AdminPermissionsPanel.tsx, aprovan/client/web/src/lib/registry.ts, aprovan/client/web/src/lib/credentials.ts, aprovan/client/web/src/components/ServicesMenu.tsx, aprovan/client/web/src/components/ProviderPicker.tsx, aprovan/client/web/src/components/SessionControls.tsx, aprovan/client/web/src/pages/ChatPage.tsx, aprovan/client/web/src/features/tabs/** | Verify: cd ~/Documents/Code/AprovanLabs/aprovan && pnpm --filter @aprovan/patchwork-web build
 
-- [x] 2.1 Replace CredentialsPanel / AdminPermissionsPanel guts with registry-ui widgets;
+- [ ] 2.1 Replace CredentialsPanel / AdminPermissionsPanel guts with registry-ui widgets;
       wire OAuth to existing `/chat/account/oauth-callback` — ux.md credentials/admin.
-- [x] 2.2 Replace `credentialsUrl()` navigations with `openNativeTab("credentials")` (+
+- [ ] 2.2 Replace `credentialsUrl()` navigations with `openNativeTab("credentials")` (+
       provider prefill); add chat deep-link URL helper for external stubs only — specs:
       credential-hosting.
-- [x] 2.3 Parse `?native=credentials|admin&provider=` on app boot to open the matching tab.
+- [ ] 2.3 Parse `?native=credentials|admin&provider=` on app boot to open the matching tab.
 
 ## 3. Registry catalog hosts (standalone + prod stubs)
 
 > Depends-on: 1 | Touches: registry/apps/registry/src/pages/account/**, registry/apps/registry/src/pages/admin/**, registry/apps/registry/src/components/MovedNotice.astro, registry/apps/registry/src/components/credentials/**, registry/apps/registry/src/components/shell/**, registry/apps/registry/src/components/AdminPanel.tsx | Verify: cd ~/Documents/Code/AprovanLabs/registry && pnpm --filter @aprovan/registry-site build
 
-- [ ] 3.1 Restore live `/account/credentials` and `/admin/permissions` pages that compose
+- [x] 3.1 Restore live `/account/credentials` and `/admin/permissions` pages that compose
       registry-ui widgets when `PUBLIC_ACCOUNT_HOST=local` (or equivalent) — specs:
       credential-hosting "Registry-standalone".
-- [ ] 3.2 Keep production stubs as MovedNotice; CTAs deep-link to
+- [x] 3.2 Keep production stubs as MovedNotice; CTAs deep-link to
       `https://aprovan.com/chat/?native=credentials` / `?native=admin` (+ provider when
       present) — specs: credential-hosting "Production catalog stubs".
-- [ ] 3.3 Remove duplicate local credential form sources once widgets are consumed; bump
+- [x] 3.3 Remove duplicate local credential form sources once widgets are consumed; bump
       `@aprovan/registry-ui` dep as needed.
 
 ## 4. Playground restore (registry + chat)
