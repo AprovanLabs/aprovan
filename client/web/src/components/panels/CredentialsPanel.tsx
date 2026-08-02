@@ -2,11 +2,11 @@
  * Credentials panel — workspace credential CRUD in the product app (ux.md).
  */
 
-import { KeyRound, Plus, Trash2 } from "lucide-react";
+import { KeyRound, Loader2, Plus, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import {
   PanelEmpty,
-  PanelError,
+  PanelErrorWithRetry,
   PanelLoading,
   PanelShell,
   type NativePanelProps,
@@ -20,6 +20,7 @@ import {
   addCredential,
   deleteCredential,
   listCredentials,
+  loadOAuthPending,
   type CredentialRecord,
 } from "@/lib/credentials";
 
@@ -38,10 +39,12 @@ export function CredentialsPanel(_props: NativePanelProps) {
   const [provider, setProvider] = useState("");
   const [token, setToken] = useState("");
   const [revoking, setRevoking] = useState<string | null>(null);
+  const [oauthPending, setOauthPending] = useState(loadOAuthPending());
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setOauthPending(loadOAuthPending());
     try {
       setRecords(await listCredentials());
     } catch (err) {
@@ -95,7 +98,7 @@ export function CredentialsPanel(_props: NativePanelProps) {
   if (error && !records) {
     return (
       <PanelShell icon={KeyRound} title="Credentials" description="Provider tokens for tool calls">
-        <PanelError message={error} />
+        <PanelErrorWithRetry message={error} onRetry={() => void load()} retrying={loading} />
       </PanelShell>
     );
   }
@@ -112,9 +115,27 @@ export function CredentialsPanel(_props: NativePanelProps) {
       }
       description="Provider tokens for tool calls"
       icon={KeyRound}
+      onRefresh={() => void load()}
+      refreshing={loading}
       title="Credentials"
     >
-      {error ? <PanelError message={error} /> : null}
+      {error ? (
+        <PanelErrorWithRetry message={error} onRetry={() => void load()} retrying={loading} />
+      ) : null}
+      {oauthPending ? (
+        <Card className="mb-4 border-dashed">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-sm">
+              <Loader2 className="size-4 animate-spin text-muted-foreground" />
+              OAuth in progress
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground">
+            Complete authorization for <span className="font-mono">{oauthPending.provider}</span> in
+            the provider window, or start again if it expired.
+          </CardContent>
+        </Card>
+      ) : null}
       {showAdd ? (
         <Card className="mb-4">
           <CardHeader>
@@ -127,7 +148,7 @@ export function CredentialsPanel(_props: NativePanelProps) {
           </CardContent>
         </Card>
       ) : null}
-      {items.length === 0 ? (
+      {items.length === 0 && !oauthPending ? (
         <PanelEmpty>No credentials yet — add one to enable provider tools.</PanelEmpty>
       ) : (
         <div className="flex flex-col gap-2">

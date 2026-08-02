@@ -7,10 +7,12 @@
 import {
   createRegistryServer,
   defaultCatalog,
+  ProviderExecutor,
   type CallContext,
   type RegistryServer,
 } from "@aprovan/registry-server";
 import { dispatchNativeAgentOp } from "./agents/runner.js";
+import { getExecutor } from "./isolate.js";
 import { getAuthMode } from "./middleware/auth.js";
 import { getRegistryStorage } from "./registry-storage.js";
 import {
@@ -22,6 +24,26 @@ import { ensureTenantForWorkspace, tenantIdForWorkspace } from "./tenant-registr
 import type { ServiceContext } from "./service-kernel.js";
 
 let _server: Promise<RegistryServer> | undefined;
+
+/** Route embed execution through the workspace executor (shared test seams). */
+class WorkspaceBackedExecutor extends ProviderExecutor {
+  override async execute(
+    options: Parameters<ProviderExecutor["execute"]>[0],
+  ): Promise<Awaited<ReturnType<ProviderExecutor["execute"]>>> {
+    const workspace = await getExecutor();
+    return workspace.execute({
+      provider: options.provider,
+      ...(options.module ? { module: options.module } : {}),
+      operation: options.operation,
+      args: options.args,
+      credentials: options.credentials,
+      ...(options.baseUrl ? { baseUrl: options.baseUrl } : {}),
+      ...(options.timeout !== undefined ? { timeout: options.timeout } : {}),
+    });
+  }
+}
+
+const embedExecutor = new WorkspaceBackedExecutor();
 
 /** Lazily construct and memoize the embedded registry server. */
 export function getRegistryServer(): Promise<RegistryServer> {
@@ -44,6 +66,7 @@ async function bootRegistryServer(): Promise<RegistryServer> {
     storage,
     catalog: defaultCatalog(),
     nativeServices,
+    executorInstance: embedExecutor,
     ...(authMode === "none" ? { allowInsecure: true } : {}),
     auth:
       authMode === "none"

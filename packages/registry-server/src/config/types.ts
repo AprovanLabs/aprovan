@@ -64,6 +64,8 @@ export interface RegistryServerOptions {
   nativeServices?: Record<string, CoreService>;
   telemetry?: { otlpEndpoint?: string; serviceName?: string };
   executor?: { cacheSize?: number }; // default 20
+  /** Share the host process executor (test seams, module cache). */
+  executorInstance?: ProviderExecutor;
   sandbox?: { memoryLimitMb?: number; concurrency?: number }; // defaults 32 / 2
   limits?: { defaultRps?: number; defaultBurst?: number }; // tenant-level defaults
   /** Gate: networked multi-tenant + auth none. */

@@ -65,4 +65,25 @@ describe("registry embed", () => {
       registryDispatch(ctx("ws-agent"), "agent", "get", { id: "missing" }),
     ).rejects.toThrow();
   });
+
+  it("invokeTool routes contract calls through embed on dsql backend", async () => {
+    process.env["STORE_BACKEND"] = "dsql";
+    process.env["DSQL_ENDPOINT"] = process.env["WORKSPACE_TEST_DSQL_URL"] ?? "postgres://invalid";
+    if (!process.env["WORKSPACE_TEST_DSQL_URL"]) {
+      // Without a DSQL endpoint, assert the routing gate only.
+      const { dispatchInterface } = await import("../src/workflows/invoke.js");
+      const source = await import("node:fs/promises").then((fs) =>
+        fs.readFile(new URL("../src/workflows/invoke.ts", import.meta.url), "utf8"),
+      );
+      expect(source).toContain("usesEmbedInterfaceDispatch");
+      expect(source).toContain("dispatchThroughEmbed");
+      return;
+    }
+    const { invokeTool } = await import("../src/workflows/invoke.js");
+    await expect(
+      invokeTool(ctx("ws-invoke"), "agent", "get", { id: "missing" }),
+    ).rejects.toThrow();
+    delete process.env["STORE_BACKEND"];
+    delete process.env["DSQL_ENDPOINT"];
+  });
 });

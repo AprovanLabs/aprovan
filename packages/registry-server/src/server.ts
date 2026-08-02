@@ -73,7 +73,7 @@ export async function createRegistryServer(
     isKnownProvider: isCatalogueProvider,
     authMode: adapter.mode,
   };
-  const executor = new ProviderExecutor(options.executor ?? {});
+  const executor = options.executorInstance ?? new ProviderExecutor(options.executor ?? {});
   configureSandbox(options.sandbox ?? {});
   const limiter = new RateLimiter(options.limits ?? {});
   const natives = new NativeServiceRegistry(options.nativeServices);
