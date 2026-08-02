@@ -50,14 +50,23 @@ fork → published-package edge first (or in the same change).
 ```
 App (installable unit)                    AppInstallation (workspace binding)
 ─────────────────────                     ──────────────────────────────────
-global id  (origin workspace + name,      { appRef, release|channel pin,
-  or registry-issued id)                    vfs prefix (partition),
+appId: generated ULID (minted at          { appId ref, release|channel pin,
+  creation; the durable reference)          own ULID + originAppId lineage,
+name: mutable alias/slug (URLs, display)    vfs prefix (partition),
 manifest + releases/channels                profile bindings per declared dep,
 declared dependencies:                      per-user opt-in partitions,
   - interface contracts (sql, llm, …)       editing: off by default (fork) }
   - provider requirements
   - native capability tiers
 ```
+
+**Identity (settled):** every app gets a generated ULID at creation; `(workspaceId, name)` is
+a mutable alias for URLs/display — renames never break installs. Forks/installations mint
+their own ID with an `originAppId` lineage pointer. **Storage goes ID-keyed everywhere**
+(record scopes `app#<appId>#…`, install keys, VFS partition roots derive from the ID), under
+the refactor's nuke-and-reseed posture — no rename migrations, ever. Registry-server's
+existing `GrantSubjectKind: "app"` consumes these IDs as opaque principals (attribution +
+grants only, no app semantics — the boundary holds).
 
 - **Dependency fulfillment = Profiles** (decision 7, already schema'd in
   `registry-server/src/storage/types.ts:45-75`). An app declares
@@ -68,16 +77,18 @@ declared dependencies:                      per-user opt-in partitions,
   is source of truth for releases; installs are forks pinned to a release/channel, editing
   disabled by default. `install.ts` is the seed; drop its `dataScope` restriction and add
   profile binding + update flow.
-- **Per-user data**: generalize the `.personal` partition rule to
+- **Per-user data (settled)**: generalize the `.personal` partition rule to
   `<appPrefix>/data/<userSub>` (already the shape, `store.ts:225`) as *the* opaque per-user
   partition, SDK-managed. WS-6 (`data-auth-model`) already generalizes Personal into real
-  per-user partitions — this rides that. Retire "Personal" as a brand: personal *flows* remain
-  per-user; everything published must live in an app.
-- **Distribution**: private-to-workspace by default; `visibility: public` makes it installable.
-  v1 directory = deployment-wide listing served by the workspace server. Publishing app
-  packages to the registry catalog (like providers) is a later, separate step — app semantics
-  (roles, channels, VFS) are product-plane; the registry should only ever see them as inert
-  artifacts.
+  per-user partitions — this rides that. The `Personal` pseudo-app is **deleted** (with its
+  triplicated prefix literal): two primitives replace it — per-app per-user private
+  partitions, and the user's own private space for unpublished personal workflows/files
+  (branded "yours", not "Personal app"). Publishing anything means bundling it under an app.
+- **Distribution (settled)**: private-to-workspace by default; `visibility: public` makes it
+  installable. v1 directory = deployment-wide listing served by the workspace server. **The
+  registry never learns about apps** — no catalog publishing. If cross-deployment sharing is
+  ever wanted, it is export/import of an inert app bundle (files + manifest, versioned
+  archive) between deployments; file transport, no registry involvement.
 
 **Client side**: `apps` is a `CoreService` with **no** `NativeSurfaceDef` — the exact hole
 (`native-surfaces.tsx:64` has 12 surfaces, no `apps`). Add `{id:"apps", Panel: AppsPanel}`,
@@ -92,8 +103,11 @@ one-off geometry). Restores the "namespace = surface" invariant from
 1. **`useEditDraft.beginEditDraft` (`useEditDraft.ts:93`)** — opening any file to edit mints a
    staged chat session server-side. This single coupling is the whole "we save ephemeral chats
    too much" complaint. Fix: direct edits write through the VFS (it already has OPFS
-   write-ahead + offline journal, `lib/workspace-vfs.ts:394-472`); a session/draft is created
-   only when (a) chat is invoked or (b) the target is an app/repo where staged VCS is wanted.
+   write-ahead + offline journal, `lib/workspace-vfs.ts:394-472`). **Staging rule (settled),
+   derived from the target path**: plain workspace files → direct write-through; app source
+   trees and mounted VCS repos → staged draft → review → apply (they have releases/commits
+   downstream); chat-driven edits → always staged (the AI proposes, the user applies). No
+   user-facing mode toggle.
 2. **`EditModal` is `fixed inset-0 z-50` (`EditModal.tsx:253`)** — browse and edit are two
    apps. Fix: editable in-tab pane (the tree, tabs, `CodePreview`, TipTap, and VFS all exist;
    what's missing is only the non-modal composition). Chat becomes an opt-in side dock on the
@@ -134,12 +148,14 @@ The moved-notice is a **runtime fork, not a stub**: `credentials.astro:12` rende
 `GatewayClient`), and `@aprovan/registry-server` already serves `/credentials` CRUD +
 `/profiles`.
 
-Standalone plan: catalog (or a small page served by registry-server itself) points at a
-standalone registry-server; the only genuine gap is **standalone auth** — `SessionGate`
-currently assumes `auth: none` local gateways. registry-server's pluggable auth
-(OIDC/API-key/none, decision 4) is the answer; the catalog needs a thin session against it.
-Boundary stays clean: the sanctioned reverse edge (aprovan-published UI consumed by catalog)
-already covers this. **Do not merge `product-plane-removal` until this lands.**
+**Auth (settled): one UI, config decides issuer + gateway.** The hosted catalog
+authenticates against the **same Cognito pool** (same-origin SSO already exists) and targets
+the **product gateway** — the credentials shown on the registry site ARE the user's aprovan
+credentials, one store. Standalone/self-hosted deployments get the identical UI against their
+own registry-server via its pluggable auth (their OIDC / API key / none). `SessionGate`
+evolves into that configurable session layer. Boundary stays clean: the sanctioned reverse
+edge (aprovan-published UI consumed by catalog) already covers this. **Do not merge
+`product-plane-removal` until this lands.**
 
 Credential **profiles**: the structured model exists (`ProfileRow` with limits/grants,
 `profiles/{service,resolve}.ts`); the workspace still has two older "profile" notions
@@ -169,11 +185,13 @@ file, no cursor. Zero CRDT/WebSocket/WebRTC anywhere ("ECS" = the one Fargate se
 `sessions-service.ts:62` already anticipates: "a CRDT transport can replace the polling
 without changing the surface."
 
-Target: presence keyed by **open file**, not workspace; tiny avatar chip on the file only.
-Build order: (1) WS signalling route on the workspace server, (2) file-scoped presence over
-it, (3) CRDT (Yjs or Loro) for main-area (non-staged) co-editing with cursors, P2P via
-WebRTC with the server as signalling/fallback. Depends on the editor refactor (§2) — CRDT on
-the main area only makes sense once direct in-tab editing exists.
+Target (settled): presence keyed by **open file**, not workspace; tiny avatar chip on the
+file only. Transport is a **single topic-multiplexed WebSocket endpoint** on the workspace
+server (server-relayed; no P2P/WebRTC v1). v1 ships only `presence:<file>` topics, but the
+protocol is designed for more: CRDT doc-sync (Yjs or Loro) for main-area co-editing rides the
+same socket later, and the VFS change feed can migrate onto it after WS-5's ETag feed lands
+(don't collide with that in-flight work). Depends on the editor refactor (§2) — CRDT on the
+main area only makes sense once direct in-tab editing exists.
 
 ## 7. Desktop app — later, but constrained by §1/§2 choices
 
@@ -184,27 +202,63 @@ capability tiers (local FS, on-device transcription). Design §1's capability de
 `host: desktop` capabilities are just additional entries in the same three-tier model, not a
 parallel system.
 
-## Sequencing sketch
+## Workstreams (improve wave — OpenSpec changes)
 
 ```
-0. boundary hygiene (fork → npm, path leaks)          ── unblocks everything, small
-1. app model: App vs AppInstallation + profiles dep   ── the center of gravity
-   └ apps native surface, drawer removal
-2. editor: decouple beginEditDraft, in-tab edit, md   ── independent of 1
-   └ chat-history simplification, renderer sizing
-3. registry standalone creds (auth + config)          ── independent; blocks removal branch
-4. panel UX fan-out (agents/admin/credentials copy)   ── after 1 (apps pane) else free
-5. telemetry contract v2                              ── independent, small
-6. presence/CRDT                                      ── after 2
-7. desktop                                            ── after 1 (capability model), 2
+IW-0 execution-plane-unfork ───────────── free; GATES IW-1, IW-3
+IW-1 app-model-split ────────┐            needs IW-0; center of gravity
+IW-4 native-panel-polish ────┘ after IW-1 (apps surface); playground removal is free
+IW-2 editor-direct-edit ─────┐            free
+IW-6 presence-realtime ──────┘ needs IW-2
+IW-3 registry-standalone-credentials ──── needs IW-0
+IW-5 telemetry-contract-v2 ────────────── free (mostly registry repo)
 ```
 
-Open questions for the owner:
+Three parallel lanes after IW-0: {IW-1→IW-4}, {IW-2→IW-6}, {IW-3}; IW-5 anytime.
 
-1. App global identity: is `(originWorkspaceId, name)` sufficient v1, or mint registry-style
-   IDs now? (Collision risk exists today.)
-2. Cross-deployment app distribution via the registry catalog — v1 or explicitly later?
-3. Registry standalone auth: which pluggable-auth mode does the hosted catalog use (OIDC
-   against the same Cognito? API keys?) — decides how much of `SessionGate` survives.
-4. Presence P2P: is WebRTC actually required v1, or is server-relayed WS acceptable until
-   scale demands P2P?
+- **IW-0 `execution-plane-unfork`** (aprovan + registry, small): delete aprovan's forked
+  execution-plane packages; consume published `@aprovan/registry-server` + `@utdk/*` from npm
+  (reconciling the 3 diverged files upstream first); fix absolute-path reads in
+  `packages/utdk/*/package.json`; fix `.claude/launch.json`; refresh registry lockfile
+  importers. Exit: fresh clone of each repo builds with no sibling checkout.
+- **IW-1 `app-model-split`** (aprovan): App vs AppInstallation split per §1 — ULIDs, ID-keyed
+  storage (nuke-and-reseed), declared dependencies bound via Profiles, install lifecycle
+  (release pin, update, fork lineage), Personal pseudo-app deletion, per-user opaque
+  partitions, deployment-wide directory, `apps` NativeSurfaceDef + `SidebarApps` sub-group
+  removal. Registry stays app-ignorant (grant subjects are opaque IDs).
+- **IW-2 `editor-direct-edit`** (aprovan): decouple `beginEditDraft`; editable in-tab pane;
+  md → WYSIWYG default with source toggle; staging rule by target (§2); chat-history/
+  SessionBar simplification (one conflict surface); renderer sizing negotiated with host pane.
+- **IW-3 `registry-standalone-credentials`** (registry + small aprovan): catalog credential/
+  admin surfaces live for standalone per §4; session layer with configurable issuer/gateway
+  (hosted = shared Cognito + product gateway; standalone = registry-server pluggable auth);
+  supersedes the `product-plane-removal` branch.
+- **IW-4 `native-panel-polish`** (aprovan): delete `playground` surface (registry keeps
+  `/playground`); rebuild Agents pane UX; admin group→profile UI (backend exists, UI absent);
+  credential profiles surfacing; copy/professionalism pass across panels. Panel contract
+  (`NativePanelProps`) unchanged — pure UX.
+- **IW-5 `telemetry-contract-v2`** (registry + aprovan native impl): three-signal contract
+  (lift metrics 501), app-facing SDK helpers, native service registered as default impl,
+  `export` stays the egress op; query stays native.
+- **IW-6 `presence-realtime`** (aprovan): topic-multiplexed WS endpoint; `presence:<file>`
+  v1 (file-scoped avatar chip, kill workspace-wide heartbeat rows); protocol reserves topics
+  for CRDT doc-sync and change feed. No P2P.
+- **Desktop app**: deliberately NOT a change yet — it consumes IW-1's capability model and
+  IW-2's editor shell; spec it after those land (Tauri-leaning per low-memory requirement).
+
+## Settled decisions (owner, 2026-08-02)
+
+1. **App identity**: generated ULID per app, minted at creation; `(workspaceId, name)` is a
+   mutable alias. Forks/installs get their own ID + `originAppId` lineage. Storage
+   (record scopes, install keys, VFS partition roots) goes **ID-keyed everywhere**,
+   nuke-and-reseed.
+2. **Distribution**: the registry never knows about apps. Deployment-scoped directory v1;
+   cross-deployment sharing (if ever) = inert bundle export/import.
+3. **Catalog auth**: hosted catalog = same Cognito pool + product gateway (one credential
+   store); standalone = same UI over registry-server pluggable auth.
+4. **Presence transport**: server-relayed, single topic-multiplexed WS endpoint;
+   `presence:<file>` first; CRDT/change-feed ride the same socket later. No P2P v1.
+5. **Personal**: pseudo-app deleted; per-app per-user opaque partitions + a private per-user
+   space for unpublished flows. Publishing requires an app.
+6. **Staging rule**: by target — plain files direct write-through; app source + mounted repos
+   staged; chat edits always staged. No mode toggle.
