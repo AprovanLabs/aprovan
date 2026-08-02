@@ -1,4 +1,4 @@
-# patchwork
+# aprovan
 
 ![Aprovan Labs](https://raw.githubusercontent.com/AprovanLabs/aprovan.com/main/docs/assets/header-labs.svg)
 <br />
@@ -12,7 +12,8 @@
 <img height="20" src="https://img.shields.io/badge/-Aprovan-blue?style=flat-square&logo=Linkedin&logoColor=white&link=https://www.linkedin.com/company/aprovan)" alt="Aprovan LinkedIn">
 </a>
 
-Platform for building generative UI experiences
+The aprovan product repo: the workspace chat app, widget compiler/editor
+packages, and the patchwork runtime for building generative UI experiences.
 
 ## Architecture
 

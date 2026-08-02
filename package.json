@@ -1,5 +1,5 @@
 {
-  "name": "@aprovan/patchwork-workspace",
+  "name": "@aprovan/aprovan-monorepo",
   "private": true,
   "version": "0.1.1",
   "description": "Platform for building generative UI experiences",
