@@ -81,6 +81,17 @@ export interface ServiceContext extends RegistryServiceContext {
    * vfs. Absent means unbounded (the executing user's normal reach).
    */
   grants?: import("./grants.js").CapabilityGrants;
+  /**
+   * Server-stamped source for `telemetry.export` flattening (workflow runner /
+   * HTTP `X-Telemetry-Source`). When set, exported events carry this instead
+   * of the default `{ type: "widget" }`.
+   */
+  telemetrySource?: {
+    type: "tool" | "workflow" | "widget" | "app" | "chat";
+    path?: string;
+    runId?: string;
+    sessionId?: string;
+  };
 }
 
 /**

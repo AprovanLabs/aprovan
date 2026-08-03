@@ -706,7 +706,17 @@ toolsRouter.post("/:provider/:operation{.*}", rateLimitByUserId, async (c) => {
     }
     try {
       const data = await coreService.call(
-        { workspaceId, userId: callerId },
+        {
+          workspaceId,
+          userId: callerId,
+          // Export attribution: same X-Telemetry-Source the dispatch-span
+          // writer already trusts (widget path / session).
+          ...(provider === "telemetry" &&
+          operation === "export" &&
+          attribution?.source
+            ? { telemetrySource: attribution.source }
+            : {}),
+        },
         operation,
         (body.args ?? {}) as Record<string, unknown>,
       );

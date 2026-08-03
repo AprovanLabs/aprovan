@@ -64,7 +64,7 @@ interface QueryResult {
     level?: string;
     status?: string;
     error?: { message: string; stack?: string };
-    source: { type: string; path?: string; app?: string };
+    source: { type: string; path?: string; app?: string; runId?: string };
     metricType?: string;
     value?: number;
     unit?: string;
@@ -240,6 +240,74 @@ describe("telemetry (auto-instrumentation)", () => {
       await manage("notifications/list", {}),
     );
     expect(list2.notifications.filter((n) => n.title.includes("tele-boom"))).toHaveLength(1);
+  });
+
+  it("flushes SDK log/counter/withSpan helpers with runId attribution (no hand-built OTLP)", async () => {
+    await putFile(
+      "workflows/sdk-helpers.js",
+      `import telemetry from "telemetry";
+       export default async function run() {
+         telemetry.log("info", "sdk-hello");
+         telemetry.counter("sdk.clicks", 3);
+         await telemetry.withSpan("sdk-work", async (span) => {
+           span.setAttribute("step", "one");
+           telemetry.log("info", "inside-span");
+           return 42;
+         });
+         return "ok";
+       }`,
+    );
+    await manage("workflows/register", {
+      name: "sdk-helpers",
+      script_path: "workflows/sdk-helpers.js",
+    });
+    const run = await data<{ id: string; status: string }>(
+      await manage("workflows/run", { name: "sdk-helpers" }),
+    );
+    expect(run.status).toBe("succeeded");
+
+    const queried = await data<QueryResult>(
+      await manage("telemetry/query", { runId: run.id }),
+    );
+    const kinds = new Set(queried.events.map((e) => e.kind));
+    expect(kinds.has("log")).toBe(true);
+    expect(kinds.has("metric")).toBe(true);
+    expect(kinds.has("span")).toBe(true);
+    expect(queried.events.some((e) => e.message === "sdk-hello")).toBe(true);
+    expect(queried.events.some((e) => e.message === "inside-span")).toBe(true);
+    expect(queried.events.some((e) => e.name === "sdk.clicks" && e.value === 3)).toBe(true);
+    expect(queried.events.some((e) => e.name === "sdk-work")).toBe(true);
+    expect(
+      queried.events.every(
+        (e) => e.source.type === "workflow" && e.source.runId === run.id,
+      ),
+    ).toBe(true);
+  });
+
+  it("flushes SDK helpers on failed runs", async () => {
+    await putFile(
+      "workflows/sdk-fail.js",
+      `import telemetry from "telemetry";
+       export default async function run() {
+         telemetry.log("warn", "before-boom");
+         telemetry.counter("sdk.fail.count");
+         throw new Error("sdk-boom");
+       }`,
+    );
+    await manage("workflows/register", {
+      name: "sdk-fail",
+      script_path: "workflows/sdk-fail.js",
+    });
+    const run = await data<{ id: string; status: string }>(
+      await manage("workflows/run", { name: "sdk-fail" }),
+    );
+    expect(run.status).toBe("failed");
+
+    const queried = await data<QueryResult>(
+      await manage("telemetry/query", { runId: run.id }),
+    );
+    expect(queried.events.some((e) => e.message === "before-boom")).toBe(true);
+    expect(queried.events.some((e) => e.name === "sdk.fail.count")).toBe(true);
   });
 });
 

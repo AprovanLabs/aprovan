@@ -26,6 +26,7 @@
     "@tiptap/pm": "^3.19.0",
     "@tiptap/react": "^3.19.0",
     "@tiptap/starter-kit": "^3.19.0",
+    "@utdk/telemetry": "^0.3.0",
     "@xyflow/react": "^12.8.2",
     "ai": "^6.0.67",
     "class-variance-authority": "^0.7.1",

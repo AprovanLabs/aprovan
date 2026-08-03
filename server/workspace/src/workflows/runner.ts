@@ -23,9 +23,14 @@ import { getCredentialStore } from "../credentials.js";
 import { getFsStore } from "../fs-store.js";
 import { listInstances, listInterfaces } from "../interfaces.js";
 import { CORE_SERVICE_NAMES, ServiceError, type ServiceContext } from "../service-kernel.js";
+import type { TelemetryExportResult } from "@utdk/telemetry";
 import { recordTelemetry, type TelemetryEventInput } from "../telemetry/service.js";
 import { invokeTool } from "./invoke.js";
 import { runScriptInSandbox } from "./sandbox.js";
+import {
+  createWorkflowTelemetryFacade,
+  TELEMETRY_SDK_GUEST_BIND,
+} from "./telemetry-sdk.js";
 import {
   newRunId,
   newTraceId,
@@ -206,7 +211,25 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<Workflow
     parentRunId: run.id,
     // The profile's grants bound every dispatch (invoke.ts) and vfs path.
     ...(agentProfile?.grants ? { grants: agentProfile.grants } : {}),
+    // Native export flattening stamps this on every SDK-flushed event.
+    telemetrySource: {
+      type: "workflow",
+      path: registration.scriptPath,
+      runId: run.id,
+    },
   };
+
+  const telemetryFacade = createWorkflowTelemetryFacade({
+    path: registration.scriptPath,
+    runId: run.id,
+    exportArgs: async (args) =>
+      (await invokeTool(
+        ctx,
+        "telemetry",
+        "export",
+        args as unknown as Record<string, unknown>,
+      )) as TelemetryExportResult,
+  });
 
   const pushLog = (level: WorkflowLogLine["level"], parts: unknown[]) => {
     if (run.logs.length >= 500) return;
@@ -220,6 +243,11 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<Workflow
   const dispatchFor =
     (namespace: string) =>
     async (path: string, args: unknown[], profile?: string): Promise<unknown> => {
+      // SDK helpers on the telemetry namespace — host-side createTelemetry,
+      // reached via the same proxy scripts already use for emit/query/export.
+      if (telemetryFacade.handles(namespace, path)) {
+        return telemetryFacade.dispatch(path, args);
+      }
       const span: WorkflowSpan = {
         namespace,
         procedure: path,
@@ -282,7 +310,9 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<Workflow
   try {
     run.result =
       (await runScriptInSandbox({
-        source: scriptFile.content,
+        // Guest bind overlays SDK helpers on the telemetry namespace proxy
+        // before the script body runs (withSpan stays guest-local).
+        source: `${TELEMETRY_SDK_GUEST_BIND}\n${scriptFile.content}`,
         filename: registration.scriptPath,
         input: input ?? null,
         namespaces: [...namespaces],
@@ -303,6 +333,10 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<Workflow
   } catch (err) {
     run.status = "failed";
     run.error = err instanceof Error ? err.message : String(err);
+  } finally {
+    // Spec: failed runs still flush. Bounded so a hung export cannot stall
+    // the run record.
+    await telemetryFacade.flushBounded();
   }
 
   run.durationMs = Math.round(performance.now() - startMs);
