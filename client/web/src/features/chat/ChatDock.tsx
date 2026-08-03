@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MarkdownEditor, resolvePatchesInText } from "@aprovan/patchwork-editor";
-import { AlertCircle, ChevronDown, ChevronUp, Loader2, Send, X } from "lucide-react";
+import {
+  AlertCircle,
+  Check,
+  FileDiff,
+  Loader2,
+  MessageSquare,
+  Send,
+  X,
+} from "lucide-react";
 import type { UIMessage } from "ai";
 import { MergeDialog } from "@/components/MergeDialog";
 import { ProviderModelControls } from "@/components/ProviderPicker";
@@ -8,48 +16,57 @@ import { SessionBar } from "@/components/SessionBar";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { publishConflictNotification } from "@/features/sessions/conflict-notify";
+import { changedFileCount, type ChatSessionInfo } from "@/lib/chat-sessions";
 import { fetchLlmModels } from "@/lib/llm";
 import type { useSessionOrchestration } from "@/features/sessions/useSessionOrchestration";
 import { APROVAN_LOGO, MessageBubble } from "./MessageParts";
 import type { useChatProviders } from "./useChatSubmit";
 
 // ---------------------------------------------------------------------------
-// Chat/preview split layout
+// Chat side-dock layout
 //
-// While a tab has content on screen (open, not collapsed), the preview gets
-// the room by default — the chat below it shrinks to a strip (composer +
-// an "Expand chat" toggle). Expanding switches to a fixed-height chat dock
-// with a drag handle. Closing
-// or collapsing every tab always hands the chat its full height back,
-// independent of this persisted preference — see `hasContentTab` at the call
-// site.
+// With a content tab open, chat is an opt-in right-side panel (bottom sheet
+// on mobile). Width is drag-resizable and persisted. Without a content tab,
+// chat fills the main column as the workspace-wide conversation surface.
 // ---------------------------------------------------------------------------
 
-const CHAT_PANEL_KEY = "patchwork:chat-panel";
-const DEFAULT_CHAT_SPLIT_HEIGHT = 320;
-const MIN_CHAT_HEIGHT = 160;
-/** Pixels of preview that must survive any drag. */
-const MIN_PREVIEW_HEIGHT = 160;
+const CHAT_PANEL_KEY = "patchwork:chat-panel-v2";
+const DEFAULT_CHAT_SPLIT_WIDTH = 400;
+const MIN_CHAT_WIDTH = 280;
+/** Pixels of the file pane that must survive any drag. */
+const MIN_PREVIEW_WIDTH = 280;
 
 export interface ChatPanelLayout {
-  expanded: boolean;
-  splitHeight: number;
+  open: boolean;
+  splitWidth: number;
 }
 
 function loadChatPanelLayout(): ChatPanelLayout {
   try {
     const raw = localStorage.getItem(CHAT_PANEL_KEY);
-    if (!raw) return { expanded: false, splitHeight: DEFAULT_CHAT_SPLIT_HEIGHT };
+    if (!raw) {
+      // Migrate the old bottom-dock key once if present.
+      const legacy = localStorage.getItem("patchwork:chat-panel");
+      if (legacy) {
+        const parsed = JSON.parse(legacy) as { expanded?: boolean; splitHeight?: number };
+        return {
+          open: parsed.expanded === true,
+          splitWidth: DEFAULT_CHAT_SPLIT_WIDTH,
+        };
+      }
+      return { open: false, splitWidth: DEFAULT_CHAT_SPLIT_WIDTH };
+    }
     const parsed = JSON.parse(raw) as Partial<ChatPanelLayout>;
     return {
-      expanded: parsed.expanded === true,
-      splitHeight:
-        typeof parsed.splitHeight === "number" && parsed.splitHeight >= MIN_CHAT_HEIGHT
-          ? parsed.splitHeight
-          : DEFAULT_CHAT_SPLIT_HEIGHT,
+      open: parsed.open === true,
+      splitWidth:
+        typeof parsed.splitWidth === "number" && parsed.splitWidth >= MIN_CHAT_WIDTH
+          ? parsed.splitWidth
+          : DEFAULT_CHAT_SPLIT_WIDTH,
     };
   } catch {
-    return { expanded: false, splitHeight: DEFAULT_CHAT_SPLIT_HEIGHT };
+    return { open: false, splitWidth: DEFAULT_CHAT_SPLIT_WIDTH };
   }
 }
 
@@ -65,30 +82,47 @@ const clamp = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), Math.max(min, max));
 
 /**
- * Chat/preview split state + drag mechanics. `chatDockRef` is the chat
- * dock's own element (drag-handle target); its parent is the shared column
- * both it and the preview live in, used to bound how far the drag can grow
- * the chat.
+ * Side-dock open/width state + horizontal drag. `chatDockRef` is the dock
+ * element; its parent is the shared row used to bound how far the drag can
+ * grow the chat.
  */
 export function useChatPanelLayout() {
   const [chatPanel, setChatPanel] = useState<ChatPanelLayout>(() => loadChatPanelLayout());
   const [chatDragging, setChatDragging] = useState(false);
   const chatDockRef = useRef<HTMLDivElement>(null);
-  const chatHeightRef = useRef(chatPanel.splitHeight);
-  chatHeightRef.current = chatPanel.splitHeight;
+  const chatWidthRef = useRef(chatPanel.splitWidth);
+  chatWidthRef.current = chatPanel.splitWidth;
 
-  const toggleChatExpanded = useCallback(() => {
+  const openChat = useCallback(() => {
     setChatPanel((prev) => {
-      const next = { ...prev, expanded: !prev.expanded };
+      if (prev.open) return prev;
+      const next = { ...prev, open: true };
       saveChatPanelLayout(next);
       return next;
     });
   }, []);
 
-  /** Upper bound for the chat dock: whatever leaves the preview usably tall. */
-  const maxChatHeight = useCallback(() => {
-    const column = chatDockRef.current?.parentElement;
-    return Math.max(MIN_CHAT_HEIGHT, (column?.clientHeight ?? 640) - MIN_PREVIEW_HEIGHT);
+  const closeChat = useCallback(() => {
+    setChatPanel((prev) => {
+      if (!prev.open) return prev;
+      const next = { ...prev, open: false };
+      saveChatPanelLayout(next);
+      return next;
+    });
+  }, []);
+
+  const toggleChatOpen = useCallback(() => {
+    setChatPanel((prev) => {
+      const next = { ...prev, open: !prev.open };
+      saveChatPanelLayout(next);
+      return next;
+    });
+  }, []);
+
+  /** Upper bound for the chat dock: whatever leaves the file pane usable. */
+  const maxChatWidth = useCallback(() => {
+    const row = chatDockRef.current?.parentElement;
+    return Math.max(MIN_CHAT_WIDTH, (row?.clientWidth ?? 960) - MIN_PREVIEW_WIDTH);
   }, []);
 
   const resizeChatBy = useCallback(
@@ -96,43 +130,41 @@ export function useChatPanelLayout() {
       setChatPanel((prev) => {
         const next = {
           ...prev,
-          splitHeight: clamp(prev.splitHeight + delta, MIN_CHAT_HEIGHT, maxChatHeight()),
+          splitWidth: clamp(prev.splitWidth + delta, MIN_CHAT_WIDTH, maxChatWidth()),
         };
         saveChatPanelLayout(next);
         return next;
       });
     },
-    [maxChatHeight]
+    [maxChatWidth]
   );
 
   const startChatDrag = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
-      if (!chatPanel.expanded) return;
+      if (!chatPanel.open) return;
       event.preventDefault();
-      const startY = event.clientY;
-      const startHeight = chatHeightRef.current;
-      const max = maxChatHeight();
+      const startX = event.clientX;
+      const startWidth = chatWidthRef.current;
+      const max = maxChatWidth();
       setChatDragging(true);
 
-      // Dragging up grows the chat dock (it's anchored to the bottom); the
-      // preview keeps the remainder.
+      // Dragging left grows the chat dock (anchored to the right).
       const onMove = (moveEvent: PointerEvent) => {
         setChatPanel((prev) => ({
           ...prev,
-          splitHeight: clamp(startHeight + (startY - moveEvent.clientY), MIN_CHAT_HEIGHT, max),
+          splitWidth: clamp(startWidth + (startX - moveEvent.clientX), MIN_CHAT_WIDTH, max),
         }));
       };
       const onUp = () => {
         window.removeEventListener("pointermove", onMove);
         window.removeEventListener("pointerup", onUp);
         setChatDragging(false);
-        // One write at the end of the gesture, not one per pointer move.
-        saveChatPanelLayout({ expanded: true, splitHeight: chatHeightRef.current });
+        saveChatPanelLayout({ open: true, splitWidth: chatWidthRef.current });
       };
       window.addEventListener("pointermove", onMove);
       window.addEventListener("pointerup", onUp);
     },
-    [chatPanel.expanded, maxChatHeight]
+    [chatPanel.open, maxChatWidth]
   );
 
   return {
@@ -140,7 +172,9 @@ export function useChatPanelLayout() {
     setChatPanel,
     chatDragging,
     chatDockRef,
-    toggleChatExpanded,
+    openChat,
+    closeChat,
+    toggleChatOpen,
     resizeChatBy,
     startChatDrag,
   };
@@ -148,14 +182,101 @@ export function useChatPanelLayout() {
 
 export type ChatDockLayoutApi = ReturnType<typeof useChatPanelLayout>;
 
+function fileLabel(path: string): string {
+  const parts = path.replace(/\/+$/, "").split("/");
+  return parts[parts.length - 1] || path;
+}
+
+/** Proposed-changes review block: AI edits always ride a staged overlay. */
+function ProposedChangesReview({
+  session,
+  busy,
+  onApply,
+  onDismiss,
+  onOpenFile,
+}: {
+  session: ChatSessionInfo;
+  busy: boolean;
+  onApply: () => void;
+  onDismiss: () => void;
+  onOpenFile: (path: string) => void;
+}) {
+  const count = changedFileCount(session);
+  if (session.mode !== "staged" || session.status !== "open" || count === 0) return null;
+
+  const changeRows = session.changes
+    ? [
+        ...session.changes.added.map((path) => ({ path, label: "new" as const })),
+        ...session.changes.modified.map((path) => ({ path, label: "edited" as const })),
+        ...session.changes.removed.map((path) => ({ path, label: "removed" as const })),
+      ].sort((a, b) => a.path.localeCompare(b.path))
+    : [];
+
+  return (
+    <div className="shrink-0 border-b bg-violet-500/5 px-3 py-2 space-y-2">
+      <div className="flex items-center gap-2 text-xs font-medium text-violet-800 dark:text-violet-300">
+        <FileDiff className="h-3.5 w-3.5 shrink-0" />
+        <span>
+          Proposed changes — {count} file{count === 1 ? "" : "s"}
+        </span>
+        <span className="ml-auto flex items-center gap-1">
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-6 px-2 text-xs"
+            disabled={busy}
+            onClick={onDismiss}
+            title="Drop these proposed changes"
+          >
+            Dismiss
+          </Button>
+          <Button
+            size="sm"
+            className="h-6 px-2 text-xs gap-1"
+            disabled={busy}
+            onClick={onApply}
+            title="Apply proposed changes to your workspace"
+          >
+            <Check className="h-3 w-3" /> Apply
+          </Button>
+        </span>
+      </div>
+      <div className="max-h-28 overflow-y-auto space-y-0.5">
+        {changeRows.map((row) => (
+          <button
+            key={row.path}
+            type="button"
+            onClick={() => onOpenFile(row.path)}
+            className="flex w-full items-center gap-2 rounded px-1.5 py-0.5 text-left text-xs hover:bg-muted"
+          >
+            <span
+              className={`w-14 shrink-0 text-[10px] uppercase tracking-wide ${
+                row.label === "new"
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : row.label === "edited"
+                    ? "text-amber-600 dark:text-amber-400"
+                    : "text-red-600 dark:text-red-400"
+              }`}
+            >
+              {row.label}
+            </span>
+            <span className="truncate font-mono text-muted-foreground">{row.path}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /**
  * The chat dock: session bar, merge dialog, message list, and composer.
- * Full height when there's no content tab to share the screen with;
- * otherwise a compact strip or a fixed-height, drag-resizable dock.
+ * Side panel when a file pane is open; full-height conversation otherwise.
  */
 export function ChatDock({
   hasContentTab,
   layout,
+  filePath,
+  onClose,
   session,
   providers,
   messages,
@@ -170,6 +291,9 @@ export function ChatDock({
 }: {
   hasContentTab: boolean;
   layout: ChatDockLayoutApi;
+  /** Active workspace file the dock is scoped to, if any. */
+  filePath?: string | null;
+  onClose?: () => void;
   session: ReturnType<typeof useSessionOrchestration>;
   providers: ReturnType<typeof useChatProviders>;
   messages: UIMessage[];
@@ -182,11 +306,12 @@ export function ChatDock({
   openWorkspacePreview: (path: string) => void;
   onOpenCredentials?: (provider?: string) => void;
 }) {
-  const { chatPanel, chatDragging, chatDockRef, toggleChatExpanded, resizeChatBy, startChatDrag } =
-    layout;
+  const { chatDragging, chatDockRef, resizeChatBy, startChatDrag } = layout;
   const scrollRef = useRef<HTMLDivElement>(null);
+  const notifiedConflictRef = useRef<string | null>(null);
 
   const isLoading = status === "submitted" || status === "streaming";
+  const sideMode = hasContentTab;
 
   // Fold diff-based widget edits: `patch` fences are applied against the
   // sources accumulated across the conversation and rewritten into full
@@ -211,67 +336,90 @@ export function ChatDock({
     });
   }, [messages]);
 
+  // Proposal-apply conflicts → single notification helper (origin chat-proposal).
+  useEffect(() => {
+    const merge = session.mergeState;
+    const active = session.activeSession;
+    if (!merge || merge.finalize !== "apply" || !active || merge.conflicts.length === 0) {
+      return;
+    }
+    const key = `${active.id}:${merge.conflicts.join("\0")}`;
+    if (notifiedConflictRef.current === key) return;
+    notifiedConflictRef.current = key;
+    publishConflictNotification({
+      sessionId: active.id,
+      sessionTitle: active.title,
+      conflicts: merge.conflicts.map((path) => ({ path })),
+      origin: "chat-proposal",
+    });
+  }, [session.mergeState, session.activeSession]);
+
+  const handleApplyProposal = useCallback(() => {
+    session.handleApplySession();
+  }, [session]);
+
+  const composerPlaceholder = filePath
+    ? `Ask about ${fileLabel(filePath)}…`
+    : "Type a message... (Shift+Enter for new line)";
+
   return (
     <div
       ref={chatDockRef}
       className={
-        hasContentTab ? "shrink-0 flex flex-col border-t" : "flex-1 min-h-0 flex flex-col"
+        sideMode
+          ? "relative h-full min-h-0 flex flex-col bg-background"
+          : "flex-1 min-h-0 flex flex-col"
       }
-      style={hasContentTab && chatPanel.expanded ? { height: chatPanel.splitHeight } : undefined}
     >
-      {hasContentTab && (
-        <>
-          {/* Drag handle — only live once expanded; there's
-              nothing to resize while the dock is just a strip. */}
-          <div
-            role="separator"
-            aria-orientation="horizontal"
-            aria-label="Resize chat"
-            tabIndex={chatPanel.expanded ? 0 : -1}
-            onPointerDown={startChatDrag}
-            onKeyDown={(event) => {
-              if (!chatPanel.expanded) return;
-              if (event.key === "ArrowUp") resizeChatBy(16);
-              else if (event.key === "ArrowDown") resizeChatBy(-16);
-              else return;
-              event.preventDefault();
-            }}
-            className={`h-1 shrink-0 transition-colors ${
-              chatPanel.expanded
-                ? `cursor-row-resize hover:bg-primary/40 focus-visible:bg-primary/40 focus-visible:outline-none ${
-                    chatDragging ? "bg-primary/60" : ""
-                  }`
-                : "pointer-events-none"
-            }`}
-          />
-          <button
-            type="button"
-            onClick={toggleChatExpanded}
-            className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 border-b"
-            title={chatPanel.expanded ? "Collapse chat" : "Expand chat"}
-          >
-            {chatPanel.expanded ? (
-              <ChevronDown className="h-3 w-3 shrink-0" />
-            ) : (
-              <ChevronUp className="h-3 w-3 shrink-0" />
-            )}
-            <span className="font-medium">Chat</span>
-            {isLoading ? (
-              <span className="flex items-center gap-1 text-primary">
-                <Loader2 className="h-3 w-3 animate-spin" />
-                Generating…
-              </span>
-            ) : (
-              !chatPanel.expanded &&
-              messages.length > 0 && (
-                <span>
-                  {messages.length} message{messages.length === 1 ? "" : "s"}
-                </span>
-              )
-            )}
-            <span className="ml-auto">{chatPanel.expanded ? "Collapse" : "Expand"}</span>
-          </button>
-        </>
+      {sideMode && (
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize chat"
+          tabIndex={0}
+          onPointerDown={startChatDrag}
+          onKeyDown={(event) => {
+            if (event.key === "ArrowLeft") resizeChatBy(16);
+            else if (event.key === "ArrowRight") resizeChatBy(-16);
+            else return;
+            event.preventDefault();
+          }}
+          className={`absolute left-0 top-0 bottom-0 w-1 -translate-x-1/2 z-10 cursor-col-resize hover:bg-primary/40 focus-visible:bg-primary/40 focus-visible:outline-none ${
+            chatDragging ? "bg-primary/60" : ""
+          }`}
+        />
+      )}
+
+      {sideMode && (
+        <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 border-b text-xs">
+          <MessageSquare className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+          <span className="font-medium">Chat</span>
+          {filePath && (
+            <span
+              className="truncate font-mono text-muted-foreground"
+              title={filePath}
+            >
+              {fileLabel(filePath)}
+            </span>
+          )}
+          {isLoading && (
+            <span className="flex items-center gap-1 text-primary">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              Generating…
+            </span>
+          )}
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="ml-auto p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+              title="Close chat"
+              aria-label="Close chat"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
       )}
 
       {/* Branch chip: which session this chat is, which version of
@@ -284,7 +432,7 @@ export function ChatDock({
         onNew={session.handleNewSession}
         onSwitch={session.handleSwitchSession}
         onModeChange={session.handleSessionModeChange}
-        onApply={session.handleApplySession}
+        onApply={handleApplyProposal}
         onArchive={session.handleDiscardSession}
         onReset={session.handleResetSession}
         onSync={session.handleSyncSession}
@@ -293,6 +441,17 @@ export function ChatDock({
         onOpenFile={(path) => void openWorkspacePreview(path)}
         onRefreshSessions={session.refreshSessions}
       />
+
+      {session.activeSession && (
+        <ProposedChangesReview
+          session={session.activeSession}
+          busy={session.sessionBusy}
+          onApply={handleApplyProposal}
+          onDismiss={session.handleDiscardSession}
+          onOpenFile={(path) => void openWorkspacePreview(path)}
+        />
+      )}
+
       {session.mergeState && session.activeSession && (
         <MergeDialog
           open
@@ -323,39 +482,37 @@ export function ChatDock({
         </div>
       )}
 
-      {(!hasContentTab || chatPanel.expanded) && (
-        <ScrollArea className="flex-1 min-h-0" ref={scrollRef}>
-          <div className="mx-auto w-full max-w-3xl p-3 sm:p-4 space-y-4">
-            {messages.length === 0 ? (
-              <div className="text-center text-muted-foreground py-12">
-                <img
-                  src={APROVAN_LOGO}
-                  alt=""
-                  className="h-12 w-12 mx-auto mb-4 opacity-50 rounded-full"
-                />
-                <p>Start a conversation</p>
-              </div>
-            ) : (
-              resolvedMessages.map((msg) => <MessageBubble key={msg.id} message={msg} />)
-            )}
+      <ScrollArea className="flex-1 min-h-0" ref={scrollRef}>
+        <div className="mx-auto w-full max-w-3xl p-3 sm:p-4 space-y-4">
+          {messages.length === 0 ? (
+            <div className="text-center text-muted-foreground py-12">
+              <img
+                src={APROVAN_LOGO}
+                alt=""
+                className="h-12 w-12 mx-auto mb-4 opacity-50 rounded-full"
+              />
+              <p>{filePath ? `Ask about this file…` : "Start a conversation"}</p>
+            </div>
+          ) : (
+            resolvedMessages.map((msg) => <MessageBubble key={msg.id} message={msg} />)
+          )}
 
-            {isLoading && messages[messages.length - 1]?.role !== "assistant" && (
-              <div className="flex gap-3 justify-start">
-                <Avatar className="h-8 w-8 shrink-0">
-                  <img src={APROVAN_LOGO} alt="" className="rounded-full" />
-                  <AvatarFallback>A</AvatarFallback>
-                </Avatar>
-                <div className="flex flex-col gap-1">
-                  <div className="h-5" />
-                  <div className="bg-muted rounded-lg px-4 py-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  </div>
+          {isLoading && messages[messages.length - 1]?.role !== "assistant" && (
+            <div className="flex gap-3 justify-start">
+              <Avatar className="h-8 w-8 shrink-0">
+                <img src={APROVAN_LOGO} alt="" className="rounded-full" />
+                <AvatarFallback>A</AvatarFallback>
+              </Avatar>
+              <div className="flex flex-col gap-1">
+                <div className="h-5" />
+                <div className="bg-muted rounded-lg px-4 py-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
                 </div>
               </div>
-            )}
-          </div>
-        </ScrollArea>
-      )}
+            </div>
+          )}
+        </div>
+      </ScrollArea>
 
       {error && (
         <div className="shrink-0 px-4 py-2 bg-destructive/10 text-destructive text-sm flex items-center gap-2">
@@ -371,109 +528,103 @@ export function ChatDock({
         </div>
       )}
 
-      {/* Composer tracks the message column's measure so the two read
-          as one thread even when the preview pane is wide. A collapsed
-          strip hides the whole composer — sending auto-expands anyway,
-          so a hidden input costs nothing and the strip stays a strip. */}
-      {(!hasContentTab || chatPanel.expanded) && (
-        <div className="shrink-0 border-t p-2.5 sm:p-4">
-          <div className="mx-auto w-full max-w-3xl space-y-2">
-            <div className="flex items-center">
-              <ProviderModelControls
-                providers={providers.llmProviders}
-                active={providers.chatProvider}
-                onSelectProvider={providers.handleProviderChange}
-                model={providers.chatModel}
-                onSelectModel={providers.handleModelChange}
-                loadModels={fetchLlmModels}
-              />
-            </div>
-
-            {!providers.providerConnected && (
-              <div className="px-3 py-2 text-xs rounded-md border border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 flex items-center gap-2">
-                <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                <span>
-                  Chat requires an LLM provider credential. {providers.chatProviderLabel} is not
-                  connected to this workspace —{" "}
-                  {onOpenCredentials ? (
-                    <button
-                      type="button"
-                      onClick={() => onOpenCredentials(providers.chatProvider)}
-                      className="underline hover:no-underline font-medium"
-                    >
-                      add a credential
-                    </button>
-                  ) : (
-                    <span className="font-medium">add a credential</span>
-                  )}{" "}
-                  or switch providers above.
-                </span>
-              </div>
-            )}
-
-            {session.sessionReadOnly && (
-              <div className="px-3 py-2 text-xs rounded-md border bg-muted/50 text-muted-foreground flex items-center gap-2">
-                <span className="flex-1">
-                  This chat was{" "}
-                  {session.activeSession?.status === "merged"
-                    ? "applied to your workspace"
-                    : "archived"}{" "}
-                  — you're looking at a snapshot of it. Start a new chat to
-                  continue.
-                </span>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  className="h-6 px-2 text-xs"
-                  onClick={() => session.handleNewSession(session.activeSession?.mode ?? "auto")}
-                >
-                  New chat
-                </Button>
-              </div>
-            )}
-
-            <form onSubmit={handleSubmit} className="flex gap-2 items-end">
-              <MarkdownEditor
-                value={input}
-                onChange={setInput}
-                onSubmit={() => {
-                  if (
-                    !isLoading &&
-                    input.trim() &&
-                    providers.providerConnected &&
-                    !session.sessionReadOnly
-                  ) {
-                    handleSubmit();
-                  }
-                }}
-                placeholder="Type a message... (Shift+Enter for new line)"
-                disabled={isLoading || session.sessionReadOnly}
-              />
-              <Button
-                type="submit"
-                disabled={
-                  isLoading ||
-                  !input.trim() ||
-                  !providers.providerConnected ||
-                  session.sessionReadOnly
-                }
-                className="shrink-0"
-                title={
-                  providers.providerConnected
-                    ? undefined
-                    : `${providers.chatProviderLabel} is not connected — add a credential first`
-                }
-              >
-                {isLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Send className="h-4 w-4" />
-                )}
-              </Button>
-            </form>
+      <div className="shrink-0 border-t p-2.5 sm:p-4">
+        <div className="mx-auto w-full max-w-3xl space-y-2">
+          <div className="flex items-center">
+            <ProviderModelControls
+              providers={providers.llmProviders}
+              active={providers.chatProvider}
+              onSelectProvider={providers.handleProviderChange}
+              model={providers.chatModel}
+              onSelectModel={providers.handleModelChange}
+              loadModels={fetchLlmModels}
+            />
           </div>
+
+          {!providers.providerConnected && (
+            <div className="px-3 py-2 text-xs rounded-md border border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 flex items-center gap-2">
+              <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+              <span>
+                Chat requires an LLM provider credential. {providers.chatProviderLabel} is not
+                connected to this workspace —{" "}
+                {onOpenCredentials ? (
+                  <button
+                    type="button"
+                    onClick={() => onOpenCredentials(providers.chatProvider)}
+                    className="underline hover:no-underline font-medium"
+                  >
+                    add a credential
+                  </button>
+                ) : (
+                  <span className="font-medium">add a credential</span>
+                )}{" "}
+                or switch providers above.
+              </span>
+            </div>
+          )}
+
+          {session.sessionReadOnly && (
+            <div className="px-3 py-2 text-xs rounded-md border bg-muted/50 text-muted-foreground flex items-center gap-2">
+              <span className="flex-1">
+                This chat was{" "}
+                {session.activeSession?.status === "merged"
+                  ? "applied to your workspace"
+                  : "archived"}{" "}
+                — you're looking at a snapshot of it. Start a new chat to
+                continue.
+              </span>
+              <Button
+                size="sm"
+                variant="secondary"
+                className="h-6 px-2 text-xs"
+                onClick={() => session.handleNewSession(session.activeSession?.mode ?? "auto")}
+              >
+                New chat
+              </Button>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="flex gap-2 items-end">
+            <MarkdownEditor
+              value={input}
+              onChange={setInput}
+              onSubmit={() => {
+                if (
+                  !isLoading &&
+                  input.trim() &&
+                  providers.providerConnected &&
+                  !session.sessionReadOnly
+                ) {
+                  handleSubmit();
+                }
+              }}
+              placeholder={composerPlaceholder}
+              disabled={isLoading || session.sessionReadOnly}
+            />
+            <Button
+              type="submit"
+              disabled={
+                isLoading ||
+                !input.trim() ||
+                !providers.providerConnected ||
+                session.sessionReadOnly
+              }
+              className="shrink-0"
+              title={
+                providers.providerConnected
+                  ? undefined
+                  : `${providers.chatProviderLabel} is not connected — add a credential first`
+              }
+            >
+              {isLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+            </Button>
+          </form>
         </div>
-      )}
+      </div>
     </div>
   );
 }

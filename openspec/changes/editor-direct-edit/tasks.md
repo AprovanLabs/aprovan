@@ -118,17 +118,17 @@ if a stream needs more, fix the tech plan first.
 
 > Depends-on: 4 | Touches: client/web/src/features/chat/**, client/web/src/pages/** | Verify: `pnpm --filter @aprovan/patchwork-web build`
 
-- [ ] 5.1 Recompose `ChatDock` as a per-file side dock: opened from the pane header `Chat`
+- [x] 5.1 Recompose `ChatDock` as a per-file side dock: opened from the pane header `Chat`
       button, resizable beside the file pane (bottom-sheet via `MobileDrawer` on mobile),
       file context carried into the composer. Session creation stays lazy on first send
       (existing behavior — verify no dock-open call path creates one). Satisfies
       `specs/workspace-editor-shell` "Chat is an opt-in dock beside the file".
-- [ ] 5.2 Ensure chat-driven file edits always run in a staged session scope regardless of
+- [x] 5.2 Ensure chat-driven file edits always run in a staged session scope regardless of
       target policy (tech-plan D5): the dock's edit transport writes through the session
       overlay; add the proposed-changes review block (changed files, Apply/Dismiss) wired to
       the existing apply/resolve procedures. Satisfies `specs/direct-file-editing`
       "Chat-driven edits are always staged".
-- [ ] 5.3 Route proposal-apply conflicts through `publishConflictNotification` with
+- [x] 5.3 Route proposal-apply conflicts through `publishConflictNotification` with
       `origin: "chat-proposal"`. Satisfies `specs/session-history-simplification` "One
       conflict surface".
 

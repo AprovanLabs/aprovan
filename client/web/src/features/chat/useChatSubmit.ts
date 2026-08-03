@@ -118,6 +118,8 @@ export function useChatSubmit(args: {
   armSendWindow: () => void;
   setChatPanel: Dispatch<SetStateAction<ChatPanelLayout>>;
   closeSidebar: () => void;
+  /** Active file the dock is scoped to — carried into the first message. */
+  filePath?: string | null;
 }) {
   const {
     input,
@@ -133,6 +135,7 @@ export function useChatSubmit(args: {
     armSendWindow,
     setChatPanel,
     closeSidebar,
+    filePath,
   } = args;
 
   const handleSubmit = useCallback(
@@ -141,12 +144,12 @@ export function useChatSubmit(args: {
       if (!input.trim() || !providerConnected || sessionReadOnly) return;
       // Lazy history: the main state has no session record — the first real
       // message creates one (title = the message, refined by the model once
-      // the first reply lands). The stream starts immediately; the record
-      // catches up in parallel and the persistence effect backfills.
+      // the first reply lands). Chat-driven file edits always use a staged
+      // overlay (D5) regardless of the target path's write policy.
       if (!activeSession && !pendingCreateRef.current && GATEWAY_BASE) {
         pendingCreateRef.current = true;
         const seedTitle = input.trim().replace(/\s+/g, " ").slice(0, 48);
-        createChatSession({ mode: "auto", title: seedTitle })
+        createChatSession({ mode: "staged", title: seedTitle })
           .then((record) => {
             applySession(record);
             saveActiveSessionId(activeWorkspaceId, record.id);
@@ -160,13 +163,17 @@ export function useChatSubmit(args: {
       // A real user message arms the self-heal loop for the replies that
       // follow, and resets its consecutive-auto-fix budget.
       armSendWindow();
-      sendMessage({ text: input });
+      const text =
+        filePath && !input.includes(filePath)
+          ? `Regarding \`${filePath}\`:\n\n${input}`
+          : input;
+      sendMessage({ text });
       setInput("");
-      // Sending while the chat is collapsed to a strip would hide the
-      // streaming reply entirely — auto-expand so it's visible as it lands.
+      // Sending while the dock is closed would hide the streaming reply —
+      // open it so the turn is visible as it lands.
       setChatPanel((prev) => {
-        if (prev.expanded) return prev;
-        const next = { ...prev, expanded: true };
+        if (prev.open) return prev;
+        const next = { ...prev, open: true };
         saveChatPanelLayout(next);
         return next;
       });
@@ -182,6 +189,7 @@ export function useChatSubmit(args: {
       activeWorkspaceId,
       refreshSessions,
       armSendWindow,
+      filePath,
     ]
   );
 
@@ -192,7 +200,7 @@ export function useChatSubmit(args: {
   const createWorkflowInChat = useCallback(
     (appName?: string) => {
       closeSidebar();
-      setChatPanel((prev) => (prev.expanded ? prev : { ...prev, expanded: true }));
+      setChatPanel((prev) => (prev.open ? prev : { ...prev, open: true }));
       setInput(
         appName
           ? `Create a new workflow for the ${appName} app that `
@@ -208,7 +216,7 @@ export function useChatSubmit(args: {
   const publishFlowInChat = useCallback(
     (workflowName: string) => {
       closeSidebar();
-      setChatPanel((prev) => (prev.expanded ? prev : { ...prev, expanded: true }));
+      setChatPanel((prev) => (prev.open ? prev : { ...prev, open: true }));
       setInput(
         workflowName
           ? `Publish an app that exports the workflow "${workflowName}" (apps.publish)`

@@ -8,7 +8,7 @@ import {
   type DefaultView,
 } from "@aprovan/patchwork-editor";
 import type { Compiler } from "@aprovan/patchwork-compiler";
-import { AlertCircle, Code, Eye, FileCode, Pencil } from "lucide-react";
+import { AlertCircle, Code, Eye, FileCode, MessageSquare, Pencil } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SaveStateChip, type ChipState } from "./SaveStateChip";
 import { useDirectSave } from "./useDirectSave";
@@ -50,6 +50,7 @@ export function FileEditorPane({
   onKeepLocal,
   onOpenEditor,
   onOpenFile,
+  onOpenChat,
 }: {
   path: string;
   code: string;
@@ -60,6 +61,8 @@ export function FileEditorPane({
   onKeepLocal: () => void;
   onOpenEditor?: () => void;
   onOpenFile?: (path: string) => void;
+  /** Opt-in chat dock beside this pane. */
+  onOpenChat?: () => void;
 }) {
   const fileType = getFileType(path);
   const label = fileLabel(path);
@@ -240,6 +243,17 @@ export function FileEditorPane({
                 <Code className="h-3 w-3" />
               )}
               {toggleLabel}
+            </button>
+          )}
+          {onOpenChat && (
+            <button
+              type="button"
+              onClick={onOpenChat}
+              className="px-2 py-1 text-xs rounded flex items-center gap-1 hover:bg-muted"
+              title="Open chat about this file"
+            >
+              <MessageSquare className="h-3 w-3" />
+              Chat
             </button>
           )}
           {fileType.category === "compilable" && onOpenEditor && (
