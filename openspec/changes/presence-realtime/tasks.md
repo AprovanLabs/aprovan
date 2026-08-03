@@ -52,7 +52,7 @@ without coordinating._
 
 > Depends-on: 1 | Touches: server/workspace/src/realtime/presence.ts, server/workspace/src/vcs/sessions-service.ts, server/workspace/tests/presence.test.ts, server/workspace/tests/chat-sessions.test.ts | Verify: cd ~/Documents/Code/AprovanLabs/aprovan/server/workspace && pnpm typecheck && pnpm test
 
-- [ ] 2.1 Implement `src/realtime/presence.ts` as a `NamespaceHandler` (tech-plan
+- [x] 2.1 Implement `src/realtime/presence.ts` as a `NamespaceHandler` (tech-plan
       "Interfaces & Data"): `presence:<path>` topics with `bad-topic` rejection of
       non-canonical paths, exclusive focus per connection (`{action:"focus"}` moves,
       `{action:"blur"}`/disconnect clears, server emits the leave on the old topic), roster
@@ -60,12 +60,12 @@ without coordinating._
       dedupe across connections, `lastActive` refresh on focus. Register it as the only v1
       namespace (spec file-presence, requirements 1–3).
       Verify: `cd server/workspace && pnpm typecheck`
-- [ ] 2.2 Delete the legacy op from `src/vcs/sessions-service.ts`: the `sessions.presence`
+- [x] 2.2 Delete the legacy op from `src/vcs/sessions-service.ts`: the `sessions.presence`
       tool entry, the `presence` case, `heartbeatPresence`, `PresenceRecord`,
       `PRESENCE_PREFIX`, `PRESENCE_TTL_MS`, and the presence comment block — unknown
       procedure now 404s (spec file-presence "Legacy heartbeat retirement").
       Verify: `! grep -rn "PRESENCE_PREFIX\|heartbeatPresence" ~/Documents/Code/AprovanLabs/aprovan/server/workspace/src`
-- [ ] 2.3 Replace the presence test in `tests/chat-sessions.test.ts` (`:232-248`) with an
+- [x] 2.3 Replace the presence test in `tests/chat-sessions.test.ts` (`:232-248`) with an
       assertion that `sessions.presence` returns the unknown-procedure error, and write
       `tests/presence.test.ts` over real sockets covering the file-presence server
       scenarios: watching≠being-there, atomic focus move, disconnect leave, snapshot on
