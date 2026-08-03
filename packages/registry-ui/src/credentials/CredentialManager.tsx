@@ -11,6 +11,7 @@ import {
 } from "@aprovan/ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AddCredentialForm } from "./AddCredentialForm";
+import { ArmedButton } from "./ArmedButton";
 import { deleteCredential, listCredentials, parseGatewayStatus } from "./api";
 import { loadOAuthPending } from "./oauth";
 import type { CatalogProviderSummary, CredentialRecord, CredentialType } from "./types";
@@ -44,15 +45,12 @@ function CredentialCard({
             <CardTitle className="truncate">{credential.label ?? credential.provider}</CardTitle>
             <CardDescription className="font-mono text-xs">{credential.provider}</CardDescription>
           </div>
-          <Button
-            aria-label={`Revoke ${credential.label ?? credential.provider}`}
+          <ArmedButton
+            armedLabel="Confirm revoke?"
             disabled={revoking}
-            onClick={() => onRevoke(credential.id)}
-            size="sm"
-            variant="destructive"
-          >
-            Revoke
-          </Button>
+            label="Revoke"
+            onConfirm={() => onRevoke(credential.id)}
+          />
         </div>
         <Badge variant="outline">{TYPE_LABELS[credential.type]}</Badge>
       </CardHeader>
@@ -101,7 +99,7 @@ export function CredentialManager({
     try {
       setCredentials(await listCredentials(client));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load credentials.");
+      setError(err instanceof Error ? err.message : "Couldn't load credentials. Try again.");
     } finally {
       setLoading(false);
     }
@@ -132,15 +130,12 @@ export function CredentialManager({
   }, [credentials, providerFilter, search]);
 
   async function handleRevoke(id: string): Promise<void> {
-    const cred = credentials.find((c) => c.id === id);
-    const name = cred?.label ?? cred?.provider ?? id;
-    if (!confirm(`Revoke "${name}"? This cannot be undone.`)) return;
     setRevokingId(id);
     try {
       await deleteCredential(client, id);
       setCredentials((prev) => prev.filter((c) => c.id !== id));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to revoke credential.");
+      setError(err instanceof Error ? err.message : "Couldn't revoke that credential.");
     } finally {
       setRevokingId(null);
     }
@@ -152,7 +147,7 @@ export function CredentialManager({
         <div>
           <h2 className="text-lg font-semibold tracking-tight">Credentials</h2>
           <p className="text-sm text-muted-foreground">
-            Manage API keys and OAuth tokens used by UTDK providers.
+            API keys and OAuth tokens that tools use to act on your behalf.
           </p>
         </div>
         <Button onClick={() => setShowAddForm(true)} size="sm">
@@ -200,9 +195,14 @@ export function CredentialManager({
       </div>
 
       {error ? (
-        <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          {error}
-        </p>
+        <div className="flex flex-col gap-2">
+          <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {error}
+          </p>
+          <Button onClick={() => void fetchCredentials()} size="sm" variant="outline">
+            Retry
+          </Button>
+        </div>
       ) : null}
 
       {oauthPending ? (
@@ -239,12 +239,16 @@ export function CredentialManager({
         <Card>
           <CardHeader>
             <CardTitle>
-              No credentials {providerFilter ? `for ${providerFilter}` : ""}
+              {providerFilter
+                ? `No credentials for ${providerFilter}`
+                : credentials.length === 0
+                  ? "No credentials yet"
+                  : "No matching credentials"}
             </CardTitle>
             <CardDescription>
               {credentials.length === 0
-                ? "Add your first credential to get started."
-                : "Try changing the provider filter or search term."}
+                ? "Add a credential so tools and workflows can reach external providers."
+                : "Try a different provider filter or search term."}
             </CardDescription>
           </CardHeader>
         </Card>

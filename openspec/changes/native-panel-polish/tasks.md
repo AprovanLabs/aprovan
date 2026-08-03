@@ -97,7 +97,7 @@ checklist for every copy/state task._
 
 > Depends-on: 2, 3 | Touches: packages/registry-ui/src/credentials/**, packages/registry-ui/src/index.tsx, client/web/src/components/panels/CredentialsPanel.tsx | Verify: cd ~/Documents/Code/AprovanLabs/aprovan && pnpm --filter @aprovan/registry-ui build && pnpm --filter @aprovan/registry-ui test && pnpm --filter @aprovan/patchwork-web build
 
-- [ ] 5.1 Add `credentials/ProfilesSection` + profile form to registry-ui (injected
+- [x] 5.1 Add `credentials/ProfilesSection` + profile form to registry-ui (injected
       `GatewayClient`; list with name/target/credential label/limits summary; admin-gated
       create/edit/delete with `canManage`; armed delete; target picker, executing provider
       for interface targets, credential picker, options, limits) and the shared
@@ -105,16 +105,16 @@ checklist for every copy/state task._
       "Credentials panel surfaces profiles", "Profile UI lives in registry-ui"; tech-plan
       D5/D6 + Interfaces.
       Verify: `cd ~/Documents/Code/AprovanLabs/aprovan && pnpm --filter @aprovan/registry-ui build && pnpm --filter @aprovan/registry-ui test`
-- [ ] 5.2 Copy pass on `CredentialManager`/`AddCredentialForm`: ux.md tone, revoke moves
+- [x] 5.2 Copy pass on `CredentialManager`/`AddCredentialForm`: ux.md tone, revoke moves
       from `window.confirm` to the armed pattern, empty/error states per conventions —
       specs: panel-conventions "Destructive actions are armed".
       Verify: `cd ~/Documents/Code/AprovanLabs/aprovan && ! grep -rn "confirm(" packages/registry-ui/src/credentials --include="*.tsx" | grep -v test && pnpm --filter @aprovan/registry-ui test`
-- [ ] 5.3 `CredentialsPanel.tsx`: compose two tabs (Credentials | Profiles) from registry-ui
+- [x] 5.3 `CredentialsPanel.tsx`: compose two tabs (Credentials | Profiles) from registry-ui
       exports; wrapper stays wiring-only (client, OAuth redirect, prefill) — specs:
       credential-profiles "Wrapper stays thin"; Profiles tab renders `PanelUnavailable` on
       `isUnavailable` — ux.md flow step 4.
       Verify: `cd ~/Documents/Code/AprovanLabs/aprovan && pnpm --filter @aprovan/patchwork-web build && [ "$(wc -l < client/web/src/components/panels/CredentialsPanel.tsx)" -lt 120 ]`
-- [ ] 5.4 Unit tests (mocked client): member sees read-only list; admin create round-trip;
+- [x] 5.4 Unit tests (mocked client): member sees read-only list; admin create round-trip;
       501 renders unavailable card — specs: credential-profiles scenarios.
       Verify: `cd ~/Documents/Code/AprovanLabs/aprovan && pnpm --filter @aprovan/registry-ui test`
 
