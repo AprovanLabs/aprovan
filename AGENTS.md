@@ -37,10 +37,21 @@ startup update script, so it is not repeated here.
     `http://localhost:4000` (as the README shows) 404s; `.../api/gateway` is what
     actually reaches the gateway routes.
 - Chat completions need an LLM provider **credential** connected through the
-  gateway (e.g. an OpenAI/Anthropic key). Without one the UI blocks sending with
-  "Chat requires an LLM provider credential" — expected; not needed to bring the
-  stack up. Backend data-plane flows (fs read/write, sessions, profiles) work with
-  no external keys.
+  gateway (the gateway reads it from its credential store, not from `process.env`).
+  Without one the UI blocks sending with "Chat requires an LLM provider
+  credential" — backend data-plane flows (fs read/write, sessions, profiles) work
+  with no keys. To enable chat when an `OPENAI_API_KEY` is available in the env,
+  connect it once against the running gateway:
+  ```bash
+  curl -X POST http://localhost:4000/api/gateway/credentials \
+    -H 'content-type: application/json' \
+    -d "{\"provider\":\"openai\",\"label\":\"OpenAI\",\"payload\":{\"type\":\"bearer_token\",\"token\":\"$OPENAI_API_KEY\"}}"
+  ```
+  The credential persists in the SQLite data dir (`~/.aprovan`), so it survives
+  gateway restarts. The provider's built-in default model id is a placeholder
+  (`gpt-5.1`) that 404s upstream — either pick a real model in the UI's model
+  selector or start the gateway with `LLM_OPENAI_DEFAULT_MODEL=gpt-4o-mini`
+  (env override pattern is `LLM_<PROVIDER>_DEFAULT_MODEL`).
 - `dev:aws` (DynamoDB-local :8000 + MinIO :9000) is only for AWS-parity work and
   needs Docker, which is **not** installed by default. Core local dev never needs it.
 
