@@ -11,7 +11,7 @@ import { auditRouter } from "./routes/audit.js";
 import { authRouter } from "./routes/auth.js";
 import { credentialsRouter } from "./routes/credentials.js";
 import { fsRouter, fsUploadsRouter } from "./routes/fs.js";
-import { groupsRouter, workspaceProfilesRouter } from "./routes/groups.js";
+import { groupsRouter } from "./routes/groups.js";
 import { invitesRouter } from "./routes/invites.js";
 import { appsRouter } from "./routes/apps.js";
 import { hooksRouter } from "./routes/hooks.js";
@@ -20,6 +20,7 @@ import { mcpRouter } from "./routes/mcp.js";
 import { membersRouter } from "./routes/members.js";
 import { oauthRouter } from "./routes/oauth.js";
 import { permissionsRouter } from "./routes/permissions.js";
+import { workspaceProfilesRouter } from "./routes/profiles.js";
 import { sandboxHostsRouter } from "./routes/sandbox-hosts.js";
 import { sessionRouter } from "./routes/session.js";
 import { toolsRouter } from "./routes/tools.js";
@@ -152,7 +153,7 @@ export function createApp(): Hono {
   app.route("/oauth", oauthRouter);
   app.route("/credentials", credentialsRouter);
   app.route("/groups", groupsRouter);
-  // Admin picker for group→profile attachment (routes/groups.ts).
+  // Workspace profile CRUD (routes/profiles.ts).
   app.route("/profiles", workspaceProfilesRouter);
   app.route("/invites", invitesRouter);
   app.route("/members", membersRouter);

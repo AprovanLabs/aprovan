@@ -13,7 +13,8 @@
 // ---------------------------------------------------------------------------
 
 import type { AppsSelection } from "@aprovan/registry-ui/apps-panel";
-import { NATIVE_TAB_PREFIX, parseNativeTabPath } from "@/lib/native-surfaces";
+import { parseNativeTabPath } from "@/lib/native-surfaces";
+import { isNativeTabPath, nativeTabId } from "./UnknownNativeSurface";
 
 export const APP_TAB_PREFIX = "app://";
 export const WORKFLOW_TAB_PREFIX = "workflow://";
@@ -24,7 +25,7 @@ export const isAppsTabPath = (path: string) =>
 /** Any pseudo-path tab (apps panel selections, native surfaces) — no file
  *  behind it, so loaders and FS watchers must leave it alone. */
 export const isVirtualTabPath = (path: string) =>
-  isAppsTabPath(path) || path.startsWith(NATIVE_TAB_PREFIX);
+  isAppsTabPath(path) || isNativeTabPath(path);
 
 /** Pseudo-path for a panel selection: `app://<name>`, `workflow://[<app>/]<name>`. */
 export function appsTabPath(selection: AppsSelection): string {
@@ -62,6 +63,10 @@ export interface OpenTab {
 export function tabLabel(path: string): string {
   const surface = parseNativeTabPath(path);
   if (surface) return surface.title;
+  const staleNativeId = nativeTabId(path);
+  if (staleNativeId) {
+    return staleNativeId === "playground" ? "Playground" : staleNativeId;
+  }
   const selection = parseAppsTabPath(path);
   if (selection) return selection.name;
   return path.split("/").pop() ?? path;

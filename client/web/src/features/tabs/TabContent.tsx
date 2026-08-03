@@ -10,6 +10,7 @@ import { editorLogsSource } from "@/lib/telemetry";
 import { invokeAppsTool, invokeWorkflowsTool } from "@/lib/tools";
 import { workspaceWidgetVfs } from "@/lib/workspace-vfs";
 import { appsTabPath, parseAppsTabPath, type OpenTab } from "./tab-routing";
+import { isNativeTabPath, UnknownNativeSurface } from "./UnknownNativeSurface";
 
 /**
  * Active tab content: dispatches the active tab's pseudo-path to a native
@@ -57,6 +58,7 @@ export function TabContent({
   const tab = openTabs.get(activeTabPath)!;
   const appsSelection = parseAppsTabPath(activeTabPath);
   const nativeSurface = parseNativeTabPath(activeTabPath);
+  const unknownNative = !nativeSurface && isNativeTabPath(activeTabPath);
   // App panes get contextual native tabs (Details + the
   // surfaces that declare appTab). Reset on app change.
   const appTabSurfaces =
@@ -81,6 +83,9 @@ export function TabContent({
       className="flex-1 min-h-0 flex flex-col bg-card relative"
     >
       {nativeSurface && <nativeSurface.Panel />}
+      {unknownNative && (
+        <UnknownNativeSurface path={activeTabPath} onClose={() => closeTab(activeTabPath)} />
+      )}
       {appsSelection?.kind === "app" && appTabSurfaces.length > 0 && (
         <PanelTabs
           tabs={[
@@ -123,7 +128,7 @@ export function TabContent({
           a native tab renders its Panel above and must
           not also mount CodePreview (whose edit toolbar
           makes no sense on a native surface). */}
-      {!appsSelection && !nativeSurface && (
+      {!appsSelection && !nativeSurface && !unknownNative && (
         <>
           {tab.stale && !tab.loading && (
             <div className="shrink-0 px-3 py-1.5 text-xs bg-orange-50 dark:bg-orange-950/40 border-b border-orange-200 dark:border-orange-800 flex items-center gap-2 text-orange-700 dark:text-orange-400">
