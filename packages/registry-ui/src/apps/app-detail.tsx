@@ -59,18 +59,26 @@ import {
   unwrapList,
   NATIVE_APP_NAMESPACES,
   type AppChannel,
+  type AppDependencyStatus,
   type AppRelease,
   type AppSummary,
   type CapabilityModel,
+  type InstallSummary,
   type ToolEntryInfo,
   type ToolEntryTier,
   type ToolsInvoke,
   type WorkflowSummary,
 } from "./wire";
 
-export type AppDetailTab = "overview" | "workflows" | "access" | "releases" | "versions";
+export type AppDetailTab =
+  | "overview"
+  | "workflows"
+  | "access"
+  | "releases"
+  | "versions"
+  | "install";
 
-const TABS: ReadonlyArray<{ id: AppDetailTab; label: string }> = [
+const OWNER_TABS: ReadonlyArray<{ id: AppDetailTab; label: string }> = [
   { id: "overview", label: "Overview" },
   { id: "workflows", label: "Workflows" },
   { id: "access", label: "Access" },
@@ -78,26 +86,70 @@ const TABS: ReadonlyArray<{ id: AppDetailTab; label: string }> = [
   { id: "versions", label: "Versions" },
 ];
 
+const INSTALL_TABS: ReadonlyArray<{ id: AppDetailTab; label: string }> = [
+  { id: "overview", label: "Overview" },
+  { id: "access", label: "Access" },
+  { id: "install", label: "Install settings" },
+];
+
 // ---------------------------------------------------------------------------
 // Overview
 // ---------------------------------------------------------------------------
 
-function Overview({ app }: { app: AppSummary }) {
+function Overview({
+  app,
+  install,
+}: {
+  app: AppSummary;
+  install?: InstallSummary | undefined;
+}) {
+  const permalink = install?.permalink ?? app.permalink ?? (app.appId ? `/apps/id/${app.appId}` : undefined);
+  const lineage = install
+    ? `installed from ${install.originWorkspaceId ? `${install.originWorkspaceId}/` : ""}${install.name ?? install.originAppId}`
+    : app.originAppId
+      ? `forked from ${app.originAppId}`
+      : null;
+
   return (
     <div className="space-y-2.5">
       {app.description && <p className="text-xs text-muted-foreground">{app.description}</p>}
+      {(app.appId || install?.installId) && (
+        <FieldRow label={install ? "Install id" : "App id"}>
+          <span className="flex flex-wrap items-center gap-1.5">
+            <code className="break-all font-mono text-[0.7rem]">
+              {install?.installId ?? app.appId}
+            </code>
+            {(install?.installId ?? app.appId) && (
+              <CopyChip text={(install?.installId ?? app.appId) as string} />
+            )}
+          </span>
+        </FieldRow>
+      )}
+      {permalink && (
+        <FieldRow label="Stable link">
+          <span className="flex flex-wrap items-center gap-1.5">
+            <code className="break-all font-mono text-[0.7rem]">{permalink}</code>
+            <CopyChip text={permalink} />
+          </span>
+        </FieldRow>
+      )}
+      {lineage && (
+        <FieldRow label="Lineage">
+          <span className="text-xs text-muted-foreground">{lineage}</span>
+        </FieldRow>
+      )}
       <FieldRow label="Live page">
-        {app.liveUrl ? (
+        {app.liveUrl || install?.liveUrl ? (
           <span className="flex flex-wrap items-center gap-1.5">
             <a
               className="break-all font-mono underline-offset-2 hover:underline"
-              href={app.liveUrl}
+              href={(app.liveUrl ?? install?.liveUrl) as string}
               rel="noreferrer"
               target="_blank"
             >
-              {app.liveUrl}
+              {app.liveUrl ?? install?.liveUrl}
             </a>
-            <CopyChip text={app.liveUrl} />
+            <CopyChip text={(app.liveUrl ?? install?.liveUrl) as string} />
           </span>
         ) : (
           <span className="text-muted-foreground">not published yet</span>
@@ -133,19 +185,28 @@ function Overview({ app }: { app: AppSummary }) {
       </FieldRow>
       <FieldRow label="Updated">{app.updatedAt ? formatWhen(app.updatedAt) : "—"}</FieldRow>
       <div className="flex flex-wrap items-center gap-1.5 pt-1">
-        {app.builtin ? (
-          <span className={`${BADGE} border-dashed text-muted-foreground`}>builtin · personal</span>
+        {install?.available === false ? (
+          <span className={`${BADGE} border-amber-300 text-amber-700 dark:border-amber-900 dark:text-amber-400`}>
+            origin unavailable
+          </span>
         ) : (
           <VisibilityBadge app={app} />
         )}
         <DataScopeBadge app={app} />
-        {/* No release pin for the builtin app — Personal has no release machinery. */}
-        {!app.builtin && <ReleaseChip app={app} />}
+        {!install && <ReleaseChip app={app} />}
+        {install && (
+          <span className={`${BADGE} border-border font-mono text-muted-foreground`}>
+            {"channel" in install.pin
+              ? `channel · ${install.pin.channel}`
+              : `release · ${install.pin.release.slice(0, 12)}`}
+            {install.updateAvailable ? " · update available" : ""}
+          </span>
+        )}
       </div>
-      {app.liveUrl && (
+      {(app.liveUrl || install?.liveUrl) && (
         <a
           className="inline-flex items-center rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-          href={app.liveUrl}
+          href={(app.liveUrl ?? install?.liveUrl) as string}
           rel="noreferrer"
           target="_blank"
         >
@@ -786,18 +847,256 @@ function LimitsSection({
   );
 }
 
+function DependenciesSection({
+  dependencies,
+  showRebind,
+  onRebind,
+}: {
+  dependencies: AppDependencyStatus[];
+  showRebind?: boolean;
+  onRebind?: (() => void) | undefined;
+}) {
+  if (dependencies.length === 0) return null;
+  return (
+    <div className="space-y-1.5">
+      <SectionHeading>Dependencies</SectionHeading>
+      <div className="space-y-1">
+        {dependencies.map((dep) => {
+          const unfulfilled = dep.fulfilled === false;
+          const ungated = dep.fulfilled === "ungated";
+          return (
+            <div
+              className={`flex flex-wrap items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs ${
+                unfulfilled
+                  ? "border-amber-300 dark:border-amber-900"
+                  : "border-border"
+              }`}
+              key={dep.contract}
+            >
+              <code className="font-mono">{dep.contract}</code>
+              {dep.optional && (
+                <span className={`${BADGE} border-border text-muted-foreground`}>optional</span>
+              )}
+              {dep.boundProfile ? (
+                <span className="text-muted-foreground">→ {dep.boundProfile}</span>
+              ) : (
+                <span className="text-muted-foreground">unbound</span>
+              )}
+              {ungated && (
+                <span className={`${BADGE} border-dashed text-muted-foreground`}>
+                  ungated
+                </span>
+              )}
+              {unfulfilled && (
+                <span className={`${BADGE} border-amber-300 text-amber-700 dark:border-amber-900 dark:text-amber-400`}>
+                  unfulfilled
+                </span>
+              )}
+              {unfulfilled && showRebind && onRebind && (
+                <button className={`${SMALL_BUTTON} ml-auto`} onClick={onRebind} type="button">
+                  Re-bind
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function InstallSettingsTab({
+  install,
+  invoke,
+  onChanged,
+}: {
+  install: InstallSummary;
+  invoke: ToolsInvoke;
+  onChanged: () => void;
+}) {
+  const [bindings, setBindings] = React.useState(install.bindings);
+  const [configText, setConfigText] = React.useState(
+    () => JSON.stringify(install.config ?? {}, null, 2),
+  );
+  const [editing, setEditing] = React.useState(install.editing);
+  const [busy, setBusy] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+  const [status, setStatus] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    setBindings(install.bindings);
+    setConfigText(JSON.stringify(install.config ?? {}, null, 2));
+    setEditing(install.editing);
+    setError(null);
+    setStatus(null);
+  }, [install.installId, install.bindings, install.config, install.editing]);
+
+  const pinLabel =
+    "channel" in install.pin
+      ? `channel · ${install.pin.channel}`
+      : `release · ${install.pin.release}`;
+
+  const save = async () => {
+    setBusy("save");
+    setError(null);
+    let config: Record<string, unknown> = {};
+    try {
+      config = JSON.parse(configText) as Record<string, unknown>;
+    } catch {
+      setError("Config must be valid JSON");
+      setBusy(null);
+      return;
+    }
+    const result = await attempt(() =>
+      invoke("configure", {
+        install: install.installId,
+        bindings,
+        config,
+        editing,
+      }),
+    );
+    setBusy(null);
+    if (!result.ok) {
+      setError(result.error ?? "Configure failed");
+      return;
+    }
+    setStatus("Saved");
+    onChanged();
+  };
+
+  const update = async (force = false) => {
+    setBusy("update");
+    setError(null);
+    const result = await attempt(() =>
+      invoke("update", { install: install.installId, ...(force ? { force: true } : {}) }),
+    );
+    setBusy(null);
+    if (!result.ok) {
+      setError(result.error ?? "Update failed");
+      return;
+    }
+    setStatus("Updated");
+    onChanged();
+  };
+
+  return (
+    <div className="space-y-3">
+      {install.available === false && (
+        <p className="rounded-md border border-amber-300 px-2.5 py-1.5 text-xs text-amber-700 dark:border-amber-900 dark:text-amber-400">
+          Origin app is unavailable — update is disabled; the install keeps running from its pin.
+        </p>
+      )}
+      <FieldRow label="Pin">
+        <span className="flex flex-wrap items-center gap-1.5">
+          <span className={`${BADGE} border-border font-mono`}>{pinLabel}</span>
+          {install.resolvedRelease && (
+            <span className="font-mono text-[0.65rem] text-muted-foreground">
+              → {install.resolvedRelease.slice(0, 12)}
+            </span>
+          )}
+          {install.updateAvailable && (
+            <span className={`${BADGE} border-emerald-300 text-emerald-700`}>update available</span>
+          )}
+        </span>
+      </FieldRow>
+      <div className="flex flex-wrap gap-2">
+        <button
+          className={SMALL_BUTTON}
+          disabled={busy !== null || install.available === false}
+          onClick={() => void update(false)}
+          type="button"
+        >
+          {busy === "update" ? "Updating…" : "Update"}
+        </button>
+      </div>
+
+      <div className="space-y-1.5">
+        <SectionHeading>Bindings</SectionHeading>
+        {Object.keys(bindings).length === 0 && !(install.requires?.length) ? (
+          <span className="text-[0.7rem] text-muted-foreground">No bindings</span>
+        ) : (
+          (install.requires ?? Object.keys(bindings).map((c) => ({ contract: c }))).map((req) => (
+            <div className="space-y-1" key={req.contract}>
+              <label className={LABEL}>{req.contract}</label>
+              <input
+                className={FIELD}
+                onChange={(e) =>
+                  setBindings((prev) => ({ ...prev, [req.contract]: e.target.value }))
+                }
+                placeholder="profile id"
+                value={bindings[req.contract] ?? ""}
+              />
+            </div>
+          ))
+        )}
+      </div>
+
+      <div className="space-y-1.5">
+        <SectionHeading>Config</SectionHeading>
+        <textarea
+          className={`${FIELD} min-h-[6rem] font-mono`}
+          onChange={(e) => setConfigText(e.target.value)}
+          spellCheck={false}
+          value={configText}
+        />
+      </div>
+
+      <label className="flex items-start gap-2 text-xs">
+        <input
+          checked={editing}
+          onChange={(e) => {
+            if (e.target.checked) {
+              const ok = window.confirm(
+                `Copies the pinned release's source into this workspace${
+                  install.prefix ? ` at ${install.prefix}` : ""
+                }; future updates from the origin will overwrite local edits (or be blocked).`,
+              );
+              if (!ok) return;
+            }
+            setEditing(e.target.checked);
+          }}
+          type="checkbox"
+        />
+        <span>
+          Editing enabled
+          {install.prefix ? (
+            <span className="block text-[0.65rem] text-muted-foreground">
+              prefix: {install.prefix}
+            </span>
+          ) : null}
+        </span>
+      </label>
+
+      <ErrorLine error={error} />
+      <div className="flex items-center gap-2 border-t pt-2">
+        <button
+          className="rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+          disabled={busy !== null}
+          onClick={() => void save()}
+          type="button"
+        >
+          {busy === "save" ? "Saving…" : "Save install settings"}
+        </button>
+        {status && <span className="text-xs text-emerald-600 dark:text-emerald-400">{status}</span>}
+      </div>
+    </div>
+  );
+}
+
 function AccessTab({
   app,
   workflows,
   invoke,
   invokeRegistry,
   onChanged,
+  install,
 }: {
   app: AppSummary;
   workflows: WorkflowSummary[];
   invoke: ToolsInvoke;
   invokeRegistry?: ToolsInvoke | undefined;
   onChanged: () => void;
+  install?: InstallSummary | undefined;
 }) {
   // The data-location line still wants the gateway's own capability read when
   // there is one — everything else in this tab works entirely off the
@@ -809,7 +1108,9 @@ function AccessTab({
     executingProfiles: Record<string, string>;
   }> => {
     const base = deriveCapabilities(app, workflows);
-    const result = await attempt(() => invoke("capabilities", { name: app.name }));
+    const result = await attempt(() =>
+      invoke("capabilities", { app: app.appId ?? app.name, name: app.name }),
+    );
     if (!result.ok) return { model: base, executingProfiles: {} };
     // Tier-2 entries name the profile that executes each provider grant on
     // profiles-enabled gateways; older gateways simply omit the field and
@@ -906,6 +1207,18 @@ function AccessTab({
           tools={tools}
         />
       </div>
+
+      <DependenciesSection
+        dependencies={model.dependencies}
+        onRebind={
+          install
+            ? () => {
+                /* host can open install settings / rebind via configure */
+              }
+            : undefined
+        }
+        showRebind={Boolean(install)}
+      />
 
       <div className="space-y-1.5">
         <SectionHeading>Limits</SectionHeading>
@@ -1176,6 +1489,8 @@ function ReleasesTab({ app, invoke }: { app: AppSummary; invoke: ToolsInvoke }) 
 
 export interface AppDetailProps {
   app: AppSummary;
+  /** When set, this is an installation detail (Install settings tab appears). */
+  install?: InstallSummary | undefined;
   /** The app's exported workflows, resolved against the workflow registry. */
   workflows: WorkflowSummary[];
   /** Gateway `apps` namespace transport. */
@@ -1199,6 +1514,8 @@ export interface AppDetailProps {
    */
   onRemoved?: (() => void) | undefined;
   onOpenApp?: ((app: AppSummary) => void) | undefined;
+  /** Navigate back to the list (pane variant). */
+  onBack?: (() => void) | undefined;
   tab?: AppDetailTab;
   onTabChange?: ((tab: AppDetailTab) => void) | undefined;
   /** Wired into the Workflows tab's empty state — see {@link AppsPanelProps.onCreateWorkflow}. */
@@ -1209,6 +1526,7 @@ export interface AppDetailProps {
 
 export function AppDetail({
   app,
+  install,
   workflows,
   invokeApps,
   invoke,
@@ -1217,12 +1535,14 @@ export function AppDetail({
   onChanged,
   onRemoved,
   onOpenApp,
+  onBack,
   tab,
   onTabChange,
   onCreateWorkflow,
   createWorkflowHref,
   className,
 }: AppDetailProps) {
+  const tabs = install ? INSTALL_TABS : OWNER_TABS;
   const [localTab, setLocalTab] = React.useState<AppDetailTab>("overview");
   const active = tab ?? localTab;
   const setTab = (next: AppDetailTab) => {
@@ -1234,19 +1554,27 @@ export function AppDetail({
   const [purgeData, setPurgeData] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
-  // A different app in the same pane resets to Overview.
+  // A different app/install in the same pane resets to Overview.
   React.useEffect(() => {
     setLocalTab("overview");
     setError(null);
     setPurgeData(false);
-  }, [app.name]);
+  }, [app.name, install?.installId]);
 
   const removeApp = async () => {
     setDeleting(true);
     setError(null);
-    const result = await attempt(() =>
-      invokeApps("remove", { name: app.name, purge_data: purgeData }),
-    );
+    const result = install
+      ? await attempt(() =>
+          invokeApps("uninstall", { install: install.installId, purge_data: purgeData }),
+        )
+      : await attempt(() =>
+          invokeApps("remove", {
+            app: app.appId ?? app.name,
+            name: app.name,
+            purge_data: purgeData,
+          }),
+        );
     if (!result.ok) {
       setError(result.error ?? "Delete failed");
       setDeleting(false);
@@ -1256,14 +1584,43 @@ export function AppDetail({
     else onChanged?.();
   };
 
+  const permalink =
+    install?.permalink ?? app.permalink ?? (app.appId ? `/apps/id/${app.appId}` : undefined);
+
   return (
     <div className={`space-y-3 ${className ?? ""}`}>
+      {onBack && (
+        <button
+          className="text-[0.7rem] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+          onClick={onBack}
+          type="button"
+        >
+          ‹ Apps
+        </button>
+      )}
       <div className="flex flex-wrap items-start gap-2">
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-medium">{app.title ?? app.name}</span>
-          <code className="font-mono text-[0.7rem] text-muted-foreground">{app.name}</code>
+          <span className="block truncate text-sm font-medium">
+            {install?.title ?? app.title ?? app.name}
+          </span>
+          <code className="font-mono text-[0.7rem] text-muted-foreground">
+            {install ? install.installId : app.name}
+          </code>
+          {permalink && (
+            <span className="mt-0.5 flex flex-wrap items-center gap-1">
+              <code className="font-mono text-[0.65rem] text-muted-foreground">{permalink}</code>
+              <CopyChip text={permalink} />
+            </span>
+          )}
+          {(install || app.originAppId) && (
+            <span className="mt-0.5 block text-[0.65rem] text-muted-foreground">
+              {install
+                ? `installed from ${install.originWorkspaceId ? `${install.originWorkspaceId}/` : ""}${install.name ?? install.originAppId}`
+                : `forked from ${app.originAppId}`}
+            </span>
+          )}
         </span>
-        {onOpenApp && (
+        {onOpenApp && !install && (
           <button className={SMALL_BUTTON} onClick={() => onOpenApp(app)} type="button">
             Open
           </button>
@@ -1275,16 +1632,13 @@ export function AppDetail({
       <Tabs
         active={active}
         onChange={setTab}
-        tabs={TABS
-          // The builtin Personal app has no release machinery — it's your
-          // workspace, not a deploy — so the tab that would only ever say
-          // "unsupported" doesn't render at all.
-          .filter((entry) => entry.id !== "releases" || !app.builtin)
-          .map((entry) => (entry.id === "workflows" ? { ...entry, badge: workflows.length } : entry))}
+        tabs={tabs.map((entry) =>
+          entry.id === "workflows" ? { ...entry, badge: workflows.length } : entry,
+        )}
       />
 
-      {active === "overview" && <Overview app={app} />}
-      {active === "workflows" && (
+      {active === "overview" && <Overview app={app} install={install} />}
+      {active === "workflows" && !install && (
         <WorkflowsTab
           app={app}
           createWorkflowHref={createWorkflowHref}
@@ -1297,14 +1651,15 @@ export function AppDetail({
       {active === "access" && (
         <AccessTab
           app={app}
+          install={install}
           invoke={invokeApps}
           invokeRegistry={invokeRegistry}
           onChanged={() => onChanged?.()}
           workflows={workflows}
         />
       )}
-      {active === "releases" && !app.builtin && <ReleasesTab app={app} invoke={invokeApps} />}
-      {active === "versions" && (
+      {active === "releases" && !install && <ReleasesTab app={app} invoke={invokeApps} />}
+      {active === "versions" && !install && (
         <VersionsSection
           invoke={invokeApps}
           name={app.name}
@@ -1312,27 +1667,29 @@ export function AppDetail({
           open
         />
       )}
-
-      {app.builtin ? (
-        <p className="border-t pt-2 text-[0.7rem] text-muted-foreground">
-          Personal is built into your workspace — there's nothing to unpublish. Remove a workflow
-          from the Workflows tab to take it out of Personal.
-        </p>
-      ) : (
-        <div className="flex flex-wrap items-center gap-2 border-t pt-2">
-          <label className="flex items-center gap-1 text-[0.7rem] text-muted-foreground">
-            <input
-              checked={purgeData}
-              onChange={(event) => setPurgeData(event.target.checked)}
-              type="checkbox"
-            />
-            also delete the app folder &amp; every user's data
-          </label>
-          <span className="ml-auto">
-            <ConfirmDeleteButton busy={deleting} label="Unpublish" onConfirm={() => void removeApp()} />
-          </span>
-        </div>
+      {active === "install" && install && (
+        <InstallSettingsTab install={install} invoke={invokeApps} onChanged={() => onChanged?.()} />
       )}
+
+      <div className="flex flex-wrap items-center gap-2 border-t pt-2">
+        <label className="flex items-center gap-1 text-[0.7rem] text-muted-foreground">
+          <input
+            checked={purgeData}
+            onChange={(event) => setPurgeData(event.target.checked)}
+            type="checkbox"
+          />
+          {install
+            ? "also delete this install's per-user data"
+            : "also delete the app folder & every user's data"}
+        </label>
+        <span className="ml-auto">
+          <ConfirmDeleteButton
+            busy={deleting}
+            label={install ? "Uninstall" : "Unpublish"}
+            onConfirm={() => void removeApp()}
+          />
+        </span>
+      </div>
     </div>
   );
 }

@@ -6,9 +6,8 @@
  *
  * This is deliberately data-only: transport types, wire normalisers, the
  * "three ways data is reached" capability model, and the grouped catalog
- * store (including client-side Personal-app synthesis for gateways that
- * predate it). Presentation — the rendered list, rows, tabs, and detail
- * panes — lives in `@aprovan/registry-ui`, which depends on this package and
+ * store. Presentation — the rendered list, rows, tabs, and detail panes —
+ * lives in `@aprovan/registry-ui`, which depends on this package and
  * re-exports the moved types from its existing import paths so its own public
  * API doesn't move.
  *
@@ -42,14 +41,23 @@ export {
   type TraceRunNode,
   // Apps
   normalizeApp,
+  normalizeRequirement,
+  normalizeRequirements,
+  normalizePin,
   type AppRateLimit,
+  type AppRequirement,
   type AppRoles,
   type AppSummary,
+  type AppPin,
   type DataScope,
-  // The Personal app
-  PERSONAL_APP_NAME,
-  isPersonalApp,
-  synthesizePersonalApp,
+  // Installations and directory
+  installBindingsReady,
+  normalizeDirectory,
+  normalizeDirectoryEntry,
+  normalizeInstall,
+  normalizeInstalls,
+  type DirectoryEntry,
+  type InstallSummary,
   // Releases and channels
   normalizeChannels,
   normalizeRelease,
@@ -60,6 +68,7 @@ export {
   NATIVE_APP_NAMESPACES,
   deriveCapabilities,
   mergeCapabilities,
+  type AppDependencyStatus,
   type CapabilityModel,
   type CapabilityReach,
   type ReachKind,
@@ -74,10 +83,10 @@ export {
 
 export {
   AppsCatalogProvider,
-  PERSONAL_GROUP_ID,
+  PRIVATE_FLOWS_GROUP_ID,
   useAppsCatalog,
   useSharedAppsCatalog,
-  /** @deprecated see {@link PERSONAL_GROUP_ID} — kept for older persisted state. */
+  /** @deprecated see {@link PRIVATE_FLOWS_GROUP_ID} — kept for older persisted state. */
   WORKSPACE_GROUP_ID,
   type AppsCatalog,
   type AppsCatalogProviderProps,

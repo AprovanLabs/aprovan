@@ -1,17 +1,13 @@
 /**
- * The apps catalog store: one loader for both gateway namespaces, grouped the
- * way every Apps surface renders it. Pure data plane — presentation (the
- * grouped list, rows, detail panes) lives in `@aprovan/registry-ui`; hosts and
- * that package both consume this store so two surfaces on one page share one
- * load, one cache and one `refresh()`.
+ * The apps catalog store: one loader for gateway namespaces, grouped the way
+ * every Apps surface renders it. Pure data plane — presentation (the grouped
+ * list, rows, detail panes) lives in `@aprovan/registry-ui`; hosts and that
+ * package both consume this store so two surfaces on one page share one load,
+ * one cache and one `refresh()`.
  *
- * Shape follows docs/apps-and-workflows.md — each app is a group whose
- * children are the workflows it exports, and **every workflow belongs to an
- * app**: the ones nothing exports belong to the implicit Personal app. The
- * gateway synthesizes Personal in `apps.list` (`builtin: true`); when it
- * doesn't (an older gateway), the catalog synthesizes the identical group
- * client-side from the unbundled workflows, so the tree reads the same either
- * way. There is no "Workspace" pseudo-group anymore.
+ * Groups: published apps (Your apps), installations, and unbundled workflows
+ * under "Your flows (private)". There is no synthesized Personal app — an
+ * empty workspace yields an empty app list.
  *
  * Loading is deduplicated by {@link AppsCatalogProvider}: a page that mounts
  * two surfaces (chat mounts the sidebar explorer and the full panel) otherwise
@@ -23,13 +19,14 @@ import * as React from "react";
 import { LastRunProvider } from "./last-runs";
 import {
   attempt,
-  isPersonalApp,
   normalizeApp,
+  normalizeDirectory,
+  normalizeInstalls,
   normalizeWorkflow,
-  synthesizePersonalApp,
   unwrapList,
-  PERSONAL_APP_NAME,
   type AppSummary,
+  type DirectoryEntry,
+  type InstallSummary,
   type ToolsInvoke,
   type WorkflowRunSummary,
   type WorkflowSummary,
@@ -37,33 +34,39 @@ import {
 
 /** What the detail pane is showing. */
 export type AppsSelection =
-  | { kind: "app"; name: string }
+  | { kind: "app"; name: string; appId?: string }
+  | { kind: "install"; installId: string }
+  | { kind: "directory" }
   | { kind: "workflow"; name: string; app?: string };
 
-/** The Personal group's id — the builtin app's own name. */
-export const PERSONAL_GROUP_ID = PERSONAL_APP_NAME;
+/** Unbundled workflows live under this group id (private to the caller). */
+export const PRIVATE_FLOWS_GROUP_ID = "__flows__";
 
 /**
  * @deprecated The "Workspace" pseudo-group is gone — unbundled workflows live
- * under the Personal app ({@link PERSONAL_GROUP_ID}). Kept so persisted
- * selections and expansion sets from older hosts still resolve.
+ * under {@link PRIVATE_FLOWS_GROUP_ID}. Kept so persisted selections and
+ * expansion sets from older hosts still resolve.
  */
 export const WORKSPACE_GROUP_ID = "__workspace__";
 
 export interface CatalogGroup {
   id: string;
-  /** `"workspace"` no longer occurs; kept in the union for older consumers. */
-  kind: "app" | "workspace";
+  kind: "app" | "install" | "flows" | "workspace";
   label: string;
   app?: AppSummary;
+  install?: InstallSummary;
   workflows: WorkflowSummary[];
 }
 
 export interface AppsCatalog {
   apps: AppSummary[];
+  installs: InstallSummary[];
+  directory: DirectoryEntry[];
   workflows: WorkflowSummary[];
   groups: CatalogGroup[];
   appByName: Map<string, AppSummary>;
+  appById: Map<string, AppSummary>;
+  installById: Map<string, InstallSummary>;
   workflowByName: Map<string, WorkflowSummary>;
   /** Last runs the gateway inlined on `list`, ready to seed the run cache. */
   lastRunSeed: Map<string, WorkflowRunSummary | null>;
@@ -115,6 +118,8 @@ function useCatalogLoader({
   enabled: boolean;
 }): AppsCatalog {
   const [apps, setApps] = React.useState<AppSummary[]>([]);
+  const [installs, setInstalls] = React.useState<InstallSummary[]>([]);
+  const [directory, setDirectory] = React.useState<DirectoryEntry[]>([]);
   const [workflows, setWorkflows] = React.useState<WorkflowSummary[]>([]);
   const [loading, setLoading] = React.useState(enabled);
   const [error, setError] = React.useState<string | null>(null);
@@ -129,9 +134,11 @@ function useCatalogLoader({
     let alive = true;
     setLoading(true);
     void (async () => {
-      const [workflowResult, appResult] = await Promise.all([
+      const [workflowResult, appResult, installResult, directoryResult] = await Promise.all([
         attempt(() => invoke("list", {})),
         invokeApps ? attempt(() => invokeApps("list", {})) : Promise.resolve(null),
+        invokeApps ? attempt(() => invokeApps("installed", {})) : Promise.resolve(null),
+        invokeApps ? attempt(() => invokeApps("directory", {})) : Promise.resolve(null),
       ]);
       if (!alive) return;
 
@@ -149,6 +156,8 @@ function useCatalogLoader({
 
       if (!appResult) {
         setApps([]);
+        setInstalls([]);
+        setDirectory([]);
         setAppsUnavailable(true);
       } else if (appResult.ok) {
         setApps(
@@ -157,10 +166,18 @@ function useCatalogLoader({
             .filter((app): app is AppSummary => app !== null),
         );
         setAppsUnavailable(false);
+        setInstalls(
+          installResult?.ok ? normalizeInstalls(installResult.value) : [],
+        );
+        setDirectory(
+          directoryResult?.ok ? normalizeDirectory(directoryResult.value) : [],
+        );
       } else {
         // A missing/erroring apps namespace degrades to workflows-only rather
         // than blanking the panel.
         setApps([]);
+        setInstalls([]);
+        setDirectory([]);
         setAppsUnavailable(true);
       }
       setLoading(false);
@@ -174,44 +191,50 @@ function useCatalogLoader({
     const workflowByName = new Map(workflows.map((workflow) => [workflow.name, workflow]));
     const bundled = new Set<string>();
 
-    // The gateway's Personal app, when it sends one — synthesized locally
-    // otherwise, so older gateways render the identical tree.
-    const personalFromGateway = apps.find(isPersonalApp);
-    const published = apps.filter((app) => !isPersonalApp(app));
-
-    const groups: CatalogGroup[] = published
+    const groups: CatalogGroup[] = apps
       .slice()
       .sort((a, b) => (a.title ?? a.name).localeCompare(b.title ?? b.name))
       .map((app) => ({
-        id: app.name,
+        id: app.appId ?? app.name,
         kind: "app" as const,
         label: app.title ?? app.name,
         app,
         workflows: exportRows(app, workflowByName, bundled),
       }));
 
-    // Personal always closes the list, whether the gateway sent it or not: a
-    // stable anatomy (published apps, then your own) reads better than a group
-    // that moves with the alphabet. Its rows are the gateway's exports plus
-    // any registered workflow no group has claimed — belt and braces, so a
-    // gateway whose Personal listing lags the registry drops nothing.
-    const personalApp: AppSummary = personalFromGateway
-      ? { ...personalFromGateway, builtin: true }
-      : synthesizePersonalApp();
-    const personalRows = personalFromGateway
-      ? exportRows(personalFromGateway, workflowByName, bundled)
-      : [];
-    const unbundled = workflows.filter((workflow) => !bundled.has(workflow.name));
-    groups.push({
-      id: personalApp.name,
-      kind: "app",
-      label: personalApp.title ?? "Personal",
-      app: personalApp,
-      workflows: [...personalRows, ...unbundled],
+    for (const install of installs) {
+      groups.push({
+        id: install.installId,
+        kind: "install",
+        label: install.title ?? install.name ?? install.installId,
+        install,
+        workflows: [],
+      });
+    }
+
+    // Unbundled workflows — private to the caller — close the list. No
+    // synthesized app card: an empty workspace yields an empty list.
+    const unbundled = workflows.filter((workflow) => {
+      if (bundled.has(workflow.name)) return false;
+      // Prefer export annotations when present; otherwise treat as private.
+      if (workflow.exportedBy && workflow.exportedBy.length > 0) return false;
+      if (workflow.apps && workflow.apps.length > 0) return false;
+      return true;
     });
+    if (unbundled.length > 0) {
+      groups.push({
+        id: PRIVATE_FLOWS_GROUP_ID,
+        kind: "flows",
+        label: "Your flows (private)",
+        workflows: unbundled,
+      });
+    }
 
     const appByName = new Map(apps.map((app) => [app.name, app]));
-    appByName.set(personalApp.name, personalApp);
+    const appById = new Map(
+      apps.filter((app) => app.appId).map((app) => [app.appId as string, app]),
+    );
+    const installById = new Map(installs.map((install) => [install.installId, install]));
 
     const lastRunSeed = new Map<string, WorkflowRunSummary | null>();
     for (const workflow of workflows) {
@@ -220,9 +243,13 @@ function useCatalogLoader({
 
     return {
       apps,
+      installs,
+      directory,
       workflows,
       groups,
       appByName,
+      appById,
+      installById,
       workflowByName,
       lastRunSeed,
       loading,
@@ -230,13 +257,13 @@ function useCatalogLoader({
       appsUnavailable,
       refresh: () => setNonce((n) => n + 1),
     };
-  }, [apps, workflows, loading, error, appsUnavailable]);
+  }, [apps, installs, directory, workflows, loading, error, appsUnavailable]);
 }
 
 export interface AppsCatalogProviderProps {
   /** Gateway `workflows` tool namespace (POST /tools/workflows/:operation). */
   invoke: ToolsInvoke;
-  /** Gateway `apps` tool namespace; omit and the tree degrades to Personal alone. */
+  /** Gateway `apps` tool namespace; omit and the tree shows private flows only. */
   invokeApps?: ToolsInvoke | undefined;
   children: React.ReactNode;
 }
@@ -277,8 +304,8 @@ export function useSharedAppsCatalog(): AppsCatalog | null {
 /**
  * The catalog for one surface: the shared one from {@link AppsCatalogProvider}
  * when there is one, otherwise a load of its own. Either side may fail
- * independently — no apps still gives you the Personal group, and no
- * workflows still gives you the app directory.
+ * independently — no apps still gives you an empty list (plus private flows
+ * when present), and no workflows still gives you the app directory.
  */
 export function useAppsCatalog(options?: {
   invoke?: ToolsInvoke | undefined;

@@ -2,24 +2,17 @@
  * The rendered list: the grouped catalog from `@aprovan/ui/apps-store`, drawn
  * as rows.
  *
- * The catalog *store* — loading, grouping, Personal-app synthesis — moved to
- * `@aprovan/ui/apps-store` (2026-07-24) so it's shared with any host that
- * renders an Apps surface. What stays here is presentation: `AppsList`, its
- * rows, and the size-aware expand/collapse behaviour, all re-exported under
- * their original names so nothing importing `./catalog` (or
- * `@aprovan/registry-ui/apps-panel`) had to change.
+ * The catalog *store* — loading and grouping — lives in `@aprovan/ui/apps-store`
+ * so it's shared with any host that renders an Apps surface. What stays here is
+ * presentation: `AppsList`, its rows, and the size-aware expand/collapse
+ * behaviour. Groups are published apps, installations, and unbundled private
+ * flows — never a synthesized Personal card.
  *
- * There is no "Workspace" pseudo-group anymore. Every workflow belongs to an
- * app — the ones nothing exports belong to the implicit **Personal** app,
- * which the store either reads from the gateway (`builtin: true`) or
- * synthesizes client-side. This list renders it like any other app group,
- * just with quieter chrome: no visibility badge, no release chip, a "builtin"
- * tone on the label instead of a public/private pill. `AppsList` is the *same
- * component and the same state* at both densities — the chat sidebar passes
- * `variant="sidebar"` for a 288px column, the registry passes `variant="full"`
- * for the master column of the master/detail panel. Which groups start open
- * follows the *row count*, not the variant ({@link SMALL_LIST_ROWS}), and a
- * host may control it outright.
+ * `AppsList` is the *same component and the same state* at both densities —
+ * the chat sidebar passes `variant="sidebar"` for a 288px column, the registry
+ * passes `variant="full"` for the master column of the master/detail panel.
+ * Which groups start open follows the *row count*, not the variant
+ * ({@link SMALL_LIST_ROWS}), and a host may control it outright.
  */
 
 import * as React from "react";
@@ -38,7 +31,7 @@ import { attempt, normalizeRunTrace, type AppSummary, type ToolsInvoke, type Wor
 
 export {
   AppsCatalogProvider,
-  PERSONAL_GROUP_ID,
+  PRIVATE_FLOWS_GROUP_ID,
   useAppsCatalog,
   useSharedAppsCatalog,
   /** @deprecated the "Workspace" pseudo-group is gone; kept for older persisted state. */
@@ -49,7 +42,7 @@ export {
   type CatalogGroup,
 } from "@aprovan/ui/apps-store";
 import {
-  PERSONAL_GROUP_ID,
+  PRIVATE_FLOWS_GROUP_ID,
   type AppsCatalog,
   type AppsSelection,
   type CatalogGroup,
@@ -117,10 +110,10 @@ function WorkflowRow({
 }: {
   workflow: WorkflowSummary;
   selected: boolean;
-  variant: "full" | "sidebar";
+  variant: "full" | "sidebar" | "pane";
   invoke: ToolsInvoke;
   onSelect: () => void;
-  onOpenScript?: ((path: string) => void) | undefined;
+  onOpenScript?: ((path: string) => Promise<void> | void) | undefined;
 }) {
   const lastRun = useLastRun(workflow.name);
   const compact = variant === "sidebar";
@@ -165,7 +158,7 @@ function WorkflowRow({
 /**
  * One consistent, explorer-like interaction model in both variants:
  *
- *  - the **row** selects. An app row opens the app detail (and, via the
+ *  - the **row** selects. An app/install row opens the detail (and, via the
  *    list's select path, expands the group if it was collapsed — selecting
  *    never collapses).
  *  - the **chevron** toggles expansion alone, never touching the selection —
@@ -174,8 +167,7 @@ function WorkflowRow({
  *
  * Badges stay off the row in both densities (a count plus a "public" marker
  * at most) — data scope and release pins belong to the detail pane, not a
- * master list that has to scan. The builtin Personal app gets none of that:
- * no visibility badge (it's never public), quieter label tone instead.
+ * master list that has to scan. Private-flows groups use quieter chrome.
  */
 function GroupHeader({
   group,
@@ -189,15 +181,17 @@ function GroupHeader({
   group: CatalogGroup;
   expanded: boolean;
   selected: boolean;
-  variant: "full" | "sidebar";
+  variant: "full" | "sidebar" | "pane";
   onToggle: () => void;
   onSelect: () => void;
   onOpenApp?: ((app: AppSummary) => void) | undefined;
 }) {
   const app = group.app;
+  const install = group.install;
   const compact = variant === "sidebar";
-  const builtin = app?.builtin === true;
+  const flows = group.kind === "flows";
   const hasWorkflows = group.workflows.length > 0;
+  const selectable = Boolean(app || install);
   return (
     <div
       className={`group flex items-center gap-1 rounded px-1 py-1 transition-colors ${
@@ -225,20 +219,27 @@ function GroupHeader({
       )}
       <button
         className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
-        onClick={app ? onSelect : onToggle}
+        onClick={selectable ? onSelect : onToggle}
         type="button"
       >
         <span
-          className={`truncate text-xs font-medium ${builtin ? "text-muted-foreground" : ""}`}
+          className={`truncate text-xs font-medium ${flows ? "text-muted-foreground" : ""}`}
         >
           {group.label}
         </span>
-        <span className="shrink-0 text-[0.65rem] tabular-nums text-muted-foreground">
-          {group.workflows.length}
-        </span>
-        {builtin ? (
+        {hasWorkflows && (
+          <span className="shrink-0 text-[0.65rem] tabular-nums text-muted-foreground">
+            {group.workflows.length}
+          </span>
+        )}
+        {flows ? (
           <span className="shrink-0 rounded-full border border-dashed px-1.5 py-px text-[0.6rem] text-muted-foreground">
-            personal
+            private
+          </span>
+        ) : install ? (
+          <span className="shrink-0 rounded-full border px-1.5 py-px text-[0.6rem] text-muted-foreground">
+            installed
+            {install.available === false ? " · unavailable" : ""}
           </span>
         ) : (
           app && !compact && app.visibility === "public" && <VisibilityBadge app={app} />
@@ -284,7 +285,7 @@ export interface AppsListProps {
   selection: AppsSelection | null;
   onSelect: (selection: AppsSelection) => void;
   invoke: ToolsInvoke;
-  variant?: "full" | "sidebar";
+  variant?: "full" | "sidebar" | "pane";
   onOpenApp?: ((app: AppSummary) => void) | undefined;
   onOpenScript?: ((path: string) => void) | undefined;
   /** Rows rendered before the "show more" tail (default 60). */
@@ -383,10 +384,11 @@ export function AppsList({
       // opens itself so the selected row is never invisible.
       if (expandedList !== null) return expandedList.includes(group.id);
       if (selection?.kind === "workflow" && selection.app === group.id) return true;
-      if (selection?.kind === "workflow" && group.id === PERSONAL_GROUP_ID && !selection.app) {
+      if (selection?.kind === "workflow" && group.id === PRIVATE_FLOWS_GROUP_ID && !selection.app) {
         return true;
       }
-      if (selection?.kind === "app" && selection.name === group.id) return true;
+      if (selection?.kind === "app" && (selection.name === group.id || selection.name === group.app?.name)) return true;
+      if (selection?.kind === "install" && selection.installId === group.id) return true;
       return expandByDefault;
     },
     [expandByDefault, expandedList, query, selection],
@@ -441,10 +443,21 @@ export function AppsList({
     const key =
       selection.kind === "app"
         ? `a:${selection.name}`
-        : `w:${selection.app ?? ""}:${selection.name}`;
+        : selection.kind === "install"
+          ? `i:${selection.installId}`
+          : selection.kind === "directory"
+            ? "directory"
+            : `w:${selection.app ?? ""}:${selection.name}`;
     if (lastRevealed.current === key) return;
     lastRevealed.current = key;
-    ensureExpanded(selection.kind === "app" ? selection.name : (selection.app ?? PERSONAL_GROUP_ID));
+    if (selection.kind === "directory") return;
+    ensureExpanded(
+      selection.kind === "app"
+        ? selection.appId ?? selection.name
+        : selection.kind === "install"
+          ? selection.installId
+          : (selection.app ?? PRIVATE_FLOWS_GROUP_ID),
+    );
   }, [selection, ensureExpanded]);
 
   // Flatten to rows first so the cap counts *rendered rows*, not groups —
@@ -516,14 +529,29 @@ export function AppsList({
                   key={row.key}
                   onOpenApp={onOpenApp}
                   onSelect={() => {
+                    if (row.group.install) {
+                      onSelect({ kind: "install", installId: row.group.install.installId });
+                      ensureExpanded(row.group.id);
+                      return;
+                    }
                     if (!row.group.app) return;
                     // Row click = select + reveal. The reveal is one-way; the
                     // chevron is the only thing that collapses.
-                    onSelect({ kind: "app", name: row.group.app.name });
+                    onSelect({
+                      kind: "app",
+                      name: row.group.app.name,
+                      ...(row.group.app.appId ? { appId: row.group.app.appId } : {}),
+                    });
                     ensureExpanded(row.group.id);
                   }}
                   onToggle={() => toggle(row.group.id)}
-                  selected={selection?.kind === "app" && selection.name === row.group.id}
+                  selected={
+                    (selection?.kind === "app" &&
+                      (selection.name === row.group.app?.name ||
+                        selection.appId === row.group.app?.appId ||
+                        selection.name === row.group.id)) ||
+                    (selection?.kind === "install" && selection.installId === row.group.id)
+                  }
                   variant={variant}
                 />
               ) : (
