@@ -8,10 +8,11 @@
  */
 
 import { ArrowRight, GitCompareArrows, Loader2 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import {
+  ArmedButton,
   PanelEmpty,
-  PanelError,
+  PanelErrorWithRetry,
   PanelLoading,
   PanelShell,
   relativeTime,
@@ -41,32 +42,6 @@ interface SyncPipeline {
 }
 
 const invokeSync = invokeNamespaceTool("sync");
-
-/** Two-click destructive confirm: first click arms for 3s. */
-function ConfirmDeleteButton({ onConfirm, disabled }: { onConfirm: () => void; disabled?: boolean }) {
-  const [arming, setArming] = useState(false);
-  const timer = useRef<number | undefined>(undefined);
-  return (
-    <Button
-      variant={arming ? "destructive" : "ghost"}
-      size="sm"
-      disabled={disabled}
-      className="h-7 px-2 text-xs"
-      onClick={() => {
-        if (arming) {
-          window.clearTimeout(timer.current);
-          setArming(false);
-          onConfirm();
-          return;
-        }
-        setArming(true);
-        timer.current = window.setTimeout(() => setArming(false), 3000);
-      }}
-    >
-      {arming ? "Confirm delete?" : "Delete"}
-    </Button>
-  );
-}
 
 function StageChip({ label, title }: { label: string; title?: string }) {
   return (
@@ -114,7 +89,13 @@ function SyncCard({ sync, onChanged }: { sync: SyncPipeline; onChanged: () => vo
     setActionError(null);
     invokeSync(operation, { name: sync.name })
       .then(onChanged)
-      .catch((err) => setActionError(err instanceof Error ? err.message : String(err)))
+      .catch(() =>
+        setActionError(
+          operation === "run"
+            ? "Couldn't run this pipeline. Retry, or check your connection."
+            : "Couldn't delete this pipeline. Retry, or check your connection.",
+        ),
+      )
       .finally(() => setBusy(false));
   };
 
@@ -162,7 +143,13 @@ function SyncCard({ sync, onChanged }: { sync: SyncPipeline; onChanged: () => vo
           {running && <Loader2 className="mr-1 h-3 w-3 animate-spin" />}
           {running ? "Running…" : "Run now"}
         </Button>
-        <ConfirmDeleteButton onConfirm={() => act("delete", setDeleting)} disabled={running || deleting} />
+        {!running && !deleting && (
+          <ArmedButton
+            label="Delete"
+            armedLabel="Confirm delete?"
+            onConfirm={() => act("delete", setDeleting)}
+          />
+        )}
       </div>
     </div>
   );
@@ -178,18 +165,22 @@ export function SyncPanel({ scope: _scope }: NativePanelProps) {
     <PanelShell
       icon={GitCompareArrows}
       title="Sync"
-      description="Pipelines that move data between services and your workspace"
+      description="Keep external services and your workspace data in step"
       onRefresh={refresh}
       refreshing={loading}
     >
       {error ? (
-        <PanelError message={error} />
+        <PanelErrorWithRetry
+          message="Couldn't load sync pipelines. Retry, or check your connection."
+          onRetry={refresh}
+          retrying={loading}
+        />
       ) : loading && !data ? (
-        <PanelLoading />
+        <PanelLoading label="Loading pipelines…" />
       ) : syncs.length === 0 ? (
         <PanelEmpty>
-          No sync pipelines yet. Ask in chat to set one up — pick a source, an optional
-          transform, and where the data should land.
+          Pipelines that move data between services and your workspace appear here. Ask in
+          chat to set one up.
         </PanelEmpty>
       ) : (
         <div className="flex flex-col gap-2 p-3">

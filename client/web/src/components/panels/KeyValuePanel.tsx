@@ -7,11 +7,12 @@
  * scopes the `list` call to workspace keys automatically.
  */
 
-import { Database, Plus, Trash2 } from "lucide-react";
+import { Database, Plus } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  ArmedButton,
   PanelEmpty,
-  PanelError,
+  PanelErrorWithRetry,
   PanelLoading,
   PanelShell,
   usePanelData,
@@ -57,13 +58,10 @@ export function KeyValuePanel({ scope: explicitScope }: NativePanelProps) {
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
-  const [deleteArmed, setDeleteArmed] = useState(false);
   const flashTimer = useRef(0);
-  const armTimer = useRef(0);
   useEffect(
     () => () => {
       window.clearTimeout(flashTimer.current);
-      window.clearTimeout(armTimer.current);
     },
     []
   );
@@ -73,7 +71,6 @@ export function KeyValuePanel({ scope: explicitScope }: NativePanelProps) {
   // Load the selected key's value into the editor.
   useEffect(() => {
     setFormError(null);
-    setDeleteArmed(false);
     if (!selectedKey) {
       setEditorText("");
       return;
@@ -86,8 +83,10 @@ export function KeyValuePanel({ scope: explicitScope }: NativePanelProps) {
         const { value } = result as { key: string; value: unknown };
         setEditorText(JSON.stringify(value, null, 2) ?? "null");
       })
-      .catch((err) => {
-        if (!cancelled) setFormError(err instanceof Error ? err.message : String(err));
+      .catch(() => {
+        if (!cancelled) {
+          setFormError("Couldn't load this record. Retry, or check your connection.");
+        }
       })
       .finally(() => {
         if (!cancelled) setValueLoading(false);
@@ -102,7 +101,6 @@ export function KeyValuePanel({ scope: explicitScope }: NativePanelProps) {
     setNewKey("");
     setEditorText("");
     setFormError(null);
-    setDeleteArmed(false);
   };
 
   const handleSave = async () => {
@@ -115,8 +113,8 @@ export function KeyValuePanel({ scope: explicitScope }: NativePanelProps) {
     let value: unknown;
     try {
       value = editorText.trim() === "" ? null : JSON.parse(editorText);
-    } catch (err) {
-      setFormError(`Invalid JSON: ${err instanceof Error ? err.message : String(err)}`);
+    } catch {
+      setFormError("Value must be valid JSON. Fix the syntax and try again.");
       return;
     }
     setSaving(true);
@@ -128,33 +126,25 @@ export function KeyValuePanel({ scope: explicitScope }: NativePanelProps) {
       flashTimer.current = window.setTimeout(() => setSavedFlash(false), 1500);
       if (detail.kind === "create") setDetail({ kind: "view", key });
       refresh();
-    } catch (err) {
-      setFormError(err instanceof Error ? err.message : String(err));
+    } catch {
+      setFormError("Couldn't save this record. Retry, or check your connection.");
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async () => {
-    if (detail?.kind !== "view") return;
-    if (!deleteArmed) {
-      setDeleteArmed(true);
-      window.clearTimeout(armTimer.current);
-      armTimer.current = window.setTimeout(() => setDeleteArmed(false), 3000);
-      return;
-    }
-    window.clearTimeout(armTimer.current);
+    if (detail?.kind !== "view" || saving) return;
     setSaving(true);
     setFormError(null);
     try {
       await kv("delete", { key: detail.key });
       setDetail(null);
       refresh();
-    } catch (err) {
-      setFormError(err instanceof Error ? err.message : String(err));
+    } catch {
+      setFormError("Couldn't delete this record. Retry, or check your connection.");
     } finally {
       setSaving(false);
-      setDeleteArmed(false);
     }
   };
 
@@ -162,7 +152,7 @@ export function KeyValuePanel({ scope: explicitScope }: NativePanelProps) {
     <PanelShell
       icon={Database}
       title="Data"
-      description="Records your workspace and workflows store"
+      description="Browse and edit the records your workspace and workflows store"
       actions={scopeFilter}
       onRefresh={refresh}
       refreshing={loading}
@@ -171,14 +161,15 @@ export function KeyValuePanel({ scope: explicitScope }: NativePanelProps) {
         // The gateway keeps each app's data private to that app — there is
         // nothing the workspace view could list for it.
         <PanelEmpty>
-          {scope.title ?? scope.name} keeps its own private data, which is only visible inside the
-          app.
+          {scope.title ?? scope.name} keeps its own private data, which is only visible
+          inside the app.
         </PanelEmpty>
       ) : (
         <div className="flex h-full min-h-0 flex-col">
           {explicitScope && (
             <div className="border-b px-3 py-1.5 text-xs text-muted-foreground">
-              Each app keeps its own private data, which isn&apos;t visible from the workspace view.
+              Each app keeps its own private data, which isn&apos;t visible from the
+              workspace view.
             </div>
           )}
           <div className="flex items-center gap-2 border-b px-3 py-2">
@@ -200,12 +191,17 @@ export function KeyValuePanel({ scope: explicitScope }: NativePanelProps) {
             </Button>
           </div>
           {loading && !data ? (
-            <PanelLoading label="Loading keys…" />
+            <PanelLoading label="Loading records…" />
           ) : error ? (
-            <PanelError message={error} />
+            <PanelErrorWithRetry
+              message="Couldn't load records. Retry, or check your connection."
+              onRetry={refresh}
+              retrying={loading}
+            />
           ) : keys.length === 0 && !committedPrefix && !detail ? (
             <PanelEmpty>
-              No data yet. Records that widgets and workflows save will show up here.
+              Records that widgets and workflows save appear here. Create one with New
+              record.
             </PanelEmpty>
           ) : (
             <div className="flex min-h-0 flex-1 flex-col md:flex-row">
@@ -268,16 +264,11 @@ export function KeyValuePanel({ scope: explicitScope }: NativePanelProps) {
                         Save
                       </Button>
                       {detail.kind === "view" && (
-                        <Button
-                          size="sm"
-                          variant={deleteArmed ? "destructive" : "outline"}
-                          className="h-8"
-                          onClick={handleDelete}
-                          disabled={saving}
-                        >
-                          <Trash2 className="mr-1 h-3.5 w-3.5" />
-                          {deleteArmed ? "Confirm delete?" : "Delete"}
-                        </Button>
+                        <ArmedButton
+                          label="Delete"
+                          armedLabel="Confirm delete?"
+                          onConfirm={() => void handleDelete()}
+                        />
                       )}
                       {savedFlash && <span className="text-xs text-muted-foreground">Saved</span>}
                     </div>

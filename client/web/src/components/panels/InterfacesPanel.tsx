@@ -19,10 +19,11 @@
  */
 
 import { Loader2, Plug, Plus } from "lucide-react";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import {
+  ArmedButton,
   PanelEmpty,
-  PanelError,
+  PanelErrorWithRetry,
   PanelLoading,
   PanelShell,
   type NativePanelProps,
@@ -371,40 +372,6 @@ function BindingForm({
   );
 }
 
-/** Two-click destructive confirm: first click arms for 3s. */
-function ConfirmButton({
-  label,
-  onConfirm,
-  disabled,
-}: {
-  label: string;
-  onConfirm: () => void;
-  disabled?: boolean;
-}) {
-  const [arming, setArming] = useState(false);
-  const timer = useRef<number | undefined>(undefined);
-  return (
-    <Button
-      variant={arming ? "destructive" : "ghost"}
-      size="sm"
-      disabled={disabled}
-      className="h-7 px-2 text-xs"
-      onClick={() => {
-        if (arming) {
-          window.clearTimeout(timer.current);
-          setArming(false);
-          onConfirm();
-          return;
-        }
-        setArming(true);
-        timer.current = window.setTimeout(() => setArming(false), 3000);
-      }}
-    >
-      {arming ? "Confirm?" : label}
-    </Button>
-  );
-}
-
 function summarize(options: Record<string, unknown> | undefined): string {
   const entries = Object.entries(options ?? {}).filter(
     ([, value]) => (typeof value === "string" && value) || typeof value === "number",
@@ -447,7 +414,7 @@ function InterfaceCard({
         setInstanceName("");
         onChanged();
       })
-      .catch((err) => setActionError(err instanceof Error ? err.message : String(err)))
+      .catch(() => setActionError("Couldn't update this interface. Retry, or check your connection."))
       .finally(() => setBusy(false));
   };
 
@@ -548,7 +515,7 @@ function InterfaceCard({
               className="h-7 px-2 text-xs"
               onClick={() => setEditing(true)}
             >
-              {def.binding ? "Change binding" : "Bind"}
+              {def.binding ? "Change provider" : "Choose provider"}
             </Button>
             <Button
               variant="ghost"
@@ -559,10 +526,10 @@ function InterfaceCard({
               <Plus className="h-3 w-3" />
               Add profile
             </Button>
-            {def.binding && (
-              <ConfirmButton
-                label="Unbind"
-                disabled={busy}
+            {def.binding && !busy && (
+              <ArmedButton
+                label="Clear"
+                armedLabel="Confirm clear?"
                 onConfirm={() => run("unbind", { interface: def.id })}
               />
             )}
@@ -598,7 +565,7 @@ function InstanceRow({
         setEditing(false);
         onChanged();
       })
-      .catch((err) => setActionError(err instanceof Error ? err.message : String(err)))
+      .catch(() => setActionError("Couldn't update this profile. Retry, or check your connection."))
       .finally(() => setBusy(false));
   };
 
@@ -662,13 +629,15 @@ function InstanceRow({
           >
             Edit
           </Button>
-          <ConfirmButton
-            label="Remove"
-            disabled={busy}
-            onConfirm={() =>
-              run("unbind", { interface: instance.interface, as: instance.name })
-            }
-          />
+          {!busy && (
+            <ArmedButton
+              label="Remove"
+              armedLabel="Confirm remove?"
+              onConfirm={() =>
+                run("unbind", { interface: instance.interface, as: instance.name })
+              }
+            />
+          )}
         </div>
       )}
     </div>
@@ -693,16 +662,22 @@ export function InterfacesPanel({ scope: _scope }: NativePanelProps) {
     <PanelShell
       icon={Plug}
       title="Interfaces"
-      description="Choose which service backs each built-in capability"
+      description="Pick which connected service powers each workspace capability"
       onRefresh={refresh}
       refreshing={loading}
     >
       {error ? (
-        <PanelError message={error} />
+        <PanelErrorWithRetry
+          message="Couldn't load interfaces. Retry, or check your connection."
+          onRetry={refresh}
+          retrying={loading}
+        />
       ) : loading && !data ? (
-        <PanelLoading />
+        <PanelLoading label="Loading interfaces…" />
       ) : interfaces.length === 0 ? (
-        <PanelEmpty>No interfaces available from this gateway.</PanelEmpty>
+        <PanelEmpty>
+          Workspace capabilities you can wire to a connected service appear here.
+        </PanelEmpty>
       ) : (
         <div className="flex flex-col gap-3 p-3">
           {interfaces.map((def) => {
