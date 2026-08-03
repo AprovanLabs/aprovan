@@ -135,32 +135,50 @@ export function MergeDialog({
     [runCompletion, setResolution],
   );
 
-  const confirm = useCallback(async () => {
-    setApplying(true);
-    setError(null);
-    try {
-      const keepWorkspace: string[] = [];
-      for (const path of conflicts) {
-        const resolution = resolutions.get(path) ?? { choice: "draft" as const };
-        if (resolution.choice === "workspace") keepWorkspace.push(path);
-        else if (resolution.choice === "ai") {
-          if (resolution.aiContent === undefined) {
-            throw new Error(`“${path}” is set to Combine but hasn't been combined yet.`);
+  const applyResolutions = useCallback(
+    async (choices: Map<string, FileResolution>) => {
+      setApplying(true);
+      setError(null);
+      try {
+        const keepWorkspace: string[] = [];
+        for (const path of conflicts) {
+          const resolution = choices.get(path) ?? { choice: "draft" as const };
+          if (resolution.choice === "workspace") keepWorkspace.push(path);
+          else if (resolution.choice === "ai") {
+            if (resolution.aiContent === undefined) {
+              throw new Error(`“${path}” is set to Combine but hasn't been combined yet.`);
+            }
+            await writeFile(path, resolution.aiContent); // session-scoped write
           }
-          await writeFile(path, resolution.aiContent); // session-scoped write
+          // "draft" needs nothing — the draft already holds that version.
         }
-        // "draft" needs nothing — the draft already holds that version.
+        if (keepWorkspace.length > 0) {
+          await discardSessionChanges(sessionId, keepWorkspace);
+        }
+        onResolved();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setApplying(false);
       }
-      if (keepWorkspace.length > 0) {
-        await discardSessionChanges(sessionId, keepWorkspace);
-      }
-      onResolved();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setApplying(false);
-    }
-  }, [conflicts, resolutions, sessionId, onResolved]);
+    },
+    [conflicts, sessionId, onResolved],
+  );
+
+  const confirm = useCallback(async () => {
+    await applyResolutions(resolutions);
+  }, [applyResolutions, resolutions]);
+
+  /** Bulk keep-all — only surface that executes bulk resolutions (tech-plan D6). */
+  const resolveAll = useCallback(
+    async (choice: "draft" | "workspace") => {
+      const next = new Map<string, FileResolution>();
+      for (const path of conflicts) next.set(path, { choice });
+      setResolutions(next);
+      await applyResolutions(next);
+    },
+    [conflicts, applyResolutions],
+  );
 
   if (!open) return null;
 
@@ -177,6 +195,27 @@ export function MergeDialog({
           While this draft was open, your workspace changed too. For each file, choose which
           version to keep — or let AI combine them and tell you what it decided.
         </p>
+
+        <div className="flex flex-wrap gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs"
+            disabled={applying || busy}
+            onClick={() => void resolveAll("draft")}
+          >
+            Keep all mine
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs"
+            disabled={applying || busy}
+            onClick={() => void resolveAll("workspace")}
+          >
+            Keep all workspace
+          </Button>
+        </div>
 
         {conflicts.map((path) => {
           const resolution = resolutions.get(path) ?? { choice: "draft" as const };

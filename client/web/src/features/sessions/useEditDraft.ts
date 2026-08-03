@@ -8,9 +8,6 @@ import {
 } from "@/lib/workspace-vfs";
 import type { ChatSessionInfo } from "@/lib/chat-sessions";
 
-/** "1" = closing the editor keeps its changes as a draft instead of applying. */
-export const EDIT_KEEP_DRAFT_KEY = "patchwork:edit-keep-draft";
-
 export function toProjectRelativePath(projectId: string, path: string): string {
   const normalizedProjectId = projectId.replace(/^\/+|\/+$/g, "");
   const normalizedPath = path.replace(/^\/+|\/+$/g, "");
@@ -47,19 +44,6 @@ export function useEditDraft(args: {
   // args shape for call-site stability; draft apply/conflict lives in hooks.
 
   const [editSession, setEditSession] = useState<EditSessionState | null>(null);
-  const [keepEditDrafts, setKeepEditDrafts] = useState<boolean>(
-    () => localStorage.getItem(EDIT_KEEP_DRAFT_KEY) === "1",
-  );
-
-  const handleKeepEditDraftsChange = useCallback((keep: boolean) => {
-    setKeepEditDrafts(keep);
-    try {
-      if (keep) localStorage.setItem(EDIT_KEEP_DRAFT_KEY, "1");
-      else localStorage.removeItem(EDIT_KEEP_DRAFT_KEY);
-    } catch {
-      // Preference persistence is best-effort.
-    }
-  }, []);
 
   /** Close the modal and restore VFS scope to the active chat (if any). */
   const closeEditSession = useCallback(() => {
@@ -131,8 +115,6 @@ export function useEditDraft(args: {
   return {
     editSession,
     setEditSession,
-    keepEditDrafts,
-    handleKeepEditDraftsChange,
     closeEditSession,
     openSharedEditSession,
     openWorkspaceSession,

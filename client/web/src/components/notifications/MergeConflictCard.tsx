@@ -1,12 +1,8 @@
 /**
- * builtin:merge-conflict — the first widget-rendered notification
- * (registry docs/vcs-and-sessions.md "Notifications").
+ * builtin:merge-conflict — summary entry for the one conflict surface.
  *
- * Content only: which files changed in two places and what each resolution
- * would do. The actions live on the notification itself — choices call
- * `sessions.resolve` natively (one click completes the merge), and the
- * link opens the full merge dialog for file-by-file resolution with AI
- * help. This card just makes the decision legible.
+ * Lists conflicted paths and points at Review. Resolution (per-file and bulk)
+ * lives only in MergeDialog — this card never offers one-click choices.
  */
 
 import { FileDiff } from "lucide-react";
@@ -39,20 +35,10 @@ export function MergeConflictCard({ data }: { data: unknown }) {
           <li className="text-muted-foreground">…and {conflicts.length - 8} more</li>
         )}
       </ul>
-      <div className="space-y-1 text-muted-foreground">
-        <p>
-          <span className="font-medium text-foreground">Keep the draft's versions</span> —
-          the draft's files replace the workspace's and everything applies.
-        </p>
-        <p>
-          <span className="font-medium text-foreground">Keep the workspace versions</span> —
-          the draft lets those files go and the rest applies.
-        </p>
-        <p>
-          <span className="font-medium text-foreground">Review</span> — decide file by
-          file, with AI to combine both versions where you want it.
-        </p>
-      </div>
+      <p className="text-muted-foreground">
+        <span className="font-medium text-foreground">Review</span> — choose per file, or
+        keep all mine / keep all workspace in the dialog.
+      </p>
     </div>
   );
 }

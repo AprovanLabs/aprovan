@@ -1,12 +1,12 @@
 import { useEffect, useRef, type Dispatch, type SetStateAction } from "react";
 import { GATEWAY_BASE } from "@/lib/gateway";
-import { publishNotification } from "@/lib/notifications";
 import { syncChatSession, type ChatSessionInfo } from "@/lib/chat-sessions";
 import {
   startLiveWorkspaceSync,
   subscribeToSyncState,
   type WorkspaceSyncState,
 } from "@/lib/workspace-vfs";
+import { publishConflictNotification } from "@/features/sessions/conflict-notify";
 
 /**
  * Background sync loops around the active session: draft auto-sync with
@@ -41,43 +41,17 @@ export function useDraftSync(args: {
             notifiedConflictsRef.current = "";
             return;
           }
-          const signature = conflicts.map((c) => c.path).sort().join("|");
+          const signature = conflicts
+            .map((c) => c.path)
+            .sort()
+            .join("|");
           if (notifiedConflictsRef.current === signature) return;
           notifiedConflictsRef.current = signature;
-          publishNotification({
-            category: "decision",
-            title: "Some files changed in two places",
-            body: `Your workspace and the draft “${session.title}” both changed ${
-              conflicts.length === 1 ? "a file" : `${conflicts.length} files`
-            }.`,
-            widget: {
-              path: "builtin:merge-conflict",
-              data: {
-                sessionTitle: session.title,
-                conflicts: conflicts.map((c) => ({ path: c.path })),
-              },
-            },
-            choices: [
-              {
-                label: "Keep the draft's versions",
-                description: "The draft's files replace the workspace's and everything applies",
-                call: {
-                  namespace: "sessions",
-                  procedure: "resolve",
-                  args: { id, strategy: "keep-draft" },
-                },
-              },
-              {
-                label: "Keep the workspace versions",
-                description: "The draft lets the conflicted files go and the rest applies",
-                call: {
-                  namespace: "sessions",
-                  procedure: "resolve",
-                  args: { id, strategy: "keep-workspace" },
-                },
-              },
-            ],
-            link: { kind: "open-merge", sessionId: id },
+          publishConflictNotification({
+            sessionId: id,
+            sessionTitle: session.title,
+            conflicts: conflicts.map((c) => ({ path: c.path })),
+            origin: "draft-sync",
           });
         })
         .catch(() => {});

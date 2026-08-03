@@ -136,24 +136,24 @@ if a stream needs more, fix the tech plan first.
 
 > Depends-on: 4 | Touches: client/web/src/components/SessionBar.tsx, client/web/src/components/MergeDialog.tsx, client/web/src/components/notifications/MergeConflictCard.tsx, client/web/src/features/sessions/useDraftSync.ts, client/web/src/components/ui/dropdown-menu.tsx | Verify: `pnpm --filter @aprovan/patchwork-web build && ! grep -rn "edit-keep-draft\|keepEditDrafts" client/web/src && ! grep -c "publishNotification" client/web/src/features/sessions/useDraftSync.ts`
 
-- [ ] 6.1 Migrate `useDraftSync.ts`'s inline conflict notification (L52–86) to
+- [x] 6.1 Migrate `useDraftSync.ts`'s inline conflict notification (L52–86) to
       `publishConflictNotification({origin:"draft-sync"})`, deleting the duplicated
       choice-blob literal. Satisfies scenario "One code path builds conflict notifications".
-- [ ] 6.2 Strip `MergeConflictCard.tsx` to summary + `Review` (remove the copy describing
+- [x] 6.2 Strip `MergeConflictCard.tsx` to summary + `Review` (remove the copy describing
       one-click bulk choices; the notification's `choices` no longer exist after 6.1); move
       bulk "keep all mine / keep all workspace" actions into `MergeDialog.tsx`'s header, which
       becomes the only surface executing resolutions (tech-plan D6). Satisfies "One conflict
       surface".
-- [ ] 6.3 Declutter `SessionBar.tsx`: keep chats-list/title button, sync chip, draft badge +
+- [x] 6.3 Declutter `SessionBar.tsx`: keep chats-list/title button, sync chip, draft badge +
       changed-files + Apply (staged only), presence chip; move open-in-window, reset, archive,
       delete, and refresh into one overflow `DropdownMenu` (add the vendored shadcn
       `dropdown-menu.tsx` to `components/ui/` if absent). ≤5 visible controls outside the
       overflow in non-draft state. Satisfies "SessionBar is decluttered".
-- [ ] 6.4 Delete the `keepEditDrafts` preference end-to-end: `EDIT_KEEP_DRAFT_KEY`,
+- [x] 6.4 Delete the `keepEditDrafts` preference end-to-end: `EDIT_KEEP_DRAFT_KEY`,
       `handleKeepEditDraftsChange`, the SessionBar checkbox (L386–398), and all prop threading
       (grep gate in Verify). Satisfies `specs/direct-file-editing` scenario "No mode toggle
       exists".
-- [ ] 6.5 Scope versioning vocabulary to staged contexts: audit `SessionBar`/pane surfaces so
+- [x] 6.5 Scope versioning vocabulary to staged contexts: audit `SessionBar`/pane surfaces so
       base-age ("workspace as of …"), apply/sync, and merge affordances render only when a
       staged session is active — never on direct-edit surfaces. Satisfies "Versioning and
       merge UI is scoped to staged targets".

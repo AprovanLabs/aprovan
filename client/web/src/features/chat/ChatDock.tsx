@@ -166,8 +166,6 @@ export function ChatDock({
   setInput,
   handleSubmit,
   openWorkspacePreview,
-  keepEditDrafts,
-  onKeepEditDraftsChange,
   onOpenCredentials,
 }: {
   hasContentTab: boolean;
@@ -182,8 +180,6 @@ export function ChatDock({
   setInput: (value: string) => void;
   handleSubmit: (e?: React.FormEvent) => void;
   openWorkspacePreview: (path: string) => void;
-  keepEditDrafts: boolean;
-  onKeepEditDraftsChange: (keep: boolean) => void;
   onOpenCredentials?: (provider?: string) => void;
 }) {
   const { chatPanel, chatDragging, chatDockRef, toggleChatExpanded, resizeChatBy, startChatDrag } =
@@ -296,8 +292,6 @@ export function ChatDock({
         onOpenWindow={session.handleOpenSessionWindow}
         onOpenFile={(path) => void openWorkspacePreview(path)}
         onRefreshSessions={session.refreshSessions}
-        keepEditDrafts={keepEditDrafts}
-        onKeepEditDraftsChange={onKeepEditDraftsChange}
       />
       {session.mergeState && session.activeSession && (
         <MergeDialog
