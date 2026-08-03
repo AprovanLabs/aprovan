@@ -109,15 +109,15 @@ aprovan fork of the contract package is a verbatim mirror until IW-0 lands.
 
 > Depends-on: 5 | Touches: aprovan/server/workspace/src/workflows/**, aprovan/client/web/src/lib/** (widget runtime bridge only) | Verify: cd /Users/jacob/Documents/Code/AprovanLabs/aprovan && pnpm --filter @aprovan/workspace test && pnpm --filter @aprovan/patchwork-web build
 
-- [ ] 6.1 Workflow sandbox: expose a pre-bound `createTelemetry` facade on the `telemetry`
+- [x] 6.1 Workflow sandbox: expose a pre-bound `createTelemetry` facade on the `telemetry`
       namespace proxy whose `export` calls `telemetry.export` and whose attribution
       carries the run's `{type: "workflow", path, runId}`; raw ops stay available.
-- [ ] 6.2 Workflow runner: flush the facade at run end on success and error paths
+- [x] 6.2 Workflow runner: flush the facade at run end on success and error paths
       (try/finally, bounded flush — spec: "Failed runs still flush").
-- [ ] 6.3 Widget runtime: same facade over the widget tool-call bridge with
+- [x] 6.3 Widget runtime: same facade over the widget tool-call bridge with
       `{type: "widget", path, sessionId}` attribution; flush on teardown/visibility
       change.
-- [ ] 6.4 Test: a workflow script using `log`/`counter`/`withSpan` ends with events
+- [x] 6.4 Test: a workflow script using `log`/`counter`/`withSpan` ends with events
       queryable by `runId`, having built no OTLP envelope in script code.
 
 ## 7. Activity panel metric rows

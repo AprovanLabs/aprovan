@@ -374,7 +374,19 @@ function flattenExport(args: TelemetryExportArgs, ctx: ServiceContext): {
   events: TelemetryEvent[];
   accepted: TelemetryExportResult["accepted"];
 } {
-  const source = stampSource({ type: "widget" }, ctx);
+  // Prefer server-stamped attribution (workflow runner / X-Telemetry-Source)
+  // over the legacy widget default — client OTLP aprovan.* attrs stay advisory.
+  const base: TelemetrySource = ctx.telemetrySource
+    ? {
+        type: ctx.telemetrySource.type,
+        ...(ctx.telemetrySource.path ? { path: ctx.telemetrySource.path } : {}),
+        ...(ctx.telemetrySource.runId ? { runId: ctx.telemetrySource.runId } : {}),
+        ...(ctx.telemetrySource.sessionId
+          ? { sessionId: ctx.telemetrySource.sessionId }
+          : {}),
+      }
+    : { type: "widget" };
+  const source = stampSource(base, ctx);
   const events: TelemetryEvent[] = [];
   let spans = 0;
   let logs = 0;
