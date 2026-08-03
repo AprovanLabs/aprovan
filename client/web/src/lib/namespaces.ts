@@ -130,6 +130,23 @@ const FALLBACK_CORE = new Set([
 const FALLBACK_INTERFACES = new Set(["llm", "sql", "sandbox", "agent", "vcs"]);
 
 /**
+ * Agent hosting, git hosting, and LLM are first-class native surfaces in the
+ * sidebar (Runtime / VCS / LLM). They still resolve through the interfaces
+ * binding model, but the services menu should list them under Native, not
+ * Interfaces — same as core services.
+ */
+const NATIVE_INTERFACE_IDS = new Set(["agent", "vcs", "llm"]);
+
+function interfaceBaseId(namespace: string): string {
+  const separator = namespace.indexOf(":");
+  return separator === -1 ? namespace : namespace.slice(0, separator);
+}
+
+function isNativeInterface(namespace: string): boolean {
+  return NATIVE_INTERFACE_IDS.has(interfaceBaseId(namespace));
+}
+
+/**
  * Split the namespaces a workspace can call into the three sections the
  * services menu renders.
  *
@@ -157,16 +174,17 @@ export function groupNamespaces(
           ? "interface"
           : undefined);
     if (kind === "core") core.push(namespace);
-    else if (kind === "interface") interfaces.push(namespace);
-    else providers.push(namespace);
+    else if (kind === "interface") {
+      if (isNativeInterface(namespace)) core.push(namespace);
+      else interfaces.push(namespace);
+    } else providers.push(namespace);
   }
   return { core, interfaces: interfaces.sort(), providers: providers.sort() };
 }
 
 /** `sql` and `sql:analytics` are both the `sql` interface. */
 function isFallbackInterface(namespace: string): boolean {
-  const separator = namespace.indexOf(":");
-  return FALLBACK_INTERFACES.has(separator === -1 ? namespace : namespace.slice(0, separator));
+  return FALLBACK_INTERFACES.has(interfaceBaseId(namespace));
 }
 
 /**

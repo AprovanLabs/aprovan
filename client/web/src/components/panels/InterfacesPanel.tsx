@@ -18,8 +18,8 @@
  * image/region for sandbox, API root for vcs).
  */
 
-import { Loader2, Plug, Plus } from "lucide-react";
-import { useState } from "react";
+import { Loader2, Plug, Plus, type LucideIcon } from "lucide-react";
+import { useMemo, useState } from "react";
 import {
   ArmedButton,
   PanelEmpty,
@@ -644,25 +644,55 @@ function InstanceRow({
   );
 }
 
-export function InterfacesPanel({ scope: _scope }: NativePanelProps) {
+export interface InterfacesPanelProps extends NativePanelProps {
+  /** Limit to one or more interface ids (`agent`, `vcs`, `llm`, …). */
+  filter?: string | string[];
+  icon?: LucideIcon;
+  title?: string;
+  description?: string;
+  emptyMessage?: string;
+  loadingLabel?: string;
+}
+
+function normalizeFilter(filter: string | string[] | undefined): Set<string> | null {
+  if (!filter) return null;
+  const ids = Array.isArray(filter) ? filter : [filter];
+  return new Set(ids);
+}
+
+export function InterfacesPanel({
+  scope: _scope,
+  filter,
+  icon = Plug,
+  title = "Interfaces",
+  description = "Pick which connected service powers each workspace capability",
+  emptyMessage = "Workspace capabilities you can wire to a connected service appear here.",
+  loadingLabel = "Loading interfaces…",
+}: InterfacesPanelProps) {
+  const filterIds = useMemo(() => normalizeFilter(filter), [filter]);
   const { data, error, loading, refresh } = usePanelData(
     async () => (await invokeInterfaces("list", {})) as InterfacesListing,
   );
-  const interfaces = data?.interfaces ?? [];
+  const interfaces = useMemo(() => {
+    const all = data?.interfaces ?? [];
+    if (!filterIds) return all;
+    return all.filter((def) => filterIds.has(def.id));
+  }, [data?.interfaces, filterIds]);
   const credentials = data?.credentials ?? [];
-  // The default instances are already rendered inside their interface card;
-  // these are the named profiles, which nest under their interface below.
-  const named = (data?.instances ?? []).filter((instance) => instance.name);
-  // A profile whose interface left the catalog still needs a row to remove it.
+  const named = useMemo(() => {
+    const instances = (data?.instances ?? []).filter((instance) => instance.name);
+    if (!filterIds) return instances;
+    return instances.filter((instance) => filterIds.has(instance.interface));
+  }, [data?.instances, filterIds]);
   const orphans = named.filter(
     (instance) => !interfaces.some((def) => def.id === instance.interface),
   );
 
   return (
     <PanelShell
-      icon={Plug}
-      title="Interfaces"
-      description="Pick which connected service powers each workspace capability"
+      icon={icon}
+      title={title}
+      description={description}
       onRefresh={refresh}
       refreshing={loading}
     >
@@ -673,11 +703,9 @@ export function InterfacesPanel({ scope: _scope }: NativePanelProps) {
           retrying={loading}
         />
       ) : loading && !data ? (
-        <PanelLoading label="Loading interfaces…" />
+        <PanelLoading label={loadingLabel} />
       ) : interfaces.length === 0 ? (
-        <PanelEmpty>
-          Workspace capabilities you can wire to a connected service appear here.
-        </PanelEmpty>
+        <PanelEmpty>{emptyMessage}</PanelEmpty>
       ) : (
         <div className="flex flex-col gap-3 p-3">
           {interfaces.map((def) => {

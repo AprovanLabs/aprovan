@@ -70,8 +70,25 @@ describe("groupNamespaces", () => {
       ["sql", "sql:analytics", "llm", "agent", "vcs", "linear"],
       null,
     );
-    expect(grouped.interfaces).toEqual(["agent", "llm", "sql", "sql:analytics", "vcs"]);
+    expect(grouped.core).toEqual(["llm", "agent", "vcs"]);
+    expect(grouped.interfaces).toEqual(["sql", "sql:analytics"]);
     expect(grouped.providers).toEqual(["linear"]);
+  });
+
+  it("promotes agent, vcs, and llm interfaces to Native", () => {
+    const grouped = groupNamespaces(
+      ["llm", "llm:fast", "agent", "vcs", "sql"],
+      catalog([
+        ["llm", "interface"],
+        ["llm:fast", "interface"],
+        ["agent", "interface"],
+        ["vcs", "interface"],
+        ["sql", "interface"],
+      ]),
+    );
+    expect(grouped.core).toEqual(["llm", "llm:fast", "agent", "vcs"]);
+    expect(grouped.interfaces).toEqual(["sql"]);
+    expect(grouped.providers).toEqual([]);
   });
 
   it("never claims an unknown namespace is native, catalog or not", () => {
