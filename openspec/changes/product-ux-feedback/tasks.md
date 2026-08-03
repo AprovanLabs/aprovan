@@ -8,8 +8,8 @@ wave-1 parallel. Do not touch overlapping paths across parallel streams._
 
 > Depends-on: - | Touches: registry:apps/registry/src/components/shell/**, registry:apps/registry/src/layouts/** | Verify: cd /Users/jacob/Documents/Code/AprovanLabs/registry && ! rg -n "Open the app|OpenAppLink" apps/registry/src && pnpm --filter @aprovan/registry-web build
 
-- [ ] 1.1 Remove `OpenAppLink` from catalog shell/header layouts and delete or stop exporting the component.
-- [ ] 1.2 Confirm `/account/credentials` and `/admin/permissions` remain live CredentialsHost/AdminHost (no MovedNotice). If stubs remain on the branch tip, restore standalone hosts.
+- [x] 1.1 Remove `OpenAppLink` from catalog shell/header layouts and delete or stop exporting the component.
+- [x] 1.2 Confirm `/account/credentials` and `/admin/permissions` remain live CredentialsHost/AdminHost (no MovedNotice). If stubs remain on the branch tip, restore standalone hosts.
 
 ## 2. Keyvalue backend (DynamoDB)
 
