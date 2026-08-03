@@ -106,7 +106,7 @@ if a stream needs more, fix the tech plan first.
       routes its saves through the same stream-3 hooks by target policy. Migrate its conflict
       notification call site to `publishConflictNotification`. Satisfies
       `specs/direct-file-editing` "Opening a file never creates a chat session".
-- [ ] 4.5 In `EditModalHost.tsx`, remove `initialState={{ showPreview: false, showTree: true }}`
+- [x] 4.5 In `EditModalHost.tsx`, remove `initialState={{ showPreview: false, showTree: true }}`
       (L77) — view now comes from `fileTypes.ts` (stream 1); keep `showTree` behavior via the
       remaining supported prop surface. Satisfies `specs/file-renderer-defaults` scenario
       "Policy is consulted, not host state".
