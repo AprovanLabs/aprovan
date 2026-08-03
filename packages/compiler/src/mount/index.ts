@@ -1,3 +1,8 @@
+export {
+  mountDefaultExport,
+  pickCreateElement,
+  pickRenderer,
+} from "./mount-default-export.js";
 export { mountEmbedded, reloadEmbedded } from "./embedded.js";
 export {
   mountIframe,
