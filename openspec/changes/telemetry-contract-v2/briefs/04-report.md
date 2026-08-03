@@ -2,7 +2,7 @@
 
 ## PRs
 - Registry: https://github.com/AprovanLabs/registry/pull/97 (merged)
-- Aprovan: _(this PR)_
+- Aprovan: https://github.com/AprovanLabs/aprovan/pull/60
 
 Branch: `iw5/telemetry-freeze`
 Worktrees: `/tmp/iw5-telemetry-freeze` (registry), `/tmp/iw5-telemetry-freeze-aprovan` (aprovan)
