@@ -41,7 +41,12 @@ import {
   type AppRelease,
 } from "../apps/releases.js";
 import { generateAppSdk } from "../apps/sdk.js";
-import { resolveAppLocation, resolveAppRef } from "../apps/identity.js";
+import {
+  cachedOriginRelease,
+  readInstall,
+  remapEntry,
+} from "../apps/install.js";
+import { isAppId, resolveAppLocation, resolveAppRef } from "../apps/identity.js";
 import {
   appPathServable,
   callerRole,
@@ -79,7 +84,12 @@ export const liveAppsRouter = new Hono();
 
 interface LiveApp {
   manifest: AppManifest;
+  /** Workspace whose FS is read for content (origin when serving a default install). */
   workspaceId: string;
+  /** Pinned release when serving an install or channel pin. */
+  release?: AppRelease;
+  /** True when content comes from a materialized local fork. */
+  localFork?: boolean;
 }
 
 function toAppPaths(manifest: AppManifest) {
@@ -105,6 +115,43 @@ async function resolveLiveApp(c: HonoCtx): Promise<LiveApp> {
   const workspaceId = c.req.param("workspaceId");
   const name = c.req.param("name");
   if (!workspaceId || !name) throw new ServiceError("Not found", 404);
+
+  // Install-id address: serve from origin release (editing off) or local fork.
+  if (isAppId(name)) {
+    const install = await readInstall(workspaceId, name);
+    if (install) {
+      const release = await cachedOriginRelease(
+        install.originWorkspaceId,
+        install.originAppId,
+        install.resolvedRelease,
+      );
+      const originManifest =
+        release?.manifest ??
+        (await readApp(install.originWorkspaceId, install.originAppId).catch(() => undefined));
+      if (!originManifest?.entry) throw new ServiceError("Not found", 404);
+
+      if (install.editing && install.prefix) {
+        const forked: AppManifest = {
+          ...originManifest,
+          entry: remapEntry(originManifest.entry, originManifest.paths, install.prefix),
+          paths: [install.prefix],
+          originAppId: install.originAppId,
+        };
+        return {
+          manifest: forked,
+          workspaceId,
+          release,
+          localFork: true,
+        };
+      }
+      return {
+        manifest: originManifest,
+        workspaceId: install.originWorkspaceId,
+        release: release ?? undefined,
+      };
+    }
+  }
+
   const appId = await resolveAppRef(workspaceId, name);
   const manifest = await readApp(workspaceId, appId).catch(() => undefined);
   if (!manifest?.entry) throw new ServiceError("Not found", 404);
@@ -144,6 +191,8 @@ async function requireViewer(c: HonoCtx, manifest: AppManifest): Promise<void> {
  * here, on the token-bearing endpoints, rather than on the page shell.
  */
 async function resolvePin(c: HonoCtx, app: LiveApp): Promise<AppRelease | undefined> {
+  // Install-pinned content wins over channel query.
+  if (app.release) return app.release;
   const channel = channelName(c.req.query("channel"));
   if (channel !== DEFAULT_CHANNEL) {
     const sub = await viewerSub(c);

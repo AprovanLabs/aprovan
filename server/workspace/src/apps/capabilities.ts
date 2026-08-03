@@ -25,9 +25,12 @@
  * else — a provider *wildcard* in particular — with a message pointing at (3).
  */
 
+import { isInterface } from "../interfaces.js";
 import { isCoreServiceName, ServiceError } from "../service-kernel.js";
 import { DEFAULT_DAILY_CALLS } from "./usage.js";
-import type { AppManifest } from "./store.js";
+import type { AppManifest, AppRequirement } from "./store.js";
+
+export type { AppRequirement };
 
 /** The auto-partitioned first-party namespaces an app session may call.
  *  `notifications` is scoped per (app, user) by construction: an app can
@@ -238,10 +241,18 @@ export interface ProviderGrant {
   procedure: string;
 }
 
+/** Declared contract ids from a requires list (for allow-list checks). */
+function declaredContracts(requires: readonly AppRequirement[] | undefined): Set<string> {
+  return new Set((requires ?? []).map((req) => req.contract));
+}
+
 /**
  * Validate an `allowed_tools` list against the three-ways-to-reach-data rule
  * and return the provider credential grants it contains (tier 2 — the caller
  * must still verify the workspace holds a credential for each provider).
+ *
+ * Declared interface contracts (from `requires`) are a fourth acceptable form:
+ * exact `contract.procedure` entries, same no-wildcard rule as providers.
  *
  * A provider *wildcard* is rejected with the escape hatch spelled out, because
  * "add github.* to allowed_tools" is exactly the mistake this model exists to
@@ -251,8 +262,13 @@ export interface ProviderGrant {
  */
 export function assertAllowedTools(
   entries: string[],
-  context: { app: string; workflows: readonly string[] },
+  context: {
+    app: string;
+    workflows: readonly string[];
+    requires?: readonly AppRequirement[];
+  },
 ): ProviderGrant[] {
+  const contracts = declaredContracts(context.requires);
   const grants: ProviderGrant[] = [];
   for (const entry of entries) {
     const match = ENTRY_RE.exec(entry);
@@ -275,13 +291,27 @@ export function assertAllowedTools(
         400,
       );
     }
+    // Declared interface contracts: exact procedures only (tier-2 shape).
+    if (contracts.has(namespace)) {
+      if (procedure === "*") {
+        throw new ServiceError(
+          `allowed_tools entry "${entry}" grants a whole interface namespace, which is never allowed: a contract entry ` +
+            `must name one exact procedure (e.g. "${namespace}.query"). ` +
+            `Anything broader belongs in an exported workflow — register one that calls ${namespace}, list it in ` +
+            `\`workflows\`, and the app calls it as "${APP_WORKFLOW_NAMESPACE}.<workflow>".`,
+          400,
+        );
+      }
+      continue;
+    }
     // Core service namespaces (registry, workflows, apps, …) are neither
     // native app namespaces nor providers — they are never app-reachable.
     if (isCoreServiceName(namespace)) {
       throw new ServiceError(
         `allowed_tools entry "${entry}" is not reachable from an app session: "${namespace}" is a core service ` +
           `namespace, not a provider. Only the auto-partitioned natives (${NATIVE_APP_NAMESPACES.join(", ")}), ` +
-          `this app's workflow namespace ("${APP_WORKFLOW_NAMESPACE}.*"), and exact provider procedures are allowed.`,
+          `this app's workflow namespace ("${APP_WORKFLOW_NAMESPACE}.*"), exact provider procedures, and ` +
+          `exact procedures on declared requires contracts are allowed.`,
         400,
       );
     }
@@ -301,6 +331,94 @@ export function assertAllowedTools(
   return grants;
 }
 
+/**
+ * Parse and validate a publish-time `requires` array. Unknown contracts → 400.
+ */
+export function parseRequires(raw: unknown): AppRequirement[] | undefined {
+  if (raw === undefined || raw === null) return undefined;
+  if (!Array.isArray(raw)) {
+    throw new ServiceError("requires must be an array of {contract, profileName?, optional?}", 400);
+  }
+  if (raw.length === 0) return [];
+  const requires: AppRequirement[] = [];
+  for (const entry of raw) {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+      throw new ServiceError("requires entries must be objects with a contract id", 400);
+    }
+    const value = entry as Record<string, unknown>;
+    const contract = value["contract"];
+    if (typeof contract !== "string" || !contract.trim()) {
+      throw new ServiceError("requires entry must name a contract string", 400);
+    }
+    if (!isInterface(contract)) {
+      throw new ServiceError(
+        `Unknown contract "${contract}" — declare a contract that exists in the interface catalog`,
+        400,
+      );
+    }
+    const req: AppRequirement = { contract };
+    if (typeof value["profileName"] === "string" && value["profileName"].trim()) {
+      req.profileName = value["profileName"].trim();
+    }
+    if (value["optional"] === true) req.optional = true;
+    requires.push(req);
+  }
+  return requires;
+}
+
+/** One dependencies-section row of `apps.capabilities`. */
+export interface DependencyCapability {
+  contract: string;
+  optional: boolean;
+  /** Bound profile id when an installation (or default) resolved one. */
+  boundProfile?: string;
+  /**
+   * Whether the binding is currently authorized. `"ungated"` when the
+   * deployment has no profile-grant storage (interim dynamo) — install-side
+   * binding only.
+   */
+  fulfilled: boolean | "ungated";
+}
+
+/**
+ * Dependencies half of `apps.capabilities`: each declared contract, whether
+ * optional, the bound profile (when known), and fulfillment status.
+ */
+export function dependencyCapabilities(
+  manifest: AppManifest,
+  options: {
+    bindings?: Record<string, string>;
+    /** Per-contract fulfillment override (grant check / ungated). */
+    fulfilled?: Record<string, boolean | "ungated">;
+  } = {},
+): DependencyCapability[] {
+  return (manifest.requires ?? []).map((req) => {
+    const boundProfile = options.bindings?.[req.contract];
+    const fulfilled =
+      options.fulfilled?.[req.contract] ??
+      (boundProfile ? true : req.optional === true ? true : false);
+    return {
+      contract: req.contract,
+      optional: req.optional === true,
+      ...(boundProfile ? { boundProfile } : {}),
+      fulfilled,
+    };
+  });
+}
+
+/**
+ * May an app session call `namespace.procedure` as a declared-contract grant?
+ * Exact allow-list entry only; wildcards never qualify.
+ */
+export function contractGrantCallable(
+  manifest: AppManifest,
+  namespace: string,
+  procedure: string,
+): boolean {
+  if (!declaredContracts(manifest.requires).has(namespace)) return false;
+  return manifest.allowedTools.includes(`${namespace}.${procedure}`);
+}
+
 /** The provider credential grants declared in an allow-list, in entry order. */
 export function providerGrantEntries(allowedTools: readonly string[]): ProviderGrant[] {
   const grants: ProviderGrant[] = [];
@@ -311,6 +429,7 @@ export function providerGrantEntries(allowedTools: readonly string[]): ProviderG
     const procedure = match[2]!;
     if (isNativeNamespace(namespace) || isWorkflowNamespace(namespace)) continue;
     if (isCoreServiceName(namespace) || procedure === "*") continue;
+    if (isInterface(namespace)) continue;
     grants.push({ provider: namespace, procedure });
   }
   return grants;
@@ -329,6 +448,7 @@ export function providerGrantCallable(
 ): boolean {
   if (isNativeNamespace(namespace) || isWorkflowNamespace(namespace)) return false;
   if (isCoreServiceName(namespace)) return false;
+  if (isInterface(namespace)) return false;
   return manifest.allowedTools.includes(`${namespace}.${procedure}`);
 }
 

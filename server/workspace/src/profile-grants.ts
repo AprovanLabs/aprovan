@@ -178,3 +178,100 @@ export async function profileGrantAllows(
   const rows = await store.profiles.list(workspaceId, { targetId: namespace });
   return rows.some((row) => granted.has(row.id));
 }
+
+// ---------------------------------------------------------------------------
+// App-install profile grants (app-model-split D5)
+// ---------------------------------------------------------------------------
+
+const appSubject = (installId: string): GrantSubject => ({ kind: "app", id: installId });
+
+/**
+ * Resolve an interface profile by name (or return undefined). Used at install
+ * binding time — does not throw 501 on dynamo (returns undefined instead so
+ * the degrade path can still record install-side bindings when callers pass
+ * explicit ids).
+ */
+export async function resolveInterfaceProfileId(
+  workspaceId: string,
+  contract: string,
+  profileName: string,
+): Promise<string | undefined> {
+  if (!profileGrantsAvailable()) return undefined;
+  try {
+    const store = await getRegistryStorage();
+    await store.tenants.ensure(workspaceId);
+    // Exact (targetKind, targetId, name) lookup first.
+    const byName = await store.profiles.getByName(
+      workspaceId,
+      "interface",
+      contract,
+      profileName,
+    );
+    if (byName) return byName.id;
+    // Allow passing a raw profile id as the "name".
+    const byId = await store.profiles.getById(workspaceId, profileName);
+    if (byId && byId.targetKind === "interface" && byId.targetId === contract) {
+      return byId.id;
+    }
+    return undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Mirror a binding as a profile grant to `{kind: "app", id: installId}`.
+ * No-op (returns "ungated") when profile grants are unavailable.
+ */
+export async function grantProfileToInstall(
+  workspaceId: string,
+  profileId: string,
+  installId: string,
+  grantedBy: string,
+): Promise<"granted" | "ungated"> {
+  if (!profileGrantsAvailable()) return "ungated";
+  const store = await storage(workspaceId);
+  await store.grants.grant(workspaceId, profileId, appSubject(installId), grantedBy);
+  return "granted";
+}
+
+/** Revoke the install's grant for a profile. No-op when grants unavailable. */
+export async function revokeInstallProfileGrant(
+  workspaceId: string,
+  profileId: string,
+  installId: string,
+): Promise<boolean> {
+  if (!profileGrantsAvailable()) return false;
+  const store = await storage(workspaceId);
+  return store.grants.revoke(workspaceId, profileId, appSubject(installId));
+}
+
+/**
+ * Does the install currently hold a grant for `profileId`?
+ * When grants are unavailable, returns `"ungated"` (install-side-only binding).
+ */
+export async function installGrantHolds(
+  workspaceId: string,
+  installId: string,
+  profileId: string,
+): Promise<boolean | "ungated"> {
+  if (!profileGrantsAvailable()) return "ungated";
+  const store = await getRegistryStorage();
+  await store.tenants.ensure(workspaceId);
+  const granted = await store.grants.grantedProfileIds(workspaceId, [appSubject(installId)]);
+  return granted.has(profileId);
+}
+
+/** Revoke every grant held by an install subject (best-effort on uninstall). */
+export async function revokeAllInstallGrants(
+  workspaceId: string,
+  installId: string,
+  profileIds: Iterable<string>,
+): Promise<void> {
+  if (!profileGrantsAvailable()) return;
+  const store = await storage(workspaceId);
+  for (const profileId of profileIds) {
+    await store.grants.revoke(workspaceId, profileId, appSubject(installId)).catch(() => false);
+  }
+}
+

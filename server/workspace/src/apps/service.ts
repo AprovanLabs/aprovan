@@ -15,7 +15,7 @@
  *   publish/remove/share      — the bundle and its path binding
  *   capabilities              — what the app may touch and where its data lands
  *   release/releases/channels/promote/rollback — the deployable version pin
- *   install/uninstall/installed — interim install records (stream 3 rewrites)
+ *   install/update/configure/uninstall/installed/directory — install lifecycle
  *   rename                       — mutable alias move (storage keys unchanged)
  *   sdk                       — generated bindings (js + d.ts) for the manifest
  *   versions/version/restore  — the entrypoint's FS content history
@@ -32,31 +32,51 @@ import { getRecordStore } from "../records.js";
 import { ServiceError, type CoreService } from "../service-kernel.js";
 import { hookPath } from "../workflows/service.js";
 import { listRegistrations, listRuns, type WorkflowRegistration } from "../workflows/store.js";
-import { profileGrantsAvailable } from "../profile-grants.js";
+import {
+  grantProfileToInstall,
+  installGrantHolds,
+  profileGrantsAvailable,
+  resolveInterfaceProfileId,
+  revokeAllInstallGrants,
+  revokeInstallProfileGrant,
+} from "../profile-grants.js";
 import { getRegistryStorage } from "../registry-storage.js";
 import {
   APP_WORKFLOW_NAMESPACE,
   assertAllowedTools,
   camelCase,
+  dependencyCapabilities,
   effectiveRateLimit,
   nativeCapabilities,
+  parseRequires,
   providerGrantCapabilities,
   type ProviderGrant,
   type ProviderGrantCapability,
 } from "./capabilities.js";
+import { assertNotDeploymentTenant, listDirectoryForWorkspace } from "./directory.js";
 import {
-  assertInstallable,
+  bindingMissingError,
+  findInstallByOrigin,
   installPrefix,
+  isChannelPin,
   listInstalls,
+  materializeFork,
+  mintNewInstall,
+  parseInstallPin,
+  purgeInstallData,
   readInstall,
   removeInstall,
+  requireInstall,
+  resolveBindings,
+  resolvePinRelease,
   saveInstall,
-  type AppInstall,
+  type AppInstallation,
 } from "./install.js";
 import {
   dropAlias,
   mintAppId,
   readAlias,
+  resolveAppLocation,
   resolveAppRef,
   setAlias,
 } from "./identity.js";
@@ -136,7 +156,7 @@ function apiBase(workspaceId: string, name: string): string {
 
 function parseAllowedTools(
   raw: unknown,
-  context: { app: string; workflows: string[] },
+  context: { app: string; workflows: string[]; requires?: AppManifest["requires"] },
 ): { tools: string[]; grants: ProviderGrant[] } {
   if (!Array.isArray(raw)) {
     throw new ServiceError(
@@ -148,9 +168,6 @@ function parseAllowedTools(
   if (tools.length === 0) {
     throw new ServiceError("allowed_tools must contain at least one entry", 400);
   }
-  // Deny by default AND deny by construction: the auto-partitioned native
-  // namespaces, this app's own workflows, and exact provider procedures
-  // (credential grants — verified against the credential store below).
   const grants = assertAllowedTools(tools, context);
   return { tools, grants };
 }
@@ -297,6 +314,7 @@ async function describeApp(
     apiBase: apiBase(workspaceId, manifest.name),
     /** Channel → release id. `apps.channels` resolves them to release records. */
     channels: manifest.channels ?? {},
+    requires: manifest.requires ?? [],
     allowedTools: manifest.allowedTools,
     roles: manifest.roles,
     rateLimit: effectiveRateLimit(manifest),
@@ -315,6 +333,103 @@ async function describeApp(
 async function registrationIndex(workspaceId: string): Promise<Map<string, WorkflowRegistration>> {
   const registrations = await listRegistrations(workspaceId).catch(() => []);
   return new Map(registrations.map((registration) => [registration.name, registration]));
+}
+
+async function summarizeInstall(
+  workspaceId: string,
+  install: AppInstallation,
+  origin: AppManifest | undefined,
+  userId: string,
+) {
+  return {
+    installId: install.installId,
+    originAppId: install.originAppId,
+    originWorkspaceId: install.originWorkspaceId,
+    pin: install.pin,
+    resolvedRelease: install.resolvedRelease,
+    bindings: install.bindings,
+    config: install.config,
+    editing: install.editing,
+    prefix: install.prefix,
+    installedBy: install.installedBy,
+    installedAt: install.installedAt,
+    updatedAt: install.updatedAt,
+    name: origin?.name,
+    title: origin?.title,
+    description: origin?.description,
+    url: origin ? livePath(install.originWorkspaceId, origin.name) : undefined,
+    permalink: `/apps/id/${install.originAppId}`,
+    dataPrefix: appDataDir(install.installId, userId),
+    available: Boolean(origin),
+    requires: origin?.requires ?? [],
+  };
+}
+
+async function completeInstall(
+  ctx: { workspaceId: string; userId: string },
+  input: {
+    originWorkspaceId: string;
+    manifest: AppManifest;
+    args: Record<string, unknown>;
+  },
+) {
+  const { originWorkspaceId, manifest, args } = input;
+  const isOwn = originWorkspaceId === ctx.workspaceId;
+  const visibility = manifest.visibility ?? "private";
+  if (!isOwn && visibility !== "public") {
+    // No existence oracle for private apps elsewhere.
+    throw new ServiceError("Not found", 404);
+  }
+
+  const pin = parseInstallPin(args["pin"]);
+  const release = await resolvePinRelease(originWorkspaceId, manifest, pin);
+  const explicitBindings =
+    args["bindings"] && typeof args["bindings"] === "object" && !Array.isArray(args["bindings"])
+      ? (args["bindings"] as Record<string, string>)
+      : undefined;
+  const resolved = await resolveBindings(
+    manifest.requires,
+    explicitBindings,
+    (contract, name) => resolveInterfaceProfileId(ctx.workspaceId, contract, name),
+  );
+  // When grants are unavailable, allow install-side bindings only if the
+  // caller passed explicit profile ids (or there are no requirements).
+  if (resolved.missing.length > 0) {
+    if (!profileGrantsAvailable() && explicitBindings) {
+      for (const contract of resolved.missing) {
+        const id = explicitBindings[contract];
+        if (id) resolved.bindings[contract] = id;
+      }
+      resolved.missing = resolved.missing.filter((c) => !resolved.bindings[c]);
+    }
+    if (resolved.missing.length > 0) throw bindingMissingError(resolved.missing);
+  }
+
+  const config =
+    args["config"] && typeof args["config"] === "object" && !Array.isArray(args["config"])
+      ? (args["config"] as Record<string, unknown>)
+      : {};
+  const prefix =
+    args["prefix"] !== undefined
+      ? installPrefix(args["prefix"], manifest.name)
+      : undefined;
+
+  const install = mintNewInstall({
+    originAppId: manifest.appId,
+    originWorkspaceId,
+    pin,
+    resolvedRelease: release?.id ?? manifest.channels?.[DEFAULT_CHANNEL] ?? null,
+    bindings: resolved.bindings,
+    config,
+    prefix,
+    installedBy: ctx.userId,
+  });
+
+  for (const profileId of Object.values(install.bindings)) {
+    await grantProfileToInstall(ctx.workspaceId, profileId, install.installId, ctx.userId);
+  }
+  await saveInstall(ctx.workspaceId, install);
+  return summarizeInstall(ctx.workspaceId, install, manifest, ctx.userId);
 }
 
 /** Resolve `app` or `name` (alias or ULID) to a stored manifest. */
@@ -407,6 +522,10 @@ export const appsService: CoreService = {
           },
           dir: { type: "string", description: "Sugar for entry: a folder whose entrypoint is resolved for you" },
           visibility: { type: "string", enum: ["public", "private"], description: "Who can open the live page (default private)" },
+          requires: {
+            type: "array",
+            description: "Interface-contract requirements: [{contract, profileName?, optional?}]",
+          },
           workflows: {
             type: "array",
             items: { type: "string" },
@@ -585,32 +704,84 @@ export const appsService: CoreService = {
       name: "apps.install",
       operation: "install",
       description:
-        "Install an app into THIS workspace (interim pre-stream-3): records the owner, name, pinned release, and a prefix. Stream 3 replaces this with ULID installs, pins, and bindings.",
+        "Install a public app (or any app of this workspace) into THIS workspace: mints an installId, pins a release/channel (default live), and binds required interface profiles.",
       inputSchema: {
         type: "object",
         properties: {
-          owner: { type: "string", description: "Workspace id that published the app" },
-          name: { type: "string" },
-          prefix: { type: "string", description: "Workspace prefix for the app's data (default apps/<name>)" },
+          app: { type: "string", description: "App alias or ULID" },
+          workspace: {
+            type: "string",
+            description: "Origin workspace id (defaults to this workspace; required for cross-workspace installs by alias)",
+          },
+          pin: { description: "Channel name, {channel}, or {release}" },
+          bindings: {
+            type: "object",
+            description: "contract → profile id or name overrides",
+          },
+          config: { type: "object", description: "Per-install config JSON" },
+          prefix: { type: "string", description: "Fork prefix when editing is later enabled (default apps/<name>)" },
         },
-        required: ["owner", "name"],
+        required: ["app"],
+      },
+    },
+    {
+      name: "apps.update",
+      operation: "update",
+      description:
+        "Re-resolve an installation's pin against the origin (channel → current release, or an explicit newer release). Returns {from, to}. Editing forks require force=true to overwrite local source.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          install: { type: "string", description: "Install ULID" },
+          release: { type: "string", description: "Explicit release id (release-pinned installs)" },
+          force: { type: "boolean", description: "Overwrite local fork source when editing" },
+        },
+        required: ["install"],
+      },
+    },
+    {
+      name: "apps.configure",
+      operation: "configure",
+      description:
+        "Update an installation's bindings, config, and/or editing flag. Enabling editing materializes the pinned release under the install prefix.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          install: { type: "string" },
+          bindings: { type: "object" },
+          config: { type: "object" },
+          editing: { type: "boolean" },
+          prefix: { type: "string" },
+        },
+        required: ["install"],
       },
     },
     {
       name: "apps.uninstall",
       operation: "uninstall",
       description:
-        "Remove an install record from this workspace. The app's data stays on the filesystem under its prefix; delete it with vfs if you want it gone.",
+        "Remove an install record. Pass purgeData=true to delete `.apps/<installId>` data partitions.",
       inputSchema: {
         type: "object",
-        properties: { owner: { type: "string" }, name: { type: "string" } },
-        required: ["owner", "name"],
+        properties: {
+          install: { type: "string" },
+          purgeData: { type: "boolean" },
+          purge_data: { type: "boolean" },
+        },
+        required: ["install"],
       },
     },
     {
       name: "apps.installed",
       operation: "installed",
-      description: "Apps installed into this workspace (owner, name, pinned release, data prefix).",
+      description: "Installations in this workspace, with an available flag when the origin is reachable.",
+      inputSchema: { type: "object", properties: {} },
+    },
+    {
+      name: "apps.directory",
+      operation: "directory",
+      description:
+        "Deployment-wide directory of public apps plus this workspace's own apps. Registry is never consulted.",
       inputSchema: { type: "object", properties: {} },
     },
     {
@@ -755,9 +926,14 @@ export const appsService: CoreService = {
           }
         }
         const { entry, paths } = await resolveBinding(ctx.workspaceId, name, args, existing);
+        const requires =
+          args["requires"] !== undefined
+            ? parseRequires(args["requires"])
+            : existing?.requires;
         const { tools: allowedTools, grants } = parseAllowedTools(args["allowed_tools"], {
           app: name,
           workflows,
+          requires,
         });
         await assertGrantCredentials(ctx.workspaceId, grants);
         const now = new Date().toISOString();
@@ -773,6 +949,7 @@ export const appsService: CoreService = {
           paths,
           visibility: parseVisibility(args["visibility"]) ?? existing?.visibility ?? "private",
           workflows,
+          requires,
           channels: existing?.channels,
           allowedTools,
           roles: parseRoles(args["roles"]) ?? existing?.roles,
@@ -854,6 +1031,20 @@ export const appsService: CoreService = {
       case "capabilities": {
         const manifest = await requireApp(ctx.workspaceId, args);
         const registrations = await registrationIndex(ctx.workspaceId);
+        const installId = typeof args["install"] === "string" ? args["install"] : undefined;
+        const install = installId
+          ? await readInstall(ctx.workspaceId, installId)
+          : await findInstallByOrigin(ctx.workspaceId, manifest.appId);
+        const fulfilled: Record<string, boolean | "ungated"> = {};
+        if (install) {
+          for (const [contract, profileId] of Object.entries(install.bindings)) {
+            fulfilled[contract] = await installGrantHolds(
+              ctx.workspaceId,
+              install.installId,
+              profileId,
+            );
+          }
+        }
         return {
           appId: manifest.appId,
           app: manifest.name,
@@ -861,6 +1052,11 @@ export const appsService: CoreService = {
           native: nativeCapabilities(manifest),
           /** Provider credential grants — tier (2), exact procedures only. */
           providers: await withExecutingProfiles(ctx.workspaceId, providerGrantCapabilities(manifest)),
+          /** Declared interface-contract requirements and their bindings. */
+          dependencies: dependencyCapabilities(manifest, {
+            bindings: install?.bindings,
+            fulfilled,
+          }),
           /** Exported workflows — the app's own namespace (`app.<procedure>`). */
           workflows: (
             await summarizeWorkflows(ctx.workspaceId, manifest, registrations, false)
@@ -1067,57 +1263,247 @@ export const appsService: CoreService = {
         };
       }
       case "install": {
-        const owner = typeof args["owner"] === "string" ? args["owner"] : "";
-        if (!owner) throw new ServiceError("owner (the publishing workspace id) is required", 400);
-        const name = appName(args["name"]);
-        const appId = await resolveAppRef(owner, name).catch(() => undefined);
-        const manifest = appId ? await readApp(owner, appId).catch(() => undefined) : undefined;
-        if (!manifest) throw new ServiceError(`Unknown app: ${owner}/${name}`, 404);
-        assertInstallable(manifest);
-        const existing = await readInstall(ctx.workspaceId, owner, name);
-        const install: AppInstall = {
-          owner,
-          name,
-          release: manifest.channels?.[DEFAULT_CHANNEL] ?? null,
-          prefix: installPrefix(args["prefix"] ?? existing?.prefix, name),
-          installedAt: new Date().toISOString(),
-        };
-        await saveInstall(ctx.workspaceId, install);
-        return {
+        assertNotDeploymentTenant(ctx.workspaceId);
+        const appRef = typeof args["app"] === "string" ? args["app"] : "";
+        if (!appRef) throw new ServiceError("app (alias or ULID) is required", 400);
+
+        let originWorkspaceId: string;
+        let manifest: AppManifest | undefined;
+
+        // ULID → deployment location index (cross-workspace).
+        const loc = await resolveAppLocation(appRef).catch(() => undefined);
+        if (loc) {
+          originWorkspaceId =
+            typeof args["workspace"] === "string" && args["workspace"]
+              ? args["workspace"]
+              : loc.workspaceId;
+          if (originWorkspaceId !== loc.workspaceId && args["workspace"] !== undefined) {
+            // Caller forced a workspace that doesn't own this appId.
+            throw new ServiceError("Not found", 404);
+          }
+          originWorkspaceId = loc.workspaceId;
+          manifest = await readApp(originWorkspaceId, appRef).catch(() => undefined);
+        } else {
+          originWorkspaceId =
+            typeof args["workspace"] === "string" && args["workspace"]
+              ? args["workspace"]
+              : ctx.workspaceId;
+          assertNotDeploymentTenant(originWorkspaceId);
+          const appId = await resolveAppRef(originWorkspaceId, appRef).catch(() => undefined);
+          manifest = appId
+            ? await readApp(originWorkspaceId, appId).catch(() => undefined)
+            : undefined;
+        }
+        if (!manifest) throw new ServiceError("Not found", 404);
+        return completeInstall(ctx, { originWorkspaceId, manifest, args });
+      }
+      case "update": {
+        const installId = typeof args["install"] === "string" ? args["install"] : "";
+        if (!installId) throw new ServiceError("install is required", 400);
+        const install = await requireInstall(ctx.workspaceId, installId);
+        const originManifest = await readApp(install.originWorkspaceId, install.originAppId).catch(
+          () => undefined,
+        );
+        if (!originManifest) {
+          throw new ServiceError(
+            `Origin unavailable: app ${install.originAppId} in workspace ${install.originWorkspaceId} is gone`,
+            404,
+          );
+        }
+        let pin = install.pin;
+        if (typeof args["release"] === "string" && args["release"]) {
+          pin = { release: args["release"] };
+        }
+        const release = await resolvePinRelease(
+          install.originWorkspaceId,
+          originManifest,
+          pin,
+        );
+        if (!release) {
+          throw new ServiceError(
+            isChannelPin(pin)
+              ? `Origin channel "${pin.channel}" has no release`
+              : `Unknown origin release: ${pin.release}`,
+            404,
+          );
+        }
+        if (install.editing && args["force"] !== true) {
+          throw new ServiceError(
+            "Installation has local edits; pass force=true to overwrite the fork from the origin release",
+            409,
+          );
+        }
+        const from = install.resolvedRelease;
+        const to = release.id;
+        const next: AppInstallation = {
           ...install,
-          appId: manifest.appId,
-          title: manifest.title,
-          url: livePath(owner, name),
-          dataPrefix: appDataDir(manifest.appId, ctx.userId),
+          pin,
+          resolvedRelease: to,
+          updatedAt: new Date().toISOString(),
+        };
+        if (install.editing && install.prefix && args["force"] === true) {
+          await materializeFork(
+            ctx.workspaceId,
+            install.originWorkspaceId,
+            release,
+            install.prefix,
+          );
+        }
+        await saveInstall(ctx.workspaceId, next);
+        return {
+          installId: next.installId,
+          from,
+          to,
+          pin: next.pin,
+          config: next.config,
+          editing: next.editing,
         };
       }
+      case "configure": {
+        const installId = typeof args["install"] === "string" ? args["install"] : "";
+        if (!installId) throw new ServiceError("install is required", 400);
+        const install = await requireInstall(ctx.workspaceId, installId);
+        const originManifest = await readApp(install.originWorkspaceId, install.originAppId).catch(
+          () => undefined,
+        );
+        let next: AppInstallation = { ...install, updatedAt: new Date().toISOString() };
+
+        if (args["config"] !== undefined) {
+          if (!args["config"] || typeof args["config"] !== "object" || Array.isArray(args["config"])) {
+            throw new ServiceError("config must be an object", 400);
+          }
+          next = { ...next, config: args["config"] as Record<string, unknown> };
+        }
+
+        if (args["bindings"] !== undefined) {
+          if (!args["bindings"] || typeof args["bindings"] !== "object" || Array.isArray(args["bindings"])) {
+            throw new ServiceError("bindings must be an object", 400);
+          }
+          const explicit = args["bindings"] as Record<string, string>;
+          const resolved = await resolveBindings(
+            originManifest?.requires ?? Object.keys(install.bindings).map((c) => ({ contract: c })),
+            { ...install.bindings, ...explicit },
+            (contract, name) => resolveInterfaceProfileId(ctx.workspaceId, contract, name),
+          );
+          if (resolved.missing.length > 0) throw bindingMissingError(resolved.missing);
+          // Revoke removed / changed grants, grant new ones.
+          for (const [contract, oldId] of Object.entries(install.bindings)) {
+            const newId = resolved.bindings[contract];
+            if (newId !== oldId) {
+              await revokeInstallProfileGrant(ctx.workspaceId, oldId, install.installId);
+            }
+          }
+          for (const [contract, profileId] of Object.entries(resolved.bindings)) {
+            if (install.bindings[contract] !== profileId) {
+              await grantProfileToInstall(
+                ctx.workspaceId,
+                profileId,
+                install.installId,
+                ctx.userId,
+              );
+            }
+          }
+          next = { ...next, bindings: resolved.bindings };
+        }
+
+        if (args["editing"] === true && !install.editing) {
+          const prefix =
+            typeof args["prefix"] === "string" && args["prefix"]
+              ? installPrefix(args["prefix"], originManifest?.name ?? "app")
+              : install.prefix ??
+                installPrefix(undefined, originManifest?.name ?? "app");
+          const release = install.resolvedRelease
+            ? await resolvePinRelease(
+                install.originWorkspaceId,
+                originManifest ?? {
+                  appId: install.originAppId,
+                  name: "app",
+                  entry: "",
+                  paths: [],
+                  allowedTools: [],
+                  createdBy: install.installedBy,
+                  createdAt: install.installedAt,
+                  updatedAt: install.updatedAt,
+                },
+                install.pin,
+              )
+            : undefined;
+          const pinned =
+            release ??
+            (install.resolvedRelease
+              ? await readRelease(
+                  install.originWorkspaceId,
+                  install.originAppId,
+                  install.resolvedRelease,
+                )
+              : undefined);
+          if (!pinned) {
+            throw new ServiceError(
+              "Cannot enable editing: no resolved release to materialize",
+              400,
+            );
+          }
+          await materializeFork(
+            ctx.workspaceId,
+            install.originWorkspaceId,
+            pinned,
+            prefix,
+          );
+          next = { ...next, editing: true, prefix };
+        } else if (args["editing"] === false) {
+          next = { ...next, editing: false };
+        } else if (typeof args["prefix"] === "string" && args["prefix"]) {
+          next = {
+            ...next,
+            prefix: installPrefix(args["prefix"], originManifest?.name ?? "app"),
+          };
+        }
+
+        await saveInstall(ctx.workspaceId, next);
+        return summarizeInstall(ctx.workspaceId, next, originManifest, ctx.userId);
+      }
       case "uninstall": {
-        const owner = typeof args["owner"] === "string" ? args["owner"] : "";
-        const name = appName(args["name"]);
-        if (!owner) throw new ServiceError("owner is required", 400);
-        const removed = await removeInstall(ctx.workspaceId, owner, name);
-        return { owner, name, removed };
+        const installId = typeof args["install"] === "string" ? args["install"] : "";
+        if (!installId) throw new ServiceError("install is required", 400);
+        const install = await readInstall(ctx.workspaceId, installId);
+        if (install) {
+          await revokeAllInstallGrants(
+            ctx.workspaceId,
+            install.installId,
+            Object.values(install.bindings),
+          );
+        }
+        const removed = await removeInstall(ctx.workspaceId, installId);
+        const purge = args["purgeData"] === true || args["purge_data"] === true;
+        if (purge) await purgeInstallData(ctx.workspaceId, installId);
+        return { install: installId, removed, purged: purge };
       }
       case "installed": {
         const installs = await listInstalls(ctx.workspaceId);
         return {
-          apps: await Promise.all(
+          installs: await Promise.all(
             installs.map(async (install) => {
-              const appId = await resolveAppRef(install.owner, install.name).catch(() => undefined);
-              const manifest = appId
-                ? await readApp(install.owner, appId).catch(() => undefined)
-                : undefined;
-              return {
-                ...install,
-                appId: manifest?.appId,
-                title: manifest?.title,
-                description: manifest?.description,
-                url: livePath(install.owner, install.name),
-                dataPrefix: manifest ? appDataDir(manifest.appId, ctx.userId) : `${install.prefix}/data`,
-                available: Boolean(manifest),
-              };
+              const manifest = await readApp(
+                install.originWorkspaceId,
+                install.originAppId,
+              ).catch(() => undefined);
+              return summarizeInstall(ctx.workspaceId, install, manifest, ctx.userId);
             }),
           ),
+        };
+      }
+      case "directory": {
+        assertNotDeploymentTenant(ctx.workspaceId);
+        const entries = await listDirectoryForWorkspace(ctx.workspaceId);
+        return {
+          apps: entries.map((entry) => ({
+            ...entry,
+            url: livePath(entry.workspaceId, entry.name),
+            permalink: `/apps/id/${entry.appId}`,
+            installable:
+              entry.workspaceId === ctx.workspaceId ||
+              /* public index entries are installable */ true,
+          })),
         };
       }
       case "remove": {

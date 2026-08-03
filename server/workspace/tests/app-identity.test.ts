@@ -135,13 +135,22 @@ describe("publish / rename / storage keys", () => {
     await records.set("local", `app#${published.appId}#u#${userSub}`, "note", { v: 1 }, userSub);
     expect(appDataDir(published.appId, userSub)).toBe(`.apps/${published.appId}/data/${userSub}`);
 
-    // Seed an install record pointing at appId lineage (name-keyed interim).
-    await writeSvcRecord("other-ws", svcScope("apps", "installed"), `local.rename-me`, {
-      owner: "local",
-      name: "rename-me",
-      release: release.id,
+    // Seed an install record pointing at appId lineage (ULID-keyed).
+    const { mintInstallId } = await import("../src/apps/identity.js");
+    const installId = mintInstallId();
+    await writeSvcRecord("other-ws", svcScope("installs"), installId, {
+      installId,
+      originAppId: published.appId,
+      originWorkspaceId: "local",
+      pin: { channel: "live" },
+      resolvedRelease: release.id,
+      bindings: {},
+      config: {},
+      editing: false,
       prefix: "apps/rename-me",
+      installedBy: "alice",
       installedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     });
 
     const renamed = await data<{ appId: string; name: string }>(
