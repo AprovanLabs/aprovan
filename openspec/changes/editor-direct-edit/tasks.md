@@ -162,13 +162,13 @@ if a stream needs more, fix the tech plan first.
 
 > Depends-on: 5, 6 | Touches: (no source — verification only) | Verify: `pnpm --filter @aprovan/patchwork-editor build && pnpm --filter @aprovan/registry-ui build && pnpm --filter @aprovan/registry-ui test && pnpm --filter @aprovan/patchwork-web build && ! grep -rn "edit-keep-draft" client/web/src packages && ! grep -rn "beginEditDraft" client/web/src && ! grep -rnE "min-h-\[[0-9]+vh\]|max-h-\[[0-9]+vh\]" packages/editor/src/components/CodePreview.tsx packages/registry-ui/src/apps-panel.tsx`
 
-- [ ] 7.1 Run every stream's Verify command from a clean checkout and confirm all grep gates
+- [x] 7.1 Run every stream's Verify command from a clean checkout and confirm all grep gates
       hold repo-wide (not just per-file).
-- [ ] 7.2 Manual smoke pass against every flow in `ux.md` (browse→edit→save plain file with
+- [x] 7.2 Manual smoke pass against every flow in `ux.md` (browse→edit→save plain file with
       network dev-tools open confirming zero `sessions` POSTs; md WYSIWYG + source toggle;
       staged app-source draft → review → apply; chat dock proposal → apply; conflict →
       single card → MergeDialog; offline edit → journal flush). Record results in the PR
       description — `client/web` has no automated UI suite (PRD constraint).
-- [ ] 7.3 Confirm the IW-6 seam: direct in-tab editing of the main area works with no session
+- [x] 7.3 Confirm the IW-6 seam: direct in-tab editing of the main area works with no session
       scope active (the surface `presence-realtime` will attach CRDT to), and note any
       deviations in the PR for the IW-6 author.
