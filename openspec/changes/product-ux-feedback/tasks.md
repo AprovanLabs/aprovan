@@ -31,9 +31,9 @@ wave-1 parallel. Do not touch overlapping paths across parallel streams._
 
 > Depends-on: - | Touches: registry:packages/contracts/vfs/** | Verify: cd /Users/jacob/Documents/Code/AprovanLabs/registry && pnpm --filter @utdk/vfs test && pnpm --filter @utdk/vfs build
 
-- [ ] 4.1 Implement `s3.ts` for read/write/delete/list/stat with etag conditionals.
-- [ ] 4.2 Compat registration + mocked S3 unit tests.
-- [ ] 4.3 Document bucket/prefix credential options.
+- [x] 4.1 Implement `s3.ts` for read/write/delete/list/stat with etag conditionals.
+- [x] 4.2 Compat registration + mocked S3 unit tests.
+- [x] 4.3 Document bucket/prefix credential options.
 
 ## 5. Editor dark theme + markdown default
 
