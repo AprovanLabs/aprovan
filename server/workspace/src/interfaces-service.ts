@@ -144,6 +144,14 @@ export const interfacesService: CoreService = {
             400,
           );
         }
+        // Named telemetry instances never resolve to native — the activity
+        // store is the bare `telemetry` core service (D3).
+        if (interfaceId === "telemetry" && provider === "native") {
+          throw new ServiceError(
+            "telemetry's native store is the bare telemetry core service; bind vendor backends as named instances (e.g. telemetry:datadog)",
+            400,
+          );
+        }
         const namespace = instanceNamespace(interfaceId, args["as"]);
         const credentialId =
           typeof args["credential"] === "string" && args["credential"]
