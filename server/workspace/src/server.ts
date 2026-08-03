@@ -17,9 +17,11 @@
  */
 
 import { serve } from "@hono/node-server";
+import type { Server as HttpServer } from "node:http";
 import { Hono } from "hono";
 import { createApp } from "./app.js";
 import { getAuthMode, initAuth } from "./middleware/auth.js";
+import { attachRealtime, type RealtimeHandle } from "./realtime/socket.js";
 import { liveAppsRouter } from "./routes/live-apps.js";
 import { mcpRouter } from "./routes/mcp.js";
 import { wellKnownRouter } from "./routes/well-known.js";
@@ -79,6 +81,8 @@ export async function startWorkspace(
   await initAuth();
 
   const app = createWorkspaceApp();
+  // WebSocket upgrade only — a plain GET answers 426 Upgrade Required.
+  app.get("/api/gateway/ws", (c) => c.text("Upgrade Required", 426));
   const server = serve({ fetch: app.fetch, port }, (info) => {
     const where =
       config.data.kind === "sqlite" ? `sqlite ${config.data.dir}` : `aws ${config.data.region}`;
@@ -87,6 +91,10 @@ export async function startWorkspace(
         `(mode=${config.mode} auth=${getAuthMode()} data=${where})\n`,
     );
   });
+
+  // Realtime requires a Node HTTP server (tech-plan D2). Fetch-embedded hosts
+  // that only call createWorkspaceApp() have no upgrade path.
+  const realtime: RealtimeHandle = attachRealtime(server as HttpServer);
 
   const cron = config.cron.enabled ? startCronScheduler() : undefined;
 
@@ -104,6 +112,8 @@ export async function startWorkspace(
       // Release the lease first: a peer can start ticking while this process
       // is still draining, so a deploy never skips a cron minute.
       await cron?.stop();
+      // Close realtime sockets before the HTTP drain so brokers drop cleanly.
+      realtime.close();
       await new Promise<void>((resolve) => {
         const forced = setTimeout(resolve, options.drainMs ?? 30_000);
         forced.unref?.();

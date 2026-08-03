@@ -12,6 +12,9 @@
 export { createWorkspaceApp, startWorkspace } from "./server.js";
 export type { StartWorkspaceOptions, WorkspaceHandle } from "./server.js";
 
+export { attachRealtime } from "./realtime/socket.js";
+export type { AttachRealtimeOptions, RealtimeHandle } from "./realtime/socket.js";
+
 export {
   getWorkspaceConfig,
   loadWorkspaceConfig,

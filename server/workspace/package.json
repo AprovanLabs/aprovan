@@ -38,6 +38,7 @@
   "dependencies": {
     "@aprovan/node": "workspace:*",
     "@aprovan/patchwork-compiler": "workspace:*",
+    "@aprovan/registry-server": "workspace:*",
     "@aprovan/sandbox-bashkit": "workspace:*",
     "@aws-sdk/client-cognito-identity-provider": "^3.1077.0",
     "@aws-sdk/client-dynamodb": "^3.1077.0",
@@ -66,12 +67,13 @@
     "quickjs-emscripten-core": "0.32.0",
     "tslib": "^2.8.1",
     "utdk": "workspace:*",
-    "zod": "3.25.76",
-    "@aprovan/registry-server": "workspace:*"
+    "ws": "^8.18.0",
+    "zod": "3.25.76"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^25.5.0",
+    "@types/ws": "^8.18.0",
     "@vitest/coverage-v8": "^2.1.5",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3",
@@ -81,7 +83,7 @@
     "node": ">=20.0.0"
   },
   "optionalDependencies": {
-    "pg": "^8.22.0",
-    "@aws-sdk/dsql-signer": "^3.1077.0"
+    "@aws-sdk/dsql-signer": "^3.1077.0",
+    "pg": "^8.22.0"
   }
 }

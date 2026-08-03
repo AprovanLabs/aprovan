@@ -13,13 +13,13 @@ without coordinating._
 
 > Depends-on: - | Touches: server/workspace/src/realtime/**, server/workspace/src/server.ts, server/workspace/package.json, server/workspace/tests/realtime-socket.test.ts, pnpm-lock.yaml | Verify: cd ~/Documents/Code/AprovanLabs/aprovan/server/workspace && pnpm typecheck && pnpm vitest run tests/realtime-socket.test.ts
 
-- [ ] 1.1 Add the `ws` dependency (+`@types/ws`) to `server/workspace` and create
+- [x] 1.1 Add the `ws` dependency (+`@types/ws`) to `server/workspace` and create
       `src/realtime/protocol.ts`: zod schemas for the client/server envelopes, the
       `<namespace>:<rest>` topic grammar, error codes, and the reserved-namespace constants
       `doc` and `fs` with doc comments naming their future owners (CRDT doc-sync; post-WS-5
       change feed) — tech-plan D5, spec realtime-socket "Topic protocol envelope".
       Verify: `cd server/workspace && pnpm install && pnpm typecheck`
-- [ ] 1.2 Implement `src/realtime/broker.ts`: per-workspace connection/subscription maps,
+- [x] 1.2 Implement `src/realtime/broker.ts`: per-workspace connection/subscription maps,
       namespace registry (`registerNamespace(handler)`), dispatch of
       subscribe/unsubscribe/publish to handlers, `publishToTopic` fan-out, idempotent
       subscriptions, single cleanup path on disconnect that drops subscriptions and calls
@@ -27,7 +27,7 @@ without coordinating._
       `reserved-namespace` for `doc:`/`fs:`, `unknown-namespace` otherwise (spec
       realtime-socket "Namespace registry with reserved namespaces").
       Verify: `cd server/workspace && pnpm typecheck`
-- [ ] 1.3 Implement `src/realtime/socket.ts` and export `attachRealtime(server)`: `ws`
+- [x] 1.3 Implement `src/realtime/socket.ts` and export `attachRealtime(server)`: `ws`
       `WebSocketServer` in noServer mode, `upgrade` listener matching `/api/gateway/ws`,
       subprotocol auth (`aprovan.v1` + `bearer.<token>` → existing
       `verifyAccessToken`/principal resolution, honoring `none` auth mode), 401 rejection
@@ -35,12 +35,12 @@ without coordinating._
       2-missed-pong termination, close 1008 at token `exp`, and `bad-message` error frames
       for unparseable input without closing (tech-plan D2/D3).
       Verify: `cd server/workspace && pnpm typecheck`
-- [ ] 1.4 Wire it into the lifecycle: `startWorkspace` (`src/server.ts`) calls
+- [x] 1.4 Wire it into the lifecycle: `startWorkspace` (`src/server.ts`) calls
       `attachRealtime` on the `serve(...)` return value; `stop()` closes open sockets
       before the HTTP drain. Export `attachRealtime` from `src/index.ts` for embedding
       hosts that do run a Node server.
       Verify: `cd server/workspace && pnpm build`
-- [ ] 1.5 Write `tests/realtime-socket.test.ts` against a real server on an ephemeral port
+- [x] 1.5 Write `tests/realtime-socket.test.ts` against a real server on an ephemeral port
       with `ws` clients, covering every realtime-socket spec scenario: valid-token upgrade
       (accepted subprotocol `aprovan.v1`), 401 on bad/absent token, no cross-workspace
       delivery, subscribe→publish→event with no self-echo by default, malformed frame
@@ -77,7 +77,7 @@ without coordinating._
 
 > Depends-on: - | Touches: client/web/src/lib/realtime.ts | Verify: cd ~/Documents/Code/AprovanLabs/aprovan/client/web && pnpm build
 
-- [ ] 3.1 Implement `RealtimeClient` in `client/web/src/lib/realtime.ts` exactly to the
+- [x] 3.1 Implement `RealtimeClient` in `client/web/src/lib/realtime.ts` exactly to the
       tech-plan client contract: connect to `GATEWAY_BASE`-derived `wss…/api/gateway/ws`
       with subprotocols `["aprovan.v1", "bearer." + getAccessTokenSync()]`, jittered
       exponential backoff 1s→30s forever with a fresh token per attempt, resubscription of
