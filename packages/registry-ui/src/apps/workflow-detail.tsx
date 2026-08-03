@@ -688,8 +688,8 @@ export interface StandaloneWorkflowDetailProps {
   invoke: ToolsInvoke;
   /**
    * Gateway `apps` namespace transport. Purely cosmetic here: with it, the
-   * pane can say which app exports this workflow (or that it's Personal).
-   * Without it, the pane still runs the workflow and reads its trace fine.
+   * pane can say which app exports this workflow. Without it, the pane still
+   * runs the workflow and reads its trace fine.
    */
   invokeApps?: ToolsInvoke | undefined;
   /** Read the script so the graph can render; without it, the form renders alone. */
@@ -747,7 +747,7 @@ export function StandaloneWorkflowDetail({
         const owner = apps.find(
           (app): app is NonNullable<typeof app> => app !== null && (app.workflows ?? []).includes(name),
         );
-        if (owner) appLabel = owner.builtin ? "Personal" : (owner.title ?? owner.name);
+        if (owner) appLabel = owner.title ?? owner.name;
       }
     }
     return { workflow, appLabel };

@@ -122,23 +122,23 @@ else in this change is IW-0-independent. Nuke-and-reseed: no task migrates name-
 
 > Depends-on: - (build against the tech-plan wire contract; integration asserts in stream 6) | Touches: packages/ui/src/apps-store/**, packages/registry-ui/src/apps-panel.tsx, packages/registry-ui/src/apps/** | Verify: pnpm --dir /Users/jacob/Documents/Code/AprovanLabs/aprovan/packages/ui typecheck && pnpm --dir /Users/jacob/Documents/Code/AprovanLabs/aprovan/packages/registry-ui typecheck && pnpm --dir /Users/jacob/Documents/Code/AprovanLabs/aprovan/packages/registry-ui test && ! grep -rn "PERSONAL_APP_NAME\|personalApp\|builtin" /Users/jacob/Documents/Code/AprovanLabs/aprovan/packages/ui/src/apps-store /Users/jacob/Documents/Code/AprovanLabs/aprovan/packages/registry-ui/src
 
-- [ ] 4.1 `packages/ui/src/apps-store/wire.ts` + `catalog.tsx`: delete the Personal
+- [x] 4.1 `packages/ui/src/apps-store/wire.ts` + `catalog.tsx`: delete the Personal
       synthesis/fallback and `builtin` handling; parse `appId`, `installId`,
       `originAppId`, `requires`, and pin fields from the new wire shapes (spec
       per-user-space grep gate; tech-plan Interfaces).
-- [ ] 4.2 `registry-ui` `apps-panel.tsx`: pane variant — opens on the grouped list (Your
+- [x] 4.2 `registry-ui` `apps-panel.tsx`: pane variant — opens on the grouped list (Your
       apps / Installed / Your flows (private) / Directory), in-pane list↔detail navigation,
       props confined to injected transports (`NativePanelProps`-compatible) (spec
       apps-native-surface "App selection lives inside the pane"; ux.md Apps pane).
-- [ ] 4.3 `registry-ui` `apps/app-detail.tsx`: remove all `builtin` branches; add the
+- [x] 4.3 `registry-ui` `apps/app-detail.tsx`: remove all `builtin` branches; add the
       Dependencies section to the Access tab (contract, optional, bound profile,
       unfulfilled warning + re-bind CTA); add Install settings section for installations
       (pin chip + update, bindings pickers, config editor, editing toggle with the
       overwrite warning); header gains id permalink + lineage line (ux.md detail screen).
-- [ ] 4.4 Directory + install sheet components in `registry-ui`: entry cards with
+- [x] 4.4 Directory + install sheet components in `registry-ui`: entry cards with
       dependency chips, install sheet with pin selector and per-contract profile rows
       (disabled-until-bound, "Create profile" link when unresolvable) (ux.md install flow).
-- [ ] 4.5 Package tests: wire parsing round-trips id/lineage/requires; list has no
+- [x] 4.5 Package tests: wire parsing round-trips id/lineage/requires; list has no
       synthesized entries on empty input; install sheet disables until non-optional
       requirements bound.
 

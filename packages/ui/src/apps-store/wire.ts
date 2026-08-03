@@ -158,6 +158,8 @@ export interface WorkflowSummary {
   registered?: boolean;
   /** Apps that export this workflow — filled in by the catalog, not the wire. */
   apps?: string[];
+  /** App ids that export this workflow (from workflows.list). */
+  exportedBy?: string[];
 }
 
 export interface WorkflowRunSummary {
@@ -225,6 +227,8 @@ export function normalizeWorkflow(raw: unknown): WorkflowSummary | null {
   if (procedure) workflow.procedure = procedure;
   const registered = pick(record, "registered");
   if (typeof registered === "boolean") workflow.registered = registered;
+  const exportedBy = asStringList(pick(record, "exportedBy", "exported_by"));
+  if (exportedBy.length) workflow.exportedBy = exportedBy;
   return workflow;
 }
 
@@ -363,8 +367,24 @@ export interface AppRateLimit {
 
 export type DataScope = "owner" | "workspace";
 
+/** One declared interface dependency on an app manifest. */
+export interface AppRequirement {
+  contract: string;
+  profileName?: string;
+  optional?: boolean;
+}
+
+/** Channel pin or exact release pin for an installation. */
+export type AppPin = { channel: string } | { release: string };
+
 export interface AppSummary {
   name: string;
+  /** Durable ULID identity. Present on gateways that mint ids. */
+  appId?: string;
+  /** Set when this app was forked from another. */
+  originAppId?: string;
+  /** Durable live URL that survives renames (`/apps/id/<appId>`). */
+  permalink?: string;
   title?: string;
   description?: string;
   /** Workspace path of the UI entrypoint. */
@@ -387,18 +407,43 @@ export interface AppSummary {
   allowedTools?: string[];
   roles?: AppRoles;
   rateLimit?: AppRateLimit;
-  /** Where an app user's data physically lands. Absent on older gateways. */
+  /** Where an app user's data physically lands. Absent once dataScope is gone. */
   dataScope?: DataScope;
   /** Channel the caller is looking at, when the gateway pins one. */
   channel?: string;
   /** Release currently serving the live channel, when known. */
   release?: AppRelease;
-  /**
-   * Synthesized by the gateway rather than published — today that is the
-   * implicit Personal app that owns every unbundled workflow. Builtin apps
-   * have no release machinery and cannot be unpublished.
-   */
-  builtin?: boolean;
+  /** Declared interface requirements (contract → profile binding at install). */
+  requires?: AppRequirement[];
+}
+
+export function normalizeRequirement(raw: unknown): AppRequirement | null {
+  const record = asRecord(raw);
+  const contract = asString(pick(record, "contract", "interface", "name"));
+  if (!record || !contract) return null;
+  const req: AppRequirement = { contract };
+  const profileName = asString(pick(record, "profileName", "profile_name", "profile"));
+  if (profileName) req.profileName = profileName;
+  if (pick(record, "optional") === true) req.optional = true;
+  return req;
+}
+
+export function normalizeRequirements(raw: unknown): AppRequirement[] {
+  return asArray(raw)
+    .map(normalizeRequirement)
+    .filter((req): req is AppRequirement => req !== null);
+}
+
+export function normalizePin(raw: unknown): AppPin | undefined {
+  const record = asRecord(raw);
+  if (!record) {
+    const channel = asString(raw);
+    return channel ? { channel } : undefined;
+  }
+  const release = asString(pick(record, "release", "releaseId", "release_id"));
+  if (release) return { release };
+  const channel = asString(pick(record, "channel")) ?? "live";
+  return { channel };
 }
 
 export function normalizeApp(raw: unknown): AppSummary | null {
@@ -407,6 +452,14 @@ export function normalizeApp(raw: unknown): AppSummary | null {
   if (!record || !name) return null;
   const visibility = pick(record, "visibility") === "public" ? "public" : "private";
   const app: AppSummary = { name, visibility };
+
+  const appId = asString(pick(record, "appId", "app_id", "id"));
+  if (appId) app.appId = appId;
+  const originAppId = asString(pick(record, "originAppId", "origin_app_id"));
+  if (originAppId) app.originAppId = originAppId;
+  const permalink = asString(pick(record, "permalink", "idUrl", "id_url"));
+  if (permalink) app.permalink = permalink;
+  else if (appId) app.permalink = `/apps/id/${appId}`;
 
   const title = asString(pick(record, "title"));
   if (title) app.title = title;
@@ -467,43 +520,158 @@ export function normalizeApp(raw: unknown): AppSummary | null {
   if (channel) app.channel = channel;
   const release = normalizeRelease(pick(record, "release"));
   if (release) app.release = release;
-  if (pick(record, "builtin", "built_in") === true) app.builtin = true;
+  const requires = normalizeRequirements(pick(record, "requires", "requirements"));
+  if (requires.length) app.requires = requires;
   return app;
 }
 
 // ---------------------------------------------------------------------------
-// The Personal app
+// Installations and directory
 // ---------------------------------------------------------------------------
 
-/**
- * The reserved name of the workspace's implicit app. The gateway synthesizes
- * it in `apps.list` (`builtin: true`) as the owner of every workflow no
- * published app exports; {@link synthesizePersonalApp} builds the identical
- * record client-side for gateways that predate it, so the explorer renders
- * the same tree either way.
- */
-export const PERSONAL_APP_NAME = "personal";
+export interface InstallSummary {
+  installId: string;
+  originAppId: string;
+  originWorkspaceId?: string;
+  /** Resolved origin app name/title when the gateway inlines them. */
+  name?: string;
+  title?: string;
+  description?: string;
+  pin: AppPin;
+  resolvedRelease?: string | null;
+  bindings: Record<string, string>;
+  config: Record<string, unknown>;
+  editing: boolean;
+  prefix?: string;
+  available?: boolean;
+  updateAvailable?: boolean;
+  requires?: AppRequirement[];
+  installedAt?: string;
+  updatedAt?: string;
+  liveUrl?: string;
+  permalink?: string;
+}
 
-/** Is this the gateway-synthesized Personal app? */
-export function isPersonalApp(app: AppSummary): boolean {
-  return app.builtin === true || app.name === PERSONAL_APP_NAME;
+export interface DirectoryEntry {
+  appId: string;
+  name: string;
+  workspaceId?: string;
+  title?: string;
+  description?: string;
+  requires?: AppRequirement[];
+  liveRelease?: string;
+  updatedAt?: string;
+  /** True when the caller's workspace already has at least one install. */
+  installed?: boolean;
+}
+
+export function normalizeInstall(raw: unknown): InstallSummary | null {
+  const record = asRecord(raw);
+  const installId = asString(pick(record, "installId", "install_id", "id"));
+  const originAppId = asString(pick(record, "originAppId", "origin_app_id", "appId", "app_id"));
+  if (!record || !installId || !originAppId) return null;
+  const pin = normalizePin(pick(record, "pin")) ?? { channel: "live" };
+  const bindingsRecord = asRecord(pick(record, "bindings")) ?? {};
+  const bindings: Record<string, string> = {};
+  for (const [contract, profile] of Object.entries(bindingsRecord)) {
+    const id = asString(profile);
+    if (id) bindings[contract] = id;
+  }
+  const config = asRecord(pick(record, "config")) ?? {};
+  const install: InstallSummary = {
+    installId,
+    originAppId,
+    pin,
+    bindings,
+    config,
+    editing: pick(record, "editing") === true,
+  };
+  const originWorkspaceId = asString(
+    pick(record, "originWorkspaceId", "origin_workspace_id", "workspaceId", "workspace_id"),
+  );
+  if (originWorkspaceId) install.originWorkspaceId = originWorkspaceId;
+  const name = asString(pick(record, "name"));
+  if (name) install.name = name;
+  const title = asString(pick(record, "title"));
+  if (title) install.title = title;
+  const description = asString(pick(record, "description"));
+  if (description) install.description = description;
+  if ("resolvedRelease" in record || "resolved_release" in record) {
+    install.resolvedRelease =
+      asString(pick(record, "resolvedRelease", "resolved_release")) ?? null;
+  }
+  const prefix = asString(pick(record, "prefix"));
+  if (prefix) install.prefix = prefix;
+  if (typeof pick(record, "available") === "boolean") {
+    install.available = pick(record, "available") === true;
+  }
+  if (pick(record, "updateAvailable", "update_available") === true) {
+    install.updateAvailable = true;
+  }
+  const requires = normalizeRequirements(pick(record, "requires", "requirements"));
+  if (requires.length) install.requires = requires;
+  const installedAt = asString(pick(record, "installedAt", "installed_at"));
+  if (installedAt) install.installedAt = installedAt;
+  const updatedAt = asString(pick(record, "updatedAt", "updated_at"));
+  if (updatedAt) install.updatedAt = updatedAt;
+  const liveUrl = asString(pick(record, "liveUrl", "live_url", "url"));
+  if (liveUrl) install.liveUrl = liveUrl;
+  const permalink = asString(pick(record, "permalink"));
+  if (permalink) install.permalink = permalink;
+  else install.permalink = `/apps/id/${originAppId}`;
+  return install;
+}
+
+export function normalizeInstalls(raw: unknown): InstallSummary[] {
+  return unwrapList(raw, "installs", "installations", "installed")
+    .map(normalizeInstall)
+    .filter((item): item is InstallSummary => item !== null);
+}
+
+export function normalizeDirectoryEntry(raw: unknown): DirectoryEntry | null {
+  const record = asRecord(raw);
+  const appId = asString(pick(record, "appId", "app_id", "id"));
+  const name = asString(pick(record, "name"));
+  if (!record || !appId || !name) return null;
+  const entry: DirectoryEntry = { appId, name };
+  const workspaceId = asString(pick(record, "workspaceId", "workspace_id", "originWorkspaceId"));
+  if (workspaceId) entry.workspaceId = workspaceId;
+  const title = asString(pick(record, "title"));
+  if (title) entry.title = title;
+  const description = asString(pick(record, "description"));
+  if (description) entry.description = description;
+  const requires = normalizeRequirements(pick(record, "requires", "requirements"));
+  if (requires.length) entry.requires = requires;
+  const liveRelease = asString(pick(record, "liveRelease", "live_release", "release"));
+  if (liveRelease) entry.liveRelease = liveRelease;
+  const updatedAt = asString(pick(record, "updatedAt", "updated_at"));
+  if (updatedAt) entry.updatedAt = updatedAt;
+  if (typeof pick(record, "installed") === "boolean") {
+    entry.installed = pick(record, "installed") === true;
+  }
+  return entry;
+}
+
+export function normalizeDirectory(raw: unknown): DirectoryEntry[] {
+  return unwrapList(raw, "apps", "directory", "entries")
+    .map(normalizeDirectoryEntry)
+    .filter((entry): entry is DirectoryEntry => entry !== null);
 }
 
 /**
- * The client-side stand-in for a gateway that doesn't return the implicit
- * Personal app yet. Mirrors the gateway's own record: private, builtin, no
- * release machinery — the catalog attaches the workspace's unbundled
- * workflows to it.
+ * Whether an install can proceed given the declared requirements and the
+ * caller's chosen bindings (contract → profileId). Non-optional requirements
+ * must be bound; optional ones may stay unbound.
  */
-export function synthesizePersonalApp(): AppSummary {
-  return {
-    name: PERSONAL_APP_NAME,
-    title: "Personal",
-    visibility: "private",
-    builtin: true,
-    description:
-      "Your workspace's built-in app. Every workflow no published app exports lives here — private to you, running with your own credentials.",
-  };
+export function installBindingsReady(
+  requires: AppRequirement[] | undefined,
+  bindings: Record<string, string>,
+): boolean {
+  for (const req of requires ?? []) {
+    if (req.optional) continue;
+    if (!bindings[req.contract]?.trim()) return false;
+  }
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -665,6 +833,15 @@ export interface CapabilityReach {
   credential?: string;
 }
 
+/** One row in the capabilities Dependencies section. */
+export interface AppDependencyStatus {
+  contract: string;
+  optional?: boolean;
+  boundProfile?: string;
+  /** `true` when bound, `false` when missing, `"ungated"` on degraded gateways. */
+  fulfilled: boolean | "ungated";
+}
+
 export interface CapabilityModel {
   dataScope: DataScope;
   /** Human-readable answer to "where does this app's data live?". */
@@ -677,6 +854,8 @@ export interface CapabilityModel {
    * which the spec says must go through an exported workflow instead.
    */
   rejected: string[];
+  /** Declared interface requirements and their fulfillment (from gateway). */
+  dependencies: AppDependencyStatus[];
   /** True once a gateway `apps.capabilities` response has been merged in. */
   fromGateway: boolean;
 }
@@ -836,6 +1015,11 @@ export function deriveCapabilities(
     workflows: workflowReaches,
     credentialed,
     rejected,
+    dependencies: (app.requires ?? []).map((req) => ({
+      contract: req.contract,
+      optional: req.optional,
+      fulfilled: false,
+    })),
     fromGateway: false,
   };
 }
@@ -941,6 +1125,26 @@ export function mergeCapabilities(base: CapabilityModel, raw: unknown): Capabili
   }
   const rejected = asStringList(pick(record, "rejected", "denied", "blocked"));
   if (rejected.length) merged.rejected = rejected;
+
+  const depsRaw = pick(record, "dependencies", "requires");
+  if (depsRaw !== undefined) {
+    merged.dependencies = asArray(depsRaw).flatMap((entry) => {
+      const item = asRecord(entry);
+      const contract = asString(pick(item, "contract", "interface", "name"));
+      if (!contract) return [];
+      const fulfilledRaw = pick(item, "fulfilled");
+      let fulfilled: boolean | "ungated" = false;
+      if (fulfilledRaw === true || fulfilledRaw === "true") fulfilled = true;
+      else if (fulfilledRaw === "ungated") fulfilled = "ungated";
+      const dep: AppDependencyStatus = { contract, fulfilled };
+      if (pick(item, "optional") === true) dep.optional = true;
+      const boundProfile = asString(
+        pick(item, "boundProfile", "bound_profile", "profile", "profileId", "profile_id"),
+      );
+      if (boundProfile) dep.boundProfile = boundProfile;
+      return [dep];
+    });
+  }
   return merged;
 }
 

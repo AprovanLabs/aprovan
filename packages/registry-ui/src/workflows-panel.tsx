@@ -7,7 +7,7 @@
  * history, per-run traces, cascade trees, the version log, and the app access
  * / release editors — lives in `./apps-panel` and its internals, so there is
  * one implementation rather than two that drift. Hosts that only pass
- * `invoke` get the implicit Personal group alone, which is exactly the flat
+ * `invoke` get unbundled private flows alone, which is exactly the flat
  * list they had before; hosts that also pass `invokeApps` get the published
  * app groups too.
  *
