@@ -1,5 +1,6 @@
 import {
   CodeBlockView,
+  ViewModeToggle,
   WidgetPreview,
   parseUsesAttribute,
 } from "@aprovan/patchwork-editor";
@@ -7,8 +8,6 @@ import { createSingleFileProject } from "@aprovan/patchwork-compiler";
 import {
   AlertCircle,
   Check,
-  Code,
-  Eye,
   Loader2,
   Pencil,
   X,
@@ -149,16 +148,11 @@ export function ChatWidgetArtifact({
               Edit
             </button>
           )}
-          <button
-            type="button"
+          <ViewModeToggle
+            active={showCode}
+            label={showCode ? "Preview" : "Code"}
             onClick={() => setShowCode((v) => !v)}
-            className={`w-[5rem] px-2 py-1 text-xs rounded flex items-center gap-1 ${
-              showCode ? "bg-primary text-primary-foreground" : "hover:bg-muted text-primary"
-            }`}
-          >
-            {showCode ? <Eye className="h-3 w-3" /> : <Code className="h-3 w-3" />}
-            {showCode ? "Preview" : "Code"}
-          </button>
+          />
         </div>
       </div>
 

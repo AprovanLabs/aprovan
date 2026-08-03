@@ -1,10 +1,11 @@
 import { createSingleFileProject } from '@aprovan/patchwork-compiler';
-import { Code, Eye, Pencil, RotateCcw, MessageSquare } from 'lucide-react';
+import { Code, Pencil, RotateCcw, MessageSquare } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { withTimeout } from '../lib/utils';
 import { EditModal, type CompileFn, type EditorLogsSource, CodeBlockView, MediaPreview, getFileType } from './edit';
 import { MarkdownPreview } from './MarkdownPreview';
 import { SaveStatusButton, type SaveStatus } from './SaveStatusButton';
+import { ViewModeToggle } from './ViewModeToggle';
 import { WidgetPreview } from './WidgetPreview';
 import type { Compiler, Manifest , VirtualProject } from '@aprovan/patchwork-compiler';
 
@@ -467,13 +468,11 @@ export function CodePreview({
               tone="muted"
               target={vfsPath ?? undefined}
             />
-            <button
+            <ViewModeToggle
+              active={showPreview}
+              label={showPreview ? 'Preview' : 'Code'}
               onClick={() => setShowPreview(!showPreview)}
-              className={`w-[5rem] px-2 py-1 text-xs rounded flex items-center gap-1 ${showPreview ? 'bg-primary text-primary-foreground' : 'hover:bg-primary/20 text-primary'}`}
-            >
-              {showPreview ? <Eye className="h-3 w-3" /> : <Code className="h-3 w-3" />}
-              {showPreview ? 'Preview' : 'Code'}
-            </button>
+            />
           </div>
         </div>
 

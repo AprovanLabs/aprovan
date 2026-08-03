@@ -1,6 +1,4 @@
 import {
-  Code,
-  Eye,
   AlertCircle,
   Loader2,
   Pencil,
@@ -15,6 +13,7 @@ import { MarkdownEditor } from '../MarkdownEditor';
 import { MarkdownPreview } from '../MarkdownPreview';
 import { MobileDrawer } from '../MobileDrawer';
 import { SaveStatusButton, type SaveStatus } from '../SaveStatusButton';
+import { ViewModeToggle } from '../ViewModeToggle';
 import { CodeBlockView } from './CodeBlockView';
 import { EditHistory } from './EditHistory';
 import { LogsPanel, type EditorLogsSource } from './LogsPanel';
@@ -338,21 +337,11 @@ export function EditModal({
               />
             )}
             {fileType.canToggleView && (
-              <button
+              <ViewModeToggle
+                active={view === 'rich' || view === 'preview'}
+                label={view === 'rich' || view === 'preview' ? 'Preview' : 'Code'}
                 onClick={() => setView((current) => toggleDefaultView(current, fileType))}
-                className={`w-[5rem] px-2 py-1 text-xs rounded flex items-center gap-1 ${
-                  view === 'rich' || view === 'preview'
-                    ? 'bg-primary text-primary-foreground'
-                    : 'hover:bg-primary/20 text-primary'
-                }`}
-              >
-                {view === 'rich' || view === 'preview' ? (
-                  <Eye className="h-3 w-3" />
-                ) : (
-                  <Code className="h-3 w-3" />
-                )}
-                {view === 'rich' || view === 'preview' ? 'Preview' : 'Code'}
-              </button>
+              />
             )}
             <button
               onClick={handleClose}
