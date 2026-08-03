@@ -364,7 +364,7 @@ export function WorkspaceTree({
   onSelectFile,
   onSelectDirectory,
   onOpenInEditor,
-  openInEditorTitle = 'Open in editor',
+  openInEditorTitle = 'Edit',
   pinnedPaths,
   onTogglePin,
   onDeletePath,
