@@ -38,16 +38,16 @@ Repos: registry = `/Users/jacob/Documents/Code/AprovanLabs/registry`, aprovan =
 
 > Depends-on: - | Touches: aprovan:packages/registry-ui/** | Verify: cd /Users/jacob/Documents/Code/AprovanLabs/aprovan && pnpm --filter @aprovan/registry-ui typecheck && pnpm --filter @aprovan/registry-ui test
 
-- [ ] 3.1 Add `capabilities?: ReadonlyArray<AdminCapability>` to `AdminPanelProps`
+- [x] 3.1 Add `capabilities?: ReadonlyArray<AdminCapability>` to `AdminPanelProps`
   defaulting to `["members","groups","permissions"]`; render sections strictly from the
   list, no endpoint probing (tech-plan D5; spec scenario: Standalone admin scope).
-- [ ] 3.2 Build `ApiKeysSection` against `GET/POST /api-keys` + `DELETE /api-keys/:id`:
+- [x] 3.2 Build `ApiKeysSection` against `GET/POST /api-keys` + `DELETE /api-keys/:id`:
   list, mint with one-time plaintext reveal, revoke confirm (ux: Admin page).
-- [ ] 3.3 Build `ProfilesSection` against `/profiles` CRUD + `/profiles/:id/grants`:
+- [x] 3.3 Build `ProfilesSection` against `/profiles` CRUD + `/profiles/:id/grants`:
   list/create/edit, grants sub-list; 501 from grant endpoints renders the "not supported
   by this storage backend" notice, not an error toast.
-- [ ] 3.4 Build `AuditSection` against `GET /audit` (read-only, paged, empty state).
-- [ ] 3.5 Tests: default capability set renders the exact current hosted sections (the
+- [x] 3.4 Build `AuditSection` against `GET /audit` (read-only, paged, empty state).
+- [x] 3.5 Tests: default capability set renders the exact current hosted sections (the
   workspace app passes no prop — regression guard); standalone set issues no `/members` or
   `/groups` requests.
 
