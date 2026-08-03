@@ -18,7 +18,7 @@ import {
  */
 export interface ExplorerPageBridge {
   isTabOpen(path: string): boolean;
-  reloadStaleTab(path: string): void;
+  reloadStaleTab(path: string, options?: { external?: boolean }): void;
   pruneTabsToExisting(existing: Set<string>): void;
   openWorkspacePreview(path: string): void;
   /** Workspace switch: reset state owned by other features (tabs, sessions, edit modal). */
@@ -98,17 +98,15 @@ export function useWorkspaceExplorer(args: {
       // say so, unless this window made the change itself.
       if (changedPath) {
         const isOpen = bridgeRef.current?.isTabOpen(changedPath) ?? false;
-        if (isOpen) {
-          if (!wasRecentLocalWrite(changedPath)) {
-            publishNotification({
-              category: "activity",
-              title: `Updated ${changedPath.split("/").pop()} with outside changes`,
-              body: `${changedPath} was changed by another chat, window, or workflow — the open preview refreshed automatically.`,
-              link: { kind: "open-file", path: changedPath },
-              localOnly: true,
-            });
-          }
-          bridgeRef.current?.reloadStaleTab(changedPath);
+        if (isOpen && !wasRecentLocalWrite(changedPath)) {
+          publishNotification({
+            category: "activity",
+            title: `Updated ${changedPath.split("/").pop()} with outside changes`,
+            body: `${changedPath} was changed by another chat, window, or workflow — the open preview refreshed automatically.`,
+            link: { kind: "open-file", path: changedPath },
+            localOnly: true,
+          });
+          bridgeRef.current?.reloadStaleTab(changedPath, { external: true });
         }
       }
 

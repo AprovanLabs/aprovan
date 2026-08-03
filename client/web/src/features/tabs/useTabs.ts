@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AppsSelection } from "@aprovan/registry-ui/apps-panel";
+import { getFileType } from "@aprovan/patchwork-editor";
 import { stashCredentialsPrefill } from "@/lib/credentials";
 import { nativeTabPath, parseNativeTabPath } from "@/lib/native-surfaces";
 import { loadWorkspaceFileProject } from "@/lib/workspace-vfs";
@@ -36,6 +37,11 @@ function loadPersistedTabState(workspaceId: string | null): {
 
 function persistTabState(paths: string[], activePath: string | null, workspaceId: string | null) {
   localStorage.setItem(getTabsStorageKey(workspaceId), JSON.stringify({ paths, activePath }));
+}
+
+function isEditablePreviewPath(path: string): boolean {
+  const category = getFileType(path).category;
+  return category === "text" || category === "compilable";
 }
 
 /**
@@ -258,13 +264,7 @@ export function useTabs(args: {
     setActiveTabPath(null);
   }, []);
 
-  const reloadStaleTab = useCallback((path: string) => {
-    setOpenTabs((prev) => {
-      const next = new Map(prev);
-      next.set(path, { code: "", loading: true, error: null, stale: false });
-      return next;
-    });
-
+  const patchTabContent = useCallback((path: string) => {
     const requestId = (tabRequestRefs.current.get(path) ?? 0) + 1;
     tabRequestRefs.current.set(path, requestId);
 
@@ -273,9 +273,11 @@ export function useTabs(args: {
         if (tabRequestRefs.current.get(path) !== requestId) return;
         if (!project) {
           setOpenTabs((prev) => {
+            const existing = prev.get(path);
+            if (!existing) return prev;
             const next = new Map(prev);
             next.set(path, {
-              code: "",
+              ...existing,
               loading: false,
               error: "Failed to reload file",
               stale: false,
@@ -286,17 +288,27 @@ export function useTabs(args: {
         }
         const file = project.files.get(project.entry);
         setOpenTabs((prev) => {
+          const existing = prev.get(path);
+          if (!existing) return prev;
           const next = new Map(prev);
-          next.set(path, { code: file?.content ?? "", loading: false, error: null, stale: false });
+          next.set(path, {
+            ...existing,
+            code: file?.content ?? "",
+            loading: false,
+            error: null,
+            stale: false,
+          });
           return next;
         });
       })
       .catch(() => {
         if (tabRequestRefs.current.get(path) !== requestId) return;
         setOpenTabs((prev) => {
+          const existing = prev.get(path);
+          if (!existing) return prev;
           const next = new Map(prev);
           next.set(path, {
-            code: "",
+            ...existing,
             loading: false,
             error: "Failed to reload file",
             stale: false,
@@ -305,6 +317,23 @@ export function useTabs(args: {
         });
       });
   }, []);
+
+  const reloadStaleTab = useCallback(
+    (path: string, options?: { external?: boolean }) => {
+      if (options?.external && isEditablePreviewPath(path)) {
+        setOpenTabs((prev) => {
+          const tab = prev.get(path);
+          if (!tab) return prev;
+          const next = new Map(prev);
+          next.set(path, { ...tab, stale: true });
+          return next;
+        });
+        return;
+      }
+      patchTabContent(path);
+    },
+    [patchTabContent],
+  );
 
   /** Tab-strip click: activate, sync the tree selection for real files, uncollapse. */
   const selectTab = useCallback(

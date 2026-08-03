@@ -51,15 +51,13 @@ export function WidgetPreview({
     let cancelled = false;
 
     const compileAndMount = async () => {
-      setLoading(true);
+      const hadMounted = mountedRef.current !== null;
+      if (!hadMounted) {
+        setLoading(true);
+      }
       setError(null);
 
       try {
-        if (mountedRef.current) {
-          compiler.unmount(mountedRef.current);
-          mountedRef.current = null;
-        }
-
         const widget = await compiler.compile(code, createManifest(services), {
           typescript: true,
           // Attribution for the compiler's own error telemetry: a failed
@@ -82,11 +80,21 @@ export function WidgetPreview({
           ...(sourcePath ? { sourcePath } : {}),
         });
 
+        if (cancelled) {
+          compiler.unmount(mounted);
+          return;
+        }
+
+        if (mountedRef.current) {
+          compiler.unmount(mountedRef.current);
+        }
         mountedRef.current = mounted;
       } catch (err) {
         if (!cancelled) {
           const message = err instanceof Error ? err.message : 'Failed to render preview';
-          setError(message);
+          if (!mountedRef.current) {
+            setError(message);
+          }
           onErrorRef.current?.(message);
         }
       } finally {
