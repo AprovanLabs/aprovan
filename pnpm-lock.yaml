@@ -634,6 +634,132 @@ importers:
         specifier: ^5.8.3
         version: 5.9.3
 
+  packages/utdk/dist/airtable: {}
+
+  packages/utdk/dist/anthropic: {}
+
+  packages/utdk/dist/asana: {}
+
+  packages/utdk/dist/cloudflare: {}
+
+  packages/utdk/dist/cloudflare/sandbox: {}
+
+  packages/utdk/dist/common:
+    devDependencies:
+      '@opentelemetry/api':
+        specifier: ^1.9.0
+        version: 1.9.0
+      '@types/node':
+        specifier: ^25.5.0
+        version: 25.9.5
+      vitest:
+        specifier: 2.1.5
+        version: 2.1.5(@types/node@25.9.5)(lightningcss@1.32.0)(terser@5.49.0)
+
+  packages/utdk/dist/databricks: {}
+
+  packages/utdk/dist/datadog: {}
+
+  packages/utdk/dist/digitalocean: {}
+
+  packages/utdk/dist/discord: {}
+
+  packages/utdk/dist/elevenlabs: {}
+
+  packages/utdk/dist/figma: {}
+
+  packages/utdk/dist/fly: {}
+
+  packages/utdk/dist/fly/sprites: {}
+
+  packages/utdk/dist/front: {}
+
+  packages/utdk/dist/gemini: {}
+
+  packages/utdk/dist/github: {}
+
+  packages/utdk/dist/google: {}
+
+  packages/utdk/dist/google-cloud-run: {}
+
+  packages/utdk/dist/google/books: {}
+
+  packages/utdk/dist/google/calendar: {}
+
+  packages/utdk/dist/google/docs: {}
+
+  packages/utdk/dist/google/drive: {}
+
+  packages/utdk/dist/google/forms: {}
+
+  packages/utdk/dist/google/gmail: {}
+
+  packages/utdk/dist/google/people: {}
+
+  packages/utdk/dist/google/sheets: {}
+
+  packages/utdk/dist/google/slides: {}
+
+  packages/utdk/dist/google/tasks: {}
+
+  packages/utdk/dist/google/youtube: {}
+
+  packages/utdk/dist/hubspot: {}
+
+  packages/utdk/dist/intercom: {}
+
+  packages/utdk/dist/itglue: {}
+
+  packages/utdk/dist/jira: {}
+
+  packages/utdk/dist/launchdarkly: {}
+
+  packages/utdk/dist/linear: {}
+
+  packages/utdk/dist/mercury: {}
+
+  packages/utdk/dist/notion: {}
+
+  packages/utdk/dist/openai: {}
+
+  packages/utdk/dist/openrouteservice: {}
+
+  packages/utdk/dist/petstore: {}
+
+  packages/utdk/dist/pipedrive: {}
+
+  packages/utdk/dist/plaid: {}
+
+  packages/utdk/dist/postgres: {}
+
+  packages/utdk/dist/posthog: {}
+
+  packages/utdk/dist/postman-explore: {}
+
+  packages/utdk/dist/producthunt: {}
+
+  packages/utdk/dist/salesforce: {}
+
+  packages/utdk/dist/sendgrid: {}
+
+  packages/utdk/dist/sentry: {}
+
+  packages/utdk/dist/slack: {}
+
+  packages/utdk/dist/snowflake: {}
+
+  packages/utdk/dist/spotify: {}
+
+  packages/utdk/dist/stripe: {}
+
+  packages/utdk/dist/stytch: {}
+
+  packages/utdk/dist/telegram: {}
+
+  packages/utdk/dist/twilio: {}
+
+  packages/utdk/dist/zendesk: {}
+
   server/workspace:
     dependencies:
       '@aprovan/node':
@@ -643,8 +769,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/compiler
       '@aprovan/registry-server':
-        specifier: ^0.2.1
-        version: 0.2.1(zod@3.25.76)
+        specifier: ^0.2.2
+        version: 0.2.2(zod@3.25.76)
       '@aprovan/sandbox-bashkit':
         specifier: workspace:*
         version: link:../../packages/sandbox-bashkit
@@ -820,8 +946,8 @@ packages:
     peerDependencies:
       ajv: '>=8'
 
-  '@aprovan/registry-server@0.2.1':
-    resolution: {integrity: sha512-Y1qcTCx8FLrR4CA/XRhhXr1kSM0lYwr0VWZ4yi6vwVoh/CaeYSCu/DcGwrVUdhTuDpvWuKD3HQGGXl/GNNh4Fg==}
+  '@aprovan/registry-server@0.2.2':
+    resolution: {integrity: sha512-OT9twmtXJIzh0pl0+U3kTefqFxiAq96DF26bPCVuP28OCo0ypJyoOMpxNQIlEywkJB+6OSTSLEhKIkJyu/RPOg==}
     engines: {node: '>=20.0.0'}
 
   '@aprovan/runtime@0.1.0':
@@ -8307,7 +8433,7 @@ snapshots:
       jsonpointer: 5.0.1
       leven: 3.1.0
 
-  '@aprovan/registry-server@0.2.1(zod@3.25.76)':
+  '@aprovan/registry-server@0.2.2(zod@3.25.76)':
     dependencies:
       '@hono/node-server': 1.19.17(hono@4.12.33)
       '@jitl/quickjs-wasmfile-debug-asyncify': 0.32.0
@@ -13094,14 +13220,6 @@ snapshots:
       chai: 5.3.3
       tinyrainbow: 2.0.0
 
-  '@vitest/mocker@2.1.5(vite@5.4.21(@types/node@22.19.11)(lightningcss@1.32.0)(terser@5.49.0))':
-    dependencies:
-      '@vitest/spy': 2.1.5
-      estree-walker: 3.0.3
-      magic-string: 0.30.21
-    optionalDependencies:
-      vite: 5.4.21(@types/node@22.19.11)(lightningcss@1.32.0)(terser@5.49.0)
-
   '@vitest/mocker@2.1.5(vite@5.4.21(@types/node@25.9.5)(lightningcss@1.32.0)(terser@5.49.0))':
     dependencies:
       '@vitest/spy': 2.1.5
@@ -17201,7 +17319,7 @@ snapshots:
   vitest@2.1.5(@types/node@22.19.11)(lightningcss@1.32.0)(terser@5.49.0):
     dependencies:
       '@vitest/expect': 2.1.5
-      '@vitest/mocker': 2.1.5(vite@5.4.21(@types/node@22.19.11)(lightningcss@1.32.0)(terser@5.49.0))
+      '@vitest/mocker': 2.1.5(vite@5.4.21(@types/node@25.9.5)(lightningcss@1.32.0)(terser@5.49.0))
       '@vitest/pretty-format': 2.1.9
       '@vitest/runner': 2.1.5
       '@vitest/snapshot': 2.1.5

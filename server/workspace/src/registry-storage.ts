@@ -8,7 +8,7 @@ import { adaptCredentialStore } from "./credential-store-adapter.js";
 import { getCredentialStore } from "./credentials.js";
 import { dynamo } from "./db/client.js";
 import { storeBackend, workspaceDataDir } from "./runtime/config.js";
-import type { RegistryStorage } from "@aprovan/registry-server";
+import type { DynamoCommands, DynamoSend, RegistryStorage } from "@aprovan/registry-server";
 
 async function createDsqlBackedStorage(): Promise<RegistryStorage> {
   const [{ createSqlStorage }, dsql] = await Promise.all([
@@ -60,14 +60,15 @@ export function getRegistryStorage(): Promise<RegistryStorage> {
         ]);
         return createDynamoStorage({
           tableName: process.env["CREDENTIALS_TABLE"] ?? "Credentials",
-          send: (command) => client.send(command),
+          send: ((command) => client.send(command as never)) as DynamoSend,
           credentials: adaptCredentialStore(getCredentialStore()),
           commands: {
-            GetCommand: ddb.GetCommand,
-            PutCommand: ddb.PutCommand,
-            QueryCommand: ddb.QueryCommand,
-            TransactWriteCommand: ddb.TransactWriteCommand,
-            DeleteCommand: ddb.DeleteCommand,
+            GetCommand: ddb.GetCommand as unknown as DynamoCommands["GetCommand"],
+            PutCommand: ddb.PutCommand as unknown as DynamoCommands["PutCommand"],
+            QueryCommand: ddb.QueryCommand as unknown as DynamoCommands["QueryCommand"],
+            TransactWriteCommand:
+              ddb.TransactWriteCommand as unknown as DynamoCommands["TransactWriteCommand"],
+            DeleteCommand: ddb.DeleteCommand as unknown as DynamoCommands["DeleteCommand"],
           },
         });
       }
