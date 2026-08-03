@@ -51,7 +51,12 @@ export interface NamespaceInfo {
   /** Interfaces only: the implementations and which are connected. */
   compat?: NamespaceCompat[];
   binding?: { provider: string; options?: Record<string, unknown> } | null;
+  /** LLM aliases: the model used when a call names none. */
   defaultModel?: string;
+  /** Named profiles when the gateway knows them (providers and interfaces). */
+  profiles?: string[];
+  /** Which profile bare import / omit-profile calls use, when present. */
+  defaultProfile?: string;
 }
 
 /**
@@ -200,6 +205,15 @@ export function namespaceLabel(
   if (info) return { label: info.label, description: info.description };
   const head = namespace.split(":")[0] ?? namespace;
   return { label: head.charAt(0).toUpperCase() + head.slice(1), description: "" };
+}
+
+/** Compact profile summary for services-menu subtitles when discovery lists them. */
+export function namespaceProfilesHint(
+  info: Pick<NamespaceInfo, "profiles" | "defaultProfile"> | undefined,
+): string | undefined {
+  if (!info?.profiles?.length) return undefined;
+  const names = info.profiles.join(", ");
+  return info.defaultProfile ? `${names} (default: ${info.defaultProfile})` : names;
 }
 
 /**

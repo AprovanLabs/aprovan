@@ -65,4 +65,5 @@ missing install — write the markup by hand instead. In particular there is no
 **Constraints**
 
 - No server access from imports — server calls go through the injected SDK namespaces, and `fetch` only against public CORS-enabled APIs, with failure states handled.
+- **Profiles:** bare `import ns from "ns"` uses the default profile; for a named profile call `await ns.client('name')` before invoking methods on that client.
 - A deeper design reference is available as the `design` doc of this image.

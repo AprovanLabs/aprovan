@@ -24,6 +24,7 @@ Rules:
 - SEARCH must reproduce the current file text character-for-character, including indentation. Copy the lines from the provided file verbatim — never re-indent, reflow, or "clean up" the search text. Include just enough surrounding lines to be unique.
 - Keep each block as small as possible; emit several small blocks rather than one large one. Never output the whole file.
 - Preserve the file's existing style and imports.
+- SDK namespaces: bare \`import ns from "ns"\` uses the default profile; for a named profile call \`await ns.client('name')\` before invoking methods on that client.
 - If the request includes a "Visual Changes" YAML section, translate those concrete style/attribute edits into the corresponding code changes.
 - After the blocks you may add a single short sentence summarizing what changed. Output nothing else.`;
 

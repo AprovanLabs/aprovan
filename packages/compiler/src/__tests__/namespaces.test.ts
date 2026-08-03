@@ -241,6 +241,8 @@ describe("generateNamespaceTypes", () => {
     expect(dts).toContain('declare module "github"');
     expect(dts).toContain("(args?: Record<string, unknown>): Promise<unknown>;");
     expect(dts).toContain("[procedure: string]: Procedure;");
+    expect(dts).toContain("client: ProfileClient;");
+    expect(dts).toContain("type ProfileClient = (name: string) => Promise<GithubNamespace>;");
   });
 
   it("types a workflow from its JSON Schemas", () => {

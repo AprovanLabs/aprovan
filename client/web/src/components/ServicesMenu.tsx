@@ -39,6 +39,7 @@ import {
   groupNamespaces,
   namespaceIcon,
   namespaceLabel,
+  namespaceProfilesHint,
   type NamespaceInfo,
 } from "@/lib/namespaces";
 import {
@@ -333,6 +334,7 @@ export function ServicesMenu({
                 const info = byId.get(ns);
                 const Icon = namespaceIcon(info ?? {});
                 const { description } = namespaceLabel(ns, info);
+                const profiles = namespaceProfilesHint(info);
                 const tools = grouped.get(ns) ?? [];
                 // What this namespace resolves to *right now*: the explicit
                 // binding, else the first connected implementation — the same
@@ -347,7 +349,7 @@ export function ServicesMenu({
                     key={ns}
                     icon={<Icon className="h-4 w-4 shrink-0 text-muted-foreground" />}
                     title={info?.label ?? ns}
-                    subtitle={description}
+                    subtitle={[description, profiles].filter(Boolean).join(" · ") || undefined}
                     badge={
                       <>
                         {providerLabel && (
@@ -404,12 +406,14 @@ export function ServicesMenu({
               connectedProviders.map((provider) => {
                 const tools = grouped.get(provider) ?? [];
                 const info = catalogById.get(provider);
+                const catalogInfo = byId.get(provider);
+                const profiles = namespaceProfilesHint(catalogInfo);
                 return (
                   <GroupSection
                     key={provider}
                     icon={<ProviderMark provider={provider} catalog={catalogById} />}
                     title={info?.title ?? provider}
-                    subtitle={info?.description ?? undefined}
+                    subtitle={[info?.description ?? undefined, profiles].filter(Boolean).join(" · ") || undefined}
                     badge={
                       <>
                         <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
