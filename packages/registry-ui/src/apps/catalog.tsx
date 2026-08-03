@@ -500,23 +500,30 @@ export function AppsList({
         {actions}
       </div>
 
+      {catalog.appsUnavailable ? (
+        <p className="rounded-md border bg-muted/40 px-2.5 py-1.5 text-xs text-muted-foreground">
+          App installs and the directory aren&apos;t available on this gateway. Private flows
+          still work here.
+        </p>
+      ) : null}
+
       {authDefer ? (
         <CreateWorkflowEmpty createWorkflowHref={createWorkflowHref} onCreateWorkflow={onCreateWorkflow}>
-          Sign in to the product app to manage apps and workflows here.
+          Sign in to manage apps and workflows here.
         </CreateWorkflowEmpty>
       ) : (
-        <ErrorLine error={catalog.error} />
+        <ErrorLine error={catalog.error} onRetry={catalog.refresh} />
       )}
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {catalog.loading && rows.length === 0 ? (
-          <Empty>Loading…</Empty>
+          <Empty>Loading apps…</Empty>
         ) : rows.length === 0 ? (
           query ? (
-            <Empty>Nothing matches that.</Empty>
+            <Empty>Nothing matches that search.</Empty>
           ) : (
             <CreateWorkflowEmpty createWorkflowHref={createWorkflowHref} onCreateWorkflow={onCreateWorkflow}>
-              No apps or workflows yet.
+              No apps yet. Create a workflow in chat, or install one from the directory.
             </CreateWorkflowEmpty>
           )
         ) : (

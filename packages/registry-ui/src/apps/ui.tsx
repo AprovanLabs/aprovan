@@ -721,9 +721,43 @@ export function CreateWorkflowEmpty({
   );
 }
 
-export function ErrorLine({ error }: { error?: string | null }) {
+export function ErrorLine({
+  error,
+  onRetry,
+}: {
+  error?: string | null;
+  /** Optional retry control for recoverable load failures. */
+  onRetry?: () => void;
+}) {
   if (!error) return null;
-  return <p className="text-xs text-red-600 dark:text-red-400">{error}</p>;
+  return (
+    <div className="space-y-1.5">
+      <p className="text-xs text-red-600 dark:text-red-400" title={error}>
+        {humanizeError(error)}
+      </p>
+      {onRetry ? (
+        <button className={SMALL_BUTTON} onClick={onRetry} type="button">
+          Retry
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+/** Strip status codes / exception noise from user-facing error copy. */
+function humanizeError(raw: string): string {
+  if (/401|403|unauthorized|forbidden/iu.test(raw)) {
+    return "Couldn't load this. Sign in and try again.";
+  }
+  if (/\b5\d\d\b|network|failed to fetch|fetch failed/iu.test(raw)) {
+    return "Couldn't load this. Retry, or check your connection.";
+  }
+  const cleaned = raw
+    .replace(/\bHTTP\/?\d(?:\.\d)?\b/giu, "")
+    .replace(/\b\d{3}\b/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return cleaned || "Something went wrong. Retry, or check your connection.";
 }
 
 /** Tab strip used by both detail panes. */
