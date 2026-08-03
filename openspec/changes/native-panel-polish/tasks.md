@@ -28,17 +28,17 @@ checklist for every copy/state task._
 
 > Depends-on: 1 | Touches: client/web/src/components/panels/shell.tsx, client/web/src/lib/native-surfaces.tsx | Verify: cd ~/Documents/Code/AprovanLabs/aprovan && pnpm --filter @aprovan/patchwork-web typecheck && git grep -n "scope?: AppScope" client/web/src/components/panels/shell.tsx
 
-- [ ] 2.1 Add `PanelUnavailable` (calm capability-gap card, non-error styling) and
+- [x] 2.1 Add `PanelUnavailable` (calm capability-gap card, non-error styling) and
       `ArmedButton` (two-step destructive control, 3s disarm, extracted from AgentsPanel's
       arm pattern) to `shell.tsx` as additive exports — tech-plan D2, Interfaces "Shell
       additive exports"; specs: panel-conventions "Capability gaps are not errors",
       "Destructive actions are armed".
       Verify: `cd ~/Documents/Code/AprovanLabs/aprovan && pnpm --filter @aprovan/patchwork-web typecheck`
-- [ ] 2.2 Rewrite the 11 remaining `NATIVE_SURFACES` titles/descriptions to the ux.md copy
+- [x] 2.2 Rewrite the 11 remaining `NATIVE_SURFACES` titles/descriptions to the ux.md copy
       tone (no dotted identifiers, benefit-first, sentence case) — specs: panel-conventions
       "Surface descriptions read as product copy".
       Verify: `cd ~/Documents/Code/AprovanLabs/aprovan && ! grep -E "description: .*[a-z]+\.[a-z]+\(|description: .*\.run|description: .*namespace" client/web/src/lib/native-surfaces.tsx && pnpm --filter @aprovan/patchwork-web typecheck`
-- [ ] 2.3 Confirm the contract freeze: `NativePanelProps` and `PanelHostActions`
+- [x] 2.3 Confirm the contract freeze: `NativePanelProps` and `PanelHostActions`
       declarations are byte-identical to pre-change — specs: panel-conventions "Contract
       unchanged".
       Verify: `cd ~/Documents/Code/AprovanLabs/aprovan && git diff main -- client/web/src/components/panels/shell.tsx | grep -E "^[-+].*(NativePanelProps|PanelHostActions|onOpenSession|onOpenFile|onOpenCredentials|scope\?)" | wc -l | grep -q "^0$"`

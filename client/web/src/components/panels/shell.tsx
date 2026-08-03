@@ -10,7 +10,7 @@
  */
 
 import { useSharedAppsCatalog } from "@aprovan/ui/apps-store";
-import { AlertCircle, Loader2, RefreshCw, type LucideIcon } from "lucide-react";
+import { AlertCircle, Info, Loader2, RefreshCw, type LucideIcon } from "lucide-react";
 import {
   createContext,
   useCallback,
@@ -275,6 +275,74 @@ export function PanelErrorWithRetry({
 
 export function PanelEmpty({ children }: { children: ReactNode }) {
   return <div className="p-4 text-sm text-muted-foreground">{children}</div>;
+}
+
+/**
+ * Calm capability-gap card for feature-detected absences (e.g. profile storage
+ * answering 501). Not an error — muted chrome, no destructive styling.
+ */
+export function PanelUnavailable({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="m-4 rounded-md border bg-muted/40 p-4 text-sm">
+      <div className="flex items-start gap-2">
+        <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+        <div className="min-w-0 space-y-1">
+          <div className="font-medium text-foreground">{title}</div>
+          <div className="text-muted-foreground">{children}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Two-step destructive control: first click arms, second confirms. Disarms
+ * after `disarmMs` (default 3s). Extracted from the AgentsPanel arm pattern.
+ */
+export function ArmedButton({
+  label,
+  armedLabel,
+  onConfirm,
+  size = "sm",
+  disarmMs = 3000,
+}: {
+  label: string;
+  armedLabel: string;
+  onConfirm: () => void;
+  size?: "sm" | "icon";
+  disarmMs?: number;
+}) {
+  const [armed, setArmed] = useState(false);
+  const timerRef = useRef(0);
+
+  useEffect(() => () => window.clearTimeout(timerRef.current), []);
+
+  return (
+    <Button
+      size={size}
+      variant={armed ? "destructive" : "ghost"}
+      className={size === "sm" ? "h-7 px-2 text-xs" : undefined}
+      onClick={() => {
+        if (!armed) {
+          setArmed(true);
+          window.clearTimeout(timerRef.current);
+          timerRef.current = window.setTimeout(() => setArmed(false), disarmMs);
+          return;
+        }
+        window.clearTimeout(timerRef.current);
+        setArmed(false);
+        onConfirm();
+      }}
+    >
+      {armed ? armedLabel : label}
+    </Button>
+  );
 }
 
 /**
