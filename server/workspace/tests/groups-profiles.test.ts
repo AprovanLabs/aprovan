@@ -228,7 +228,7 @@ describe("tool authorization through the profile join", () => {
 describe("profile admin routes are admin-only", () => {
   const MEMBER_TOKEN = "member-token";
 
-  it("answers 403 for a non-admin member", async () => {
+  it("answers 403 for group profile mutations and 501 for workspace profiles on dynamo", async () => {
     process.env["STORE_BACKEND"] = "dynamo";
     process.env["OIDC_ISSUER"] = "https://cognito-idp.us-east-2.amazonaws.com/us-east-2_gp";
     process.env["OIDCAUDIENCE"] = "gp-test-client";
@@ -242,7 +242,6 @@ describe("profile admin routes are admin-only", () => {
       for (const [path, init] of [
         ["/groups/some-group/profiles", {}],
         ["/groups/some-group/profiles", { method: "POST", body: JSON.stringify({ profile: "x" }) }],
-        ["/profiles", {}],
       ] as const) {
         const res = await createApp().request(path, {
           headers: {
@@ -253,6 +252,15 @@ describe("profile admin routes are admin-only", () => {
         });
         expect(res.status).toBe(403);
       }
+
+      // GET /profiles is member-readable but gated by the relational backend.
+      const profiles = await createApp().request("/profiles", {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${MEMBER_TOKEN}`,
+        },
+      });
+      expect(profiles.status).toBe(501);
     } finally {
       delete process.env["STORE_BACKEND"];
       delete process.env["OIDC_ISSUER"];

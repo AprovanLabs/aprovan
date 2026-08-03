@@ -10,17 +10,17 @@ checklist for every copy/state task._
 
 > Depends-on: - | Touches: client/web/src/lib/native-surfaces.tsx, client/web/src/lib/playground.ts, client/web/src/components/panels/PlaygroundPanel.tsx, client/web/src/features/tabs/** | Verify: cd ~/Documents/Code/AprovanLabs/aprovan && pnpm --filter @aprovan/patchwork-web typecheck && pnpm --filter @aprovan/patchwork-web build
 
-- [ ] 1.1 Remove the `playground` entry from `NATIVE_SURFACES`; delete
+- [x] 1.1 Remove the `playground` entry from `NATIVE_SURFACES`; delete
       `client/web/src/components/panels/PlaygroundPanel.tsx` and
       `client/web/src/lib/playground.ts`; drop deps that existed only for them (e.g.
       `sucrase`) — specs: playground-removal "surface is removed".
       Verify: `cd ~/Documents/Code/AprovanLabs/aprovan && ! git grep -q "PlaygroundPanel\|lib/playground" -- client/web/src && pnpm --filter @aprovan/patchwork-web typecheck`
-- [ ] 1.2 Add the graceful fallback for unresolvable `native://<id>` tab keys where native
+- [x] 1.2 Add the graceful fallback for unresolvable `native://<id>` tab keys where native
       tabs render: a notice card (close-tab action; for the `playground` id, copy + link to
       the registry catalog playground) — specs: playground-removal "Stale playground tabs",
       "Unknown native ids never crash"; ux.md "Stale playground tab".
       Verify: `cd ~/Documents/Code/AprovanLabs/aprovan && pnpm --filter @aprovan/patchwork-web exec vitest run --passWithNoTests src/features/tabs && pnpm --filter @aprovan/patchwork-web build`
-- [ ] 1.3 Add a unit test covering the fallback: unknown native id renders the notice (not
+- [x] 1.3 Add a unit test covering the fallback: unknown native id renders the notice (not
       a crash/blank), playground id includes the catalog link.
       Verify: `cd ~/Documents/Code/AprovanLabs/aprovan && pnpm --filter @aprovan/patchwork-web exec vitest run src/features/tabs`
 
@@ -47,7 +47,7 @@ checklist for every copy/state task._
 
 > Depends-on: - | Touches: server/workspace/src/routes/profiles.ts, server/workspace/src/routes/groups.ts, server/workspace/src/app.ts, server/workspace/src/profile-grants.ts, server/workspace/src/**/*.test.ts | Verify: cd ~/Documents/Code/AprovanLabs/aprovan && pnpm --filter @aprovan/workspace typecheck && pnpm --filter @aprovan/workspace test
 
-- [ ] 3.1 Create `routes/profiles.ts`: move `workspaceProfilesRouter` out of `groups.ts` and
+- [x] 3.1 Create `routes/profiles.ts`: move `workspaceProfilesRouter` out of `groups.ts` and
       extend to full CRUD over `@aprovan/registry-server`'s `ProfileService` (constructed on
       `getRegistryStorage()`): `GET /profiles` (any member; `ProfileWire` = ProfileRow +
       `credentialLabel`), `POST`/`PATCH /:id`/`DELETE /:id` (requireAdmin); all gated by
@@ -55,11 +55,11 @@ checklist for every copy/state task._
       through; no credential payload in any response — specs: credential-profiles "workspace
       serves profile CRUD" (all scenarios); tech-plan D4 + Interfaces.
       Verify: `cd ~/Documents/Code/AprovanLabs/aprovan && pnpm --filter @aprovan/workspace typecheck`
-- [ ] 3.2 Keep the admin attach picker green: `GET /profiles` response remains a superset of
+- [x] 3.2 Keep the admin attach picker green: `GET /profiles` response remains a superset of
       the old summary shape (or `groups.ts` picker call sites updated); `/groups/:id/profiles`
       routes untouched.
       Verify: `cd ~/Documents/Code/AprovanLabs/aprovan && pnpm --filter @aprovan/workspace test -- --reporter=dot`
-- [ ] 3.3 Route tests (sqlite backend): admin create→patch→delete round-trip with
+- [x] 3.3 Route tests (sqlite backend): admin create→patch→delete round-trip with
       credentialLabel and without payload leakage; member GET 200 + member POST rejected;
       forced dynamo backend → 501 on every route — specs: credential-profiles scenarios
       "Admin round-trips a profile", "Members read, only admins write", "Unavailable backend

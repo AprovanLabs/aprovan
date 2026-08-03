@@ -18,8 +18,7 @@
  * POST   /groups/:id/profiles            — attach a profile (idempotent)
  * DELETE /groups/:id/profiles            — detach a profile
  *
- * Plus `workspaceProfilesRouter` (mounted at /profiles): the admin picker's
- * read-only listing of every workspace profile (WS-3 storage).
+ * Workspace profile CRUD lives in `routes/profiles.ts` (mounted at /profiles).
  */
 
 import { Hono, type Context } from "hono";
@@ -39,7 +38,6 @@ import {
   attachProfileToGroup,
   detachProfileFromGroup,
   listGroupProfiles,
-  listWorkspaceProfiles,
 } from "../profile-grants.js";
 import { ServiceError } from "../service-kernel.js";
 
@@ -237,25 +235,6 @@ groupsRouter.delete("/:id/profiles", validateBody(profileRefSchema), async (c) =
     const removed = await detachProfileFromGroup(workspaceId, groupId, profile);
     if (!removed) return c.json({ error: "Profile not attached to this group" }, 404);
     return c.json({ removed: true });
-  } catch (err) {
-    return profileErrorResponse(c, err);
-  }
-});
-
-// ---------------------------------------------------------------------------
-// Workspace profile listing — the attach picker's source (mounted at
-// /profiles). Read-only here; profile CRUD is the WS-3 registry-server
-// surface's job.
-// ---------------------------------------------------------------------------
-
-export const workspaceProfilesRouter = new Hono();
-
-workspaceProfilesRouter.use("*", requireAuth, requireAdmin);
-
-workspaceProfilesRouter.get("/", async (c) => {
-  const { workspaceId } = c.get("principal");
-  try {
-    return c.json({ profiles: await listWorkspaceProfiles(workspaceId) });
   } catch (err) {
     return profileErrorResponse(c, err);
   }

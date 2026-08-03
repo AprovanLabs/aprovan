@@ -20,7 +20,6 @@ import {
   KeyRound,
   Plug,
   Shield,
-  Terminal,
   Webhook,
 } from "lucide-react";
 import { AdminPermissionsPanel } from "../components/panels/AdminPermissionsPanel";
@@ -29,7 +28,6 @@ import { CredentialsPanel } from "../components/panels/CredentialsPanel";
 import { InterfacesPanel } from "../components/panels/InterfacesPanel";
 import { KeyValuePanel } from "../components/panels/KeyValuePanel";
 import { NotificationsPanel } from "../components/panels/NotificationsPanel";
-import { PlaygroundPanel } from "../components/panels/PlaygroundPanel";
 import { SandboxesPanel } from "../components/panels/SandboxesPanel";
 import { SessionsPanel } from "../components/panels/SessionsPanel";
 import { SyncPanel } from "../components/panels/SyncPanel";
@@ -139,13 +137,6 @@ export const NATIVE_SURFACES: NativeSurfaceDef[] = [
     icon: KeyRound,
     description: "Provider tokens and OAuth connections for tool calls",
     Panel: CredentialsPanel,
-  },
-  {
-    id: "playground",
-    title: "Playground",
-    icon: Terminal,
-    description: "Run scripts against connected providers in a sandbox",
-    Panel: PlaygroundPanel,
   },
   {
     id: "admin",

@@ -71,9 +71,6 @@ importers:
       '@aprovan/registry-ui':
         specifier: workspace:*
         version: link:../../packages/registry-ui
-      '@aprovan/runtime':
-        specifier: workspace:*
-        version: link:../../packages/runtime
       '@aprovan/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -140,9 +137,6 @@ importers:
       remark-gfm:
         specifier: ^4.0.1
         version: 4.0.1
-      sucrase:
-        specifier: ^3.35.0
-        version: 3.35.1
       tailwind-merge:
         specifier: ^3.4.0
         version: 3.5.0

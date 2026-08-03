@@ -50,6 +50,11 @@ export function providerUrl(provider: string): string {
   return registryUrl(`/providers/?p=${encodeURIComponent(provider)}`);
 }
 
+/** Catalog playground (ephemeral credentials) — the only remaining playground. */
+export function playgroundUrl(): string {
+  return registryUrl("/playground");
+}
+
 export interface CatalogProviderSummary {
   id: string;
   title: string;
