@@ -137,6 +137,34 @@ const preExtractionLiterals = () => [
       },
     ],
   },
+  {
+    id: "telemetry",
+    label: "Telemetry",
+    description:
+      "Export logs, metrics, and traces in the OTLP/HTTP JSON encoding. The default is the workspace's own activity store (query/traces stay native); vendor backends are bound as named instances (telemetry:datadog).",
+    timeoutMs: 30_000,
+    defaultsFor: [],
+    compat: [
+      {
+        provider: "native",
+        label: "Workspace activity store",
+        module: "native",
+        credentialless: true,
+      },
+      {
+        provider: "datadog",
+        label: "Datadog (OTLP intake)",
+        module: "datadog/telemetry",
+      },
+      {
+        provider: "sentry",
+        label: "Sentry",
+        module: "sentry/telemetry",
+        unavailable:
+          "Sentry's OTLP ingestion is trace-focused and DSN-keyed; a logs/metrics mapping does not exist yet.",
+      },
+    ],
+  },
 ];
 
 describe("compat catalog extraction (behavior-preserving swap)", () => {

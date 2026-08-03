@@ -65,6 +65,9 @@ interface QueryResult {
     status?: string;
     error?: { message: string; stack?: string };
     source: { type: string; path?: string; app?: string };
+    metricType?: string;
+    value?: number;
+    unit?: string;
   }>;
 }
 
@@ -286,5 +289,324 @@ describe("telemetry (app scoping)", () => {
       await appCall("alice", "tele-demo/tools/telemetry/query", {}),
     );
     expect(appView2.events.every((e) => e.source.app === "tele-demo")).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Contract export (OTLP three-signal → activity store) + named instances
+// ---------------------------------------------------------------------------
+
+const TRACE_HEX = "00112233445566778899aabbccddeeff";
+const SPAN_HEX = "0011223344556677";
+const NOW_NANO = `${BigInt(Date.now()) * 1_000_000n}`;
+const LATER_NANO = `${BigInt(Date.now()) * 1_000_000n + 42_000_000n}`;
+
+describe("telemetry.export (OTLP)", () => {
+  it("flattens a three-signal payload into queryable events with trace correlation", async () => {
+    const result = await data<{
+      accepted: { spans: number; logs: number; metrics: number };
+    }>(
+      await manage("telemetry/export", {
+        resourceSpans: [
+          {
+            scopeSpans: [
+              {
+                spans: [
+                  {
+                    traceId: TRACE_HEX,
+                    spanId: SPAN_HEX,
+                    name: "otlp-span",
+                    startTimeUnixNano: NOW_NANO,
+                    endTimeUnixNano: LATER_NANO,
+                    status: { code: 1 },
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        resourceLogs: [
+          {
+            scopeLogs: [
+              {
+                logRecords: [
+                  {
+                    timeUnixNano: NOW_NANO,
+                    severityText: "INFO",
+                    body: { stringValue: "otlp-log" },
+                    traceId: TRACE_HEX,
+                    spanId: SPAN_HEX,
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        resourceMetrics: [
+          {
+            scopeMetrics: [
+              {
+                metrics: [
+                  {
+                    name: "requests",
+                    unit: "1",
+                    gauge: {
+                      dataPoints: [{ timeUnixNano: NOW_NANO, asDouble: 3 }],
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      }),
+    );
+    expect(result.accepted).toEqual({ spans: 1, logs: 1, metrics: 1 });
+
+    const byTrace = await data<QueryResult>(
+      await manage("telemetry/query", { traceId: TRACE_HEX }),
+    );
+    expect(byTrace.events.some((e) => e.kind === "span" && e.name === "otlp-span")).toBe(true);
+    expect(byTrace.events.some((e) => e.kind === "log" && e.message === "otlp-log")).toBe(true);
+
+    const metrics = await data<
+      QueryResult & {
+        events: Array<{ metricType?: string; value?: number; unit?: string }>;
+      }
+    >(await manage("telemetry/query", {}));
+    const metric = metrics.events.find((e) => e.kind === "metric" && e.name === "requests");
+    expect(metric).toMatchObject({
+      kind: "metric",
+      metricType: "gauge",
+      value: 3,
+      unit: "1",
+    });
+  });
+
+  it("rejects a malformed traceId with 400 and stores nothing", async () => {
+    const before = await data<QueryResult>(await manage("telemetry/query", { limit: 200 }));
+    const beforeCount = before.events.length;
+
+    const res = await manage("telemetry/export", {
+      resourceSpans: [
+        {
+          scopeSpans: [
+            {
+              spans: [
+                {
+                  traceId: "not-hex",
+                  spanId: SPAN_HEX,
+                  name: "bad",
+                  startTimeUnixNano: NOW_NANO,
+                  endTimeUnixNano: LATER_NANO,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toMatch(/traceId/u);
+
+    const after = await data<QueryResult>(await manage("telemetry/query", { limit: 200 }));
+    expect(after.events.length).toBe(beforeCount);
+  });
+
+  it("keeps bare telemetry.export on the core-service branch (D3)", async () => {
+    // Even with a datadog credential connected, bare telemetry.export writes
+    // the activity store — never vendor-egresses.
+    await createApp().request("/credentials", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        provider: "datadog",
+        payload: { type: "bearer_token", token: "dd-key" },
+      }),
+    });
+
+    const result = await data<{ accepted: { spans: number } }>(
+      await manage("telemetry/export", {
+        resourceSpans: [
+          {
+            scopeSpans: [
+              {
+                spans: [
+                  {
+                    traceId: "aabbccddeeff00112233445566778899",
+                    spanId: "aabbccddeeff0011",
+                    name: "native-only",
+                    startTimeUnixNano: NOW_NANO,
+                    endTimeUnixNano: LATER_NANO,
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      }),
+    );
+    expect(result.accepted.spans).toBe(1);
+
+    const found = await data<QueryResult>(
+      await manage("telemetry/query", { traceId: "aabbccddeeff00112233445566778899" }),
+    );
+    expect(found.events.some((e) => e.name === "native-only")).toBe(true);
+
+    // Bare telemetry stays kind:core; native is not a connectable vendor listing.
+    const ns = await createApp().request("/tools/namespaces");
+    const nsBody = (await ns.json()) as {
+      namespaces: Array<{
+        id: string;
+        kind: string;
+        compat?: Array<{ provider: string }>;
+      }>;
+    };
+    expect(nsBody.namespaces.find((n) => n.id === "telemetry")?.kind).toBe("core");
+    expect(nsBody.namespaces.some((n) => n.id === "telemetry" && n.kind === "interface")).toBe(
+      false,
+    );
+  });
+});
+
+describe("telemetry.export (app scoping)", () => {
+  it("stamps source.app on exported metrics and hides them from other apps", async () => {
+    await putFile("apps/tele-metric/index.tsx", "export default function App(){return null}");
+    const published = await manage("apps/publish", {
+      name: "tele-metric",
+      entry: "apps/tele-metric/index.tsx",
+      allowed_tools: ["telemetry.*"],
+    });
+    expect(published.status).toBe(200);
+
+    await putFile("apps/tele-other/index.tsx", "export default function App(){return null}");
+    expect(
+      (
+        await manage("apps/publish", {
+          name: "tele-other",
+          entry: "apps/tele-other/index.tsx",
+          allowed_tools: ["telemetry.*"],
+        })
+      ).status,
+    ).toBe(200);
+
+    await appCall("alice", "tele-metric/tools/telemetry/export", {
+      resourceMetrics: [
+        {
+          scopeMetrics: [
+            {
+              metrics: [
+                {
+                  name: "app-only-metric",
+                  gauge: { dataPoints: [{ timeUnixNano: NOW_NANO, asDouble: 9 }] },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    const own = await data<QueryResult>(
+      await appCall("alice", "tele-metric/tools/telemetry/query", {}),
+    );
+    const metric = own.events.find((e) => e.kind === "metric" && e.name === "app-only-metric");
+    expect(metric?.source.app).toBe("tele-metric");
+
+    const other = await data<QueryResult>(
+      await appCall("alice", "tele-other/tools/telemetry/query", {}),
+    );
+    expect(other.events.every((e) => e.source.app === "tele-other")).toBe(true);
+    expect(other.events.some((e) => e.name === "app-only-metric")).toBe(false);
+  });
+});
+
+describe("telemetry named instances (vendor egress)", () => {
+  it("404s an unbound named instance instead of falling back to native", async () => {
+    const res = await manage("telemetry:staging/export", {
+      resourceSpans: [
+        {
+          scopeSpans: [
+            {
+              spans: [
+                {
+                  traceId: TRACE_HEX,
+                  spanId: SPAN_HEX,
+                  name: "nope",
+                  startTimeUnixNano: NOW_NANO,
+                  endTimeUnixNano: LATER_NANO,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+    expect(res.status).toBe(404);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toMatch(/No such interface instance|bind/iu);
+  });
+
+  it("lists a bound vendor instance via telemetryToolEntries and omits native", async () => {
+    await createApp().request("/credentials", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        provider: "datadog",
+        payload: { type: "bearer_token", token: "dd-discover" },
+      }),
+    });
+    const bound = await manage("interfaces/bind", {
+      interface: "telemetry",
+      as: "dd",
+      provider: "datadog",
+    });
+    expect(bound.status).toBe(200);
+
+    const tools = await createApp().request("/tools?scope=configured");
+    const toolsBody = (await tools.json()) as { tools: Array<{ name: string }> };
+    expect(toolsBody.tools.some((t) => t.name === "telemetry:dd.export")).toBe(true);
+
+    const ns = await createApp().request("/tools/namespaces");
+    const nsBody = (await ns.json()) as {
+      namespaces: Array<{ id: string; compat?: Array<{ provider: string }> }>;
+    };
+    const named = nsBody.namespaces.find((n) => n.id === "telemetry:dd");
+    expect(named?.compat?.some((c) => c.provider === "native")).toBe(false);
+    expect(named?.compat?.some((c) => c.provider === "datadog")).toBe(true);
+  });
+
+  it("501s a sentry-bound instance with the unavailable text", async () => {
+    const bound = await manage("interfaces/bind", {
+      interface: "telemetry",
+      as: "sentry",
+      provider: "sentry",
+    });
+    expect(bound.status).toBe(200);
+
+    const res = await manage("telemetry:sentry/export", {
+      resourceSpans: [
+        {
+          scopeSpans: [
+            {
+              spans: [
+                {
+                  traceId: TRACE_HEX,
+                  spanId: SPAN_HEX,
+                  name: "sentry-try",
+                  startTimeUnixNano: NOW_NANO,
+                  endTimeUnixNano: LATER_NANO,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+    expect(res.status).toBe(501);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toMatch(/Sentry's OTLP ingestion/u);
+    expect(body.error).not.toMatch(/subpath/u);
   });
 });

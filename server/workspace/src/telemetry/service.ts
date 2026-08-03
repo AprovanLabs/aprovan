@@ -2,7 +2,7 @@
  * `telemetry` core service — the workspace's debugging evidence
  * (docs/telemetry-and-agents.md).
  *
- * OTel-shaped spans and log records in the **record store** (scope
+ * OTel-shaped spans, log records, and metrics in the **record store** (scope
  * `telemetry`), TTL'd to 3 days: telemetry is evidence for debugging, not an
  * archive — the audit store remains the long-lived compliance record. The
  * same store is written by every instrumented layer (tool dispatch, workflow
@@ -12,14 +12,30 @@
  * Layout: tenant = workspaceId, scope = "telemetry",
  * key = <time-prefixed id> — queries walk newest-first and filter on the
  * event body (trace, source, level, status) within a bounded scan. Fine for
- * a 3-day window; a real OTLP export can be layered on later without
- * changing producers.
+ * a 3-day window.
+ *
+ * The contract's `export` op flattens OTLP/HTTP JSON (spans/logs/metrics)
+ * into the same activity-store events. Bare `telemetry.*` is always this
+ * native store; vendor egress is a named interface instance
+ * (`telemetry:datadog`).
  *
  * **App scoping**: events emitted through an app session are server-stamped
  * `source.app`, and app sessions only ever read their own app's events —
  * same confused-deputy rule as notifications.
  */
 
+import {
+  TelemetryError,
+  telemetryToolEntries,
+  validateExportArgs,
+  type OtlpKeyValue,
+  type OtlpLogRecord,
+  type OtlpMetric,
+  type OtlpNumberDataPoint,
+  type OtlpSpan,
+  type TelemetryExportArgs,
+  type TelemetryExportResult,
+} from "@utdk/telemetry";
 import { getRecordStore } from "../records.js";
 import { ServiceError, type CoreService, type ServiceContext } from "../service-kernel.js";
 
@@ -32,6 +48,7 @@ const TEXT_CAP = 4000;
 
 export type TelemetryLevel = "debug" | "info" | "warn" | "error";
 export type TelemetrySourceType = "tool" | "workflow" | "widget" | "app" | "chat";
+export type TelemetryMetricType = "counter" | "gauge" | "histogram";
 
 export interface TelemetrySource {
   type: TelemetrySourceType;
@@ -47,7 +64,7 @@ export interface TelemetrySource {
 
 export interface TelemetryEvent {
   id: string;
-  kind: "span" | "log";
+  kind: "span" | "log" | "metric";
   traceId?: string;
   spanId?: string;
   parentSpanId?: string;
@@ -61,6 +78,10 @@ export interface TelemetryEvent {
   // log fields
   level?: TelemetryLevel;
   message?: string;
+  // metric fields
+  metricType?: TelemetryMetricType;
+  value?: number;
+  unit?: string;
   attributes?: Record<string, string | number | boolean>;
 }
 
@@ -111,18 +132,24 @@ function parseAttributes(
   return count > 0 ? out : undefined;
 }
 
+function stampSource(source: TelemetrySource, ctx: ServiceContext): TelemetrySource {
+  if (ctx.appScope) source.app = ctx.appScope.name;
+  return source;
+}
+
 /** Validate + normalize one client-supplied event. Throws on garbage shapes. */
 function parseEvent(raw: unknown, ctx: ServiceContext): TelemetryEvent {
   if (!raw || typeof raw !== "object") {
     throw new ServiceError("each event must be an object", 400);
   }
   const entry = raw as Record<string, unknown>;
-  const kind = entry["kind"] === "span" ? "span" : entry["kind"] === "log" ? "log" : undefined;
-  if (!kind) throw new ServiceError('event.kind must be "span" or "log"', 400);
+  const kind =
+    entry["kind"] === "span" || entry["kind"] === "log" || entry["kind"] === "metric"
+      ? entry["kind"]
+      : undefined;
+  if (!kind) throw new ServiceError('event.kind must be "span", "log", or "metric"', 400);
 
-  const source = parseSource(entry["source"]);
-  // Server-stamped provenance: app sessions cannot forge another source.
-  if (ctx.appScope) source.app = ctx.appScope.name;
+  const source = stampSource(parseSource(entry["source"]), ctx);
 
   const event: TelemetryEvent = {
     id: newEventId(),
@@ -158,17 +185,238 @@ function parseEvent(raw: unknown, ctx: ServiceContext): TelemetryEvent {
         ...(clip(err["stack"]) ? { stack: clip(err["stack"]) } : {}),
       };
     }
-  } else {
+  } else if (kind === "log") {
     const level = entry["level"];
     event.level =
       level === "debug" || level === "info" || level === "warn" || level === "error"
         ? level
         : "info";
     event.message = clip(entry["message"]) ?? "";
+  } else {
+    const name = clip(entry["name"], 200);
+    if (!name) throw new ServiceError("metric events need a name", 400);
+    event.name = name;
+    const metricType = entry["metricType"];
+    if (metricType !== "counter" && metricType !== "gauge" && metricType !== "histogram") {
+      throw new ServiceError('metric.metricType must be "counter", "gauge", or "histogram"', 400);
+    }
+    event.metricType = metricType;
+    if (typeof entry["value"] !== "number" || !Number.isFinite(entry["value"])) {
+      throw new ServiceError("metric events need a numeric value", 400);
+    }
+    event.value = entry["value"];
+    const unit = clip(entry["unit"], 40);
+    if (unit) event.unit = unit;
   }
   const attributes = parseAttributes(entry["attributes"]);
   if (attributes) event.attributes = attributes;
   return event;
+}
+
+// ---------------------------------------------------------------------------
+// OTLP → activity-store flattening (contract export)
+// ---------------------------------------------------------------------------
+
+function nanoToIso(nano: string): string {
+  const ms = Number(BigInt(nano) / 1_000_000n);
+  return new Date(ms).toISOString();
+}
+
+function nanoDurationMs(start: string, end: string): number {
+  const delta = BigInt(end) - BigInt(start);
+  if (delta <= 0n) return 0;
+  return Number(delta / 1_000_000n);
+}
+
+function otlpAttributes(
+  attrs: OtlpKeyValue[] | undefined,
+): Record<string, string | number | boolean> | undefined {
+  if (!attrs || attrs.length === 0) return undefined;
+  const out: Record<string, string | number | boolean> = {};
+  let count = 0;
+  for (const attr of attrs) {
+    if (count >= 20) break;
+    if (!attr.key) continue;
+    const v = attr.value;
+    if (v.stringValue !== undefined) out[attr.key] = v.stringValue.slice(0, 500);
+    else if (v.boolValue !== undefined) out[attr.key] = v.boolValue;
+    else if (v.doubleValue !== undefined) out[attr.key] = v.doubleValue;
+    else if (v.intValue !== undefined) {
+      const n = Number(v.intValue);
+      out[attr.key] = Number.isFinite(n) ? n : v.intValue.slice(0, 500);
+    } else continue;
+    count += 1;
+  }
+  return count > 0 ? out : undefined;
+}
+
+function mapSeverity(text: string | undefined): TelemetryLevel {
+  const normalized = (text ?? "").trim().toLowerCase();
+  if (normalized === "debug" || normalized === "trace") return "debug";
+  if (normalized === "warn" || normalized === "warning") return "warn";
+  if (normalized === "error" || normalized === "fatal" || normalized === "critical") return "error";
+  return "info";
+}
+
+function bodyToMessage(body: OtlpLogRecord["body"]): string {
+  if (!body) return "";
+  if (body.stringValue !== undefined) return body.stringValue;
+  if (body.boolValue !== undefined) return String(body.boolValue);
+  if (body.doubleValue !== undefined) return String(body.doubleValue);
+  if (body.intValue !== undefined) return body.intValue;
+  return "";
+}
+
+function numberPointValue(point: OtlpNumberDataPoint): number {
+  if (typeof point.asDouble === "number") return point.asDouble;
+  if (typeof point.asInt === "string") {
+    const n = Number(point.asInt);
+    return Number.isFinite(n) ? n : 0;
+  }
+  return 0;
+}
+
+function flattenSpan(span: OtlpSpan, source: TelemetrySource): TelemetryEvent {
+  const event: TelemetryEvent = {
+    id: newEventId(),
+    kind: "span",
+    traceId: span.traceId,
+    spanId: span.spanId,
+    source,
+    at: nanoToIso(span.startTimeUnixNano),
+    name: clip(span.name, 200) ?? "span",
+    durationMs: nanoDurationMs(span.startTimeUnixNano, span.endTimeUnixNano),
+    status: span.status?.code === 2 ? "error" : "ok",
+  };
+  if (span.parentSpanId) event.parentSpanId = span.parentSpanId;
+  if (event.status === "error") {
+    event.error = { message: clip(span.status?.message) ?? "error" };
+  }
+  const attributes = otlpAttributes(span.attributes);
+  if (attributes) event.attributes = attributes;
+  return event;
+}
+
+function flattenLog(record: OtlpLogRecord, source: TelemetrySource): TelemetryEvent {
+  const event: TelemetryEvent = {
+    id: newEventId(),
+    kind: "log",
+    source,
+    at: nanoToIso(record.timeUnixNano),
+    level: mapSeverity(record.severityText),
+    message: clip(bodyToMessage(record.body)) ?? "",
+  };
+  if (record.traceId) event.traceId = record.traceId;
+  if (record.spanId) event.spanId = record.spanId;
+  const attributes = otlpAttributes(record.attributes);
+  if (attributes) event.attributes = attributes;
+  return event;
+}
+
+function flattenMetricPoints(metric: OtlpMetric, source: TelemetrySource): TelemetryEvent[] {
+  const name = clip(metric.name, 200) ?? "metric";
+  const unit = clip(metric.unit, 40);
+  const events: TelemetryEvent[] = [];
+
+  if (metric.gauge) {
+    for (const point of metric.gauge.dataPoints) {
+      const event: TelemetryEvent = {
+        id: newEventId(),
+        kind: "metric",
+        source,
+        at: nanoToIso(point.timeUnixNano),
+        name,
+        metricType: "gauge",
+        value: numberPointValue(point),
+      };
+      if (unit) event.unit = unit;
+      const attributes = otlpAttributes(point.attributes);
+      if (attributes) event.attributes = attributes;
+      events.push(event);
+    }
+  } else if (metric.sum) {
+    for (const point of metric.sum.dataPoints) {
+      const event: TelemetryEvent = {
+        id: newEventId(),
+        kind: "metric",
+        source,
+        at: nanoToIso(point.timeUnixNano),
+        name,
+        metricType: "counter",
+        value: numberPointValue(point),
+      };
+      if (unit) event.unit = unit;
+      const attributes = otlpAttributes(point.attributes);
+      if (attributes) event.attributes = attributes;
+      events.push(event);
+    }
+  } else if (metric.histogram) {
+    for (const point of metric.histogram.dataPoints) {
+      const event: TelemetryEvent = {
+        id: newEventId(),
+        kind: "metric",
+        source,
+        at: nanoToIso(point.timeUnixNano),
+        name,
+        metricType: "histogram",
+        value: typeof point.sum === "number" ? point.sum : 0,
+      };
+      if (unit) event.unit = unit;
+      const attributes = otlpAttributes(point.attributes);
+      if (attributes) event.attributes = attributes;
+      events.push(event);
+    }
+  }
+  return events;
+}
+
+function flattenExport(args: TelemetryExportArgs, ctx: ServiceContext): {
+  events: TelemetryEvent[];
+  accepted: TelemetryExportResult["accepted"];
+} {
+  const source = stampSource({ type: "widget" }, ctx);
+  const events: TelemetryEvent[] = [];
+  let spans = 0;
+  let logs = 0;
+  let metrics = 0;
+
+  for (const resourceSpans of args.resourceSpans ?? []) {
+    for (const scopeSpans of resourceSpans.scopeSpans) {
+      for (const span of scopeSpans.spans) {
+        events.push(flattenSpan(span, source));
+        spans += 1;
+      }
+    }
+  }
+  for (const resourceLogs of args.resourceLogs ?? []) {
+    for (const scopeLogs of resourceLogs.scopeLogs) {
+      for (const record of scopeLogs.logRecords) {
+        events.push(flattenLog(record, source));
+        logs += 1;
+      }
+    }
+  }
+  for (const resourceMetrics of args.resourceMetrics ?? []) {
+    for (const scopeMetrics of resourceMetrics.scopeMetrics) {
+      for (const metric of scopeMetrics.metrics) {
+        const points = flattenMetricPoints(metric, source);
+        events.push(...points);
+        metrics += points.length;
+      }
+    }
+  }
+
+  return { events, accepted: { spans, logs, metrics } };
+}
+
+function exportToolEntry(): CoreService["tools"][number] {
+  const [entry] = telemetryToolEntries("telemetry");
+  return {
+    name: entry!.name,
+    operation: "export",
+    description: entry!.description,
+    inputSchema: entry!.inputSchema,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -325,7 +573,7 @@ export const telemetryService: CoreService = {
       name: "telemetry.emit",
       operation: "emit",
       description:
-        "Record debugging telemetry: a batch of OTel-shaped events. Spans: {kind:'span', name, traceId?, spanId?, parentSpanId?, durationMs?, status:'ok'|'error', error?:{message,stack}, source:{type,path?,runId?,sessionId?}, attributes?}. Logs: {kind:'log', level, message, traceId?, source, attributes?}. Events expire after 3 days.",
+        "Record debugging telemetry: a batch of OTel-shaped events. Spans: {kind:'span', name, traceId?, spanId?, parentSpanId?, durationMs?, status:'ok'|'error', error?:{message,stack}, source:{type,path?,runId?,sessionId?}, attributes?}. Logs: {kind:'log', level, message, traceId?, source, attributes?}. Metrics: {kind:'metric', name, metricType:'counter'|'gauge'|'histogram', value, unit?, source, attributes?}. Events expire after 3 days.",
       inputSchema: {
         type: "object",
         properties: { events: { type: "array" } },
@@ -336,7 +584,7 @@ export const telemetryService: CoreService = {
       name: "telemetry.query",
       operation: "query",
       description:
-        "Read telemetry events, newest first. Filters: traceId, source ('tool'|'workflow'|'widget'|'app'|'chat'), path (script path), app, runId, level, status ('error' to see failures), since (ISO), limit. Use this to debug a failing widget or workflow — errors carry message + stack, spans carry durations.",
+        "Read telemetry events, newest first. Filters: traceId, source ('tool'|'workflow'|'widget'|'app'|'chat'), path (script path), app, runId, level, status ('error' to see failures), since (ISO), limit. Use this to debug a failing widget or workflow — errors carry message + stack, spans carry durations, metrics carry name/value/unit.",
       inputSchema: {
         type: "object",
         properties: {
@@ -370,6 +618,7 @@ export const telemetryService: CoreService = {
         },
       },
     },
+    exportToolEntry(),
   ],
 
   async call(ctx, procedure, args) {
@@ -392,6 +641,30 @@ export const telemetryService: CoreService = {
           ids.push(event.id);
         }
         return { recorded: ids.length };
+      }
+
+      case "export": {
+        try {
+          validateExportArgs(args as TelemetryExportArgs);
+        } catch (err) {
+          if (err instanceof TelemetryError) {
+            throw new ServiceError(err.message, err.status as 400);
+          }
+          throw err;
+        }
+        const { events, accepted } = flattenExport(args as TelemetryExportArgs, ctx);
+        if (events.length > BATCH_CAP) {
+          throw new ServiceError(`at most ${BATCH_CAP} events per batch`, 400);
+        }
+        const store = getRecordStore();
+        const expiresAtEpochSeconds = ttlEpochSeconds();
+        for (const event of events) {
+          await store.set(ctx.workspaceId, SCOPE, event.id, event, ctx.userId, {
+            expiresAtEpochSeconds,
+          });
+        }
+        const result: TelemetryExportResult = { accepted };
+        return result;
       }
 
       case "query": {

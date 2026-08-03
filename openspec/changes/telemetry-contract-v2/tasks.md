@@ -82,24 +82,24 @@ aprovan fork of the contract package is a verbatim mirror until IW-0 lands.
 
 > Depends-on: 4 | Touches: aprovan/server/workspace/src/telemetry/**, aprovan/server/workspace/src/routes/tools.ts, aprovan/server/workspace/package.json | Verify: cd /Users/jacob/Documents/Code/AprovanLabs/aprovan && pnpm --filter @aprovan/workspace test && pnpm --filter @aprovan/workspace check-types
 
-- [ ] 5.1 Add `"@utdk/telemetry": "workspace:*"` to the workspace server and extend
+- [x] 5.1 Add `"@utdk/telemetry": "workspace:*"` to the workspace server and extend
       `TelemetryEvent` with `kind: "metric"` (`name`, `metricType`, `value`, `unit?`) in
       `telemetry/service.ts`; metric events flow through `query` filters and app-session
       scoping unchanged.
-- [ ] 5.2 Implement the `export` procedure on the telemetry core service: validate with
+- [x] 5.2 Implement the `export` procedure on the telemetry core service: validate with
       the contract's `validateExportArgs`, flatten per the tech-plan mapping (span→span
       with duration from nano timestamps and status 2→error; logRecord→log with
       severity→level; metric data point→metric event), apply `BATCH_CAP` to flattened
       events and existing clipping, server-stamp `source.app` for app sessions, return
       the contract's `TelemetryExportResult`; add the `telemetry.export` tool entry to the
       service's `tools` list.
-- [ ] 5.3 `routes/tools.ts`: keep bare `telemetry.*` on the core-service branch (D3 needs
+- [x] 5.3 `routes/tools.ts`: keep bare `telemetry.*` on the core-service branch (D3 needs
       no dispatch change — assert with a test); make named `telemetry:<name>` instances
       resolve through the interface machinery to `datadog/telemetry`, list bound
       instances in discovery via `telemetryToolEntries(namespace)`, and treat the
       telemetry `native` compat entry like `agent`'s (never a connectable vendor in
       namespace listings).
-- [ ] 5.4 Tests: OTLP three-signal export lands as three queryable events with trace
+- [x] 5.4 Tests: OTLP three-signal export lands as three queryable events with trace
       correlation (spec scenario); malformed traceId → 400, nothing stored; metric
       app-scoping (emitting app's stream invisible to another app session); unbound
       `telemetry:staging.export` → existing named-instance 404; `sentry`-bound instance →

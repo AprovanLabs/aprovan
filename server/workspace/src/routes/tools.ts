@@ -17,6 +17,7 @@
 import { agentToolEntries as agentDiscoveryEntries } from "@utdk/agent";
 import { withSpan } from "@utdk/common/telemetry";
 import { llmToolEntries as llmDiscoveryEntries } from "@utdk/llm";
+import { telemetryToolEntries as telemetryDiscoveryEntries } from "@utdk/telemetry";
 import { Hono } from "hono";
 import { getAuditStore } from "../audit.js";
 import { mayInvokeTool } from "../authorize.js";
@@ -34,7 +35,7 @@ import { isLlmProvider, resolveLlmProvider } from "../llm.js";
 import { getAuthMode, requireAuth } from "../middleware/auth.js";
 import { rateLimitByUserId } from "../middleware/rateLimitMiddleware.js";
 import { OAuthExchangeError, resolveToInjectable } from "../oauthTokens.js";
-import { ServiceError } from "../service-kernel.js";
+import { isCoreServiceName, ServiceError } from "../service-kernel.js";
 import { parseTelemetrySourceHeader, recordTelemetry } from "../telemetry/service.js";
 import {
   catalogToolEntries,
@@ -228,13 +229,16 @@ function toContractToolEntries(
 /**
  * Discovery entries for an interface namespace.
  *
- * `llm` and `agent` have hand-written binding-neutral entry sets: their
- * contract packages know the whole surface, so they can describe themselves
- * with no implementation resolvable. For `agent` that is not a convenience but
- * a requirement — its default implementation is the gateway's own runner,
- * which has no module to import and no credential to be connected by, so
- * borrowing schemas from "whatever resolved" would leave the namespace
- * permanently empty in a workspace that connected no vendor.
+ * `llm`, `agent`, and `telemetry` have hand-written binding-neutral entry
+ * sets: their contract packages know the whole surface, so they can describe
+ * themselves with no implementation resolvable. For `agent` that is not a
+ * convenience but a requirement — its default implementation is the gateway's
+ * own runner, which has no module to import and no credential to be connected
+ * by, so borrowing schemas from "whatever resolved" would leave the namespace
+ * permanently empty in a workspace that connected no vendor. For `telemetry`,
+ * named instances expose only the contract's `export` op via
+ * `telemetryToolEntries` — the bare `telemetry` namespace is the Activity core
+ * service and never rides this path.
  *
  * Every other interface borrows the entries of whichever implementation the
  * workspace resolves to and re-labels them onto the interface namespace —
@@ -277,6 +281,11 @@ async function interfaceToolEntries(
       namespace,
       agentDiscoveryEntries(namespace, capabilities ? { capabilities } : {}),
     );
+  }
+  if (parsed.interfaceId === "telemetry") {
+    // Vendor egress only — named instances advertise `export`; the bare
+    // namespace is the core service (emit/query/traces/export → activity store).
+    return toContractToolEntries(namespace, telemetryDiscoveryEntries(namespace));
   }
   try {
     const resolved = await resolveInterfaceForWorkspace(workspaceId, namespace);
@@ -325,12 +334,16 @@ async function interfaceNamespaces(
   connected: Set<string>,
 ): Promise<string[]> {
   const namespaces = listInterfaces()
-    .filter((def) =>
+    .filter((def) => {
+      // When an interface id is also a core service (`telemetry`), the bare
+      // namespace stays on the core-service branch — vendor egress is named
+      // instances only (D3). Don't advertise a duplicate interface namespace.
+      if (isCoreServiceName(def.id)) return false;
       // A credentialless implementation is always available, so its interface
       // is always listed — `agent` must appear in a workspace that has
       // connected nothing, because the gateway's own runner is already there.
-      def.compat.some((entry) => entry.credentialless || connected.has(entry.provider)),
-    )
+      return def.compat.some((entry) => entry.credentialless || connected.has(entry.provider));
+    })
     .map((def) => def.id);
   for (const instance of await listInstances(workspaceId)) {
     if (!namespaces.includes(instance.instance)) namespaces.push(instance.instance);
@@ -572,15 +585,21 @@ async function describeNamespaces(workspaceId: string): Promise<NamespaceInfo[]>
       label: parsed.name ? `${def.label} · ${parsed.name}` : def.label,
       description: def.description,
       icon: "plug",
-      compat: def.compat.map((entry) => ({
-        provider: entry.provider,
-        label: entry.label,
-        // A credentialless implementation reads as connected because there is
-        // nothing to connect; showing the gateway's own agent runner as
-        // "not connected" next to the binding that resolves to it is the kind
-        // of contradiction a panel should never render.
-        connected: entry.credentialless === true || connected.has(entry.provider),
-      })),
+      compat: def.compat
+        // Telemetry's `native` entry is the Activity core service, not a
+        // connectable vendor — same INTERFACE_ONLY treatment as agent's
+        // in-process runner, but filtered from listings so named instances
+        // only offer real backends (datadog, sentry, …).
+        .filter((entry) => !(parsed.interfaceId === "telemetry" && entry.provider === "native"))
+        .map((entry) => ({
+          provider: entry.provider,
+          label: entry.label,
+          // A credentialless implementation reads as connected because there is
+          // nothing to connect; showing the gateway's own agent runner as
+          // "not connected" next to the binding that resolves to it is the kind
+          // of contradiction a panel should never render.
+          connected: entry.credentialless === true || connected.has(entry.provider),
+        })),
       binding: bindings[namespace] ?? null,
     });
   }
