@@ -55,10 +55,10 @@ Repos: registry = `/Users/jacob/Documents/Code/AprovanLabs/registry`, aprovan =
 
 > Depends-on: 1, 2, 3 | Touches: registry:packages/registry-server/package.json, aprovan:packages/registry-main/package.json, aprovan:packages/registry-ui/package.json | Verify: npm view @aprovan/registry-server version && npm view @aprovan/registry-main version && npm view @aprovan/registry-ui version
 
-- [ ] 4.1 Version and publish `@aprovan/registry-server` (minor: discovery endpoints)
+- [x] 4.1 Version and publish `@aprovan/registry-server` (minor: discovery endpoints)
   through the registry repo's existing publish workflow. Requires IW-0 landed so the
   published package is the single source (spec: Shipped in the published package).
-- [ ] 4.2 Version and publish `@aprovan/registry-main` (minor: header options) and
+- [x] 4.2 Version and publish `@aprovan/registry-main` (minor: header options) and
   `@aprovan/registry-ui` (minor: admin capabilities/sections) through the aprovan publish
   pipeline.
 
