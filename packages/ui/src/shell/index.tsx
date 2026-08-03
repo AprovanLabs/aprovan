@@ -98,20 +98,15 @@ export interface AppNavLink {
  * surface renders the same set so "where can I go from here" has one answer;
  * prefer {@link aprovanApps} over hand-rolling a links array, because a new
  * destination should appear everywhere the moment it is added here.
- *
- * "Apps" is a first-class destination alongside Chat and Registry: it is the
- * directory of published app bundles (pages + workflows), not a menu buried
- * inside one of the other surfaces.
  */
 export const APROVAN_APPS: AppNavLink[] = [
   { label: "Home", href: "https://aprovan.com/" },
-  { label: "Chat", href: "https://aprovan.com/chat/" },
-  { label: "Apps", href: "https://aprovan.com/registry/apps/" },
+  { label: "Workspace", href: "https://aprovan.com/chat/" },
   { label: "Registry", href: "https://aprovan.com/registry/" },
 ];
 
 /** Label of an {@link APROVAN_APPS} entry, for marking the current surface. */
-export type AprovanApp = "Home" | "Chat" | "Apps" | "Registry";
+export type AprovanApp = "Home" | "Chat" | "Registry";
 
 /**
  * The app-family nav with the surface the user is currently in marked, plus
@@ -174,7 +169,7 @@ export interface AppHeaderProps {
 export function AppHeader({
   leading,
   logo,
-  name = "aprovan",
+  name,
   homeHref = "/",
   links = [],
   children,
@@ -194,16 +189,16 @@ export function AppHeader({
       )}
       data-slot="app-header"
     >
-      <div className="mx-auto flex h-14 max-w-6xl items-center gap-2 px-3 sm:px-4">
+      <div className="flex items-center max-w-6xl gap-2 px-3 mx-auto h-14 sm:px-4">
         {leading}
-        <a className="flex shrink-0 items-center gap-2" href={homeHref}>
+        <a className="flex items-center gap-2 shrink-0" href={homeHref}>
           {logo}
-          <span className="text-base font-semibold tracking-tight">{name}</span>
+          {name && <span className="text-base font-semibold tracking-tight">{name}</span>}
         </a>
 
         {links.length > 0 && (
           <>
-            <nav className="ml-4 hidden items-center gap-1 sm:flex">
+            <nav className="items-center hidden gap-1 ml-4 sm:flex">
               {links.map((link) => (
                 <a
                   className={navLinkClass(link)}
@@ -221,7 +216,7 @@ export function AppHeader({
             <DropdownMenu.Root>
               <DropdownMenu.Trigger
                 aria-label="Navigation menu"
-                className="ml-1 inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring sm:hidden"
+                className="inline-flex items-center justify-center ml-1 transition-colors rounded-md outline-none size-8 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring sm:hidden"
               >
                 <MenuIcon className="size-4" />
               </DropdownMenu.Trigger>
@@ -250,7 +245,7 @@ export function AppHeader({
           </>
         )}
 
-        <div className="ml-auto flex items-center gap-2">{children}</div>
+        <div className="flex items-center gap-2 ml-auto">{children}</div>
       </div>
     </header>
   );
@@ -297,7 +292,7 @@ export function WorkspaceSwitcher({
         data-slot="workspace-switcher"
         disabled={disabled}
       >
-        <span className="truncate font-medium">{active?.name ?? "Workspace"}</span>
+        <span className="font-medium truncate">{active?.name ?? "Workspace"}</span>
         <ChevronsUpDownIcon className="size-3.5 shrink-0 text-muted-foreground" />
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
@@ -311,7 +306,7 @@ export function WorkspaceSwitcher({
               key={workspace.id}
               onSelect={() => void onSelect(workspace.id)}
             >
-              <span className="flex min-w-0 flex-1 flex-col">
+              <span className="flex flex-col flex-1 min-w-0">
                 <span className="truncate">{workspace.name}</span>
                 <span className="text-[0.65rem] uppercase tracking-wide text-muted-foreground">
                   {workspace.role}
@@ -386,15 +381,15 @@ export function UserMenu({
         <DropdownMenu.Content align="end" className={dropdownContentClass} sideOffset={6}>
           <div className="px-2.5 py-2">
             {user.name && (
-              <p className="truncate text-sm font-medium">{user.name}</p>
+              <p className="text-sm font-medium truncate">{user.name}</p>
             )}
-            <p className="truncate text-xs text-muted-foreground">
+            <p className="text-xs truncate text-muted-foreground">
               {user.email ?? "Signed in"}
             </p>
           </div>
           {links.length > 0 && (
             <>
-              <DropdownMenu.Separator className="my-1 h-px bg-border" />
+              <DropdownMenu.Separator className="h-px my-1 bg-border" />
               {links.map((link) =>
                 link.onClick ? (
                   <DropdownMenu.Item
@@ -417,7 +412,7 @@ export function UserMenu({
           )}
           {onSignOut && (
             <>
-              <DropdownMenu.Separator className="my-1 h-px bg-border" />
+              <DropdownMenu.Separator className="h-px my-1 bg-border" />
               <DropdownMenu.Item
                 className={cn(dropdownItemClass, "text-destructive data-[highlighted]:text-destructive")}
                 onSelect={() => void onSignOut()}
@@ -484,8 +479,8 @@ export function SessionArea({
         className={cn("flex items-center gap-2", className)}
         data-slot="session-area"
       >
-        <div className="h-8 w-28 animate-pulse rounded-lg bg-muted" />
-        <div className="size-8 animate-pulse rounded-full bg-muted" />
+        <div className="h-8 rounded-lg w-28 animate-pulse bg-muted" />
+        <div className="rounded-full size-8 animate-pulse bg-muted" />
       </div>
     );
   }

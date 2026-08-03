@@ -61,6 +61,8 @@ jobs:
           push: true
           file: server/workspace/Dockerfile
           platforms: ${{ matrix.platform }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/AprovanLabs/aprovan
           cache-from: type=gha,scope=${{ matrix.platform }}
           cache-to: type=gha,mode=max,scope=${{ matrix.platform }}
           outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true

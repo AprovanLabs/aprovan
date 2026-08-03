@@ -27,6 +27,8 @@ RUN pnpm --filter @aprovan/workspace... run build
 RUN pnpm --filter @aprovan/workspace --prod deploy /srv/workspace
 
 FROM node:${NODE_VERSION}-bookworm-slim AS runtime
+# See: https://docs.github.com/packages/learn-github-packages/connecting-a-repository-to-a-package
+LABEL org.opencontainers.image.source=https://github.com/AprovanLabs/aprovan
 ENV NODE_ENV=production \
     WORKSPACE_MODE=local \
     WORKSPACE_DATA_DIR=/data \
