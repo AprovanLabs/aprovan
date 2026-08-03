@@ -1,7 +1,7 @@
 # Brief 08 report — copy pass B (activity & delivery panels)
 
 ## PR
-(pending — filled after merge)
+https://github.com/AprovanLabs/aprovan/pull/49
 
 ## Done
 - Stream 8.1: NotificationsPanel — ux.md copy, `PanelErrorWithRetry`, denser rows,
