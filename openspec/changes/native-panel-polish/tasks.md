@@ -150,16 +150,16 @@ may run in parallel otherwise.
 
 > Depends-on: 2 | Touches: client/web/src/components/panels/KeyValuePanel.tsx, client/web/src/components/panels/SyncPanel.tsx, client/web/src/components/panels/SandboxesPanel.tsx, client/web/src/components/panels/InterfacesPanel.tsx | Verify: cd ~/Documents/Code/AprovanLabs/aprovan && pnpm --filter @aprovan/patchwork-web typecheck && pnpm --filter @aprovan/patchwork-web build
 
-- [ ] 7.1 KeyValuePanel (Data): descriptions, empty/error states, labels to ux.md tone;
+- [x] 7.1 KeyValuePanel (Data): descriptions, empty/error states, labels to ux.md tone;
       density + states onto shell primitives; destructive actions → `ArmedButton` — specs:
       panel-conventions (all requirements).
       Verify: `cd ~/Documents/Code/AprovanLabs/aprovan && ! grep -n "confirm(" client/web/src/components/panels/KeyValuePanel.tsx && pnpm --filter @aprovan/patchwork-web typecheck`
-- [ ] 7.2 SyncPanel: same pass.
+- [x] 7.2 SyncPanel: same pass.
       Verify: `cd ~/Documents/Code/AprovanLabs/aprovan && ! grep -n "confirm(" client/web/src/components/panels/SyncPanel.tsx && pnpm --filter @aprovan/patchwork-web typecheck`
-- [ ] 7.3 SandboxesPanel: same pass (largest of the four — keep structure, restyle copy/
+- [x] 7.3 SandboxesPanel: same pass (largest of the four — keep structure, restyle copy/
       states only).
       Verify: `cd ~/Documents/Code/AprovanLabs/aprovan && ! grep -n "confirm(" client/web/src/components/panels/SandboxesPanel.tsx && pnpm --filter @aprovan/patchwork-web typecheck`
-- [ ] 7.4 InterfacesPanel: same pass (labels already improved by `interface-labeling` — do
+- [x] 7.4 InterfacesPanel: same pass (labels already improved by `interface-labeling` — do
       not regress `def.label` titling).
       Verify: `cd ~/Documents/Code/AprovanLabs/aprovan && pnpm --filter @aprovan/patchwork-web exec vitest run src/lib/namespaces.test.ts && pnpm --filter @aprovan/patchwork-web typecheck`
 

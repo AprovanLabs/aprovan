@@ -21,11 +21,12 @@
  * must not blank the panel — every check is isolated.
  */
 
-import { AlertTriangle, Box, ChevronRight, Play, RefreshCw, Trash2, Upload } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { AlertTriangle, Box, ChevronRight, Play, Upload } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
+  ArmedButton,
   PanelEmpty,
-  PanelError,
+  PanelErrorWithRetry,
   PanelLoading,
   PanelShell,
   PanelTabs,
@@ -196,45 +197,6 @@ function FilterChip({
   );
 }
 
-/** Two-click destructive confirm: the first click arms for 3s. */
-function ConfirmButton({
-  label,
-  armedLabel,
-  onConfirm,
-  disabled,
-  icon: Icon,
-}: {
-  label: string;
-  armedLabel: string;
-  onConfirm: () => void;
-  disabled?: boolean;
-  icon?: typeof Trash2;
-}) {
-  const [armed, setArmed] = useState(false);
-  const timer = useRef<number | undefined>(undefined);
-  return (
-    <Button
-      variant={armed ? "destructive" : "ghost"}
-      size="sm"
-      disabled={disabled}
-      className="h-7 px-2 text-xs"
-      onClick={() => {
-        if (armed) {
-          window.clearTimeout(timer.current);
-          setArmed(false);
-          onConfirm();
-          return;
-        }
-        setArmed(true);
-        timer.current = window.setTimeout(() => setArmed(false), 3000);
-      }}
-    >
-      {Icon && !armed && <Icon className="mr-1 h-3 w-3" />}
-      {armed ? armedLabel : label}
-    </Button>
-  );
-}
-
 /** Paths that changed, grouped by what happened to them. */
 function DiffList({ changes }: { changes: MountChanges }) {
   const groups: Array<{ label: string; className: string; paths: string[] }> = [
@@ -309,8 +271,14 @@ function SandboxRow({
         await invoke("destroy", { id: sandbox.id });
         onChanged();
       }
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : String(err));
+    } catch {
+      setActionError(
+        kind === "destroy"
+          ? "Couldn't destroy this sandbox. Retry, or check your connection."
+          : kind === "apply"
+            ? "Couldn't apply changes. Retry, or check your connection."
+            : "Couldn't reset from the workspace. Retry, or check your connection.",
+      );
     } finally {
       setBusy(null);
     }
@@ -458,20 +426,20 @@ function SandboxRow({
           <Upload className="mr-1 h-3 w-3" />
           {busy === "apply" ? "Applying…" : "Apply to workspace"}
         </Button>
-        <ConfirmButton
-          label="Reset from workspace"
-          armedLabel="Discard sandbox changes?"
-          icon={RefreshCw}
-          disabled={busy !== null}
-          onConfirm={() => void act("sync")}
-        />
-        <ConfirmButton
-          label="Destroy"
-          armedLabel={dirty ? `Destroy? ${pending} file(s) lost` : "Confirm destroy?"}
-          icon={Trash2}
-          disabled={busy !== null}
-          onConfirm={() => void act("destroy")}
-        />
+        {busy === null && (
+          <>
+            <ArmedButton
+              label="Reset from workspace"
+              armedLabel="Discard sandbox changes?"
+              onConfirm={() => void act("sync")}
+            />
+            <ArmedButton
+              label="Destroy"
+              armedLabel={dirty ? `Destroy? ${pending} file(s) lost` : "Confirm destroy?"}
+              onConfirm={() => void act("destroy")}
+            />
+          </>
+        )}
       </div>
     </div>
   );
@@ -544,7 +512,7 @@ function Environments({
       <PanelEmpty>
         {scopedTo
           ? `No sandboxes are working on ${scopedTo}'s files.`
-          : "No sandboxes yet. Ask in chat to start one, or to schedule work for whichever machine is free."}
+          : "Isolated runtimes that can read and write your workspace files appear here. Ask in chat to start one."}
       </PanelEmpty>
     );
   }
@@ -620,7 +588,11 @@ function Console({
   };
 
   if (live.length === 0) {
-    return <PanelEmpty>No running sandbox to run commands in.</PanelEmpty>;
+    return (
+      <PanelEmpty>
+        Commands run inside a live sandbox. Start one from Environments, then come back here.
+      </PanelEmpty>
+    );
   }
 
   return (
@@ -743,7 +715,7 @@ function Runs({
   if (runs.length === 0) {
     return (
       <PanelEmpty>
-        No scheduled runs. Queue one from chat — it waits until a capable machine picks it up.
+        Scheduled work waiting for a free machine appears here. Queue a run from chat.
       </PanelEmpty>
     );
   }
@@ -782,15 +754,15 @@ function Runs({
           {run.error && <div className="mt-1 text-xs text-destructive">{run.error}</div>}
           {run.status === "pending" && (
             <div className="mt-1.5 border-t pt-1.5">
-              <ConfirmButton
+              <ArmedButton
                 label="Cancel"
                 armedLabel="Confirm cancel?"
                 onConfirm={() => {
                   setError(null);
                   invoke("cancelRun", { id: run.id })
                     .then(onChanged)
-                    .catch((err: unknown) =>
-                      setError(err instanceof Error ? err.message : String(err)),
+                    .catch(() =>
+                      setError("Couldn't cancel this run. Retry, or check your connection."),
                     );
                 }}
               />
@@ -820,12 +792,15 @@ function Hosts({
   if (hosts.length === 0) {
     return (
       <PanelEmpty>
-        No hosts registered. Offer a machine with{" "}
+        Machines that can run sandboxes appear here. Register one with{" "}
         <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">
           aprovan sandbox host register --name my-laptop
         </code>
-        , then keep <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">aprovan
-        sandbox host run</code> running on it.
+        , then keep{" "}
+        <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">
+          aprovan sandbox host run
+        </code>{" "}
+        running on it.
       </PanelEmpty>
     );
   }
@@ -906,16 +881,15 @@ function Hosts({
             </div>
 
             <div className="mt-1.5 border-t pt-1.5">
-              <ConfirmButton
+              <ArmedButton
                 label="Revoke"
                 armedLabel="Confirm revoke? Tokens stop working"
-                icon={Trash2}
                 onConfirm={() => {
                   setError(null);
                   invoke("revokeHost", { id: host.id })
                     .then(onChanged)
-                    .catch((err: unknown) =>
-                      setError(err instanceof Error ? err.message : String(err)),
+                    .catch(() =>
+                      setError("Couldn't revoke this host. Retry, or check your connection."),
                     );
                 }}
               />
@@ -976,7 +950,7 @@ export function SandboxesPanel({ scope: explicitScope }: NativePanelProps) {
     <PanelShell
       icon={Box}
       title="Sandboxes"
-      description="Execution environments mounted from your workspace"
+      description="Isolated runtimes that can read and write your workspace files"
       actions={scopeFilter}
       onRefresh={refresh}
       refreshing={loading}
@@ -994,7 +968,11 @@ export function SandboxesPanel({ scope: explicitScope }: NativePanelProps) {
       {loading && !data ? (
         <PanelLoading label="Loading sandboxes…" />
       ) : error ? (
-        <PanelError message={error} />
+        <PanelErrorWithRetry
+          message="Couldn't load sandboxes. Retry, or check your connection."
+          onRetry={refresh}
+          retrying={loading}
+        />
       ) : tab === "environments" ? (
         <Environments
           sandboxes={sandboxes}
