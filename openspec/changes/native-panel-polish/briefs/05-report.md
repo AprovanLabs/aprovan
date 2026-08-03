@@ -1,7 +1,7 @@
 # Brief 05 report — Credential profiles UI (stream 5)
 
 ## PR
-(pending — filled after merge)
+https://github.com/AprovanLabs/aprovan/pull/46
 
 ## Done
 - Stream 5.1: `credentials/ProfilesSection` + `ProfileForm` in `@aprovan/registry-ui`
