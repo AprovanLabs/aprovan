@@ -39,7 +39,6 @@ export function TabContent({
   publishFlowInChat,
   customPreview,
   loadScript,
-  onOpenChat,
 }: {
   openTabs: Map<string, OpenTab>;
   setOpenTabs: Dispatch<SetStateAction<Map<string, OpenTab>>>;
@@ -53,7 +52,6 @@ export function TabContent({
   publishFlowInChat: (workflowName: string) => void;
   customPreview: React.ComponentProps<typeof CodePreview>["customPreview"];
   loadScript: (path: string) => Promise<string | null>;
-  onOpenChat?: () => void;
 }) {
   const compiler = useCompiler();
   const namespaces = useServices();
@@ -174,7 +172,6 @@ export function TabContent({
               onReload={() => reloadStaleTab(activeTabPath)}
               onKeepLocal={keepLocal}
               onOpenFile={openWorkspacePreview}
-              onOpenChat={onOpenChat}
               onOpenEditor={
                 openSharedEditSession
                   ? () => {

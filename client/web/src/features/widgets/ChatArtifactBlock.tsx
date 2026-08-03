@@ -1,5 +1,6 @@
 import { CodeBlockView, MarkdownPreview } from "@aprovan/patchwork-editor";
 import { resolveRenderer } from "@aprovan/registry-ui/renderers";
+import { Loader2 } from "lucide-react";
 import { WorkspaceFilePreview } from "@/components/WorkspaceFilePreview";
 
 /**
@@ -12,15 +13,15 @@ export function ChatArtifactBlock({
   content,
   language,
   path,
+  isStreaming = false,
 }: {
   content: string;
   language?: string;
   path?: string;
+  isStreaming?: boolean;
 }) {
   const isMarkdown =
     language === "md" || language === "markdown" || (path ?? "").endsWith(".md");
-  // A pathless JSON fence still deserves the JSON tree — give the renderer
-  // registry a representative path to match on.
   const rendererPath = path ?? (language === "json" ? "artifact.json" : undefined);
 
   let body: React.ReactNode;
@@ -30,20 +31,31 @@ export function ChatArtifactBlock({
         <MarkdownPreview value={content} />
       </div>
     );
-  } else if (resolveRenderer({ path: rendererPath, content })) {
+  } else if (rendererPath && resolveRenderer({ path: rendererPath, content })) {
     body = <WorkspaceFilePreview code={content} filePath={rendererPath} />;
   } else {
-    body = <CodeBlockView content={content} language={language ?? null} />;
+    body = (
+      <div className="[&>div]:!h-auto [&>div]:min-h-[4rem]">
+        <CodeBlockView content={content || " "} language={language ?? "text"} />
+      </div>
+    );
   }
 
   return (
     <div className="not-prose my-2 border rounded-lg overflow-hidden min-w-0">
-      {(path || language) && (
+      {(path || language || isStreaming) && (
         <div className="flex items-center gap-2 px-3 py-1.5 bg-muted/50 border-b text-xs text-muted-foreground">
-          {path ? <span className="font-mono">{path}</span> : <span>{language}</span>}
+          {isStreaming && <Loader2 className="h-3 w-3 animate-spin" />}
+          {path ? (
+            <span className="font-mono">{path}</span>
+          ) : language ? (
+            <span>{language}</span>
+          ) : (
+            <span>Generating…</span>
+          )}
         </div>
       )}
-      <div className="bg-muted/30 overflow-auto max-h-[60vh]">{body}</div>
+      <div className="bg-muted/30 overflow-auto max-h-[60vh] min-h-[4rem]">{body}</div>
     </div>
   );
 }

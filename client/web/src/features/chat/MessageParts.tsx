@@ -1,11 +1,5 @@
-import { useContext } from "react";
-import {
-  CodeBlockView,
-  CodePreview,
-  extractCodeBlocks,
-  getFileType,
-  parseUsesAttribute,
-} from "@aprovan/patchwork-editor";
+import { useContext, useMemo } from "react";
+import { extractCodeBlocks, getFileType } from "@aprovan/patchwork-editor";
 import { AlertCircle, Brain, ChevronDown, Loader2, Wrench } from "lucide-react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -13,46 +7,61 @@ import type { UIMessage } from "ai";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { WidgetErrorReporterCtx } from "@/contexts";
 import {
-  useCompiler,
-  useServices,
-  useSharedEditSession,
-  WidgetErrorReporterCtx,
-} from "@/contexts";
+  extractVisibleWidgetBlocks,
+  isWidgetFenceLanguage,
+  stripWidgetFences,
+} from "@/features/chat/widget-fences";
 import { ChatArtifactBlock } from "@/features/widgets/ChatArtifactBlock";
-import { workflowCustomPreview } from "@/features/widgets/ChatWorkflowPreview";
-import { editorLogsSource } from "@/lib/telemetry";
-import { workspaceWidgetVfs } from "@/lib/workspace-vfs";
+import { ChatWidgetArtifact } from "@/features/widgets/ChatWidgetArtifact";
+import { isImplicitRootMain } from "@/features/widgets/suggest-artifact-path";
 
 export const APROVAN_LOGO =
   "https://raw.githubusercontent.com/AprovanLabs/aprovan.com/main/docs/assets/social-labs.png";
 
-// A pathless fence only enters the widget pipeline when its language says
-// executable UI source; everything else renders as data or prose below.
-const WIDGET_FENCE_LANGUAGES = new Set([
-  "tsx",
-  "jsx",
-  "ts",
-  "js",
-  "typescript",
-  "javascript",
-]);
-
 export function ReasoningPart({ text, isStreaming }: { text: string; isStreaming?: boolean }) {
+  const widgetBlocks = useMemo(
+    () => extractVisibleWidgetBlocks(text, { includeUnclosed: isStreaming }),
+    [text, isStreaming],
+  );
+  const thinkingText = useMemo(() => stripWidgetFences(text), [text]);
+
   return (
-    <Collapsible defaultOpen={isStreaming}>
-      <CollapsibleTrigger className="flex items-center gap-2 text-yellow-700 dark:text-yellow-400 hover:opacity-80 w-full">
-        <Brain className="h-4 w-4" />
-        <span className="text-xs font-medium">Thinking</span>
-        {isStreaming && <Loader2 className="h-3 w-3 animate-spin" />}
-        <ChevronDown className="h-3 w-3 ml-auto transition-transform [[data-state=open]>&]:rotate-180" />
-      </CollapsibleTrigger>
-      <CollapsibleContent>
-        <div className="mt-2 p-3 rounded border-l-4 border-yellow-500 bg-yellow-50 dark:bg-yellow-950/50">
-          <p className="text-sm text-muted-foreground italic whitespace-pre-wrap">{text}</p>
-        </div>
-      </CollapsibleContent>
-    </Collapsible>
+    <>
+      {widgetBlocks.map((block, index) => (
+        <ChatWidgetArtifact
+          key={`reasoning-widget-${index}`}
+          content={block.content}
+          language={block.language}
+          path={
+            block.attributes?.path && !isImplicitRootMain(block.attributes.path)
+              ? block.attributes.path
+              : undefined
+          }
+          uses={block.attributes?.uses}
+          titleHint={block.attributes?.title}
+          isStreaming={Boolean(block.unclosed)}
+        />
+      ))}
+      {thinkingText && (
+        <Collapsible defaultOpen={isStreaming}>
+          <CollapsibleTrigger className="flex items-center gap-2 text-yellow-700 dark:text-yellow-400 hover:opacity-80 w-full">
+            <Brain className="h-4 w-4" />
+            <span className="text-xs font-medium">Thinking</span>
+            {isStreaming && <Loader2 className="h-3 w-3 animate-spin" />}
+            <ChevronDown className="h-3 w-3 ml-auto transition-transform [[data-state=open]>&]:rotate-180" />
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="mt-2 p-3 rounded border-l-4 border-yellow-500 bg-yellow-50 dark:bg-yellow-950/50">
+              <p className="text-sm text-muted-foreground italic whitespace-pre-wrap">
+                {thinkingText}
+              </p>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+      )}
+    </>
   );
 }
 
@@ -121,7 +130,7 @@ export function ToolPart({
 export function MessageBubble({ message }: { message: UIMessage }) {
   const isUser = message.role === "user";
   const isStreaming = message.parts?.some(
-    (p) => "state" in p && (p.state === "input-streaming" || p.state === "input-available")
+    (p) => "state" in p && (p.state === "input-streaming" || p.state === "input-available"),
   );
 
   return (
@@ -217,9 +226,6 @@ export function TextPartWithSession({
   isUser: boolean;
   messageId?: string;
 }) {
-  const open = useSharedEditSession();
-  const compiler = useCompiler();
-  const services = useServices();
   const reportWidgetError = useContext(WidgetErrorReporterCtx);
 
   if (isUser) {
@@ -230,15 +236,11 @@ export function TextPartWithSession({
     );
   }
 
-  // includeUnclosed keeps a still-streaming widget fence visible instead of
-  // hiding it until the closing fence arrives.
   const parts = extractCodeBlocks(text, { includeUnclosed: true });
 
   return (
     <div className="prose prose-sm dark:prose-invert prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-ol:my-1 prose-li:my-0 prose-pre:my-2 prose-code:before:content-none prose-code:after:content-none">
       {parts.map((part, index) => {
-        // Patch fences that could not be applied (or are still streaming)
-        // render as plain diffs, never as compilable widget source.
         if (part.type === "code" && (part.language === "patch" || part.language === "diff")) {
           return (
             <Markdown key={index} remarkPlugins={[remarkGfm]}>
@@ -246,72 +248,80 @@ export function TextPartWithSession({
             </Markdown>
           );
         }
-        // A block whose closing fence hasn't streamed in yet: show the code
-        // arriving live, but don't compile the partial source.
+
         if (part.type === "code" && part.unclosed) {
-          return (
-            <div key={index} className="not-prose my-2 border rounded-lg overflow-hidden min-w-0">
-              <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 border-b text-xs text-muted-foreground">
-                <Loader2 className="h-3 w-3 animate-spin" />
-                <span>Generating widget…</span>
-                {part.attributes?.path && <span className="font-mono">{part.attributes.path}</span>}
-              </div>
-              <div className="bg-muted/30 overflow-auto max-h-[40vh]">
-                <CodeBlockView content={part.content} language={part.language} />
-              </div>
-            </div>
-          );
-        }
-        if (part.type === "code") {
-          const path = part.attributes?.path;
+          const rawPath = part.attributes?.path;
+          const path =
+            rawPath && !isImplicitRootMain(rawPath) ? rawPath : undefined;
           const language = part.language || undefined;
-          // Only genuine widget source reaches the compiler: a pathed fence
-          // must resolve to a compilable file type, a pathless one must carry
-          // a tsx/jsx/ts/js fence language. JSON, YAML, markdown and the rest
-          // render as artifacts instead of being force-compiled as main.tsx.
-          const isWidgetCandidate = path
-            ? getFileType(path).category === "compilable"
-            : language !== undefined && WIDGET_FENCE_LANGUAGES.has(language);
-          if (!isWidgetCandidate) {
+          const isWidgetCandidate =
+            path !== undefined
+              ? getFileType(path).category === "compilable"
+              : isWidgetFenceLanguage(language);
+          if (isWidgetCandidate) {
             return (
-              <ChatArtifactBlock
+              <ChatWidgetArtifact
                 key={index}
                 content={part.content}
                 language={language}
                 path={path}
-              />
-            );
-          }
-          // Widgets declare their SDK namespaces in the fence `uses`
-          // attribute; undeclared widgets fall back to every namespace.
-          const declared = parseUsesAttribute(part.attributes?.uses);
-          return (
-            // `not-prose` — same as the streaming block above — escapes
-            // Typography's ~65ch reading-measure cap on `.prose`. Without it
-            // every widget rendered in the transcript was squeezed to prose
-            // width regardless of how wide the message bubble actually was.
-            <div key={index} className="not-prose my-2 min-w-0">
-              <CodePreview
-                code={part.content}
-                compiler={compiler}
-                services={declared.length > 0 ? declared.map((d) => d.namespace) : services}
-                filePath={path}
-                language={language}
-                entrypoint="main.tsx"
-                onOpenEditSession={open ?? undefined}
-                vfs={workspaceWidgetVfs}
-                customPreview={workflowCustomPreview}
-                logsSource={editorLogsSource}
-                className="max-h-[60vh]"
+                uses={part.attributes?.uses}
+                titleHint={part.attributes?.title}
+                isStreaming
                 onWidgetError={
                   reportWidgetError && messageId
                     ? (error) => reportWidgetError(messageId, { path, error })
                     : undefined
                 }
               />
-            </div>
+            );
+          }
+          return (
+            <ChatArtifactBlock
+              key={index}
+              content={part.content}
+              language={language}
+              path={path ?? rawPath}
+              isStreaming
+            />
           );
         }
+
+        if (part.type === "code") {
+          const rawPath = part.attributes?.path;
+          const path =
+            rawPath && !isImplicitRootMain(rawPath) ? rawPath : undefined;
+          const language = part.language || undefined;
+          const isWidgetCandidate = path
+            ? getFileType(path).category === "compilable"
+            : isWidgetFenceLanguage(language);
+          if (!isWidgetCandidate) {
+            return (
+              <ChatArtifactBlock
+                key={index}
+                content={part.content}
+                language={language}
+                path={path ?? rawPath}
+              />
+            );
+          }
+          return (
+            <ChatWidgetArtifact
+              key={index}
+              content={part.content}
+              language={language}
+              path={path}
+              uses={part.attributes?.uses}
+              titleHint={part.attributes?.title}
+              onWidgetError={
+                reportWidgetError && messageId
+                  ? (error) => reportWidgetError(messageId, { path, error })
+                  : undefined
+              }
+            />
+          );
+        }
+
         return (
           <Markdown key={index} remarkPlugins={[remarkGfm]}>
             {part.content}
