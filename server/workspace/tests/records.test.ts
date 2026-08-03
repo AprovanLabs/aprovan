@@ -230,12 +230,11 @@ describe("lazy migration fallback", () => {
 });
 
 describe("the file plane forgets app data", () => {
-  it("hiddenDataPrefixes covers every published app's ID-keyed data root", async () => {
-    const { appId } = await publishFolderApp("hidden-one");
+  it("hiddenDataPrefixes returns structural .apps / .users roots", async () => {
+    await publishFolderApp("hidden-one");
     resetHiddenDataPrefixCache();
     const prefixes = await hiddenDataPrefixes("local");
-    expect(prefixes).toContain(`.apps/${appId}/data`);
-    expect(prefixes.every((p) => p.startsWith(".apps/"))).toBe(true);
+    expect(prefixes).toEqual([".apps", ".users"]);
   });
 
   it("vfs.list hides an app's ID-keyed data directory", async () => {

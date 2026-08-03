@@ -15,7 +15,7 @@ import { ServiceError, type CoreService } from "../service-kernel.js";
 import { parseCron } from "./cron.js";
 import { runWorkflowByName } from "./runner.js";
 import {
-  listRegistrations,
+  listVisibleRegistrations,
   listRuns,
   listScriptVersions,
   readRegistration,
@@ -23,6 +23,7 @@ import {
   readScriptVersion,
   readTrace,
   removeRegistration,
+  requireVisibleRegistration,
   restoreScriptVersion,
   saveRegistration,
   updateCronIndex,
@@ -69,7 +70,11 @@ export function hookPath(workspaceId: string, name: string): string {
   return `/hooks/${workspaceId}/${name}`;
 }
 
-export function summarizeWorkflow(registration: WorkflowRegistration, workspaceId: string) {
+export function summarizeWorkflow(
+  registration: WorkflowRegistration,
+  workspaceId: string,
+  exportedBy: string[] = [],
+) {
   return {
     name: registration.name,
     description: registration.description,
@@ -82,6 +87,8 @@ export function summarizeWorkflow(registration: WorkflowRegistration, workspaceI
     webhookPath: registration.triggers.webhook ? hookPath(workspaceId, registration.name) : undefined,
     createdBy: registration.createdBy,
     updatedAt: registration.updatedAt,
+    /** App ids that export this workflow; empty ⇒ creator-private. */
+    exportedBy,
   };
 }
 
@@ -295,18 +302,23 @@ export const workflowsService: CoreService = {
         };
       }
       case "list": {
-        const registrations = await listRegistrations(ctx.workspaceId);
+        const registrations = await listVisibleRegistrations(ctx.workspaceId, ctx.userId);
         return {
-          workflows: registrations.map((registration) => summarizeWorkflow(registration, ctx.workspaceId)),
+          workflows: registrations.map((registration) =>
+            summarizeWorkflow(registration, ctx.workspaceId, registration.exportedBy),
+          ),
         };
       }
       case "get": {
         const name = workflowName(args["name"]);
-        const registration = await readRegistration(ctx.workspaceId, name);
-        if (!registration) throw new ServiceError(`Unknown workflow: ${name}`, 404);
+        const registration = await requireVisibleRegistration(
+          ctx.workspaceId,
+          name,
+          ctx.userId,
+        );
         const runs = await listRuns(ctx.workspaceId, name, 10);
         return {
-          ...summarizeWorkflow(registration, ctx.workspaceId),
+          ...summarizeWorkflow(registration, ctx.workspaceId, registration.exportedBy),
           hookToken: registration.hookToken,
           runs: runs.map((run) => ({
             id: run.id,
@@ -320,18 +332,21 @@ export const workflowsService: CoreService = {
       }
       case "remove": {
         const name = workflowName(args["name"]);
+        await requireVisibleRegistration(ctx.workspaceId, name, ctx.userId);
         const removed = await removeRegistration(ctx.workspaceId, name);
         await updateCronIndex(ctx.workspaceId);
         return { name, removed };
       }
       case "run": {
         const name = workflowName(args["name"]);
+        await requireVisibleRegistration(ctx.workspaceId, name, ctx.userId);
         const agent =
           typeof args["agent"] === "string" && args["agent"] ? args["agent"] : undefined;
         return runWorkflowByName(ctx, name, "manual", args["input"], ctx.userId, agent);
       }
       case "runs": {
         const name = workflowName(args["name"]);
+        await requireVisibleRegistration(ctx.workspaceId, name, ctx.userId);
         const limit = Math.min(Number(args["limit"]) || 20, 100);
         const runs = await listRuns(ctx.workspaceId, name, limit);
         return {
@@ -350,6 +365,7 @@ export const workflowsService: CoreService = {
       }
       case "trace": {
         const name = workflowName(args["name"]);
+        await requireVisibleRegistration(ctx.workspaceId, name, ctx.userId);
         const runId = typeof args["run_id"] === "string" ? args["run_id"] : "";
         const run = await readRun(ctx.workspaceId, name, runId);
         if (!run) throw new ServiceError(`Unknown run: ${name}/${runId}`, 404);
@@ -372,8 +388,11 @@ export const workflowsService: CoreService = {
       }
       case "versions": {
         const name = workflowName(args["name"]);
-        const registration = await readRegistration(ctx.workspaceId, name);
-        if (!registration) throw new ServiceError(`Unknown workflow: ${name}`, 404);
+        const registration = await requireVisibleRegistration(
+          ctx.workspaceId,
+          name,
+          ctx.userId,
+        );
         const versions = await listScriptVersions(ctx.workspaceId, registration.scriptPath);
         return {
           path: registration.scriptPath,
@@ -389,8 +408,11 @@ export const workflowsService: CoreService = {
       case "version": {
         const name = workflowName(args["name"]);
         const hash = typeof args["hash"] === "string" ? args["hash"] : "";
-        const registration = await readRegistration(ctx.workspaceId, name);
-        if (!registration) throw new ServiceError(`Unknown workflow: ${name}`, 404);
+        const registration = await requireVisibleRegistration(
+          ctx.workspaceId,
+          name,
+          ctx.userId,
+        );
         const file = await readScriptVersion(ctx.workspaceId, registration.scriptPath, hash);
         if (!file) throw new ServiceError(`Unknown version: ${name}@${hash}`, 404);
         return {
@@ -404,12 +426,15 @@ export const workflowsService: CoreService = {
       case "restore": {
         const name = workflowName(args["name"]);
         const hash = typeof args["hash"] === "string" ? args["hash"] : "";
-        const registration = await readRegistration(ctx.workspaceId, name);
-        if (!registration) throw new ServiceError(`Unknown workflow: ${name}`, 404);
+        const registration = await requireVisibleRegistration(
+          ctx.workspaceId,
+          name,
+          ctx.userId,
+        );
         const restored = await restoreScriptVersion(ctx.workspaceId, registration.scriptPath, hash);
         if (!restored) throw new ServiceError(`Unknown version: ${name}@${hash}`, 404);
         return {
-          ...summarizeWorkflow(registration, ctx.workspaceId),
+          ...summarizeWorkflow(registration, ctx.workspaceId, registration.exportedBy),
           hookToken: registration.hookToken,
         };
       }

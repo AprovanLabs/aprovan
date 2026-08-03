@@ -113,7 +113,7 @@ const KV_LEGACY_PREFIX = ".services/keyvalue/";
 function kvScope(ctx: ServiceContext): string {
   const scope = ctx.appScope;
   const resolved = scope ? `app#${scope.id}#u#${scope.userId}` : "ws";
-  assertCallerScope(resolved);
+  assertCallerScope(resolved, "scope", ctx.userId);
   return resolved;
 }
 

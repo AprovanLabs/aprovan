@@ -51,27 +51,27 @@ else in this change is IW-0-independent. Nuke-and-reseed: no task migrates name-
 
 > Depends-on: 1 | Touches: server/workspace/src/apps/store.ts, server/workspace/src/apps/service.ts, server/workspace/src/services.ts, server/workspace/src/svc-records.ts, server/workspace/src/routes/fs.ts, server/workspace/src/workflows/store.ts, server/workspace/src/workflows/service.ts, server/workspace/tests/partition-access.test.ts, server/workspace/tests/user-space.test.ts, server/workspace/tests/workflow-visibility.test.ts | Verify: pnpm --dir /Users/jacob/Documents/Code/AprovanLabs/aprovan/server/workspace typecheck && pnpm --dir /Users/jacob/Documents/Code/AprovanLabs/aprovan/server/workspace test
 
-- [ ] 2.1 Re-root the partition guard in `apps/store.ts`: constants `APP_DATA_ROOT =
+- [x] 2.1 Re-root the partition guard in `apps/store.ts`: constants `APP_DATA_ROOT =
       ".apps"`, `USER_SPACE_ROOT = ".users"`; `hiddenDataPrefixes`/`partitionAccess` match
       the two roots structurally (owner = `<sub>` segment: `.apps/<id>/data/<sub>/…`,
       `.users/<sub>/…`) — delete the manifest-listing cache from the guard path (tech-plan
       D3). Keep signatures and 404 semantics from data-auth-model (spec per-user-space
       "Foreign partition stays unprobeable").
-- [ ] 2.2 Private space plumbing: `userSpaceDir(sub)`; record scope `user#<sub>` with
+- [x] 2.2 Private space plumbing: `userSpaceDir(sub)`; record scope `user#<sub>` with
       `assertCallerScope` extended so `user#` is only ever self-addressed; listings
       (`services.ts` vfs list, `routes/fs.ts` GET /fs) include the caller's own `.users`
       space and hide all foreign partitions under both roots (spec "Every member has a
       private per-user space"). No admin override: verify `apps.data` cannot address
       `.users/**` and no other procedure serves it.
-- [ ] 2.3 Re-key `apps.data` in `apps/service.ts` to `appId` (scope prefix
+- [x] 2.3 Re-key `apps.data` in `apps/service.ts` to `appId` (scope prefix
       `app#<appId>#u#`, file partitions `.apps/<appId>/data/<user>`), keeping the
       admin-gate + audit behavior; the personal rejection branch is gone with stream 1.
-- [ ] 2.4 Workflow ownership: `workflows/store.ts` listing filters to
+- [x] 2.4 Workflow ownership: `workflows/store.ts` listing filters to
       `createdBy === caller` unless the workflow is exported by some app (compute the
       exported set from `listApps`); running another member's unexported workflow by name is
       not-found; `workflows.list` annotates `exportedBy: appId[]` (spec "Unpublished
       workflows live in their creator's private space"; tech-plan D8 + risk note).
-- [ ] 2.5 Tests: foreign 404 on both planes under both new roots incl. version-pinned reads;
+- [x] 2.5 Tests: foreign 404 on both planes under both new roots incl. version-pinned reads;
       own `.users` space listed, foreign never; snapshots/restore exclude both roots;
       `user#` scope self-only; workflow visibility per 2.4 scenarios (owner sees + runs,
       non-owner not-found, exporting flips visibility).
