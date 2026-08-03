@@ -65,7 +65,7 @@
     "@utdk/mcp-core": "^0.1.0",
     "@utdk/sandbox": "^0.2.0",
     "@utdk/sql": "^0.2.0",
-    "@utdk/telemetry": "^0.2.0",
+    "@utdk/telemetry": "^0.3.0",
     "@utdk/vcs": "^0.2.0",
     "@utdk/vfs": "^0.2.0",
     "aws-jwt-verify": "^4.0.1",
