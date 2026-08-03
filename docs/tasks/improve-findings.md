@@ -1,5 +1,10 @@
 # improve.md — Exploration Findings
 
+> **Shipped (app-model-split):** Personal / `dataScope` / name-keyed identity /
+> `SidebarApps` are gone. See [app-data.md](../app-data.md) and
+> [native-surfaces.md](../native-surfaces.md) for the current model. This file
+> remains a historical digest of the exploration.
+
 _Digest of [improve.md](improve.md) against ground truth (4-agent sweep, 2026-08-02), framed by
 the settled boundary in [refactor-decisions.md](refactor-decisions.md): **registry repo =
 execution plane** (registry-server, utdk, catalog), **aprovan repo = product plane** (workspace
