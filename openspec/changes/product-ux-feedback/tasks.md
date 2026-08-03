@@ -15,9 +15,9 @@ wave-1 parallel. Do not touch overlapping paths across parallel streams._
 
 > Depends-on: - | Touches: registry:packages/contracts/keyvalue/** | Verify: cd /Users/jacob/Documents/Code/AprovanLabs/registry && pnpm --filter @utdk/keyvalue test && pnpm --filter @utdk/keyvalue build
 
-- [ ] 2.1 Implement `dynamodb.ts` against `@utdk/keyvalue` contract (get/set/delete/list + TTL via Dynamo TTL or 501 if unsupported path).
-- [ ] 2.2 Register in compat / package exports; add unit tests with mocked Dynamo client.
-- [ ] 2.3 Document credential shape (table name + AWS creds) in AUDIT or short README snippet.
+- [x] 2.1 Implement `dynamodb.ts` against `@utdk/keyvalue` contract (get/set/delete/list + TTL via Dynamo TTL or 501 if unsupported path).
+- [x] 2.2 Register in compat / package exports; add unit tests with mocked Dynamo client.
+- [x] 2.3 Document credential shape (table name + AWS creds) in AUDIT or short README snippet.
 
 ## 3. Events backend (SQS / SNS)
 
