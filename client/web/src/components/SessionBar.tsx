@@ -199,6 +199,14 @@ export function SessionBar({
               </span>
             )}
             {isDraft && changed > 0 && (
+              <span
+                className="text-violet-700 dark:text-violet-400"
+                title="These file changes are drafts in this chat until you apply them to your workspace"
+              >
+                Draft changes — apply to publish
+              </span>
+            )}
+            {isDraft && changed > 0 && (
               <button
                 type="button"
                 onClick={() => setChangesOpen((open) => !open)}
@@ -221,7 +229,7 @@ export function SessionBar({
               className="h-6 px-2 text-xs gap-1"
               disabled={busy}
               onClick={onApply}
-              title="Put this draft's changes into your workspace"
+              title="Copy this draft's file changes into your workspace"
             >
               <Check className="h-3 w-3" /> Apply to workspace
             </Button>

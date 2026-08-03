@@ -340,7 +340,6 @@ export default function ChatPage() {
                         publishFlowInChat={publishFlowInChat}
                         customPreview={workflowCustomPreview}
                         loadScript={loadWorkflowScript}
-                        onOpenChat={layout.openChat}
                       />
                     </div>
                   )}

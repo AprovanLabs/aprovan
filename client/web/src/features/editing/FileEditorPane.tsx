@@ -8,7 +8,7 @@ import {
   type DefaultView,
 } from "@aprovan/patchwork-editor";
 import type { Compiler } from "@aprovan/patchwork-compiler";
-import { AlertCircle, Code, Eye, FileCode, MessageSquare, Pencil } from "lucide-react";
+import { AlertCircle, Code, Eye, FileCode, Pencil } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SaveStateChip, type ChipState } from "./SaveStateChip";
 import { useDirectSave } from "./useDirectSave";
@@ -50,7 +50,6 @@ export function FileEditorPane({
   onKeepLocal,
   onOpenEditor,
   onOpenFile,
-  onOpenChat,
 }: {
   path: string;
   code: string;
@@ -61,11 +60,8 @@ export function FileEditorPane({
   onKeepLocal: () => void;
   onOpenEditor?: () => void;
   onOpenFile?: (path: string) => void;
-  /** Opt-in chat dock beside this pane. */
-  onOpenChat?: () => void;
 }) {
   const fileType = getFileType(path);
-  const label = fileLabel(path);
 
   const boot = initialView(path, code);
   const [view, setView] = useState<DefaultView>(boot.view);
@@ -81,7 +77,7 @@ export function FileEditorPane({
   );
 
   const direct = useDirectSave(path);
-  const draft = useLazyDraft({ path, label });
+  const draft = useLazyDraft({ path, label: fileLabel(path) });
   const stagedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const contentRef = useRef(content);
   contentRef.current = content;
@@ -215,7 +211,6 @@ export function FileEditorPane({
     <div className="flex flex-col h-full min-h-0 min-w-0">
       <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 border-b shrink-0">
         <FileCode className="h-4 w-4 text-muted-foreground shrink-0" />
-        <span className="text-xs font-mono truncate text-muted-foreground">{label}</span>
         <div className="ml-auto flex items-center gap-1">
           <SaveStateChip
             state={chipState}
@@ -245,26 +240,15 @@ export function FileEditorPane({
               {toggleLabel}
             </button>
           )}
-          {onOpenChat && (
-            <button
-              type="button"
-              onClick={onOpenChat}
-              className="px-2 py-1 text-xs rounded flex items-center gap-1 hover:bg-muted"
-              title="Open chat about this file"
-            >
-              <MessageSquare className="h-3 w-3" />
-              Chat
-            </button>
-          )}
           {fileType.category === "compilable" && onOpenEditor && (
             <button
               type="button"
               onClick={onOpenEditor}
               className="px-2 py-1 text-xs rounded flex items-center gap-1 hover:bg-muted"
-              title="Open editor"
+              title="Edit"
             >
               <Pencil className="h-3 w-3" />
-              Open editor
+              Edit
             </button>
           )}
         </div>
