@@ -27,6 +27,7 @@ export function TabContent({
   retitleAppsTab,
   closeTab,
   createWorkflowInChat,
+  publishFlowInChat,
   customPreview,
   loadScript,
 }: {
@@ -39,6 +40,7 @@ export function TabContent({
   retitleAppsTab: (from: string, selection: AppsSelection | null) => void;
   closeTab: (path: string) => void;
   createWorkflowInChat: (appName?: string) => void;
+  publishFlowInChat: (workflowName: string) => void;
   customPreview: React.ComponentProps<typeof CodePreview>["customPreview"];
   loadScript: (path: string) => Promise<string | null>;
 }) {
@@ -120,6 +122,7 @@ export function TabContent({
             // close the tab, not leave it on a placeholder.
             onSelectionRemoved={(gone) => closeTab(appsTabPath(gone))}
             onCreateWorkflow={createWorkflowInChat}
+            onPublishFlow={publishFlowInChat}
             title={null}
           />
         </div>

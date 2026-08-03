@@ -53,6 +53,10 @@ export interface PanelHostActions {
   onOpenFile?: (path: string) => void;
   /** Open the credentials native surface, optionally prefilling a provider. */
   onOpenCredentials?: (provider?: string) => void;
+  /** Prefill chat to describe a new workflow (Apps pane empty states). */
+  onCreateWorkflow?: (appName?: string) => void;
+  /** Prefill an `apps.publish` chat prompt for sharing a private flow. */
+  onPublishFlow?: (workflowName: string) => void;
 }
 
 const PanelHostContext = createContext<PanelHostActions>({});
@@ -85,8 +89,7 @@ export function usePanelHostActions(): PanelHostActions {
  *
  * The app list comes from the shared apps catalog when a provider is above
  * (ChatPage wraps the whole tab area in one); without a provider it falls
- * back to a one-shot `apps.list`. The builtin Personal app is skipped — it
- * is not an installed app and stamps nothing as its source.
+ * back to a one-shot `apps.list`.
  */
 export function useScopeFilter(explicit?: AppScope): {
   scope: AppScope | undefined;
@@ -108,10 +111,9 @@ export function useScopeFilter(explicit?: AppScope): {
         setFetched(
           list
             .filter(
-              (entry): entry is { name: string; title?: string; builtin?: boolean } =>
+              (entry): entry is { name: string; title?: string } =>
                 typeof (entry as { name?: unknown })?.name === "string",
             )
-            .filter((entry) => entry.builtin !== true)
             .map((entry) => ({
               name: entry.name,
               ...(typeof entry.title === "string" ? { title: entry.title } : {}),
@@ -127,9 +129,7 @@ export function useScopeFilter(explicit?: AppScope): {
   }, [needsFetch]);
 
   const apps: AppScope[] = shared
-    ? shared.apps
-        .filter((app) => app.builtin !== true)
-        .map((app) => ({ name: app.name, ...(app.title ? { title: app.title } : {}) }))
+    ? shared.apps.map((app) => ({ name: app.name, ...(app.title ? { title: app.title } : {}) }))
     : fetched;
 
   if (explicit) return { scope: explicit, scopeFilter: null };

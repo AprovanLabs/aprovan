@@ -1,7 +1,5 @@
 import { MobileDrawer, WorkspaceTree } from "@aprovan/patchwork-editor";
-import type { AppsSelection } from "@aprovan/registry-ui/apps-panel";
 import { useMemo } from "react";
-import { SidebarApps } from "@/components/SidebarApps";
 import {
   fromDisplayPath,
   hasPrivateEntries,
@@ -9,16 +7,17 @@ import {
   toDisplayPath,
   PRIVATE_SECTION_LABEL,
 } from "@/lib/private-partition";
+import { NATIVE_SURFACES } from "@/lib/native-surfaces";
 
 /**
- * The workspace explorer column: file tree + the Workspace/Apps sub-explorer,
+ * The workspace explorer column: file tree + plain Workspace surface rows,
  * wrapped in the same off-canvas drawer recipe the full-view editor's file
  * tree uses — hidden by default behind the header's toggle below md, a static
  * column at md+.
  *
- * The caller's own private partition (`.personal/data/<self>` — the gateway
- * only ever lists the caller's own; see lib/private-partition.ts) renders as
- * a top-level **Private** section. Translation is display-only and happens
+ * The caller's own private space (`.users/<self>` — the gateway only ever
+ * lists the caller's own; see lib/private-partition.ts) renders as a
+ * top-level **Private** section. Translation is display-only and happens
  * entirely at this seam: the tree sees `Private/...` paths, every callback
  * translates back to the raw workspace path before it leaves the sidebar,
  * so tabs, URLs, and the FS routes keep working on raw paths.
@@ -38,9 +37,6 @@ export function WorkspaceSidebar({
   deleteWorkspaceEntry,
   createWorkspaceFile,
   refreshWorkspace,
-  activeAppsSelection,
-  openAppsTab,
-  createWorkflowInChat,
   activeSurfaceId,
   openNativeTab,
 }: {
@@ -58,13 +54,10 @@ export function WorkspaceSidebar({
   deleteWorkspaceEntry: (path: string, isDir: boolean) => void;
   createWorkspaceFile: (rawPath: string) => string | void;
   refreshWorkspace: () => Promise<void>;
-  activeAppsSelection: AppsSelection | null;
-  openAppsTab: (selection: AppsSelection | null) => void;
-  createWorkflowInChat: (appName?: string) => void;
   activeSurfaceId: string | null;
   openNativeTab: (surfaceId: string) => void;
 }) {
-  // Feature-detected: null on gateways that never list the partition — the
+  // Feature-detected: null on gateways that never list the space — the
   // Private section then simply doesn't exist and no path is rewritten.
   const privateRoot = useMemo(() => resolvePrivateRoot(workspaceFiles), [workspaceFiles]);
   const displayFiles = useMemo(
@@ -78,7 +71,7 @@ export function WorkspaceSidebar({
     );
   }, [pinnedPaths, privateRoot]);
   const raw = (displayPath: string) => fromDisplayPath(displayPath, privateRoot);
-  // Empty-partition hint: the section has nothing to render as a tree node,
+  // Empty-space hint: the section has nothing to render as a tree node,
   // so say why it exists (visible only to you) instead of showing nothing.
   const showEmptyPrivateHint = privateRoot !== null && !hasPrivateEntries(displayFiles);
 
@@ -117,22 +110,43 @@ export function WorkspaceSidebar({
           )}
         </>
       )}
-      {/* Second explorer: the Workspace section — native surfaces
-          first, then the Apps sub-group of workflows they export. It
-          owns its own height (drag handle + collapse, persisted) so the
-          tree above it keeps the remainder instead of the two lists
-          fighting for one scroll. */}
-      <SidebarApps
-        selection={activeAppsSelection}
-        onSelectionChange={openAppsTab}
-        onOpenScript={(path) => {
-          setSidebarOpen(false);
-          openWorkspacePreview(path);
-        }}
-        onCreateWorkflow={createWorkflowInChat}
-        activeSurfaceId={activeSurfaceId}
-        onSelectSurface={openNativeTab}
-      />
+      <WorkspaceSurfaces activeSurfaceId={activeSurfaceId} onSelect={openNativeTab} />
     </MobileDrawer>
+  );
+}
+
+/**
+ * Workspace section: one row per native surface (Apps, Data, Agents, …),
+ * each opening a `native://` content tab. No embedded explorer or split pane.
+ */
+function WorkspaceSurfaces({
+  activeSurfaceId,
+  onSelect,
+}: {
+  activeSurfaceId: string | null;
+  onSelect: (surfaceId: string) => void;
+}) {
+  return (
+    <section className="shrink-0 border-t">
+      <div className="px-2 py-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        Workspace
+      </div>
+      <div className="space-y-0.5 px-2 pb-2">
+        {NATIVE_SURFACES.map((surface) => (
+          <button
+            key={surface.id}
+            type="button"
+            onClick={() => onSelect(surface.id)}
+            title={surface.description}
+            className={`flex w-full items-center gap-1.5 rounded px-2 py-1 text-left transition-colors ${
+              surface.id === activeSurfaceId ? "bg-muted" : "hover:bg-muted/60"
+            }`}
+          >
+            <surface.icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            <span className="truncate text-xs">{surface.title}</span>
+          </button>
+        ))}
+      </div>
+    </section>
   );
 }

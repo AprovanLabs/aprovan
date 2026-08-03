@@ -10,6 +10,9 @@
 //
 // A workflow's *script* is still a plain file tab (TailorFlow renders it);
 // these keys address the panel's selection, not a file.
+//
+// Prefer the native `native://apps` surface for new navigation — these
+// apps:// / workflow:// keys remain for open tabs and legacy deep links.
 // ---------------------------------------------------------------------------
 
 import type { AppsSelection } from "@aprovan/registry-ui/apps-panel";
@@ -27,9 +30,17 @@ export const isAppsTabPath = (path: string) =>
 export const isVirtualTabPath = (path: string) =>
   isAppsTabPath(path) || isNativeTabPath(path);
 
-/** Pseudo-path for a panel selection: `app://<name>`, `workflow://[<app>/]<name>`. */
+/** Pseudo-path for a panel selection. */
 export function appsTabPath(selection: AppsSelection): string {
-  if (selection.kind === "app") return `${APP_TAB_PREFIX}${selection.name}`;
+  if (selection.kind === "app") {
+    return `${APP_TAB_PREFIX}${selection.appId ?? selection.name}`;
+  }
+  if (selection.kind === "install") {
+    return `${APP_TAB_PREFIX}install/${selection.installId}`;
+  }
+  if (selection.kind === "directory") {
+    return `${APP_TAB_PREFIX}directory`;
+  }
   const scope = selection.app ? `${selection.app}/` : "";
   return `${WORKFLOW_TAB_PREFIX}${scope}${selection.name}`;
 }
@@ -37,8 +48,14 @@ export function appsTabPath(selection: AppsSelection): string {
 /** Inverse of {@link appsTabPath}; null for ordinary workspace file tabs. */
 export function parseAppsTabPath(path: string): AppsSelection | null {
   if (path.startsWith(APP_TAB_PREFIX)) {
-    const name = path.slice(APP_TAB_PREFIX.length);
-    return name ? { kind: "app", name } : null;
+    const rest = path.slice(APP_TAB_PREFIX.length);
+    if (!rest) return null;
+    if (rest === "directory") return { kind: "directory" };
+    if (rest.startsWith("install/")) {
+      const installId = rest.slice("install/".length);
+      return installId ? { kind: "install", installId } : null;
+    }
+    return { kind: "app", name: rest };
   }
   if (path.startsWith(WORKFLOW_TAB_PREFIX)) {
     const rest = path.slice(WORKFLOW_TAB_PREFIX.length);
@@ -59,6 +76,20 @@ export interface OpenTab {
   stale?: boolean;
 }
 
+/** Label for a selection in the tab strip. */
+function selectionLabel(selection: AppsSelection): string {
+  switch (selection.kind) {
+    case "app":
+      return selection.name;
+    case "install":
+      return selection.installId;
+    case "directory":
+      return "Directory";
+    case "workflow":
+      return selection.name;
+  }
+}
+
 /** Tab strip label: the file name, the app/workflow name, or the surface title. */
 export function tabLabel(path: string): string {
   const surface = parseNativeTabPath(path);
@@ -68,6 +99,6 @@ export function tabLabel(path: string): string {
     return staleNativeId === "playground" ? "Playground" : staleNativeId;
   }
   const selection = parseAppsTabPath(path);
-  if (selection) return selection.name;
+  if (selection) return selectionLabel(selection);
   return path.split("/").pop() ?? path;
 }
