@@ -113,13 +113,15 @@ export function MarkdownPreview({
     editor?.setEditable(editable);
   }, [editor, editable]);
 
-  // Sync external body changes
+  // Sync external body changes — skip when serialized markdown is unchanged.
   useEffect(() => {
     if (!editor) return;
     const parsed = parseFrontmatter(value);
     const markdownStorage = (editor.storage as any).markdown;
-    const current = markdownStorage?.getMarkdown?.() ?? editor.getText();
-    if (parsed.body !== current) {
+    const currentBody = markdownStorage?.getMarkdown?.() ?? editor.getText();
+    const currentSerialized = assembleFrontmatter(fmRef.current, currentBody);
+    if (value === currentSerialized) return;
+    if (parsed.body !== currentBody) {
       editor.commands.setContent(parsed.body);
     }
   }, [editor, value]);
