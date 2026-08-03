@@ -6,6 +6,7 @@
 
 import { generateImportMap } from "../transforms/cdn.js";
 import { ParentBridge, generateIframeBridgeScript } from "./bridge.js";
+import { generateIframeMountHelpers } from "./mount-default-export.js";
 import type {
   CompiledWidget,
   LoadedImage,
@@ -125,97 +126,16 @@ function generateIframeContent(
       }
     }
 
-    function pickCreateElement(globals) {
-      for (const obj of globals) {
-        if (obj && typeof obj.createElement === 'function') return obj.createElement.bind(obj);
-        if (obj?.default && typeof obj.default.createElement === 'function') return obj.default.createElement.bind(obj.default);
-      }
-      return null;
-    }
-
-    function pickRenderer(globals) {
-      for (const obj of globals) {
-        if (obj && typeof obj.createRoot === 'function') {
-          return {
-            kind: 'root',
-            createRoot: obj.createRoot.bind(obj),
-          };
-        }
-        if (obj && typeof obj.render === 'function') {
-          return {
-            kind: 'render',
-            render: obj.render.bind(obj),
-          };
-        }
-        if (obj?.default && typeof obj.default.createRoot === 'function') {
-          return {
-            kind: 'root',
-            createRoot: obj.default.createRoot.bind(obj.default),
-          };
-        }
-        if (obj?.default && typeof obj.default.render === 'function') {
-          return {
-            kind: 'render',
-            render: obj.default.render.bind(obj.default),
-          };
-        }
-      }
-      return null;
-    }
-
     function getGlobalsFromConfig() {
       const names = ${JSON.stringify(globalNames)};
       return names.map((n) => window[n]).filter(Boolean);
     }
 
+    ${generateIframeMountHelpers()}
+
     async function mountModule(mod) {
       if (!root) throw new Error('No #root element');
-
-      if (typeof mod?.mount === 'function') {
-        const cleanup = await mod.mount(root, inputs);
-        if (typeof cleanup === 'function') window.__PATCHWORK_CLEANUP__ = cleanup;
-        return;
-      }
-
-      if (typeof mod?.render === 'function') {
-        const cleanup = await mod.render(root, inputs);
-        if (typeof cleanup === 'function') window.__PATCHWORK_CLEANUP__ = cleanup;
-        return;
-      }
-
-      const Component = mod?.default;
-      if (typeof Component !== 'function') {
-        root.textContent = 'Widget did not export a default component.';
-        return;
-      }
-
-      const globals = getGlobalsFromConfig();
-      const createElement = pickCreateElement(globals);
-      const renderer = pickRenderer(globals);
-
-      if (createElement && renderer?.kind === 'root') {
-        const r = renderer.createRoot(root);
-        r.render(createElement(Component, inputs));
-        if (typeof r.unmount === 'function') window.__PATCHWORK_CLEANUP__ = () => r.unmount();
-        return;
-      }
-
-      if (createElement && renderer?.kind === 'render') {
-        renderer.render(createElement(Component, inputs), root);
-        return;
-      }
-
-      const result = Component(inputs);
-      if (result instanceof HTMLElement) {
-        root.appendChild(result);
-        return;
-      }
-      if (typeof result === 'string') {
-        root.innerHTML = result;
-        return;
-      }
-
-      root.textContent = 'No framework renderer available for this widget.';
+      await mountDefaultExport(mod, root, inputs, getGlobalsFromConfig());
     }
 
     // Wait for widget code via postMessage (more efficient than inline in srcdoc)

@@ -1,4 +1,5 @@
-import { extractCodeBlocks, type CodePart } from "@aprovan/patchwork-editor";
+import { extractCodeBlocks, getFileType, type CodePart } from "@aprovan/patchwork-editor";
+import { isWorkflowScript } from "@aprovan/registry-ui/renderers";
 
 const WIDGET_FENCE_LANGUAGES = new Set([
   "tsx",
@@ -50,4 +51,23 @@ export function stripWidgetFences(text: string): string {
 
 export function isWidgetFenceLanguage(language?: string): boolean {
   return language !== undefined && WIDGET_FENCE_LANGUAGES.has(language);
+}
+
+/** Workflow/script sources must not mount through the widget compiler. */
+export function isNonWidgetScript(path: string | undefined, content: string): boolean {
+  if (isWorkflowScript(path, content)) return true;
+  return /export\s+default\s+async\s+(function|\()/u.test(content);
+}
+
+/** Whether a fenced block should compile and mount as a UI widget. */
+export function shouldMountAsWidget(
+  path: string | undefined,
+  language: string | undefined,
+  content: string,
+): boolean {
+  const isWidgetCandidate = path
+    ? getFileType(path).category === "compilable"
+    : isWidgetFenceLanguage(language);
+  if (!isWidgetCandidate) return false;
+  return !isNonWidgetScript(path, content);
 }

@@ -1,5 +1,5 @@
 import { useContext, useMemo } from "react";
-import { extractCodeBlocks, getFileType } from "@aprovan/patchwork-editor";
+import { extractCodeBlocks } from "@aprovan/patchwork-editor";
 import { AlertCircle, Brain, ChevronDown, Loader2, Wrench } from "lucide-react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -10,7 +10,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { WidgetErrorReporterCtx } from "@/contexts";
 import {
   extractVisibleWidgetBlocks,
-  isWidgetFenceLanguage,
+  shouldMountAsWidget,
   stripWidgetFences,
 } from "@/features/chat/widget-fences";
 import { ChatArtifactBlock } from "@/features/widgets/ChatArtifactBlock";
@@ -29,21 +29,33 @@ export function ReasoningPart({ text, isStreaming }: { text: string; isStreaming
 
   return (
     <>
-      {widgetBlocks.map((block, index) => (
-        <ChatWidgetArtifact
-          key={`reasoning-widget-${index}`}
-          content={block.content}
-          language={block.language}
-          path={
-            block.attributes?.path && !isImplicitRootMain(block.attributes.path)
-              ? block.attributes.path
-              : undefined
-          }
-          uses={block.attributes?.uses}
-          titleHint={block.attributes?.title}
-          isStreaming={Boolean(block.unclosed)}
-        />
-      ))}
+      {widgetBlocks.map((block, index) => {
+        const rawPath = block.attributes?.path;
+        const path =
+          rawPath && !isImplicitRootMain(rawPath) ? rawPath : undefined;
+        if (!shouldMountAsWidget(path, block.language, block.content)) {
+          return (
+            <ChatArtifactBlock
+              key={`reasoning-widget-${index}`}
+              content={block.content}
+              language={block.language}
+              path={path ?? rawPath}
+              isStreaming={Boolean(block.unclosed)}
+            />
+          );
+        }
+        return (
+          <ChatWidgetArtifact
+            key={`reasoning-widget-${index}`}
+            content={block.content}
+            language={block.language}
+            path={path}
+            uses={block.attributes?.uses}
+            titleHint={block.attributes?.title}
+            isStreaming={Boolean(block.unclosed)}
+          />
+        );
+      })}
       {thinkingText && (
         <Collapsible defaultOpen={isStreaming}>
           <CollapsibleTrigger className="flex items-center gap-2 text-yellow-700 dark:text-yellow-400 hover:opacity-80 w-full">
@@ -254,11 +266,7 @@ export function TextPartWithSession({
           const path =
             rawPath && !isImplicitRootMain(rawPath) ? rawPath : undefined;
           const language = part.language || undefined;
-          const isWidgetCandidate =
-            path !== undefined
-              ? getFileType(path).category === "compilable"
-              : isWidgetFenceLanguage(language);
-          if (isWidgetCandidate) {
+          if (shouldMountAsWidget(path, language, part.content)) {
             return (
               <ChatWidgetArtifact
                 key={index}
@@ -292,10 +300,7 @@ export function TextPartWithSession({
           const path =
             rawPath && !isImplicitRootMain(rawPath) ? rawPath : undefined;
           const language = part.language || undefined;
-          const isWidgetCandidate = path
-            ? getFileType(path).category === "compilable"
-            : isWidgetFenceLanguage(language);
-          if (!isWidgetCandidate) {
+          if (!shouldMountAsWidget(path, language, part.content)) {
             return (
               <ChatArtifactBlock
                 key={index}
