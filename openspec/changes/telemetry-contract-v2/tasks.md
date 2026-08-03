@@ -8,22 +8,22 @@ aprovan fork of the contract package is a verbatim mirror until IW-0 lands.
 
 > Depends-on: - | Touches: registry/packages/contracts/telemetry/{index.ts,__tests__/**,AUDIT.md} | Verify: cd /Users/jacob/Documents/Code/AprovanLabs/registry && pnpm --filter @utdk/telemetry build && pnpm --filter @utdk/telemetry test
 
-- [ ] 1.1 Add the OTLP metrics subset types to `index.ts` (`OtlpNumberDataPoint`,
+- [x] 1.1 Add the OTLP metrics subset types to `index.ts` (`OtlpNumberDataPoint`,
       `OtlpHistogramDataPoint`, `OtlpMetric`, `OtlpResourceMetrics`) exactly as declared
       in tech-plan Interfaces & Data (D1: gauge/sum/histogram only; nano strings, `asInt`
       as string).
-- [ ] 1.2 Extend `TelemetryExportArgs` with `resourceMetrics` and `TelemetryExportResult`
+- [x] 1.2 Extend `TelemetryExportArgs` with `resourceMetrics` and `TelemetryExportResult`
       with `metrics` counts (data points); update `validateExportArgs` to lift the 501,
       require at least one of the three arrays non-empty, and validate metric shapes with
       field-path-naming 400s (spec: "Malformed metric is rejected with a named field").
-- [ ] 1.3 Update the package header comment (metrics no longer "deliberately absent";
+- [x] 1.3 Update the package header comment (metrics no longer "deliberately absent";
       query/read exclusion reasoning stays) and `telemetryToolEntries` description +
       `inputSchema` to name all three arrays.
-- [ ] 1.4 Extend `__tests__/telemetry.test.ts`: metrics-only payload validates; mixed
+- [x] 1.4 Extend `__tests__/telemetry.test.ts`: metrics-only payload validates; mixed
       three-signal payload validates; zero/two-data-shape metric 400s; empty `{}` and
       `{ resourceMetrics: [] }` 400; size cap applies to metrics; a literal OTLP JSON
       metrics body passes unmodified.
-- [ ] 1.5 Extend `AUDIT.md` with the metrics mapping against OTLP Collector, Datadog
+- [x] 1.5 Extend `AUDIT.md` with the metrics mapping against OTLP Collector, Datadog
       OTLP, and Honeycomb OTLP (per-shape findings or explicit "no change") — the 0.3.0
       freeze gate (spec: "Audit gates the version bump").
 
@@ -31,15 +31,15 @@ aprovan fork of the contract package is a verbatim mirror until IW-0 lands.
 
 > Depends-on: 1 | Touches: registry/packages/contracts/telemetry/{sdk/**,package.json} | Verify: cd /Users/jacob/Documents/Code/AprovanLabs/registry && pnpm --filter @utdk/telemetry build && pnpm --filter @utdk/telemetry test
 
-- [ ] 2.1 Implement `sdk/index.ts`: `newTraceId`/`newSpanId` (crypto.getRandomValues →
+- [x] 2.1 Implement `sdk/index.ts`: `newTraceId`/`newSpanId` (crypto.getRandomValues →
       lowercase hex), `nowUnixNano`, and `createTelemetry` per the tech-plan SDK surface —
       `log`, `counter` (monotonic delta sum), `gauge`, `histogram` (default explicit
       bounds per tech-plan open question), `startSpan`/`withSpan`, `flush`; buffering with
       `maxBatch`/`flushIntervalMs`/`onError`; attribution folded via `withAttribution`
       (D2, D6). No imports beyond the contract's own module and Web APIs.
-- [ ] 2.2 Add the `./sdk` subpath export to `package.json` (types + import conditions,
+- [x] 2.2 Add the `./sdk` subpath export to `package.json` (types + import conditions,
       mirroring the root export shape).
-- [ ] 2.3 SDK tests: every flushed batch passes `validateExportArgs`; logs inside
+- [x] 2.3 SDK tests: every flushed batch passes `validateExportArgs`; logs inside
       `withSpan` carry the active trace/span ids; `attribution` lands as `aprovan.*`
       resource attributes; rejecting `export` reaches `onError` without throwing into
       caller code and the facade keeps accepting; `flush()` drains and returns the result;
@@ -49,19 +49,19 @@ aprovan fork of the contract package is a verbatim mirror until IW-0 lands.
 
 > Depends-on: 1 | Touches: registry/packages/contracts/telemetry/compat.json, registry/packages/utdk/datadog/telemetry/** | Verify: cd /Users/jacob/Documents/Code/AprovanLabs/registry && npx vitest run packages/utdk/datadog/telemetry && pnpm --filter utdk check-types
 
-- [ ] 3.1 Write `contracts/telemetry/compat.json` exactly as specified in the tech plan:
+- [x] 3.1 Write `contracts/telemetry/compat.json` exactly as specified in the tech plan:
       `native` (credentialless), `datadog` (module `datadog/telemetry`), `sentry`
       (module `sentry/telemetry`, `unavailable` with the trace-focused/DSN-keyed reason).
       Confirm it loads via `@utdk/common/compat` `loadCompatDocuments`.
-- [ ] 3.2 Implement handwritten `packages/utdk/datadog/telemetry/index.ts` (`github/vcs`
+- [x] 3.2 Implement handwritten `packages/utdk/datadog/telemetry/index.ts` (`github/vcs`
       pattern): `createDatadogTelemetryClient(options)` → validate with
       `validateExportArgs`, fan out non-empty signal arrays to `/v1/traces`, `/v1/logs`,
       `/v1/metrics` with `DD-API-KEY` from `secretFromHeaders`, zero shape translation,
       merge partial-success into one `TelemetryExportResult` (D5).
-- [ ] 3.3 Adapter tests against injected `fetchImpl`: per-signal fan-out (two POSTs for
+- [x] 3.3 Adapter tests against injected `fetchImpl`: per-signal fan-out (two POSTs for
       spans+metrics), verbatim bodies, `DD-API-KEY` header present, partial-success merge
       (`rejected.spans = 2` case), missing-credential 400 naming `datadog`.
-- [ ] 3.4 Ensure the catalogue build picks up the new suite module (transpiles into
+- [x] 3.4 Ensure the catalogue build picks up the new suite module (transpiles into
       `dist/datadog/telemetry/`, exports map advertises it — the `github/vcs` precedent).
 
 ## 4. Freeze and mirror

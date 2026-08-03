@@ -10,18 +10,18 @@ checkouts contain untracked husk dirs that mask failures._
 
 > Depends-on: - | Touches: registry/packages/registry-server/** | Verify: cd /Users/jacob/Documents/Code/AprovanLabs/registry && pnpm --filter @aprovan/registry-server build && pnpm --filter @aprovan/registry-server typecheck && pnpm --filter @aprovan/registry-server test
 
-- [ ] 1.1 Port the `executorInstance?: ProviderExecutor` option from
+- [x] 1.1 Port the `executorInstance?: ProviderExecutor` option from
       `aprovan/packages/registry-server/src/config/types.ts` into
       `registry/packages/registry-server/src/config/types.ts`, and the
       `options.executorInstance ?? new ProviderExecutor(options.executor ?? {})` wiring
       into `src/server.ts` — verbatim per tech-plan D1 (spec: registry-publish-integrity /
       "Embedding host can share its executor").
-- [ ] 1.2 Port the monorepo-contracts fallback (`existsSync`-guarded
+- [x] 1.2 Port the monorepo-contracts fallback (`existsSync`-guarded
       `import.meta.dirname → ../../../../packages/contracts`) from
       `aprovan/packages/registry-server/src/catalog/default.ts` into the registry copy,
       verbatim (tech-plan D1).
-- [ ] 1.3 Bump `registry/packages/registry-server/package.json` to `0.1.1` (tech-plan D2).
-- [ ] 1.4 Confirm reconciliation is a superset:
+- [x] 1.3 Bump `registry/packages/registry-server/package.json` to `0.1.1` (tech-plan D2).
+- [x] 1.4 Confirm reconciliation is a superset:
       `diff -r aprovan/packages/registry-server/src registry/packages/registry-server/src`
       shows `catalog/default.ts`, `config/types.ts`, and `server.ts` byte-identical (spec:
       registry-publish-integrity / "Reconciled files match the fork's behavior").
@@ -31,24 +31,24 @@ checkouts contain untracked husk dirs that mask failures._
 
 > Depends-on: - | Touches: registry/packages/utdk/*/package.json, registry/pnpm-workspace.yaml, registry/pnpm-lock.yaml, registry/.github/workflows/publish.yml | Verify: cd /Users/jacob/Documents/Code/AprovanLabs/registry && grep -rn "/Users/" packages/utdk --include=package.json | grep -v node_modules | grep -v /dist/ | wc -l | grep -qx 0 && pnpm install --frozen-lockfile
 
-- [ ] 2.1 Rewrite `utdk.docs.{manifestPath,indexPath,docsPath}` in
+- [x] 2.1 Rewrite `utdk.docs.{manifestPath,indexPath,docsPath}` in
       `registry/packages/utdk/{anthropic,figma,gemini,github,posthog}/package.json` to
       repo-relative form (`.registry/<p>/manifest.json`, `.registry/<p>/index.md`,
       `packages/utdk/<p>/docs`) per tech-plan D4 (spec: registry-publish-integrity /
       "Repo grep is clean").
-- [ ] 2.2 Fix `registry/.github/workflows/publish.yml` per tech-plan D3: ensure `utdk` is
+- [x] 2.2 Fix `registry/.github/workflows/publish.yml` per tech-plan D3: ensure `utdk` is
       built in the workflow's build step (add `--filter utdk` with adequate
       `NODE_OPTIONS`), add `@aprovan/runtime` to the build filters and stable list, remove
       the stale `@aprovan/sandbox-image-node` entry (spec: registry-publish-integrity /
       "@aprovan/runtime is published", "utdk meta-package is on npm").
-- [ ] 2.3 Remove the dead `infra` glob from `registry/pnpm-workspace.yaml`; run
+- [x] 2.3 Remove the dead `infra` glob from `registry/pnpm-workspace.yaml`; run
       `pnpm install` and commit the refreshed `pnpm-lock.yaml`, reviewing the diff to
       confirm it only removes stale importers (`apps/workspace`, `infra`,
       `packages/{aprovan-cli,registry-main,registry-ui,sandbox-bashkit,sandbox-host,sandbox-image-node,utdk-isolate}`,
       `packages/utdk/{agent,llm,sql,sandbox,vcs}`) plus intended dependency changes (spec:
       registry-publish-integrity / "No stale importers").
       Verify: `git -C /Users/jacob/Documents/Code/AprovanLabs/registry worktree add /tmp/reg-fresh HEAD && cd /tmp/reg-fresh && pnpm install --frozen-lockfile; rc=$?; git -C /Users/jacob/Documents/Code/AprovanLabs/registry worktree remove --force /tmp/reg-fresh; exit $rc`
-- [ ] 2.4 Dry-run tarball leak check: `pnpm --filter utdk exec npm pack --dry-run 2>&1 |
+- [x] 2.4 Dry-run tarball leak check: `pnpm --filter utdk exec npm pack --dry-run 2>&1 |
       grep -c "/Users/"` returns 0, and repeat for `@aprovan/registry-server` (spec:
       registry-publish-integrity / "Tarball grep is clean").
 
@@ -62,12 +62,16 @@ checkouts contain untracked husk dirs that mask failures._
       `@aprovan/registry-server@0.1.1` published. If `utdk` fails in CI, apply tech-plan
       D3's contingency (manual publish from a clean checkout, then fix CI before closing).
       Verify: `npm view utdk version && npm view @aprovan/runtime version && npm view @aprovan/registry-server version | grep -qx 0.1.1`
+      _Partial: merged (#85); `@aprovan/runtime@0.1.0` + `@aprovan/registry-server@0.1.1`
+      published; `utdk` blocked by npm E403 name-similarity (manual publish same failure)._
 - [ ] 3.2 Clean-room installability gate (spec: registry-publish-integrity / "Clean-room
       install"): in a fresh temp dir, `npm install @aprovan/registry-server` succeeds and
       the package loads. Streams 4 and 6 are blocked until this passes.
 - [ ] 3.3 Fresh-clone registry exit criterion (spec: registry-publish-integrity / "Fresh
       registry clone is green").
       Verify: `T=$(mktemp -d) && git clone https://github.com/AprovanLabs/registry $T/registry && cd $T/registry && pnpm install && pnpm build && pnpm typecheck && pnpm test`
+      _Partial: `pnpm install --frozen-lockfile` + execution-plane build/typecheck/test green;
+      full `pnpm typecheck` fails on pre-existing `@aprovan/registry-web` errors._
 
 ## 4. Aprovan: switch to npm and delete the fork
 
