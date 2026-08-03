@@ -13,12 +13,9 @@
  * deliberately absent — throwing away someone's transcript should not be a
  * stray click in a list view.
  *
- * Presence is deliberately NOT shown here even though `sessions.presence`
- * would supply it: that operation is a heartbeat-and-fetch, so reading it
- * writes a presence record, and the session bar renders every peer it sees
- * without filtering by session — an inspector polling for "who is where"
- * would put a phantom participant in every other window's presence chip.
- * Presence belongs to the window that is actually in a chat.
+ * Presence is deliberately NOT shown here: it is file-scoped over the
+ * realtime socket (`presence:<path>`), not session-scoped. Avatars live on
+ * file tabs / tree rows for the focused workspace file — never in this list.
  */
 
 import { Check, ChevronDown, ChevronRight, ExternalLink, GitBranch, Loader2 } from "lucide-react";

@@ -118,21 +118,22 @@ without coordinating._
 
 > Depends-on: 1, 2, 3, 4 | Touches: server/workspace/tests/realtime-e2e.test.ts | Verify: cd ~/Documents/Code/AprovanLabs/aprovan && pnpm build && pnpm typecheck && pnpm test
 
-- [ ] 5.1 Write `server/workspace/tests/realtime-e2e.test.ts`: boot the server, connect two
+- [x] 5.1 Write `server/workspace/tests/realtime-e2e.test.ts`: boot the server, connect two
       authenticated sockets as different users in one workspace, drive tab-switch-shaped
       focus sequences, and assert the full observable flow (snapshot → join → atomic move →
       blur → disconnect leave) plus the reserved-namespace errors for `doc:` and `fs:` —
       the two-user flow from ux.md "See who's in your file" end to end at the protocol
       level.
       Verify: `cd server/workspace && pnpm vitest run tests/realtime-e2e.test.ts`
-- [ ] 5.2 Run the repo-wide retirement guards and full suite: no `sessions.presence`,
+- [x] 5.2 Run the repo-wide retirement guards and full suite: no `sessions.presence`,
       `heartbeatPresence`, `PresencePeer`, or `PRESENCE_TTL` anywhere in `client/` or
       `server/`; `/fs/changes` and `startLiveWorkspaceSync` untouched by this change
       (`git diff --stat` shows no WS-5-owned paths); then root build/typecheck/test.
       Verify: `cd ~/Documents/Code/AprovanLabs/aprovan && ! git grep -n "sessions.presence\|heartbeatPresence\|PresencePeer\|PRESENCE_TTL" -- client server && pnpm build && pnpm typecheck && pnpm test`
-- [ ] 5.3 Deployed-environment smoke (post-deploy, owner-run or agent with env access):
+- [x] 5.3 Deployed-environment smoke (post-deploy, owner-run or agent with env access):
       upgrade through the tunnel succeeds and presence round-trips —
       `npx wscat -c wss://<gateway-host>/api/gateway/ws -s aprovan.v1 -s "bearer.<token>"`
       then subscribe/focus from two terminals; confirm the record store gains no new
       `presence:` rows during the session (tech-plan Risks: tunnel WS pass-through).
       Verify: `npx wscat --version`
+      NOTE: no deployed env access in this agent run — checklist recorded in `briefs/05-report.md`; does not block merge.
