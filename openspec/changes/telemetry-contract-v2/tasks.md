@@ -66,15 +66,17 @@ aprovan fork of the contract package is a verbatim mirror until IW-0 lands.
 
 ## 4. Freeze and mirror
 
-> Depends-on: 1, 2, 3 | Touches: registry/packages/contracts/telemetry/package.json, aprovan/packages/contracts/telemetry/** | Verify: diff -r --exclude=node_modules --exclude=dist /Users/jacob/Documents/Code/AprovanLabs/registry/packages/contracts/telemetry /Users/jacob/Documents/Code/AprovanLabs/aprovan/packages/contracts/telemetry && cd /Users/jacob/Documents/Code/AprovanLabs/aprovan && pnpm --filter @utdk/telemetry build && pnpm --filter @utdk/telemetry test
+> Depends-on: 1, 2, 3 | Touches: registry/packages/contracts/telemetry/package.json, aprovan/server/workspace/package.json | Verify: npm view @utdk/telemetry version # 0.3.0; cd aprovan && pnpm install && dependency resolves to 0.3.0
 
-- [ ] 4.1 Bump `@utdk/telemetry` to 0.3.0 (audit from 1.5 must be closed) and run
+- [x] 4.1 Bump `@utdk/telemetry` to 0.3.0 (audit from 1.5 must be closed) and run
       `pnpm publish --dry-run` to confirm the manifest (incl. the new `./sdk` subpath)
       is publishable.
-- [ ] 4.2 Mirror the contract package verbatim into
+- [x] 4.2 Mirror the contract package verbatim into
       `aprovan/packages/contracts/telemetry` (D7). Skip and switch the dependency to
       published npm instead iff IW-0 (`execution-plane-unfork`) has landed. Record which
       path was taken in the commit message.
+      **Path taken: npm** — IW-0 landed; no mirror. `@aprovan/workspace` depends on
+      `@utdk/telemetry@^0.3.0` from the registry (published via registry#97).
 
 ## 5. Native implementation: export + metric kind
 

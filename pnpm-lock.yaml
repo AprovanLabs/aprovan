@@ -721,8 +721,8 @@ importers:
         specifier: ^0.2.0
         version: 0.2.0
       '@utdk/telemetry':
-        specifier: ^0.2.0
-        version: 0.2.0
+        specifier: ^0.3.0
+        version: 0.3.0
       '@utdk/vcs':
         specifier: ^0.2.0
         version: 0.2.0
@@ -4589,6 +4589,9 @@ packages:
 
   '@utdk/telemetry@0.2.0':
     resolution: {integrity: sha512-fkLVNNIH96fFJ+TLkcnEzJJinf6ArP8T3K4/S93Q40byjH8QCZwx8yu+z7cwyx7zI7iQ3bkZVrBKkUIskihnBg==}
+
+  '@utdk/telemetry@0.3.0':
+    resolution: {integrity: sha512-jRCCdnvWv05vVHHK6TfrTTZ7zAIqeP2J6+KVK9Xs9AsIZyqJfkWI4be6CtCL3KtvPXIevhDtA1hAYXTypV4HIQ==}
 
   '@utdk/vcs@0.2.0':
     resolution: {integrity: sha512-lVuW1hGovNEUe+XqAD7Wugv9oO8jfULko56sDIDIFhxKs5jgflYXK9YuflDqPL0MmPdnGXiBWNc12KZZvDU/Uw==}
@@ -13026,6 +13029,8 @@ snapshots:
       - pg-native
 
   '@utdk/telemetry@0.2.0': {}
+
+  '@utdk/telemetry@0.3.0': {}
 
   '@utdk/vcs@0.2.0': {}
 
