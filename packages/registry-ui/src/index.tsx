@@ -50,12 +50,20 @@ export function useGateway(): GatewayContextValue {
 export {
   AddCredentialForm,
   CredentialManager,
+  ProfilesSection,
+  ProfilesListView,
+  ProfilesUnavailableCard,
   clearOAuthPending,
   generateState,
   initiateOAuthFlow,
   loadOAuthPending,
   saveOAuthPending,
   validateProviderId,
+  isUnavailable,
+  listWorkspaceProfiles,
+  createWorkspaceProfile,
+  updateWorkspaceProfile,
+  deleteWorkspaceProfile,
   type AddCredentialFormProps,
   type CatalogProviderSummary,
   type CredentialInput,
@@ -63,6 +71,12 @@ export {
   type CredentialRecord,
   type CredentialType,
   type OAuthPendingState,
+  type ProfileCreateInput,
+  type ProfileLimits,
+  type ProfileTargetKind,
+  type ProfileUpdateInput,
+  type ProfileWire,
+  type ProfilesSectionProps,
 } from "./credentials";
 
 export {

@@ -84,3 +84,45 @@ export interface OAuthPendingState {
   scopes?: string[];
   state: string;
 }
+
+/** Workspace profile wire shape (no credential payload). */
+export type ProfileTargetKind = "interface" | "provider";
+
+export interface ProfileLimits {
+  rps?: number;
+  burst?: number;
+  budget?: number;
+}
+
+export interface ProfileWire {
+  id: string;
+  name: string;
+  targetKind: ProfileTargetKind;
+  targetId: string;
+  provider?: string;
+  credentialId?: string;
+  options: Record<string, unknown>;
+  limits?: ProfileLimits;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  credentialLabel?: string;
+}
+
+export interface ProfileCreateInput {
+  name: string;
+  targetKind: ProfileTargetKind;
+  targetId: string;
+  provider?: string;
+  credentialId?: string;
+  options?: Record<string, unknown>;
+  limits?: ProfileLimits;
+}
+
+export interface ProfileUpdateInput {
+  name?: string;
+  provider?: string;
+  credentialId?: string | null;
+  options?: Record<string, unknown>;
+  limits?: ProfileLimits | null;
+}
