@@ -14,7 +14,10 @@ import {
   Bell,
   Bot,
   Box,
+  Brain,
+  Cpu,
   Database,
+  FolderGit,
   GitBranch,
   GitCompareArrows,
   KeyRound,
@@ -29,11 +32,14 @@ import { AppsPanel } from "../components/panels/AppsPanel";
 import { CredentialsPanel } from "../components/panels/CredentialsPanel";
 import { InterfacesPanel } from "../components/panels/InterfacesPanel";
 import { KeyValuePanel } from "../components/panels/KeyValuePanel";
+import { LlmPanel } from "../components/panels/LlmPanel";
 import { NotificationsPanel } from "../components/panels/NotificationsPanel";
+import { RuntimePanel } from "../components/panels/RuntimePanel";
 import { SandboxesPanel } from "../components/panels/SandboxesPanel";
 import { SessionsPanel } from "../components/panels/SessionsPanel";
 import { SyncPanel } from "../components/panels/SyncPanel";
 import { TelemetryPanel } from "../components/panels/TelemetryPanel";
+import { VcsPanel } from "../components/panels/VcsPanel";
 import { WebhooksPanel } from "../components/panels/WebhooksPanel";
 import type { NativePanelProps } from "../components/panels/shell";
 import type { LucideIcon } from "lucide-react";
@@ -83,6 +89,27 @@ export const NATIVE_SURFACES: NativeSurfaceDef[] = [
     icon: Bot,
     description: "Reusable AI workers with their own model, instructions, and permissions",
     Panel: AgentsPanel,
+  },
+  {
+    id: "runtime",
+    title: "Runtime",
+    icon: Cpu,
+    description: "Choose which runtime executes agent turns in this workspace",
+    Panel: RuntimePanel,
+  },
+  {
+    id: "vcs",
+    title: "VCS",
+    icon: FolderGit,
+    description: "Choose which git host powers code review and repo tools",
+    Panel: VcsPanel,
+  },
+  {
+    id: "llm",
+    title: "LLM",
+    icon: Brain,
+    description: "Choose which provider powers chat completions and model calls",
+    Panel: LlmPanel,
   },
   {
     id: "webhooks",
