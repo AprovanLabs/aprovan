@@ -4,7 +4,7 @@
 **Streams 4–5: DONE (PR).** Stream 6: worktree green; fresh-clone/docker pending post-merge.
 
 ## What shipped
-PR: (filled after create)
+PR: https://github.com/AprovanLabs/aprovan/pull/24
 
 ### Aprovan unfork
 - Repointed `server/workspace` to npm: `@utdk/{agent,llm,sandbox}^0.2.0`,
