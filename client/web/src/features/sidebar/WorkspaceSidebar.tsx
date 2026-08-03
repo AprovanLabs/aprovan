@@ -61,6 +61,7 @@ export function WorkspaceSidebar({
   deleteWorkspaceEntry,
   createWorkspaceFile,
   refreshWorkspace,
+  expandWorkspaceDirectory,
   activeSurfaceId,
   openNativeTab,
 }: {
@@ -78,6 +79,7 @@ export function WorkspaceSidebar({
   deleteWorkspaceEntry: (path: string, isDir: boolean) => void;
   createWorkspaceFile: (rawPath: string) => string | void;
   refreshWorkspace: () => Promise<void>;
+  expandWorkspaceDirectory?: (path: string) => void;
   activeSurfaceId: string | null;
   openNativeTab: (surfaceId: string) => void;
 }) {
@@ -131,6 +133,11 @@ export function WorkspaceSidebar({
             onTogglePin={(path, isDir) => togglePin(raw(path), isDir)}
             onDeletePath={(path, isDir) => deleteWorkspaceEntry(raw(path), isDir)}
             onCreateFile={(path) => createWorkspaceFile(raw(path))}
+            onExpandDirectory={
+              expandWorkspaceDirectory
+                ? (path) => expandWorkspaceDirectory(raw(path))
+                : undefined
+            }
             onRefresh={() => void refreshWorkspace()}
             refreshing={workspaceLoading}
             presenceTitles={presenceTitles}

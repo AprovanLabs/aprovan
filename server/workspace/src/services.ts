@@ -428,6 +428,8 @@ const vfs: CoreService = {
           prefix: { type: "string" },
           commit: { type: "string" },
           session: { type: "string" },
+          limit: { type: "number" },
+          cursor: { type: "string" },
         },
       },
     },
@@ -619,29 +621,47 @@ const vfs: CoreService = {
         if (prefix && isServicePath(prefix)) {
           throw new ServiceError("Service state is managed through its tool namespaces", 403);
         }
-        const entries = await listAll(store, ctx.workspaceId, prefix);
+        const limit =
+          typeof args["limit"] === "number" && Number.isFinite(args["limit"])
+            ? Math.min(Math.floor(args["limit"]), 10_000)
+            : undefined;
+        const listCursor = typeof args["cursor"] === "string" ? args["cursor"] : undefined;
+        if (listCursor && limit === undefined) {
+          throw new ServiceError("cursor requires limit", 400);
+        }
+        const page =
+          limit !== undefined
+            ? await store.list(ctx.workspaceId, prefix, {
+                limit,
+                ...(listCursor ? { cursor: listCursor } : {}),
+              })
+            : null;
+        const entries = page ? page.entries : await listAll(store, ctx.workspaceId, prefix);
         // A workspace listing never surfaces OTHER users' data partitions —
         // the caller's own partition IS listed (their private files are a
         // place, not a secret; tech-plan data-auth-model D2), and foreign
         // partitions are invisible AND unreadable (the partition guard 404s
         // exact-path access below).
         const hidden = await hiddenDataPrefixes(ctx.workspaceId);
-        const mounted = await mountEntries(ctx.workspaceId, prefix);
+        const includeMounts = limit === undefined || !listCursor;
+        const mounted = includeMounts ? await mountEntries(ctx.workspaceId, prefix) : [];
+        const filtered = [
+          ...entries.filter(
+            (entry) =>
+              !isServicePath(entry.path) &&
+              partitionAccess(entry.path, ctx.userId, hidden) !== "foreign",
+          ),
+          ...mounted,
+        ]
+          // Agent-bounded contexts only see what their path grants cover.
+          .filter(
+            (entry) =>
+              !ctx.grants?.paths || pathAccess(ctx.grants.paths, entry.path) !== "none",
+          )
+          .sort((a, b) => a.path.localeCompare(b.path));
         return {
-          entries: [
-            ...entries.filter(
-              (entry) =>
-                !isServicePath(entry.path) &&
-                partitionAccess(entry.path, ctx.userId, hidden) !== "foreign",
-            ),
-            ...mounted,
-          ]
-            // Agent-bounded contexts only see what their path grants cover.
-            .filter(
-              (entry) =>
-                !ctx.grants?.paths || pathAccess(ctx.grants.paths, entry.path) !== "none",
-            )
-            .sort((a, b) => a.path.localeCompare(b.path)),
+          entries: filtered,
+          ...(page?.cursor ? { cursor: page.cursor } : {}),
         };
       }
       case "read": {

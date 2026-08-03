@@ -24,6 +24,7 @@ import type {
   ContextMenuAnchorRect,
   ContextMenuItem,
   ContextMenuOpenContext,
+  FileTreeDirectoryHandle,
   FileTreeOptions,
   FileTreeRowDecoration,
 } from '@pierre/trees';
@@ -58,6 +59,8 @@ export interface WorkspaceTreeProps {
    * context-menu entry).
    */
   onCreateFile?: (path: string) => string | void;
+  /** Lazy tree: fetch paths under a directory when it is expanded. */
+  onExpandDirectory?: (path: string) => void;
   /**
    * Presence tooltips keyed by tree path (display path). When set for a row,
    * a small green dot decoration is shown after the name (pierre trees only
@@ -372,6 +375,7 @@ export function WorkspaceTree({
   onRefresh,
   refreshing,
   onCreateFile,
+  onExpandDirectory,
   presenceTitles,
 }: WorkspaceTreeProps) {
   // Refs keep the once-built model's captured closures pointed at fresh values.
@@ -391,6 +395,8 @@ export function WorkspaceTree({
   };
   const selectFileRef = useCallbackRef(onSelectFile);
   const selectDirRef = useCallbackRef(onSelectDirectory);
+  const expandDirRef = useCallbackRef(onExpandDirectory);
+  const expandedDirsRef = useRef(new Set<string>());
   // Suppresses the callback when we mirror an external `activePath` selection.
   const suppressRef = useRef(false);
   pinnedRef.current = pinnedPaths;
@@ -425,10 +431,36 @@ export function WorkspaceTree({
   const { model } = useFileTree(options);
   modelRef.current = model;
 
+  const pathsKey = paths.join('\n');
+
+  // Lazy tree: detect directory expansion and ask the host to fetch that prefix.
+  useEffect(() => {
+    if (!onExpandDirectory) return;
+    const knownDirs = () => {
+      const dirs = new Set<string>();
+      for (const path of paths) {
+        const parts = path.split('/');
+        for (let depth = 1; depth < parts.length; depth += 1) {
+          dirs.add(parts.slice(0, depth).join('/'));
+        }
+      }
+      return dirs;
+    };
+    return model.subscribe(() => {
+      for (const dir of knownDirs()) {
+        const item = model.getItem(dir);
+        if (!item || !item.isDirectory()) continue;
+        const directory = item as FileTreeDirectoryHandle;
+        if (!directory.isExpanded() || expandedDirsRef.current.has(dir)) continue;
+        expandedDirsRef.current.add(dir);
+        expandDirRef.current?.(dir);
+      }
+    });
+  }, [model, pathsKey, onExpandDirectory, expandDirRef, paths]);
+
   // Rebuild the tree when the path set changes (filter, refresh, delete). Skip
   // the first run — construction already seeded these paths and a reset here
   // would needlessly collapse the tree.
-  const pathsKey = paths.join('\n');
   const firstPathsRun = useRef(true);
   useEffect(() => {
     if (firstPathsRun.current) {

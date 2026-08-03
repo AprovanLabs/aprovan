@@ -26,7 +26,14 @@
 import { Hono, type Context } from "hono";
 import { hiddenDataPrefixes, partitionAccess } from "../apps/store.js";
 import { changesSince, currentCursor, recordChange } from "../change-journal.js";
-import { listAll, getFsStore, isServicePath, normalizeFsPath } from "../fs-store.js";
+import {
+  listAll,
+  getFsStore,
+  isServicePath,
+  normalizeFsPath,
+  type FsEntry,
+  type FsListOptions,
+} from "../fs-store.js";
 import { requireAuth } from "../middleware/auth.js";
 import { ServiceError } from "../service-kernel.js";
 import {
@@ -89,12 +96,36 @@ async function foreignPartitionResponse(
   return null;
 }
 
+function parseFsListLimit(raw: string | undefined): number | "invalid" | null {
+  if (!raw) return null;
+  const limit = Number(raw);
+  if (!Number.isFinite(limit) || limit < 1 || limit > 10_000) return "invalid";
+  return Math.floor(limit);
+}
+
+function filterListedEntries(
+  entries: FsEntry[],
+  sub: string,
+  hidden: readonly string[],
+): FsEntry[] {
+  return entries.filter(
+    (entry) =>
+      !isServicePath(entry.path) && partitionAccess(entry.path, sub, hidden) !== "foreign",
+  );
+}
+
 fsRouter.get("/", async (c) => {
   const prefix = c.req.query("prefix") ?? "";
   const normalized = prefix ? normalizeFsPath(prefix) : "";
   if (normalized === null) return c.json({ error: "Invalid prefix" }, 400);
   if (normalized && isServicePath(normalized)) {
     return c.json({ error: "Service state is managed through its tool namespaces" }, 403);
+  }
+  const limitParam = parseFsListLimit(c.req.query("limit"));
+  if (limitParam === "invalid") return c.json({ error: "Invalid limit" }, 400);
+  const cursor = c.req.query("cursor") ?? "";
+  if (cursor && limitParam === null) {
+    return c.json({ error: "cursor requires limit" }, 400);
   }
   const workspaceId = c.get("principal").workspaceId;
   try {
@@ -108,23 +139,32 @@ fsRouter.get("/", async (c) => {
   } catch (err) {
     return serviceErrorResponse(c, err);
   }
-  const entries = await listAll(getFsStore(), workspaceId, normalized);
+  const store = getFsStore();
   // Root listings (and the chat file tree, which calls this same route)
   // hide the service subtree entirely, plus every OTHER user's data
   // partition — the caller's own partition is listed (their private files
   // are a place, not a secret; see docs/app-data.md).
   const hidden = await hiddenDataPrefixes(workspaceId);
-  const mounted = await mountEntries(workspaceId, normalized);
   const sub = c.get("principal").sub;
+  let entries: FsEntry[];
+  let nextCursor: string | undefined;
+  if (limitParam !== null) {
+    const listOpts: FsListOptions = { limit: limitParam };
+    if (cursor) listOpts.cursor = cursor;
+    const page = await store.list(workspaceId, normalized, listOpts);
+    entries = page.entries;
+    nextCursor = page.cursor;
+  } else {
+    entries = await listAll(store, workspaceId, normalized);
+  }
+  const includeMounts = limitParam === null || !cursor;
+  const mounted = includeMounts ? await mountEntries(workspaceId, normalized) : [];
   return c.json({
     entries: [
-      ...entries.filter(
-        (entry) =>
-          !isServicePath(entry.path) &&
-          partitionAccess(entry.path, sub, hidden) !== "foreign",
-      ),
+      ...filterListedEntries(entries, sub, hidden),
       ...mounted,
     ].sort((a, b) => a.path.localeCompare(b.path)),
+    ...(nextCursor ? { cursor: nextCursor } : {}),
   });
 });
 
