@@ -229,22 +229,9 @@ describe("chat sessions", () => {
     expect(view.content).toBe("export const v = 2;");
   });
 
-  it("reports live peers via presence heartbeats and expires stale ones", async () => {
-    const beat = (window: string, title: string) =>
-      call("sessions/presence", { window, title, id: stagedId, mode: "auto" });
-
-    await beat("w1", "Window one");
-    const second = await data<{ peers: Array<{ window: string; sessionTitle?: string }> }>(
-      await beat("w2", "Window two"),
-    );
-    expect(second.peers.map((p) => p.window)).toEqual(["w1"]);
-    expect(second.peers[0]?.sessionTitle).toBe("Window one");
-
-    // Same window heartbeating again sees the other, not itself.
-    const again = await data<{ peers: Array<{ window: string }> }>(
-      await beat("w1", "Window one"),
-    );
-    expect(again.peers.map((p) => p.window)).toEqual(["w2"]);
+  it("sessions.presence is retired (unknown procedure)", async () => {
+    const res = await call("sessions/presence", { window: "w1", title: "gone" });
+    expect(res.status).toBe(404);
   });
 
   it("resolves a conflicted merge in one call — keep-workspace", async () => {

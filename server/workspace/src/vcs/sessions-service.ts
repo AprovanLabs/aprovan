@@ -7,7 +7,6 @@
  * the VCS (`requireWorkspaceCaller` mirror in every op).
  */
 
-import { getRecordStore } from "../records.js";
 import { ServiceError, type CoreService, type ServiceContext } from "../service-kernel.js";
 import {
   appendMessages,
@@ -52,72 +51,10 @@ async function withChanges(
   return { ...session, changes, ...(base ? { baseAt: base.createdAt } : {}) };
 }
 
-// ---------------------------------------------------------------------------
-// Presence — who has which chat open right now.
-//
-// Heartbeats land in the record store (unversioned, invisible to the file
-// plane — see docs/app-data.md) keyed per (user, window). A peer is "live"
-// while its heartbeat is fresher than PRESENCE_TTL_MS; stale rows are
-// best-effort garbage-collected as they're encountered. This is the
-// backend-facilitated half of live collaboration; a CRDT transport can
-// replace the polling without changing the surface.
-// ---------------------------------------------------------------------------
-
-const PRESENCE_PREFIX = "presence:";
-const PRESENCE_TTL_MS = 30_000;
-
-interface PresenceRecord {
-  userId: string;
-  window: string;
-  sessionId?: string;
-  sessionTitle?: string;
-  mode?: string;
-  lastSeen: string;
-}
-
-async function heartbeatPresence(
-  ctx: ServiceContext,
-  args: Record<string, unknown>,
-): Promise<{ peers: PresenceRecord[] }> {
-  const records = getRecordStore();
-  const window =
-    typeof args["window"] === "string" && args["window"]
-      ? args["window"].slice(0, 64)
-      : "default";
-  const record: PresenceRecord = {
-    userId: ctx.userId,
-    window,
-    ...(typeof args["id"] === "string" && args["id"] ? { sessionId: args["id"] } : {}),
-    ...(typeof args["title"] === "string" && args["title"]
-      ? { sessionTitle: args["title"].slice(0, 120) }
-      : {}),
-    ...(typeof args["mode"] === "string" ? { mode: args["mode"] } : {}),
-    lastSeen: new Date().toISOString(),
-  };
-  const selfKey = `${PRESENCE_PREFIX}${ctx.userId}:${window}`;
-  await records.set(ctx.workspaceId, "ws", selfKey, record, ctx.userId);
-
-  const keys = await records.list(ctx.workspaceId, "ws", PRESENCE_PREFIX);
-  const now = Date.now();
-  const peers: PresenceRecord[] = [];
-  for (const key of keys) {
-    if (key === selfKey) continue;
-    const hit = await records.get(ctx.workspaceId, "ws", key).catch(() => undefined);
-    const peer = hit?.value as PresenceRecord | undefined;
-    if (!peer || typeof peer.lastSeen !== "string") continue;
-    if (now - Date.parse(peer.lastSeen) > PRESENCE_TTL_MS) {
-      void records.delete(ctx.workspaceId, "ws", key).catch(() => undefined);
-      continue;
-    }
-    peers.push(peer);
-  }
-  return { peers };
-}
-
 export const sessionsService: CoreService = {
   meta: {
     label: "Sessions",
-    blurb: "Chat sessions as branches: staged diffs, presence, resolve",
+    blurb: "Chat sessions as branches: staged diffs, resolve",
     icon: "git-branch",
   },
   tools: [
@@ -221,22 +158,6 @@ export const sessionsService: CoreService = {
           paths: { type: "array", items: { type: "string" } },
         },
         required: ["id", "paths"],
-      },
-    },
-    {
-      name: "sessions.presence",
-      operation: "presence",
-      description:
-        "Heartbeat this window's presence (optionally with the open session) and get back the workspace's other live windows — who's in which chat right now.",
-      inputSchema: {
-        type: "object",
-        properties: {
-          id: { type: "string" },
-          window: { type: "string" },
-          title: { type: "string" },
-          mode: { type: "string" },
-        },
-        required: ["window"],
       },
     },
     {
@@ -347,8 +268,6 @@ export const sessionsService: CoreService = {
         const session = await requireSession(ctx.workspaceId, sessionId(args["id"]));
         return { dropped, session: await withChanges(ctx.workspaceId, session) };
       }
-      case "presence":
-        return heartbeatPresence(ctx, args);
       case "resolve": {
         const strategy = args["strategy"];
         if (strategy !== "keep-draft" && strategy !== "keep-workspace") {

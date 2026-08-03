@@ -20,6 +20,7 @@ import {
 import { getCurrentWorkspace } from "../sessions.js";
 import { listUserGroupIds } from "../userGroups.js";
 import { createBroker, type Conn, type RealtimeBroker } from "./broker.js";
+import { createPresenceHandler } from "./presence.js";
 import { parseClientMessage, type ServerMessage } from "./protocol.js";
 
 export const REALTIME_PATH = "/api/gateway/ws";
@@ -151,6 +152,9 @@ export function attachRealtime(
   options: AttachRealtimeOptions = {},
 ): RealtimeHandle {
   const broker = options.broker ?? createBroker();
+  // Presence is the only v1 namespace (file-presence). Always register so
+  // production and tests that share a broker get the real handler.
+  broker.registerNamespace(createPresenceHandler(broker));
   const pingIntervalMs = options.pingIntervalMs ?? DEFAULT_PING_INTERVAL_MS;
   const maxMissedPongs = options.maxMissedPongs ?? DEFAULT_MAX_MISSED_PONGS;
   const now = options.now ?? Date.now;
