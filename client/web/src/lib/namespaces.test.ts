@@ -3,6 +3,7 @@ import {
   groupNamespaces,
   namespaceIcon,
   namespaceLabel,
+  namespaceProfilesHint,
   type NamespaceInfo,
 } from "./namespaces";
 
@@ -173,5 +174,21 @@ describe("namespaceLabel", () => {
     expect(agentInterface.label).toBe("Agent runtime");
     expect(agentsCore.label).toBe("Agents");
     expect(agentInterface.label).not.toBe(agentsCore.label);
+  });
+});
+
+describe("namespaceProfilesHint", () => {
+  it("summarizes profile names and the default", () => {
+    expect(
+      namespaceProfilesHint({
+        profiles: ["default", "work", "personal"],
+        defaultProfile: "default",
+      }),
+    ).toBe("default, work, personal (default: default)");
+  });
+
+  it("returns undefined when discovery omits profiles", () => {
+    expect(namespaceProfilesHint(undefined)).toBeUndefined();
+    expect(namespaceProfilesHint({ profiles: [] })).toBeUndefined();
   });
 });

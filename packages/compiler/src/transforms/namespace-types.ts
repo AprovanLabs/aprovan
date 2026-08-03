@@ -325,8 +325,12 @@ function structuralDeclaration(namespace: string): string {
     [procedure: string]: Procedure;
   }
 
+  /** Pin a named profile; bare \`import\` uses the default profile. */
+  type ProfileClient = (name: string) => Promise<${typeName}>;
+
   export interface ${typeName} {
-    [procedure: string]: Procedure;
+    client: ProfileClient;
+    [procedure: string]: Procedure | ProfileClient;
   }
 
 ${moduleFooter(namespace, typeName)}
