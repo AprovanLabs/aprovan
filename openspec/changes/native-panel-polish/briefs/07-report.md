@@ -1,7 +1,7 @@
 # Brief 07 report — copy pass A (data & pipelines panels)
 
 ## PR
-(pending — filled after merge)
+https://github.com/AprovanLabs/aprovan/pull/43
 
 ## Done
 - Stream 7.1: KeyValuePanel — ux.md copy, `PanelErrorWithRetry`, `ArmedButton` delete,
