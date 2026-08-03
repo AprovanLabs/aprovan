@@ -16,7 +16,7 @@ export interface AdminTab {
 const TAB_LABELS: Record<AdminCapability, string> = {
   members: "Members",
   groups: "Groups",
-  permissions: "Tool grants",
+  permissions: "Access",
   "api-keys": "API keys",
   profiles: "Profiles",
   audit: "Audit",

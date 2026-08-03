@@ -110,3 +110,27 @@ export interface AuditEntry {
   durationMs?: number;
   createdAt: string;
 }
+
+/** Workspace profile listing shape used by the group attach picker. */
+export interface ProfileWire {
+  id: string;
+  name: string;
+  targetKind: ProfileTargetKind;
+  targetId: string;
+  provider?: string;
+  credentialId?: string;
+  options: Record<string, unknown>;
+  limits?: ProfileLimits;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  credentialLabel?: string;
+}
+
+/** Attached group↔profile row from GET/POST /groups/:id/profiles. */
+export interface GroupProfileSummary {
+  id: string;
+  name: string;
+  target: { kind: "interface" | "provider"; id: string; provider?: string };
+  credentialLabel?: string;
+}

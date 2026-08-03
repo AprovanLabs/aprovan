@@ -122,23 +122,23 @@ checklist for every copy/state task._
 
 > Depends-on: 2, 3 | Touches: packages/registry-ui/src/admin/**, client/web/src/components/panels/AdminPermissionsPanel.tsx | Verify: cd ~/Documents/Code/AprovanLabs/aprovan && pnpm --filter @aprovan/registry-ui build && pnpm --filter @aprovan/registry-ui test && pnpm --filter @aprovan/patchwork-web build
 
-- [ ] 6.1 Add group-profile client functions to `admin/api.ts`
+- [x] 6.1 Add group-profile client functions to `admin/api.ts`
       (`listGroupProfiles`/`attachGroupProfile`/`detachGroupProfile`/`listWorkspaceProfiles`)
       per tech-plan Interfaces; types for `GroupProfileSummary`.
       Verify: `cd ~/Documents/Code/AprovanLabs/aprovan && pnpm --filter @aprovan/registry-ui build`
-- [ ] 6.2 Group detail gains the Profiles section: attached list (name/target/credential
+- [x] 6.2 Group detail gains the Profiles section: attached list (name/target/credential
       label), attach picker fed by `GET /profiles`, idempotent attach, armed detach; 501 →
       unavailable card, attach hidden, rest of panel unaffected — specs:
       admin-group-profiles "Group detail exposes profile membership" (both scenarios),
       "feature-detect the storage backend".
       Verify: `cd ~/Documents/Code/AprovanLabs/aprovan && pnpm --filter @aprovan/registry-ui test`
-- [ ] 6.3 Rework `AdminPanel` presentation: tabs Members / Groups / Access (rename per ux.md
+- [x] 6.3 Rework `AdminPanel` presentation: tabs Members / Groups / Access (rename per ux.md
       OQ1), dense tables over nested cards, master-detail groups, armed destructive actions
       everywhere, conventions copy + not-authorized card; same routes/payloads (props
       signature `{ client }` unchanged) — specs: admin-group-profiles "professional and
       dense" (both scenarios).
       Verify: `cd ~/Documents/Code/AprovanLabs/aprovan && ! grep -rn "confirm(" packages/registry-ui/src/admin --include="*.tsx" | grep -v test && pnpm --filter @aprovan/registry-ui build`
-- [ ] 6.4 Unit tests (mocked client): attach/detach round-trip, 501 degradation, armed
+- [x] 6.4 Unit tests (mocked client): attach/detach round-trip, 501 degradation, armed
       revoke — specs: admin-group-profiles scenarios.
       Verify: `cd ~/Documents/Code/AprovanLabs/aprovan && pnpm --filter @aprovan/registry-ui test`
 

@@ -30,7 +30,7 @@ describe("admin capabilities", () => {
     expect(tabsForCapabilities()).toEqual([
       { id: "members", label: "Members" },
       { id: "groups", label: "Groups" },
-      { id: "permissions", label: "Tool grants" },
+      { id: "permissions", label: "Access" },
     ]);
   });
 
