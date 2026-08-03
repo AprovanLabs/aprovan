@@ -70,25 +70,25 @@ checklist for every copy/state task._
 
 > Depends-on: 2 | Touches: client/web/src/components/panels/AgentsPanel.tsx, client/web/src/components/panels/agents/** | Verify: cd ~/Documents/Code/AprovanLabs/aprovan && pnpm --filter @aprovan/patchwork-web typecheck && pnpm --filter @aprovan/patchwork-web build
 
-- [ ] 4.1 Decompose into `panels/agents/{index,ProfileList,ProfileDetail,ProfileEditor,
+- [x] 4.1 Decompose into `panels/agents/{index,ProfileList,ProfileDetail,ProfileEditor,
       Executions}.tsx`: data ownership (usePanelData, poll timers, merge/normalize) stays in
       `index`, children are presentation-only; `AgentsPanel.tsx` re-exports — tech-plan D3.
       Port `handleSave` payload normalization (null-clears on update) verbatim with a unit
       test asserting create/update/clear payload shapes BEFORE restyling — specs:
       agents-pane "dispatch chain is unchanged".
       Verify: `cd ~/Documents/Code/AprovanLabs/aprovan && pnpm --filter @aprovan/patchwork-web exec vitest run src/components/panels/agents`
-- [ ] 4.2 Profile list + detail: compact two-line rows (name, model chip, prompt preview);
+- [x] 4.2 Profile list + detail: compact two-line rows (name, model chip, prompt preview);
       click-through detail with humanized config, that agent's recent executions, edit +
       `ArmedButton` delete — specs: agents-pane "separates list, detail, and editor" (both
       scenarios); ux.md "Agents — profile list/detail".
       Verify: `cd ~/Documents/Code/AprovanLabs/aprovan && pnpm --filter @aprovan/patchwork-web build`
-- [ ] 4.3 Sectioned editor (Basics / Model / Instructions / Access / Files): only name +
+- [x] 4.3 Sectioned editor (Basics / Model / Instructions / Access / Files): only name +
       instructions prominent; Model section picks the LLM binding from the workspace's
       configured interface instances with free-text fallback; Access intro copy per ux.md;
       inline per-section validation errors — specs: agents-pane "editor is sectioned and
       guided" (both scenarios).
       Verify: `cd ~/Documents/Code/AprovanLabs/aprovan && pnpm --filter @aprovan/patchwork-web typecheck`
-- [ ] 4.4 Executions view: keep merged listing, grouping, filter chips, expand drill-down,
+- [x] 4.4 Executions view: keep merged listing, grouping, filter chips, expand drill-down,
       poll-while-visible discipline; humanize drill-down copy incl. the workflow-run
       no-detail explanation — specs: agents-pane "keeps live behavior" (both scenarios).
       Verify: `cd ~/Documents/Code/AprovanLabs/aprovan && pnpm --filter @aprovan/patchwork-web build`
