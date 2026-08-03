@@ -23,9 +23,9 @@ wave-1 parallel. Do not touch overlapping paths across parallel streams._
 
 > Depends-on: - | Touches: registry:packages/contracts/events/** | Verify: cd /Users/jacob/Documents/Code/AprovanLabs/registry && pnpm --filter @utdk/events test && pnpm --filter @utdk/events build
 
-- [ ] 3.1 Implement `sqs.ts` (optional SNS publish) for emit/list per `@utdk/events`.
-- [ ] 3.2 Compat registration + mocked AWS unit tests.
-- [ ] 3.3 Document queue/topic credential options.
+- [x] 3.1 Implement `sqs.ts` (optional SNS publish) for emit/list per `@utdk/events`.
+- [x] 3.2 Compat registration + mocked AWS unit tests.
+- [x] 3.3 Document queue/topic credential options.
 
 ## 4. VFS backend (S3)
 
@@ -47,18 +47,18 @@ wave-1 parallel. Do not touch overlapping paths across parallel streams._
 
 > Depends-on: - | Touches: aprovan:client/web/src/lib/native-surfaces.tsx, aprovan:client/web/src/components/panels/InterfacesPanel.tsx, aprovan:client/web/src/components/ServicesMenu.tsx, aprovan:client/web/src/lib/namespaces.ts, aprovan:client/web/src/components/panels/RuntimePanel.tsx, aprovan:client/web/src/components/panels/VcsPanel.tsx, aprovan:client/web/src/components/panels/LlmPanel.tsx | Verify: cd /Users/jacob/Documents/Code/AprovanLabs/aprovan && pnpm --filter @aprovan/patchwork-web typecheck && pnpm --filter @aprovan/patchwork-web build
 
-- [ ] 6.1 Add native surfaces Runtime / VCS / LLM with human titles; panels may filter Interfaces listing to those ids.
-- [ ] 6.2 Adjust ServicesMenu / namespace labels so agent/vcs/llm read as natives, not third-party providers.
+- [x] 6.1 Add native surfaces Runtime / VCS / LLM with human titles; panels may filter Interfaces listing to those ids.
+- [x] 6.2 Adjust ServicesMenu / namespace labels so agent/vcs/llm read as natives, not third-party providers.
 
 ## 7. Chat save policy, staging copy, stream visibility, code renderer host
 
 > Depends-on: - | Touches: aprovan:client/web/src/features/chat/**, aprovan:client/web/src/features/widgets/**, aprovan:client/web/src/components/SessionBar.tsx, aprovan:client/web/src/features/tabs/TabContent.tsx | Verify: cd /Users/jacob/Documents/Code/AprovanLabs/aprovan && pnpm --filter @aprovan/patchwork-web typecheck && pnpm --filter @aprovan/patchwork-web exec vitest run src/features/chat
 
-- [ ] 7.1 Stop default writes to root `main.tsx`; add Save offer with suggested `widgets/<slug>/main.tsx`.
-- [ ] 7.2 Stream widget/code fences into visible artifact UI (not only ReasoningPart).
-- [ ] 7.3 Fix ChatArtifactBlock / chat-host CodePreview blank render regressions (do not restyle editor package themes — stream 5).
-- [ ] 7.4 Clarify SessionBar staged → Apply copy.
-- [ ] 7.5 Dedupe chat icon / redundant in-pane filename when tab already shows path.
+- [x] 7.1 Stop default writes to root `main.tsx`; add Save offer with suggested `widgets/<slug>/main.tsx`.
+- [x] 7.2 Stream widget/code fences into visible artifact UI (not only ReasoningPart).
+- [x] 7.3 Fix ChatArtifactBlock / chat-host CodePreview blank render regressions (do not restyle editor package themes — stream 5).
+- [x] 7.4 Clarify SessionBar staged → Apply copy.
+- [x] 7.5 Dedupe chat icon / redundant in-pane filename when tab already shows path.
 
 ## 8. Workspaces pane collapse
 
