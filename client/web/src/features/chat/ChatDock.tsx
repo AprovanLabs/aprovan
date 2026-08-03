@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { MarkdownEditor, resolvePatchesInText } from "@aprovan/patchwork-editor";
+import { resolvePatchesInText } from "@aprovan/patchwork-editor";
 import {
   AlertCircle,
   Check,
   FileDiff,
   Loader2,
+  MessageSquare,
+  Pin,
+  PinOff,
   Send,
   X,
 } from "lucide-react";
@@ -19,6 +22,9 @@ import { publishConflictNotification } from "@/features/sessions/conflict-notify
 import { changedFileCount, type ChatSessionInfo } from "@/lib/chat-sessions";
 import { fetchLlmModels } from "@/lib/llm";
 import type { useSessionOrchestration } from "@/features/sessions/useSessionOrchestration";
+import { Badge } from "@/components/ui/badge";
+import { ChatComposer } from "./ChatComposer";
+import { fileLabel } from "./chat-file-context";
 import { APROVAN_LOGO, MessageBubble } from "./MessageParts";
 import type { useChatProviders } from "./useChatSubmit";
 
@@ -181,11 +187,6 @@ export function useChatPanelLayout() {
 
 export type ChatDockLayoutApi = ReturnType<typeof useChatPanelLayout>;
 
-function fileLabel(path: string): string {
-  const parts = path.replace(/\/+$/, "").split("/");
-  return parts[parts.length - 1] || path;
-}
-
 /** Proposed-changes review block: AI edits always ride a staged overlay. */
 function ProposedChangesReview({
   session,
@@ -287,11 +288,21 @@ export function ChatDock({
   handleSubmit,
   openWorkspacePreview,
   onOpenCredentials,
+  workspacePaths,
+  pinnedPaths,
+  onTogglePin,
+  onUnpin,
+  isPinned,
 }: {
   hasContentTab: boolean;
   layout: ChatDockLayoutApi;
   /** Active workspace file the dock is scoped to, if any. */
   filePath?: string | null;
+  workspacePaths: string[];
+  pinnedPaths: string[];
+  onTogglePin: (path: string) => void;
+  onUnpin: (path: string) => void;
+  isPinned: (path: string) => boolean;
   onClose?: () => void;
   session: ReturnType<typeof useSessionOrchestration>;
   providers: ReturnType<typeof useChatProviders>;
@@ -390,32 +401,79 @@ export function ChatDock({
       )}
 
       {sideMode && (
-        <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 border-b text-xs">
-          <span className="font-medium">Chat</span>
-          {filePath && (
-            <span
-              className="truncate font-mono text-muted-foreground"
-              title={filePath}
-            >
-              {fileLabel(filePath)}
-            </span>
-          )}
-          {isLoading && (
-            <span className="flex items-center gap-1 text-primary">
-              <Loader2 className="h-3 w-3 animate-spin" />
-              Generating…
-            </span>
-          )}
-          {onClose && (
-            <button
-              type="button"
-              onClick={onClose}
-              className="ml-auto p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
-              title="Close chat"
-              aria-label="Close chat"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
+        <div className="shrink-0 border-b">
+          <div className="flex items-center gap-2 px-3 py-1.5 text-xs">
+            <MessageSquare
+              className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
+              aria-hidden
+            />
+            {filePath && (
+              <span className="truncate font-mono font-medium" title={filePath}>
+                {fileLabel(filePath)}
+              </span>
+            )}
+            {filePath && (
+              <button
+                type="button"
+                onClick={() => onTogglePin(filePath)}
+                className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+                title={
+                  isPinned(filePath)
+                    ? "Unpin from chat context"
+                    : "Pin file for chat context"
+                }
+                aria-label={
+                  isPinned(filePath) ? "Unpin from chat context" : "Pin for chat context"
+                }
+              >
+                {isPinned(filePath) ? (
+                  <PinOff className="h-3.5 w-3.5" />
+                ) : (
+                  <Pin className="h-3.5 w-3.5" />
+                )}
+              </button>
+            )}
+            {isLoading && (
+              <span className="flex items-center gap-1 text-primary">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Generating…
+              </span>
+            )}
+            {onClose && (
+              <button
+                type="button"
+                onClick={onClose}
+                className="ml-auto p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+                title="Close chat"
+                aria-label="Close chat"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+          {pinnedPaths.length > 0 && (
+            <div className="flex flex-wrap gap-1 px-3 pb-1.5">
+              {pinnedPaths.map((path) => (
+                <Badge
+                  key={path}
+                  variant="secondary"
+                  className="text-[10px] gap-1 max-w-full"
+                >
+                  <span className="truncate font-mono" title={path}>
+                    {fileLabel(path)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => onUnpin(path)}
+                    className="shrink-0 hover:opacity-70"
+                    title="Unpin"
+                    aria-label={`Unpin ${path}`}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              ))}
+            </div>
           )}
         </div>
       )}
@@ -583,9 +641,10 @@ export function ChatDock({
           )}
 
           <form onSubmit={handleSubmit} className="flex gap-2 items-end">
-            <MarkdownEditor
+            <ChatComposer
               value={input}
               onChange={setInput}
+              workspacePaths={workspacePaths}
               onSubmit={() => {
                 if (
                   !isLoading &&
