@@ -17,6 +17,8 @@ export interface Member {
   userId: string;
   role: string;
   createdAt?: string;
+  email?: string;
+  name?: string;
 }
 
 export interface Group {

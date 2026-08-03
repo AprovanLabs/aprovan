@@ -242,6 +242,20 @@ export function createIdentityStoreSql(client: IdentitySqlClient): IIdentityStor
           [sub, workspaceId, new Date().toISOString(), workspaceId, new Date().toISOString()],
         );
       },
+      async getMany(subs) {
+        if (subs.length === 0) return [];
+        const unique = [...new Set(subs)];
+        const placeholders = unique.map(() => "?").join(", ");
+        const rows = await client.all(
+          `SELECT sub, email, name FROM users WHERE sub IN (${placeholders})`,
+          unique,
+        );
+        return rows.map((row) => ({
+          sub: String(row["sub"]),
+          ...(row["email"] != null ? { email: String(row["email"]) } : {}),
+          ...(row["name"] != null ? { name: String(row["name"]) } : {}),
+        }));
+      },
       async upsert(user: UserRecord) {
         await client.run(
           `INSERT INTO users (sub, email, name, active_workspace_id, created_at, updated_at)

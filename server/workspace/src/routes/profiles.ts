@@ -20,9 +20,6 @@ import {
 } from "@aprovan/registry-server";
 import { requireAdmin, requireAuth } from "../middleware/auth.js";
 import { validateBody } from "../middleware/validate.js";
-import {
-  profileGrantsAvailable,
-} from "../profile-grants.js";
 import { getRegistryStorage } from "../registry-storage.js";
 import { ServiceError } from "../service-kernel.js";
 
@@ -79,15 +76,6 @@ export const workspaceProfilesRouter = new Hono();
 
 workspaceProfilesRouter.use("*", requireAuth);
 
-function requireProfilesAvailable(): void {
-  if (!profileGrantsAvailable()) {
-    throw new ServiceError(
-      "Profiles need the relational store backend (sqlite/dsql) — the interim dynamo backend has no profile storage (WS-3 D8; retires at cutover).",
-      501,
-    );
-  }
-}
-
 function profileErrorResponse(c: Context, err: unknown): Response {
   if (err instanceof ServiceError) {
     return c.json({ error: err.message }, err.status as 400);
@@ -99,7 +87,6 @@ async function profileService(): Promise<{
   service: ProfileService;
   storage: Awaited<ReturnType<typeof getRegistryStorage>>;
 }> {
-  requireProfilesAvailable();
   const storage = await getRegistryStorage();
   const credentials = new CredentialService(storage.credentials);
   const service = new ProfileService(

@@ -1,21 +1,15 @@
 /**
  * Workspace member management routes.
- *
- * GET    /members         — admin only; list members of the active workspace
- * DELETE /members/:userId — admin only; remove a member from the workspace
  */
 
 import { Hono } from "hono";
+import { getIdentityStore } from "../identity/store.js";
 import { listMembers, removeMember } from "../memberships.js";
 import { requireAdmin, requireAuth } from "../middleware/auth.js";
 
 export const membersRouter = new Hono();
 
 membersRouter.use("*", requireAuth, requireAdmin);
-
-// ---------------------------------------------------------------------------
-// GET /members
-// ---------------------------------------------------------------------------
 
 membersRouter.get("/", async (c) => {
   const principal = c.get("principal");
@@ -30,18 +24,22 @@ membersRouter.get("/", async (c) => {
     return c.json({ error: "Failed to list members" }, 500);
   }
 
+  const users = await getIdentityStore().users.getMany(members.map((m) => m.userId));
+  const userById = new Map(users.map((user) => [user.sub, user]));
+
   return c.json({
-    members: members.map((m) => ({
-      userId: m.userId,
-      role: m.role ?? "member",
-      createdAt: m.createdAt,
-    })),
+    members: members.map((m) => {
+      const user = userById.get(m.userId);
+      return {
+        userId: m.userId,
+        role: m.role ?? "member",
+        createdAt: m.createdAt,
+        ...(user?.email ? { email: user.email } : {}),
+        ...(user?.name ? { name: user.name } : {}),
+      };
+    }),
   });
 });
-
-// ---------------------------------------------------------------------------
-// DELETE /members/:userId
-// ---------------------------------------------------------------------------
 
 membersRouter.delete("/:userId", async (c) => {
   const principal = c.get("principal");

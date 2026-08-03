@@ -1,19 +1,12 @@
 /**
  * The workspace's handle on `@aprovan/registry-server` storage — the WS-3
- * dispatch-plane seam. Credentials and interface bindings (as profile rows)
- * live THERE on the durable backends:
- *
- *   sqlite — local mode: the package's own sqlite driver on `registry.db`
- *            beside `workspace.db`.
- *   dsql   — cloud: the package's SQL stores over the shared db/dsql.ts pool
- *            (IAM tokens, OCC retry, 60-min recycling) inside the `registry`
- *            schema, so the package DDL and the workspace DDL share the ONE
- *            cluster without table-name collisions.
- *   dynamo — unsupported by design (WS-3 D8: the package has no Dynamo
- *            driver). Callers on the interim dynamo backend keep their
- *            legacy stores until the cutover flips to dsql.
+ * dispatch-plane seam. Profile rows live on sqlite/dsql registry storage, or
+ * on Dynamo via `createDynamoStorage` colocated in the Credentials table.
  */
 
+import { adaptCredentialStore } from "./credential-store-adapter.js";
+import { getCredentialStore } from "./credentials.js";
+import { dynamo } from "./db/client.js";
 import { storeBackend, workspaceDataDir } from "./runtime/config.js";
 import type { RegistryStorage } from "@aprovan/registry-server";
 
@@ -43,15 +36,12 @@ async function createDsqlBackedStorage(): Promise<RegistryStorage> {
       const result = await dsql.withOccRetry(() => pool.query(toPg(sql), params));
       return { changes: result.rowCount ?? 0 };
     },
-    async close() {
-      // The pool is shared with the workspace stores; db/dsql.ts owns it.
-    },
+    async close() {},
   });
 }
 
 let _storage: Promise<RegistryStorage> | undefined;
 
-/** The registry-server storage for this deployment's backend. */
 export function getRegistryStorage(): Promise<RegistryStorage> {
   _storage ??= (async () => {
     const backend = storeBackend();
@@ -62,16 +52,30 @@ export function getRegistryStorage(): Promise<RegistryStorage> {
         const { createStorage } = await import("@aprovan/registry-server");
         return createStorage({ driver: "sqlite", dir: workspaceDataDir() });
       }
-      case "dynamo":
-        throw new Error(
-          "registry-server storage has no DynamoDB driver (WS-3 D8) — the interim dynamo backend keeps its legacy stores until the DSQL cutover.",
-        );
+      case "dynamo": {
+        const [{ createDynamoStorage }, ddb, { client }] = await Promise.all([
+          import("@aprovan/registry-server"),
+          import("@aws-sdk/lib-dynamodb"),
+          dynamo(),
+        ]);
+        return createDynamoStorage({
+          tableName: process.env["CREDENTIALS_TABLE"] ?? "Credentials",
+          send: (command) => client.send(command),
+          credentials: adaptCredentialStore(getCredentialStore()),
+          commands: {
+            GetCommand: ddb.GetCommand,
+            PutCommand: ddb.PutCommand,
+            QueryCommand: ddb.QueryCommand,
+            TransactWriteCommand: ddb.TransactWriteCommand,
+            DeleteCommand: ddb.DeleteCommand,
+          },
+        });
+      }
     }
   })();
   return _storage;
 }
 
-/** Reset the memoized storage (tests switch backends/data dirs). */
 export async function resetRegistryStorage(): Promise<void> {
   const pending = _storage;
   _storage = undefined;
