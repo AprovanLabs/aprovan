@@ -1,7 +1,7 @@
 # Report: FileEditorPane + direct-edit wiring (stream 4)
 
 ## PR
-(pending — filled after open)
+https://github.com/AprovanLabs/aprovan/pull/41
 
 ## Verify results
 
