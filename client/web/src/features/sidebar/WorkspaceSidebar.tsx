@@ -1,5 +1,6 @@
 import { MobileDrawer, WorkspaceTree } from "@aprovan/patchwork-editor";
 import { useMemo } from "react";
+import { usePresenceTitleMap } from "@/features/presence";
 import {
   fromDisplayPath,
   hasPrivateEntries,
@@ -74,6 +75,17 @@ export function WorkspaceSidebar({
   // Empty-space hint: the section has nothing to render as a tree node,
   // so say why it exists (visible only to you) instead of showing nothing.
   const showEmptyPrivateHint = privateRoot !== null && !hasPrivateEntries(displayFiles);
+  // Raw workspace paths → display paths for the tree's text decoration slot
+  // (pierre trees can't host the React PresenceDot inside the shadow host).
+  const rawPresenceTitles = usePresenceTitleMap();
+  const presenceTitles = useMemo(() => {
+    if (rawPresenceTitles.size === 0) return undefined;
+    const mapped = new Map<string, string>();
+    for (const [path, title] of rawPresenceTitles) {
+      mapped.set(toDisplayPath(path, privateRoot), title);
+    }
+    return mapped;
+  }, [rawPresenceTitles, privateRoot]);
 
   return (
     <MobileDrawer
@@ -98,6 +110,7 @@ export function WorkspaceSidebar({
             onCreateFile={(path) => createWorkspaceFile(raw(path))}
             onRefresh={() => void refreshWorkspace()}
             refreshing={workspaceLoading}
+            presenceTitles={presenceTitles}
             title="Files"
             className="flex-1 min-h-0"
           />

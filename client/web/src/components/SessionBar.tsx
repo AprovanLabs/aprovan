@@ -6,8 +6,7 @@
  * straight to the workspace; a **draft chat** keeps its file changes to
  * itself until you **Apply to workspace**; the base is shown as a moment in
  * time ("workspace as of 2h ago"), never a hash; statuses are **Applied** /
- * **Archived**. Live peers (other windows/people in this workspace) show as
- * a green presence chip.
+ * **Archived**. File presence lives on the tab strip / sidebar tree, not here.
  *
  * Pure presentation — every mutation is a callback into ChatPage, which owns
  * the session state and the VFS scope.
@@ -24,7 +23,6 @@ import {
   RefreshCw,
   RotateCcw,
   Trash2,
-  Users,
   X,
 } from "lucide-react";
 import { useState } from "react";
@@ -42,7 +40,6 @@ import {
   changedFileCount,
   relativeTime,
   type ChatSessionInfo,
-  type PresencePeer,
   type SessionMode,
 } from "@/lib/chat-sessions";
 import type { WorkspaceSyncState } from "@/lib/workspace-vfs";
@@ -51,7 +48,6 @@ interface SessionBarProps {
   /** null = the main state: no record, changes sync directly. */
   session: ChatSessionInfo | null;
   sessions: ChatSessionInfo[];
-  peers: PresencePeer[];
   syncState: WorkspaceSyncState;
   busy: boolean;
   onNew: (mode: SessionMode) => void;
@@ -123,7 +119,6 @@ function changesLabel(session: ChatSessionInfo): string {
 export function SessionBar({
   session,
   sessions,
-  peers,
   syncState,
   busy,
   onNew,
@@ -142,7 +137,6 @@ export function SessionBar({
 }: SessionBarProps) {
   const [listOpen, setListOpen] = useState(false);
   const [changesOpen, setChangesOpen] = useState(false);
-  const [peersOpen, setPeersOpen] = useState(false);
   // Applied-chat commit detail (mounted-content lineage), expanded per chat.
   const [expandedCommitId, setExpandedCommitId] = useState<string | null>(null);
 
@@ -215,22 +209,6 @@ export function SessionBar({
           </>
         )}
 
-        {peers.length > 0 && (
-          <button
-            type="button"
-            onClick={() => setPeersOpen((open) => !open)}
-            className="flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-muted text-emerald-700 dark:text-emerald-400"
-            title="Also here right now"
-          >
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-            </span>
-            <Users className="h-3 w-3" />
-            {peers.length}
-          </button>
-        )}
-
         <span className="ml-auto flex items-center gap-0.5">
           {busy && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
           {isOpen && isDraft && changed > 0 && (
@@ -296,23 +274,6 @@ export function SessionBar({
           )}
         </span>
       </div>
-
-      {peersOpen && peers.length > 0 && (
-        <div className="border-t px-2 py-1 max-h-32 overflow-y-auto">
-          {peers.map((peer) => (
-            <div
-              key={`${peer.userId}:${peer.window}`}
-              className="flex items-center gap-2 px-1.5 py-0.5 text-muted-foreground"
-            >
-              <span className="inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
-              <span className="truncate">
-                {peer.sessionTitle ? `In “${peer.sessionTitle}”` : "Browsing the workspace"}
-                {peer.mode === "staged" ? " (draft)" : ""}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
 
       {changesOpen && changeRows.length > 0 && (
         <div className="border-t px-2 py-1 max-h-40 overflow-y-auto">

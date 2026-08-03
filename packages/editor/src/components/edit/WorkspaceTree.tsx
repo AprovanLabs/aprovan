@@ -58,6 +58,12 @@ export interface WorkspaceTreeProps {
    * context-menu entry).
    */
   onCreateFile?: (path: string) => string | void;
+  /**
+   * Presence tooltips keyed by tree path (display path). When set for a row,
+   * a small green dot decoration is shown after the name (pierre trees only
+   * support text decorations inside the shadow host).
+   */
+  presenceTitles?: ReadonlyMap<string, string>;
 }
 
 const MEDIA_RE = /\.(png|jpe?g|gif|webp|avif|svg|bmp|ico|mp4|webm|mov|m4v|mp3|wav|ogg)$/i;
@@ -366,10 +372,12 @@ export function WorkspaceTree({
   onRefresh,
   refreshing,
   onCreateFile,
+  presenceTitles,
 }: WorkspaceTreeProps) {
   // Refs keep the once-built model's captured closures pointed at fresh values.
   const modelRef = useRef<PierreModel | null>(null);
   const pinnedRef = useRef(pinnedPaths);
+  const presenceRef = useRef(presenceTitles);
   // The inline "new file" input's state. `prefix` is the seeded directory
   // path (with trailing slash) when opened from a directory's context menu,
   // or "" from the header button (root-level). `seq` is bumped on every open
@@ -386,6 +394,7 @@ export function WorkspaceTree({
   // Suppresses the callback when we mirror an external `activePath` selection.
   const suppressRef = useRef(false);
   pinnedRef.current = pinnedPaths;
+  presenceRef.current = presenceTitles;
 
   const options = useRef<FileTreeOptions>({
     paths,
@@ -399,8 +408,11 @@ export function WorkspaceTree({
     composition: {
       contextMenu: { enabled: true, triggerMode: 'both', buttonVisibility: 'when-needed' },
     },
-    renderRowDecoration: ({ item }): FileTreeRowDecoration | null =>
-      pinnedRef.current?.has(item.path) ? { text: '★', title: 'Pinned' } : null,
+    renderRowDecoration: ({ item }): FileTreeRowDecoration | null => {
+      const presenceTitle = presenceRef.current?.get(item.path);
+      if (presenceTitle) return { text: '●', title: presenceTitle };
+      return pinnedRef.current?.has(item.path) ? { text: '★', title: 'Pinned' } : null;
+    },
     onSelectionChange: (selected) => {
       const path = selected[selected.length - 1];
       if (!path || suppressRef.current) return;

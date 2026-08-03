@@ -38,15 +38,6 @@ export interface ChatSessionInfo {
   tabs?: unknown;
 }
 
-export interface PresencePeer {
-  userId: string;
-  window: string;
-  sessionId?: string;
-  sessionTitle?: string;
-  mode?: string;
-  lastSeen: string;
-}
-
 export interface SessionConflict {
   path: string;
   ours: string | null;
@@ -136,40 +127,6 @@ export async function discardSessionChanges(
     session: ChatSessionInfo;
   };
   return data.session;
-}
-
-// ---------------------------------------------------------------------------
-// Presence — who else is here right now
-// ---------------------------------------------------------------------------
-
-const WINDOW_ID_KEY = "patchwork:window-id";
-
-/** Stable per-browser-window id (survives reloads within the tab). */
-export function windowId(): string {
-  try {
-    let id = sessionStorage.getItem(WINDOW_ID_KEY);
-    if (!id) {
-      id = crypto.randomUUID().slice(0, 8);
-      sessionStorage.setItem(WINDOW_ID_KEY, id);
-    }
-    return id;
-  } catch {
-    return "default";
-  }
-}
-
-export async function heartbeatPresence(options: {
-  sessionId?: string;
-  title?: string;
-  mode?: SessionMode;
-}): Promise<PresencePeer[]> {
-  const data = (await invokeSessionsTool("presence", {
-    window: windowId(),
-    ...(options.sessionId ? { id: options.sessionId } : {}),
-    ...(options.title ? { title: options.title } : {}),
-    ...(options.mode ? { mode: options.mode } : {}),
-  })) as { peers: PresencePeer[] };
-  return Array.isArray(data.peers) ? data.peers : [];
 }
 
 /** "just now" / "5m ago" / "2h ago" / "Jul 25" — for "workspace as of …". */

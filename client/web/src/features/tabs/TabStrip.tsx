@@ -1,6 +1,7 @@
 import { ChevronDown, LayoutGrid, Minus, RotateCcw, Workflow, X } from "lucide-react";
 import { parseNativeTabPath } from "@/lib/native-surfaces";
-import { parseAppsTabPath, tabLabel, type OpenTab } from "./tab-routing";
+import { PresenceAvatars, usePresenceSync } from "@/features/presence";
+import { isVirtualTabPath, parseAppsTabPath, tabLabel, type OpenTab } from "./tab-routing";
 
 /** The preview pane's tab bar — pure presentation over `useTabs`' state. */
 export function TabStrip({
@@ -22,6 +23,8 @@ export function TabStrip({
   onReloadStaleTab: (path: string) => void;
   onTogglePreviewCollapsed: () => void;
 }) {
+  usePresenceSync(openTabs, activeTabPath);
+
   return (
     <div className="flex items-center border-b bg-muted/30 shrink-0">
       <div className="flex-1 flex items-center overflow-x-auto min-w-0">
@@ -30,6 +33,7 @@ export function TabStrip({
           const nativeSurface = parseNativeTabPath(path);
           const isActive = path === activeTabPath;
           const isStale = tab.stale ?? false;
+          const isFileTab = !isVirtualTabPath(path);
           return (
             <button
               key={path}
@@ -61,6 +65,7 @@ export function TabStrip({
               >
                 {tabLabel(path)}
               </span>
+              {isFileTab && <PresenceAvatars path={path} />}
               {isStale && (
                 <span
                   role="button"
