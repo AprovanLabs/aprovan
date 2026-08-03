@@ -158,7 +158,7 @@ export default function ChatPage() {
     resetForWorkspaceSwitch: () => {
       tabs.resetTabs();
       session.resetForWorkspaceSwitch();
-      editDraft.setEditSession(null);
+      editDraft.closeEditSession();
     },
   };
 
@@ -314,9 +314,7 @@ export default function ChatPage() {
         </div>
         <EditModalHost
           editSession={editDraft.editSession}
-          setEditSession={editDraft.setEditSession}
-          finishEditDraft={editDraft.finishEditDraft}
-          editDraftSavedRef={editDraft.editDraftSavedRef}
+          closeEditSession={editDraft.closeEditSession}
           refreshWorkspace={explorer.refreshWorkspace}
           compiler={bootstrap.compiler}
           namespaces={bootstrap.namespaces}

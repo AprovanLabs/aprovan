@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import {
   EditModal,
   WidgetPreview,
@@ -10,20 +11,30 @@ import { createPreviewManifest } from "@/features/widgets/createPreviewManifest"
 import { COMPILE_TIMEOUT_MS } from "@/features/widgets/useCompilerBootstrap";
 import type { EditSessionState } from "@/features/sessions/useEditDraft";
 import type { useChatProviders } from "@/features/chat/useChatSubmit";
+import { createChatSession, type ChatSessionInfo } from "@/lib/chat-sessions";
 import { fetchLlmModels } from "@/lib/llm";
 import { editorLogsSource } from "@/lib/telemetry";
-import { saveWorkspaceProject } from "@/lib/workspace-vfs";
+import { saveWorkspaceProject, setActiveVfsSession } from "@/lib/workspace-vfs";
+import {
+  getCachedStagedPrefixes,
+  loadStagedPrefixes,
+  resolveWritePolicy,
+  type WritePolicy,
+} from "@/features/editing/write-policy";
+
+function fileLabel(path: string): string {
+  const parts = path.replace(/\/+$/, "").split("/");
+  return parts[parts.length - 1] || path;
+}
 
 /**
- * Hosts the shared EditModal over the active edit session: draft-scoped
- * saves, the bounded compile check, and the live widget preview — all using
- * the same compiler instance as the rest of the app.
+ * Hosts the shared EditModal over the active edit session. Saves follow the
+ * same write-policy as the in-tab pane (direct / staged / read-only). Opening
+ * never mints a session — staged drafts are created lazily on first save.
  */
 export function EditModalHost({
   editSession,
-  setEditSession,
-  finishEditDraft,
-  editDraftSavedRef,
+  closeEditSession,
   refreshWorkspace,
   compiler,
   namespaces,
@@ -31,9 +42,7 @@ export function EditModalHost({
   providers,
 }: {
   editSession: EditSessionState | null;
-  setEditSession: (session: EditSessionState | null) => void;
-  finishEditDraft: () => Promise<void>;
-  editDraftSavedRef: React.MutableRefObject<boolean>;
+  closeEditSession: () => void;
   refreshWorkspace: () => Promise<void>;
   compiler: Compiler | null;
   namespaces: string[];
@@ -43,19 +52,80 @@ export function EditModalHost({
   if (!editSession) return null;
 
   return (
+    <EditModalHostInner
+      editSession={editSession}
+      closeEditSession={closeEditSession}
+      refreshWorkspace={refreshWorkspace}
+      compiler={compiler}
+      namespaces={namespaces}
+      editTransport={editTransport}
+      providers={providers}
+    />
+  );
+}
+
+function EditModalHostInner({
+  editSession,
+  closeEditSession,
+  refreshWorkspace,
+  compiler,
+  namespaces,
+  editTransport,
+  providers,
+}: {
+  editSession: EditSessionState;
+  closeEditSession: () => void;
+  refreshWorkspace: () => Promise<void>;
+  compiler: Compiler | null;
+  namespaces: string[];
+  editTransport: EditTransport;
+  providers: ReturnType<typeof useChatProviders>;
+}) {
+  const targetPath = editSession.workspacePath ?? editSession.initialActiveFile ?? "";
+  const [policy, setPolicy] = useState<WritePolicy>(() =>
+    resolveWritePolicy(targetPath, getCachedStagedPrefixes()),
+  );
+  const draftRef = useRef<ChatSessionInfo | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadStagedPrefixes().then((sets) => {
+      if (cancelled) return;
+      setPolicy(resolveWritePolicy(targetPath, sets));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [targetPath]);
+
+  return (
     <EditModal
       isOpen
       onClose={() => {
-        setEditSession(null);
-        // Decide the edit draft's fate: apply saved work (or keep it
-        // as a draft per config), delete a never-saved husk.
-        void finishEditDraft();
+        closeEditSession();
       }}
       onSaveProject={async (project) => {
-        // Scoped write: with an edit draft active this lands in the
-        // draft's overlay, not the workspace.
+        if (policy === "readonly") {
+          throw new Error("This path is read-only");
+        }
+        if (policy === "staged") {
+          if (!draftRef.current) {
+            try {
+              const draft = await createChatSession({
+                mode: "staged",
+                title: `Edit: ${fileLabel(targetPath)}`.slice(0, 60),
+              });
+              draftRef.current = draft;
+              setActiveVfsSession({ id: draft.id, staged: true });
+            } catch (err) {
+              // Never write through to a staged target without a draft.
+              throw err instanceof Error
+                ? err
+                : new Error("Couldn't create a draft session");
+            }
+          }
+        }
         await saveWorkspaceProject(project);
-        editDraftSavedRef.current = true;
         await refreshWorkspace();
       }}
       originalProject={editSession.project}
@@ -73,21 +143,16 @@ export function EditModalHost({
       }
       editTransport={editTransport}
       logs={editorLogsSource(editSession.workspacePath ?? editSession.initialActiveFile)}
-      // Edit means edit: land in the code view, not the preview.
       initialState={{ showTree: true }}
       compile={async (code) => {
         if (!compiler) return { success: true };
         try {
-          // Bounded so a stalled compile (e.g. an unreachable CDN
-          // package fetch) surfaces as a visible error in the edit
-          // panel rather than leaving "Applying edits..." spinning
-          // forever — see withTimeout's doc comment.
           await withTimeout(
             compiler.compile(code, createPreviewManifest(namespaces), {
               typescript: true,
             }),
             COMPILE_TIMEOUT_MS,
-            `Compilation timed out after ${COMPILE_TIMEOUT_MS / 1000}s`
+            `Compilation timed out after ${COMPILE_TIMEOUT_MS / 1000}s`,
           );
           return { success: true };
         } catch (err) {
