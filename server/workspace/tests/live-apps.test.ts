@@ -98,10 +98,9 @@ describe("path binding", () => {
     expect(((await res.json()) as { error: string }).error).toContain("a.tsx");
   });
 
-  it("binds a manifest that predates entry/paths on read", async () => {
+  it("ignores name-keyed legacy manifests (nuke-and-reseed; no rebinding)", async () => {
     await putFile("apps/legacy/widget.tsx", "export default () => null;");
-    // Straight to the record store (manifests live under svc#apps now): a
-    // pre-entry/paths shape as the migration sweep would have carried it.
+    // A pre-identity name-keyed record is not an alias and is not rebound.
     const { getRecordStore } = await import("../src/records.js");
     await getRecordStore().set(
       "local",
@@ -118,11 +117,8 @@ describe("path binding", () => {
       },
       "system",
     );
-    const project = (await (
-      await liveAppsRouter.request("/local/legacy/__project__")
-    ).json()) as { entry: string; paths: string[] };
-    expect(project.entry).toBe("apps/legacy/widget.tsx");
-    expect(project.paths).toEqual(["apps/legacy"]);
+    const res = await liveAppsRouter.request("/local/legacy/__project__");
+    expect(res.status).toBe(404);
   });
 
   it("publishes extra prefixes and serves them as one project", async () => {

@@ -108,16 +108,11 @@ function ident(value: unknown, label: string): string {
 const KV_LEGACY_PREFIX = ".services/keyvalue/";
 
 /** Record-store scope for this call: "ws" for a workspace caller, always
- * "app#<name>#u#<userSub>" for an app session — tenancy (which workspace's
- * rows these are) is `ctx.workspaceId`, already resolved upstream by
- * `resolveAppSession` per the manifest's `dataScope`. The scope suffix itself
- * never varies with `dataScope`: a session only ever addresses its own
- * per-app-user partition. The reserved `svc#` system namespace
- * (svc-records.ts) is rejected outright — callers can never address platform
- * subsystem state through the keyvalue surface. */
+ * "app#<appId>#u#<userSub>" for an app session — tenancy is `ctx.workspaceId`.
+ * The reserved `svc#` system namespace (svc-records.ts) is rejected outright. */
 function kvScope(ctx: ServiceContext): string {
   const scope = ctx.appScope;
-  const resolved = scope ? `app#${scope.name}#u#${scope.userId}` : "ws";
+  const resolved = scope ? `app#${scope.id}#u#${scope.userId}` : "ws";
   assertCallerScope(resolved);
   return resolved;
 }
@@ -127,7 +122,7 @@ function kvScope(ctx: ServiceContext): string {
 function legacyKvPath(ctx: ServiceContext, key: string): string {
   const scope = ctx.appScope;
   if (!scope) return KV_LEGACY_PREFIX + key;
-  return `${appDataDir(scope, scope.userId)}/${key}`;
+  return `${appDataDir(scope.id, scope.userId)}/${key}`;
 }
 
 const keyvalue: CoreService = {

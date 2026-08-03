@@ -2,45 +2,18 @@
  * Public app surface — how OTHER users consume a workspace's published apps.
  *
  *   GET  /apps/:workspaceId/:name              — manifest (public metadata)
+ *   GET  /apps/id/:appId                       — same, by durable id
  *   POST /apps/:workspaceId/:name/tools/:namespace/:procedure
- *   POST /apps/:workspaceId/:name/tools/app/:workflow      — an exported workflow
- *   POST /apps/:workspaceId/:name/workflows/:workflow/run  — the same thing
+ *   POST /apps/id/:appId/tools/:namespace/:procedure
+ *   POST /apps/:workspaceId/:name/workflows/:workflow/run
  *
  * The live page surface (aprovan.com/apps/...) lives in routes/live-apps.ts;
  * this router is the authenticated API the pages call back into.
  *
- * **capability = namespace.** An exported workflow answers on the namespace
- * `app`, so at the call site a workflow and a native procedure are
- * indistinguishable: `app.weeklySummary(input)` is one POST to
- * `/tools/app/weeklySummary` (kebab ids resolve through their camel-case
- * alias). `/workflows/:name/run` is the same dispatch under an older spelling.
- *
  * Auth: any valid Cognito token — membership in the owning workspace is NOT
- * required (the exception is `personal`, see below). That's the point: the
- * owner workspace is the app's "account" (its data, credentials, and
- * controls), and outside callers reach it only through this surface, which
- * enforces:
- *   - the app's role model (admins / listed users / any authenticated user)
- *   - the tool allow-list (`allowedTools` — deny by default): native
- *     namespaces, the app's own workflows, and exact provider procedures
- *     (credential grants, tier 2 — dispatched with the OWNING workspace's
- *     credential regardless of where execution otherwise lands)
- *   - per-(app, user) rate limits and a durable daily budget
- *   - per-(app, user) data partitioning (ServiceContext.appScope)
- *   - prefix-based FS authz: the session carries the manifest's declared
- *     `paths`, and nothing outside them is reachable without a share
- *
- * Where execution lands depends on the manifest's `dataScope`:
- *   - "owner" (default): as the owning workspace (its credentials, its
- *     storage), attributed to the calling user.
- *   - "workspace": if the caller's workspace holds an install record, as
- *     THEIR workspace, under the install prefix, with their credentials. The
- *     app is code; the user brings the workspace.
- *
- * `:name` = "personal" is the one exception: it is synthesized (see
- * apps/personal.ts), never stored, and members-only — the manifest role
- * model doesn't apply, workspace membership does. Execution never leaves the
- * workspace it belongs to.
+ * required. The owner workspace is the app's "account" (its data, credentials,
+ * and controls), and outside callers reach it only through this surface.
+ * Alias resolution happens at the route edge; sessions carry `appId`.
  */
 
 import { RateLimiter } from "@utdk/common/rateLimit";
@@ -52,12 +25,11 @@ import {
   resolveExportedWorkflow,
   workflowCallable,
 } from "../apps/capabilities.js";
-import { installedScope, readInstall, type AppInstall } from "../apps/install.js";
-import { isPersonalApp, personalCallerRole, readPersonalManifest } from "../apps/personal.js";
+import { readInstall, type AppInstall } from "../apps/install.js";
+import { resolveAppLocation, resolveAppRef } from "../apps/identity.js";
 import { callerRole, readApp, toolAllowed, type AppManifest, type AppPaths } from "../apps/store.js";
 import { countDailyCall } from "../apps/usage.js";
 import { getAuditStore } from "../audit.js";
-import { getMembership } from "../memberships.js";
 import { getAuthMode, readBearerToken, verifyAccessToken } from "../middleware/auth.js";
 import { ServiceError, type ServiceContext } from "../service-kernel.js";
 import { parseTelemetrySourceHeader, recordTelemetry } from "../telemetry/service.js";
@@ -77,7 +49,7 @@ interface AppSession {
   manifest: AppManifest;
   /** Workspace that published the app (owns the code and the manifest). */
   workspaceId: string;
-  /** Workspace the session's tool calls execute in (see `dataScope`). */
+  /** Workspace the session's tool calls execute in (origin workspace for now). */
   executionWorkspaceId: string;
   /** Install record when the caller runs a workspace-scoped copy. */
   install?: AppInstall;
@@ -105,86 +77,57 @@ async function callerSub(c: HonoCtx): Promise<string> {
 }
 
 /**
- * The caller's own workspace — only consulted for `dataScope: "workspace"`
- * apps, where the install record decides where data lands. An explicit
- * `X-Aprovan-Workspace` must still pass a membership check; otherwise the
- * caller's active workspace is used.
+ * Resolve an app session from either `/apps/:workspaceId/:name` (alias) or
+ * `/apps/id/:appId` (permalink). Origin-hosted execution for stream 1;
+ * install-side execution returns in stream 3.
  */
-async function callerWorkspace(c: HonoCtx, sub: string): Promise<string | undefined> {
-  const requested = c.req.header("X-Aprovan-Workspace");
-  if (getAuthMode() === "none") return requested ?? "local";
-  if (requested) {
-    const membership = await getMembership(requested, sub).catch(() => undefined);
-    return membership ? requested : undefined;
-  }
-  return getCurrentWorkspace(sub).catch(() => undefined);
-}
-
 async function resolveAppSession(c: HonoCtx): Promise<AppSession> {
-  const workspaceId = c.req.param("workspaceId");
-  const name = c.req.param("name");
-  if (!workspaceId || !name) throw new ServiceError("Not found", 404);
-
   const sub = await callerSub(c);
+  const appIdParam = c.req.param("appId");
+  const workspaceIdParam = c.req.param("workspaceId");
+  const nameParam = c.req.param("name");
 
-  // Personal is synthesized, never stored, and members-only: the manifest
-  // role model doesn't apply — the caller's workspace membership is the
-  // whole access check. It never installs elsewhere, so execution always
-  // stays in this same workspace with this workspace's own credentials.
-  if (isPersonalApp(name)) {
-    const role = await personalCallerRole(workspaceId, sub);
-    if (!role) throw new ServiceError("You do not have access to this app", 403);
-    const manifest = await readPersonalManifest(workspaceId);
-    return {
-      manifest,
-      workspaceId,
-      executionWorkspaceId: workspaceId,
-      sub,
-      role,
-      ctx: {
-        workspaceId,
-        userId: sub,
-        appScope: { name: manifest.name, paths: manifest.paths, dataScope: manifest.dataScope, userId: sub, role },
-        traceId: newTraceId(),
-      },
-    };
+  let workspaceId: string;
+  let manifest: AppManifest | undefined;
+
+  if (appIdParam) {
+    const loc = await resolveAppLocation(appIdParam).catch(() => undefined);
+    if (!loc) throw new ServiceError("Not found", 404);
+    workspaceId = loc.workspaceId;
+    manifest = await readApp(workspaceId, appIdParam).catch(() => undefined);
+  } else {
+    if (!workspaceIdParam || !nameParam) throw new ServiceError("Not found", 404);
+    workspaceId = workspaceIdParam;
+    const appId = await resolveAppRef(workspaceId, nameParam).catch(() => undefined);
+    manifest = appId ? await readApp(workspaceId, appId).catch(() => undefined) : undefined;
   }
 
-  const manifest = await readApp(workspaceId, name).catch(() => undefined);
   if (!manifest) throw new ServiceError("Not found", 404);
 
   const role = callerRole(manifest, sub);
   if (!role) throw new ServiceError("You do not have access to this app", 403);
 
-  // dataScope "workspace": the app is a template the caller installed into
-  // their own workspace. With an install record, data + native namespaces
-  // resolve there under `<prefix>/data` and execution uses the caller's
-  // credentials; without one, owner-hosted behaviour is unchanged.
-  let executionWorkspaceId = workspaceId;
-  let scope: AppPaths = { name: manifest.name, paths: manifest.paths };
-  let install: AppInstall | undefined;
-  if ((manifest.dataScope ?? "owner") === "workspace") {
-    const caller = await callerWorkspace(c, sub);
-    install = caller ? await readInstall(caller, workspaceId, name).catch(() => undefined) : undefined;
-    if (caller && install) {
-      executionWorkspaceId = caller;
-      scope = installedScope(manifest, install);
-    }
-  }
+  const scope: AppPaths = { id: manifest.appId, name: manifest.name, paths: manifest.paths };
+  // Optional install annotation for the wire (stream 3 owns execution switch).
+  const callerWs =
+    getAuthMode() === "none"
+      ? (c.req.header("X-Aprovan-Workspace") ?? "local")
+      : await getCurrentWorkspace(sub).catch(() => undefined);
+  const install = callerWs
+    ? await readInstall(callerWs, workspaceId, manifest.name).catch(() => undefined)
+    : undefined;
 
   return {
     manifest,
     workspaceId,
-    executionWorkspaceId,
+    executionWorkspaceId: workspaceId,
     install,
     sub,
     role,
     ctx: {
-      workspaceId: executionWorkspaceId,
+      workspaceId,
       userId: sub,
       appScope: { ...scope, userId: sub, role },
-      // One trace per app request: anything the call cascades into (a
-      // workflow, its emits) links back to it.
       traceId: newTraceId(),
     },
   };
@@ -197,7 +140,7 @@ async function resolveAppSession(c: HonoCtx): Promise<AppSession> {
 const appLimiters = new Map<string, RateLimiter>();
 
 function checkAppRateLimit(session: AppSession): boolean {
-  const key = `${session.workspaceId}/${session.manifest.name}:${session.sub}`;
+  const key = `${session.workspaceId}/${session.manifest.appId}:${session.sub}`;
   let limiter = appLimiters.get(key);
   if (!limiter) {
     limiter = new RateLimiter({
@@ -302,27 +245,30 @@ async function readArgs(c: { req: { json<T>(): Promise<T> } }): Promise<Record<s
 }
 
 // ---------------------------------------------------------------------------
-// GET /apps/:workspaceId/:name — public manifest
+// GET — public manifest (alias + id permalink)
 // ---------------------------------------------------------------------------
 
-appsRouter.get("/:workspaceId/:name", async (c) => {
+async function handleGetManifest(c: {
+  json: (body: unknown, status?: number) => Response;
+  req: HonoCtx["req"];
+}): Promise<Response> {
   try {
     const session = await resolveAppSession(c);
     const { manifest, workspaceId } = session;
     return c.json({
+      appId: manifest.appId,
       name: manifest.name,
       title: manifest.title,
       description: manifest.description,
       visibility: manifest.visibility ?? "private",
-      dataScope: manifest.dataScope ?? "owner",
       workflows: manifest.workflows ?? [],
       allowedTools: manifest.allowedTools,
       channels: manifest.channels ?? {},
       role: session.role,
       url: `/apps/${workspaceId}/${manifest.name}`,
       liveUrl: `/apps/${workspaceId}/${manifest.name}`,
+      permalink: `/apps/id/${manifest.appId}`,
       apiBase: `/api/gateway/apps/${workspaceId}/${manifest.name}`,
-      /** Present when this caller runs their own installed copy. */
       install: session.install
         ? {
             workspaceId: session.executionWorkspaceId,
@@ -334,13 +280,16 @@ appsRouter.get("/:workspaceId/:name", async (c) => {
   } catch (err) {
     return errorResponse(c, err);
   }
-});
+}
+
+appsRouter.get("/id/:appId", handleGetManifest);
+appsRouter.get("/:workspaceId/:name", handleGetManifest);
 
 // ---------------------------------------------------------------------------
 // POST /apps/:workspaceId/:name/tools/:namespace/:procedure
 // ---------------------------------------------------------------------------
 
-appsRouter.post("/:workspaceId/:name/tools/:namespace/:procedure{.*}", async (c) => {
+const handleToolCall = async (c: any) => {
   const startTime = Date.now();
   try {
     const session = await resolveAppSession(c);
@@ -461,13 +410,16 @@ appsRouter.post("/:workspaceId/:name/tools/:namespace/:procedure{.*}", async (c)
   } catch (err) {
     return errorResponse(c, err);
   }
-});
+};
+
+appsRouter.post("/id/:appId/tools/:namespace/:procedure{.*}", handleToolCall);
+appsRouter.post("/:workspaceId/:name/tools/:namespace/:procedure{.*}", handleToolCall);
 
 // ---------------------------------------------------------------------------
-// POST /apps/:workspaceId/:name/workflows/:workflow/run
+// POST — workflow run (alias + id permalink)
 // ---------------------------------------------------------------------------
 
-appsRouter.post("/:workspaceId/:name/workflows/:workflow/run", async (c) => {
+const handleWorkflowRun = async (c: any) => {
   try {
     const session = await resolveAppSession(c);
     const requested = c.req.param("workflow")!;
@@ -478,7 +430,6 @@ appsRouter.post("/:workspaceId/:name/workflows/:workflow/run", async (c) => {
     const rejected = await enforceBudgets(c, session);
     if (rejected) return rejected;
 
-    // This surface takes the run input as the raw body (no `args` envelope).
     let input: unknown = null;
     try {
       input = await c.req.json();
@@ -489,4 +440,7 @@ appsRouter.post("/:workspaceId/:name/workflows/:workflow/run", async (c) => {
   } catch (err) {
     return errorResponse(c, err);
   }
-});
+};
+
+appsRouter.post("/id/:appId/workflows/:workflow/run", handleWorkflowRun);
+appsRouter.post("/:workspaceId/:name/workflows/:workflow/run", handleWorkflowRun);

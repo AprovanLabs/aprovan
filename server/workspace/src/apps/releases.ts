@@ -4,17 +4,15 @@
  *
  * The workspace FS content-versions every write, so an app's UI entrypoint and
  * each exported workflow's script already have an immutable hash per revision.
- * A **release** is just a snapshot of those hashes plus a hash of the manifest:
+ * A **release** is just a snapshot of those hashes plus a hash of the manifest
+ * (and an embedded manifest copy so install resolution needs no live-manifest
+ * drift handling):
  *
- *   svc#apps#releases#<name> / <id>
- *     { id, channel, notes, manifestHash, entryHash, workflows: {name: hash} }
+ *   svc#apps#releases#<appId> / <id>
+ *     { id, channel, notes, manifestHash, entryHash, workflows, manifest, … }
  *
  * A **channel** is a named pointer at a release, stored on the manifest
- * (`channels: { live, preview, … }`). That makes a release free to cut and
- * instant to roll back: nothing is copied, only a pointer moves. The live page
- * serves `channels.live`'s pinned entry when a pointer exists and the latest
- * content when it doesn't, so an app that never cuts a release behaves exactly
- * as it always did.
+ * (`channels: { live, preview, … }`).
  */
 
 import { createHash } from "node:crypto";
@@ -40,6 +38,8 @@ export interface AppRelease {
   /** Exported workflow name → its script's content hash at snapshot time. */
   workflows: Record<string, string>;
   entry: string;
+  /** Embedded manifest snapshot at cut time (D2). */
+  manifest: AppManifest;
   createdBy: string;
   createdAt: string;
 }
@@ -52,8 +52,8 @@ export function channelName(value: unknown, fallback = DEFAULT_CHANNEL): string 
   return value;
 }
 
-function releasesScope(name: string): string {
-  return svcScope("apps", "releases", name);
+function releasesScope(appId: string): string {
+  return svcScope("apps", "releases", appId);
 }
 
 /** Time-prefixed id: sortable, unique. */
@@ -101,6 +101,7 @@ export async function snapshotRelease(
     entryHash: entry?.hash,
     workflows,
     entry: manifest.entry,
+    manifest: { ...manifest },
     createdBy: options.createdBy,
     createdAt: new Date().toISOString(),
   };
@@ -108,12 +109,12 @@ export async function snapshotRelease(
 
 export async function saveRelease(
   workspaceId: string,
-  appName: string,
+  appId: string,
   release: AppRelease,
 ): Promise<void> {
   await writeSvcRecord(
     workspaceId,
-    releasesScope(appName),
+    releasesScope(appId),
     release.id,
     release,
     release.createdBy,
@@ -122,19 +123,19 @@ export async function saveRelease(
 
 export async function readRelease(
   workspaceId: string,
-  appName: string,
+  appId: string,
   id: string,
 ): Promise<AppRelease | undefined> {
   if (!id) return undefined;
-  return readSvcRecord<AppRelease>(workspaceId, releasesScope(appName), id).catch(() => undefined);
+  return readSvcRecord<AppRelease>(workspaceId, releasesScope(appId), id).catch(() => undefined);
 }
 
 /** Every release of an app, newest first (ids are time-prefixed). */
 export async function listReleases(
   workspaceId: string,
-  appName: string,
+  appId: string,
 ): Promise<AppRelease[]> {
-  const entries = await listSvcRecords<AppRelease>(workspaceId, releasesScope(appName));
+  const entries = await listSvcRecords<AppRelease>(workspaceId, releasesScope(appId));
   return entries.map((entry) => entry.value).reverse();
 }
 
@@ -164,7 +165,7 @@ export async function resolveChannelRelease(
   channel: string,
 ): Promise<AppRelease | undefined> {
   const id = manifest.channels?.[channel];
-  return id ? readRelease(workspaceId, manifest.name, id) : undefined;
+  return id ? readRelease(workspaceId, manifest.appId, id) : undefined;
 }
 
 /**

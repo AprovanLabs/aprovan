@@ -97,7 +97,9 @@ describe("no subsystem writes service files", () => {
     expect(await records.list("local", "svc#agents")).toContain("probe-agent");
     expect(await records.list("local", "svc#sync")).toContain("probe-sync");
     expect((await records.list("local", "svc#events#probe.channel")).length).toBe(1);
-    expect(await records.list("local", "svc#apps")).toContain("probe-app");
+    const appKeys = await records.list("local", "svc#apps");
+    expect(appKeys.some((key) => /^[0-9A-HJKMNP-TV-Z]{26}$/.test(key))).toBe(true);
+    expect(await records.list("local", "svc#apps#alias")).toContain("probe-app");
     expect(await records.list("local", "svc#chat#sessions")).toContain(created.session.id);
     expect((await records.list("local", "svc#vcs#commits")).length).toBeGreaterThan(0);
     expect((await records.list("local", "svc#workflows#runs#probe")).length).toBe(1);

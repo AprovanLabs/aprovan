@@ -15,7 +15,8 @@
  *   publish/remove/share      — the bundle and its path binding
  *   capabilities              — what the app may touch and where its data lands
  *   release/releases/channels/promote/rollback — the deployable version pin
- *   install/uninstall/installed — the caller side of `dataScope: "workspace"`
+ *   install/uninstall/installed — interim install records (stream 3 rewrites)
+ *   rename                       — mutable alias move (storage keys unchanged)
  *   sdk                       — generated bindings (js + d.ts) for the manifest
  *   versions/version/restore  — the entrypoint's FS content history
  *
@@ -53,12 +54,12 @@ import {
   type AppInstall,
 } from "./install.js";
 import {
-  isPersonalApp,
-  personalManifest,
-  toPersonalWire,
-  unbundledWorkflowNames,
-  PERSONAL_APP_NAME,
-} from "./personal.js";
+  dropAlias,
+  mintAppId,
+  readAlias,
+  resolveAppRef,
+  setAlias,
+} from "./identity.js";
 import {
   DEFAULT_CHANNEL,
   channelName,
@@ -73,8 +74,8 @@ import {
 import { generateAppSdk } from "./sdk.js";
 import {
   ENTRY_CANDIDATES,
+  appDataDir,
   appName,
-  appRoot,
   listApps,
   listEntryVersions,
   pathDir,
@@ -87,7 +88,6 @@ import {
   saveApp,
   workspacePath,
   writeWorkspaceConfig,
-  type AppDataScope,
   type AppManifest,
   type AppRateLimit,
   type AppRoles,
@@ -218,16 +218,6 @@ function parseVisibility(raw: unknown): "public" | "private" | undefined {
   return raw;
 }
 
-function parseDataScope(raw: unknown): AppDataScope | undefined {
-  if (raw === undefined || raw === null) return undefined;
-  if (raw !== "owner" && raw !== "workspace") {
-    throw new ServiceError(
-      'data_scope must be "owner" (publisher hosts every user\'s data) or "workspace" (each caller installs the app into their own workspace)',
-      400,
-    );
-  }
-  return raw;
-}
 
 // ---------------------------------------------------------------------------
 // Composition — what a directory UI renders
@@ -289,17 +279,20 @@ async function describeApp(
   options: { withRuns?: boolean } = {},
 ) {
   return {
+    appId: manifest.appId,
     name: manifest.name,
+    originAppId: manifest.originAppId,
     title: manifest.title,
     description: manifest.description,
     visibility: manifest.visibility ?? "private",
-    dataScope: manifest.dataScope ?? "owner",
     /** UI entrypoint, as a workspace path. */
     entry: manifest.entry,
     /** Workspace prefixes this app publishes (paths[0] is its root). */
     paths: manifest.paths,
     /** Live page URL (aprovan.com/apps/<workspace>/<name>). */
     url: livePath(workspaceId, manifest.name),
+    /** Durable id permalink that survives renames. */
+    permalink: `/apps/id/${manifest.appId}`,
     /** API surface base (tools + workflow runs). */
     apiBase: apiBase(workspaceId, manifest.name),
     /** Channel → release id. `apps.channels` resolves them to release records. */
@@ -324,39 +317,16 @@ async function registrationIndex(workspaceId: string): Promise<Map<string, Workf
   return new Map(registrations.map((registration) => [registration.name, registration]));
 }
 
-async function requireApp(workspaceId: string, raw: unknown): Promise<AppManifest> {
-  const name = appName(raw);
-  // Personal is synthesized, not stored: it has no releases, channels,
-  // versions, or SDK pins — the procedures that resolve through here.
-  if (isPersonalApp(name)) {
-    throw new ServiceError(
-      `"${PERSONAL_APP_NAME}" is the workspace's built-in app — it has no releases, channels, or versions. ` +
-        `Use apps.get/apps.capabilities to inspect it.`,
-      400,
-    );
+/** Resolve `app` or `name` (alias or ULID) to a stored manifest. */
+async function requireApp(workspaceId: string, args: Record<string, unknown>): Promise<AppManifest> {
+  const ref = args["app"] ?? args["name"];
+  if (typeof ref !== "string" || !ref) {
+    throw new ServiceError("app (alias or id) is required", 400);
   }
-  const manifest = await readApp(workspaceId, name);
-  if (!manifest) throw new ServiceError(`Unknown app: ${name}`, 404);
+  const appId = await resolveAppRef(workspaceId, ref);
+  const manifest = await readApp(workspaceId, appId);
+  if (!manifest) throw new ServiceError(`Unknown app: ${ref}`, 404);
   return manifest;
-}
-
-/**
- * Compose Personal for the directory: the unexported workflows inlined
- * exactly like a real app's export list, flagged `builtin: true`.
- */
-async function describePersonal(
-  workspaceId: string,
-  manifests: AppManifest[],
-  registrations: Map<string, WorkflowRegistration>,
-  options: { withRuns?: boolean } = {},
-) {
-  const manifest = personalManifest(
-    unbundledWorkflowNames(manifests, [...registrations.keys()]),
-  );
-  return {
-    manifest,
-    wire: toPersonalWire(await describeApp(workspaceId, manifest, registrations, options)),
-  };
 }
 
 function summarizeRelease(release: AppRelease) {
@@ -417,7 +387,7 @@ export const appsService: CoreService = {
       name: "apps.publish",
       operation: "publish",
       description:
-        "Publish (or update) an app by binding workspace paths to a live endpoint: 'entry' is the UI entrypoint path (e.g. apps/liift4/widget.tsx) and 'paths' are the prefixes the app publishes — the same prefixes decide what the live site serves and what the app's sessions may read/write. 'workflows' is the app's export list: each becomes callable as app.<workflow>. 'allowed_tools' may only name the auto-partitioned native namespaces (vfs, keyvalue, events) or the app's own workflows — a provider (github, linear, …) must be reached through an exported workflow. 'data_scope' decides where user data lands: 'owner' (publisher hosts it, the default) or 'workspace' (each caller installs the app into their own workspace). The live app serves at /apps/<workspace>/<name>.",
+        "Publish (or update) an app by binding workspace paths to a live endpoint: 'entry' is the UI entrypoint path (e.g. apps/liift4/widget.tsx) and 'paths' are the prefixes the app publishes — the same prefixes decide what the live site serves and what the app's sessions may read/write. 'workflows' is the app's export list: each becomes callable as app.<workflow>. 'allowed_tools' may only name the auto-partitioned native namespaces (vfs, keyvalue, events) or the app's own workflows — a provider (github, linear, …) must be reached through an exported workflow. The live app serves at /apps/<workspace>/<name>; identity is a ULID with a mutable name alias.",
       inputSchema: {
         type: "object",
         properties: {
@@ -453,12 +423,6 @@ export const appsService: CoreService = {
             description:
               "Tools app users may call: vfs.*, keyvalue.*, events.* (auto-partitioned natives), or app.<workflow> for this app's exported workflows — everything else is denied",
           },
-          data_scope: {
-            type: "string",
-            enum: ["owner", "workspace"],
-            description:
-              "'owner' (default): the publishing workspace stores every user's data under <paths[0]>/data/<user>. 'workspace': callers install the app into their own workspace (apps.install) and data lands under their install prefix, executing with their credentials",
-          },
           roles: {
             type: "object",
             description: "{ admins: [subs], access: 'any'|'listed', users: [subs] }",
@@ -476,14 +440,14 @@ export const appsService: CoreService = {
       name: "apps.list",
       operation: "list",
       description:
-        "List the workspace's published apps with everything a directory needs in one call: path binding, visibility, data scope, channels, allow-list, roles, limits, and each exported workflow with its triggers, schemas, webhook path, and last run.",
+        "List the workspace's published apps with everything a directory needs in one call: appId, path binding, visibility, channels, allow-list, roles, limits, and each exported workflow with its triggers, schemas, webhook path, and last run.",
       inputSchema: { type: "object", properties: {} },
     },
     {
       name: "apps.summary",
       operation: "summary",
       description:
-        "Lightweight app list (name, title, visibility, data scope, workflow count, updatedAt) — for pickers and menus that don't render workflow detail.",
+        "Lightweight app list (appId, name, title, visibility, workflow count, updatedAt) — for pickers and menus that don't render workflow detail.",
       inputSchema: { type: "object", properties: {} },
     },
     {
@@ -492,8 +456,24 @@ export const appsService: CoreService = {
       description: "Get one app: the same composition as apps.list plus its capability report.",
       inputSchema: {
         type: "object",
-        properties: { name: { type: "string" } },
-        required: ["name"],
+        properties: {
+          app: { type: "string", description: "App alias or ULID" },
+          name: { type: "string", description: "Alias (same as app)" },
+        },
+      },
+    },
+    {
+      name: "apps.rename",
+      operation: "rename",
+      description:
+        "Rename an app's mutable alias. Storage keys (manifest, releases, partitions) are unchanged; the old alias 404s and the new one resolves. 409 when the new name is held by another app.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          app: { type: "string", description: "Current alias or ULID" },
+          name: { type: "string", description: "New alias (kebab-case)" },
+        },
+        required: ["app", "name"],
       },
     },
     {
@@ -503,24 +483,26 @@ export const appsService: CoreService = {
         "What this app can touch and where its data lives: the allow-listed native namespaces (procedures, partitioning, rate limits) and the workflows it exports (with their declared input/output schemas). Render this instead of hardcoding namespace lists.",
       inputSchema: {
         type: "object",
-        properties: { name: { type: "string" } },
-        required: ["name"],
+        properties: {
+          app: { type: "string", description: "App alias or ULID" },
+          name: { type: "string" },
+        },
       },
     },
     {
       name: "apps.data",
       operation: "data",
       description:
-        "Owner-side administration of an app's user data, since per-user partitions are read-enforced (foreign access answers 404): with just 'name', lists the app's users; add 'user' to list that user's keys; add 'key' to read one record, or 'path' to read one file from the user's file partition. Gated on the app's admin role; every call is audited. Rejects 'personal' — personal partitions have no admin override. Only sees owner-hosted (dataScope 'owner') data — a workspace-scoped install's data lives in the installer's own workspace.",
+        "Owner-side administration of an app's user data, since per-user partitions are read-enforced (foreign access answers 404): with just 'app', lists the app's users; add 'user' to list that user's keys; add 'key' to read one record, or 'path' to read one file from the user's file partition under .apps/<appId>/data/<user>. Gated on the app's admin role; every call is audited.",
       inputSchema: {
         type: "object",
         properties: {
+          app: { type: "string", description: "App alias or ULID" },
           name: { type: "string" },
           user: { type: "string", description: "App-user sub — list their keys, or read one with `key`" },
           key: { type: "string", description: "One record key to read (requires `user`; mutually exclusive with `path`)" },
           path: { type: "string", description: "One file to read from the user's file partition (requires `user`; mutually exclusive with `key`)" },
         },
-        required: ["name"],
       },
     },
     {
@@ -530,8 +512,11 @@ export const appsService: CoreService = {
         "Generate the app's SDK: { js, dts } — a runtime shim over the app tool proxy plus TypeScript types built from the native namespaces and each exported workflow's declared schemas. Served live at /apps/<workspace>/<name>/__sdk__.js and __sdk__.d.ts.",
       inputSchema: {
         type: "object",
-        properties: { name: { type: "string" }, channel: { type: "string" } },
-        required: ["name"],
+        properties: {
+          app: { type: "string" },
+          name: { type: "string" },
+          channel: { type: "string" },
+        },
       },
     },
     {
@@ -542,11 +527,11 @@ export const appsService: CoreService = {
       inputSchema: {
         type: "object",
         properties: {
+          app: { type: "string" },
           name: { type: "string" },
           channel: { type: "string", description: "Channel to point at the new release (default 'live')" },
           notes: { type: "string" },
         },
-        required: ["name"],
       },
     },
     {
@@ -555,8 +540,7 @@ export const appsService: CoreService = {
       description: "List an app's releases, newest first.",
       inputSchema: {
         type: "object",
-        properties: { name: { type: "string" } },
-        required: ["name"],
+        properties: { app: { type: "string" }, name: { type: "string" } },
       },
     },
     {
@@ -566,8 +550,7 @@ export const appsService: CoreService = {
         "What each channel currently serves: the release it points at, when it was cut, and its notes. The live page serves 'live'; '?channel=preview' serves 'preview' to the app's admins.",
       inputSchema: {
         type: "object",
-        properties: { name: { type: "string" } },
-        required: ["name"],
+        properties: { app: { type: "string" }, name: { type: "string" } },
       },
     },
     {
@@ -576,8 +559,13 @@ export const appsService: CoreService = {
       description: "Point channel 'to' at whatever channel 'from' currently serves (e.g. preview → live).",
       inputSchema: {
         type: "object",
-        properties: { name: { type: "string" }, from: { type: "string" }, to: { type: "string" } },
-        required: ["name", "from", "to"],
+        properties: {
+          app: { type: "string" },
+          name: { type: "string" },
+          from: { type: "string" },
+          to: { type: "string" },
+        },
+        required: ["from", "to"],
       },
     },
     {
@@ -586,15 +574,18 @@ export const appsService: CoreService = {
       description: "Move a channel back to the release before the one it serves.",
       inputSchema: {
         type: "object",
-        properties: { name: { type: "string" }, channel: { type: "string" } },
-        required: ["name"],
+        properties: {
+          app: { type: "string" },
+          name: { type: "string" },
+          channel: { type: "string" },
+        },
       },
     },
     {
       name: "apps.install",
       operation: "install",
       description:
-        "Install a 'workspace' data-scope app into THIS workspace: records the owner, name, pinned release, and the prefix its data lives under (<prefix>/data). Installed sessions execute with this workspace's credentials and store data here, not in the publisher's workspace.",
+        "Install an app into THIS workspace (interim pre-stream-3): records the owner, name, pinned release, and a prefix. Stream 3 replaces this with ULID installs, pins, and bindings.",
       inputSchema: {
         type: "object",
         properties: {
@@ -658,14 +649,14 @@ export const appsService: CoreService = {
       name: "apps.remove",
       operation: "remove",
       description:
-        "Unpublish an app. By default its files (UI + data) stay in the workspace; pass purge_data=true to delete its primary prefix too.",
+        "Unpublish an app. By default authored files stay; pass purge_data=true to delete `.apps/<appId>` data partitions.",
       inputSchema: {
         type: "object",
         properties: {
+          app: { type: "string" },
           name: { type: "string" },
-          purge_data: { type: "boolean", description: "Also delete the app's primary prefix and all per-user data" },
+          purge_data: { type: "boolean", description: "Also delete .apps/<appId> per-user data" },
         },
-        required: ["name"],
       },
     },
     {
@@ -675,8 +666,7 @@ export const appsService: CoreService = {
         "List the content versions of an app's UI entrypoint (its entry), newest first. The newest version is the live one (current: true).",
       inputSchema: {
         type: "object",
-        properties: { name: { type: "string" } },
-        required: ["name"],
+        properties: { app: { type: "string" }, name: { type: "string" } },
       },
     },
     {
@@ -685,8 +675,12 @@ export const appsService: CoreService = {
       description: "Read one past version of an app's UI entrypoint by content hash.",
       inputSchema: {
         type: "object",
-        properties: { name: { type: "string" }, hash: { type: "string" } },
-        required: ["name", "hash"],
+        properties: {
+          app: { type: "string" },
+          name: { type: "string" },
+          hash: { type: "string" },
+        },
+        required: ["hash"],
       },
     },
     {
@@ -696,8 +690,12 @@ export const appsService: CoreService = {
         "Restore a past version of an app's UI entrypoint: re-writes that version's content as the new latest. Non-destructive — history is preserved and the old content becomes live again. Returns the updated app.",
       inputSchema: {
         type: "object",
-        properties: { name: { type: "string" }, hash: { type: "string" } },
-        required: ["name", "hash"],
+        properties: {
+          app: { type: "string" },
+          name: { type: "string" },
+          hash: { type: "string" },
+        },
+        required: ["hash"],
       },
     },
   ],
@@ -710,21 +708,44 @@ export const appsService: CoreService = {
     switch (procedure) {
       case "publish": {
         const name = appName(args["name"]);
-        if (isPersonalApp(name)) {
+        // Match an existing app by explicit id, else by current alias.
+        const ref = typeof args["app"] === "string" ? args["app"] : name;
+        let existing: AppManifest | undefined;
+        try {
+          const appId = await resolveAppRef(ctx.workspaceId, ref);
+          existing = await readApp(ctx.workspaceId, appId);
+        } catch {
+          // Fresh publish under this alias — but reject if the alias is held.
+          const holder = await readAlias(ctx.workspaceId, name);
+          if (holder) {
+            existing = await readApp(ctx.workspaceId, holder.appId);
+          }
+        }
+        // Publishing under an alias held by a different app is a 409 (via setAlias).
+        if (existing && existing.name !== name) {
+          // Caller asked to publish as `name` while resolving a different app —
+          // treat as update that also moves the alias (prefer apps.rename).
+        }
+        if (!existing) {
+          const collision = await readAlias(ctx.workspaceId, name);
+          if (collision) {
+            throw new ServiceError(
+              `App name "${name}" is already held by app ${collision.appId}`,
+              409,
+            );
+          }
+        } else if (existing.name !== name) {
+          // Updating by id while supplying a new name — require rename procedure.
           throw new ServiceError(
-            `"${PERSONAL_APP_NAME}" is the workspace's built-in app and cannot be published or edited. ` +
-              `Register workflows (workflows.register) and any not exported by another app appear in Personal ` +
-              `automatically; publish under a different name to share them.`,
+            `App ${existing.appId} is aliased as "${existing.name}"; use apps.rename to change the alias`,
             400,
           );
         }
-        const existing = await readApp(ctx.workspaceId, name);
+
         const registrations = await registrationIndex(ctx.workspaceId);
         const workflows = Array.isArray(args["workflows"])
           ? args["workflows"].filter((w): w is string => typeof w === "string")
           : (existing?.workflows ?? []);
-        // Exported workflows must actually exist in the workspace — the
-        // export list is the app's public surface, not a wish list.
         for (const workflow of workflows) {
           if (!registrations.has(workflow)) {
             throw new ServiceError(
@@ -733,20 +754,18 @@ export const appsService: CoreService = {
             );
           }
         }
-        // The path binding is explicit: an entrypoint pointed at by the
-        // publisher must exist at publish time — publishing a live URL that
-        // 404s helps no one.
         const { entry, paths } = await resolveBinding(ctx.workspaceId, name, args, existing);
         const { tools: allowedTools, grants } = parseAllowedTools(args["allowed_tools"], {
           app: name,
           workflows,
         });
-        // Provider entries are credential grants — publishable only when the
-        // workspace holds a credential for each granted provider.
         await assertGrantCredentials(ctx.workspaceId, grants);
         const now = new Date().toISOString();
+        const appId = existing?.appId ?? mintAppId();
         const manifest: AppManifest = {
+          appId,
           name,
+          originAppId: existing?.originAppId,
           title: typeof args["title"] === "string" ? args["title"] : existing?.title,
           description:
             typeof args["description"] === "string" ? args["description"] : existing?.description,
@@ -754,7 +773,6 @@ export const appsService: CoreService = {
           paths,
           visibility: parseVisibility(args["visibility"]) ?? existing?.visibility ?? "private",
           workflows,
-          dataScope: parseDataScope(args["data_scope"]) ?? existing?.dataScope ?? "owner",
           channels: existing?.channels,
           allowedTools,
           roles: parseRoles(args["roles"]) ?? existing?.roles,
@@ -766,72 +784,62 @@ export const appsService: CoreService = {
         await saveApp(ctx.workspaceId, manifest);
         return describeApp(ctx.workspaceId, manifest, registrations, { withRuns: false });
       }
+      case "rename": {
+        const manifest = await requireApp(ctx.workspaceId, args);
+        const newName = appName(args["name"]);
+        if (newName === manifest.name) {
+          return describeApp(
+            ctx.workspaceId,
+            manifest,
+            await registrationIndex(ctx.workspaceId),
+            { withRuns: false },
+          );
+        }
+        await setAlias(ctx.workspaceId, newName, manifest.appId);
+        await dropAlias(ctx.workspaceId, manifest.name);
+        const updated: AppManifest = {
+          ...manifest,
+          name: newName,
+          updatedAt: new Date().toISOString(),
+        };
+        // saveApp would setAlias again (idempotent) — write manifest only via saveApp.
+        await saveApp(ctx.workspaceId, updated);
+        return describeApp(
+          ctx.workspaceId,
+          updated,
+          await registrationIndex(ctx.workspaceId),
+          { withRuns: false },
+        );
+      }
       case "list": {
         const [manifests, registrations] = await Promise.all([
           listApps(ctx.workspaceId),
           registrationIndex(ctx.workspaceId),
         ]);
-        // Personal always leads the directory: a fresh workspace has exactly
-        // one app, and every other app's position stays stable around it.
-        const personal = await describePersonal(ctx.workspaceId, manifests, registrations);
         const apps = await Promise.all(
           manifests.map((manifest) => describeApp(ctx.workspaceId, manifest, registrations)),
         );
-        return { apps: [personal.wire, ...apps] };
+        return { apps };
       }
       case "summary": {
-        const [manifests, registrations] = await Promise.all([
-          listApps(ctx.workspaceId),
-          registrationIndex(ctx.workspaceId),
-        ]);
-        const personalWorkflows = unbundledWorkflowNames(manifests, [...registrations.keys()]);
-        const personal = {
-          name: PERSONAL_APP_NAME,
-          title: "Personal",
-          description: personalManifest([]).description,
-          visibility: "private" as const,
-          dataScope: "owner" as const,
-          workflowCount: personalWorkflows.length,
-          channels: {},
-          updatedAt: undefined,
-          builtin: true as const,
-        };
+        const manifests = await listApps(ctx.workspaceId);
         return {
-          apps: [
-            personal,
-            ...manifests.map((manifest) => ({
-              name: manifest.name,
-              title: manifest.title,
-              description: manifest.description,
-              visibility: manifest.visibility ?? "private",
-              dataScope: manifest.dataScope ?? "owner",
-              url: livePath(ctx.workspaceId, manifest.name),
-              workflowCount: (manifest.workflows ?? []).length,
-              channels: manifest.channels ?? {},
-              updatedAt: manifest.updatedAt,
-            })),
-          ],
+          apps: manifests.map((manifest) => ({
+            appId: manifest.appId,
+            name: manifest.name,
+            title: manifest.title,
+            description: manifest.description,
+            visibility: manifest.visibility ?? "private",
+            url: livePath(ctx.workspaceId, manifest.name),
+            permalink: `/apps/id/${manifest.appId}`,
+            workflowCount: (manifest.workflows ?? []).length,
+            channels: manifest.channels ?? {},
+            updatedAt: manifest.updatedAt,
+          })),
         };
       }
       case "get": {
-        const name = appName(args["name"]);
-        if (isPersonalApp(name)) {
-          const [manifests, registrations] = await Promise.all([
-            listApps(ctx.workspaceId),
-            registrationIndex(ctx.workspaceId),
-          ]);
-          const { manifest, wire } = await describePersonal(ctx.workspaceId, manifests, registrations);
-          return {
-            ...wire,
-            capabilities: {
-              native: nativeCapabilities(manifest),
-              /** Always empty: Personal grants no provider credentials. */
-              providers: await withExecutingProfiles(ctx.workspaceId, providerGrantCapabilities(manifest)),
-              workflows: wire.workflows,
-            },
-          };
-        }
-        const manifest = await requireApp(ctx.workspaceId, name);
+        const manifest = await requireApp(ctx.workspaceId, args);
         const registrations = await registrationIndex(ctx.workspaceId);
         const described = await describeApp(ctx.workspaceId, manifest, registrations);
         return {
@@ -844,32 +852,11 @@ export const appsService: CoreService = {
         };
       }
       case "capabilities": {
-        const name = appName(args["name"]);
-        if (isPersonalApp(name)) {
-          const [manifests, registrations] = await Promise.all([
-            listApps(ctx.workspaceId),
-            registrationIndex(ctx.workspaceId),
-          ]);
-          const { manifest } = await describePersonal(ctx.workspaceId, manifests, registrations);
-          return {
-            app: manifest.name,
-            dataScope: manifest.dataScope ?? "owner",
-            native: nativeCapabilities(manifest),
-            providers: await withExecutingProfiles(ctx.workspaceId, providerGrantCapabilities(manifest)),
-            workflows: (
-              await summarizeWorkflows(ctx.workspaceId, manifest, registrations, false)
-            ).map((workflow) => ({
-              ...workflow,
-              namespace: APP_WORKFLOW_NAMESPACE,
-              toolPath: `${apiBase(ctx.workspaceId, manifest.name)}/tools/${APP_WORKFLOW_NAMESPACE}/${workflow.procedure}`,
-            })),
-          };
-        }
-        const manifest = await requireApp(ctx.workspaceId, name);
+        const manifest = await requireApp(ctx.workspaceId, args);
         const registrations = await registrationIndex(ctx.workspaceId);
         return {
+          appId: manifest.appId,
           app: manifest.name,
-          dataScope: manifest.dataScope ?? "owner",
           /** Auto-partitioned first-party namespaces, allow-list filtered. */
           native: nativeCapabilities(manifest),
           /** Provider credential grants — tier (2), exact procedures only. */
@@ -885,23 +872,8 @@ export const appsService: CoreService = {
         };
       }
       case "data": {
-        const name = appName(args["name"]);
-        // Personal partitions have NO admin override (specs per-user-data;
-        // tech-plan data-auth-model D3): no procedure serves another user's
-        // personal data, and ambient reads stay 404 for everyone. The escape
-        // hatch for lockouts is membership administration, not silent reads.
-        if (isPersonalApp(name)) {
-          throw new ServiceError(
-            "Personal data has no admin override — a member's personal partition (records and files) is readable only by that member.",
-            403,
-          );
-        }
-        const manifest = await requireApp(ctx.workspaceId, name);
+        const manifest = await requireApp(ctx.workspaceId, args);
 
-        // Owner-side administration is gated on the app's OWN admin role — a
-        // narrower check than "can manage this app's bundle" (any member
-        // reaching apps.* can already do that). A user's data is more
-        // sensitive than the app's code, so it gets its own gate.
         const admins = manifest.roles?.admins ?? [];
         if (!admins.includes(ctx.userId)) {
           throw new ServiceError(
@@ -923,26 +895,20 @@ export const appsService: CoreService = {
           throw new ServiceError("`path` and `key` are mutually exclusive", 400);
         }
 
-        // Only ever the tenancy this workspace itself owns — a
-        // `dataScope: "workspace"` install's rows live in the installer's
-        // own workspace (their own tenant), unreachable from here by design.
         const records = getRecordStore();
         const tenant = ctx.workspaceId;
-        const scopePrefix = `app#${manifest.name}#u#`;
+        const scopePrefix = `app#${manifest.appId}#u#`;
 
         let result: Record<string, unknown>;
         if (user !== undefined && filePath !== undefined) {
-          // File-partition access (tech-plan data-auth-model open question 1:
-          // `path?`, mutually exclusive with `key`): the audited procedure is
-          // the ONLY sanctioned way an app admin reaches a user's file
-          // partition — ambient file APIs answer 404 (partition guard).
-          const partition = `${appRoot(manifest)}/data/${user}`;
+          const partition = appDataDir(manifest.appId, user);
           const resolved = workspacePath(`${partition}/${filePath}`, "path");
           if (!resolved.startsWith(`${partition}/`)) {
             throw new ServiceError(`path must stay within the user's partition`, 400);
           }
           const file = await getFsStore().read(tenant, resolved);
           result = {
+            appId: manifest.appId,
             app: manifest.name,
             user,
             path: filePath,
@@ -952,6 +918,7 @@ export const appsService: CoreService = {
         } else if (user !== undefined && key !== undefined) {
           const entry = await records.get(tenant, `${scopePrefix}${user}`, key);
           result = {
+            appId: manifest.appId,
             app: manifest.name,
             user,
             key,
@@ -960,27 +927,33 @@ export const appsService: CoreService = {
             updatedBy: entry?.updatedBy,
           };
         } else if (user !== undefined) {
-          result = { app: manifest.name, user, keys: await records.list(tenant, `${scopePrefix}${user}`) };
+          result = {
+            appId: manifest.appId,
+            app: manifest.name,
+            user,
+            keys: await records.list(tenant, `${scopePrefix}${user}`),
+          };
         } else {
           const scopes = await records.listScopes(tenant, scopePrefix);
-          result = { app: manifest.name, users: scopes.map((scope) => scope.slice(scopePrefix.length)) };
+          result = {
+            appId: manifest.appId,
+            app: manifest.name,
+            users: scopes.map((scope) => scope.slice(scopePrefix.length)),
+          };
         }
 
-        // Visible power instead of ambient browsability: owner-side access
-        // to a user's data leaves an audit trail instead of being silently
-        // available through the file plane the way it used to be.
         getAuditStore().append({
           requestId: crypto.randomUUID(),
           workspaceId: tenant,
           callerId: ctx.userId,
           provider: "apps",
-          operation: `data:${manifest.name}${user ? `:${user}` : ""}${key ? `:${key}` : ""}${filePath ? `:${filePath}` : ""}`,
+          operation: `data:${manifest.appId}${user ? `:${user}` : ""}${key ? `:${key}` : ""}${filePath ? `:${filePath}` : ""}`,
           status: 200,
         });
         return result;
       }
       case "sdk": {
-        const manifest = await requireApp(ctx.workspaceId, args["name"]);
+        const manifest = await requireApp(ctx.workspaceId, args);
         const registrations = await registrationIndex(ctx.workspaceId);
         const channel = args["channel"] === undefined ? undefined : channelName(args["channel"]);
         const sdk = generateAppSdk(
@@ -997,6 +970,7 @@ export const appsService: CoreService = {
           { channel },
         );
         return {
+          appId: manifest.appId,
           app: manifest.name,
           channel: channel ?? null,
           namespaces: sdk.namespaces,
@@ -1009,7 +983,7 @@ export const appsService: CoreService = {
         };
       }
       case "release": {
-        const manifest = await requireApp(ctx.workspaceId, args["name"]);
+        const manifest = await requireApp(ctx.workspaceId, args);
         const channel = channelName(args["channel"]);
         const notes = typeof args["notes"] === "string" ? args["notes"] : undefined;
         const release = await snapshotRelease(ctx.workspaceId, manifest, {
@@ -1017,25 +991,26 @@ export const appsService: CoreService = {
           notes,
           createdBy: ctx.userId,
         });
-        await saveRelease(ctx.workspaceId, manifest.name, release);
+        await saveRelease(ctx.workspaceId, manifest.appId, release);
         const updated = await setChannel(ctx.workspaceId, manifest, channel, release.id);
         return { ...summarizeRelease(release), channels: updated.channels ?? {} };
       }
       case "releases": {
-        const manifest = await requireApp(ctx.workspaceId, args["name"]);
-        const releases = await listReleases(ctx.workspaceId, manifest.name);
+        const manifest = await requireApp(ctx.workspaceId, args);
+        const releases = await listReleases(ctx.workspaceId, manifest.appId);
         return {
+          appId: manifest.appId,
           name: manifest.name,
           channels: manifest.channels ?? {},
           releases: releases.map(summarizeRelease),
         };
       }
       case "channels": {
-        const manifest = await requireApp(ctx.workspaceId, args["name"]);
+        const manifest = await requireApp(ctx.workspaceId, args);
         const pointers = Object.entries(manifest.channels ?? {});
         const channels = await Promise.all(
           pointers.map(async ([channel, releaseId]) => {
-            const release = await readRelease(ctx.workspaceId, manifest.name, releaseId);
+            const release = await readRelease(ctx.workspaceId, manifest.appId, releaseId);
             return {
               channel,
               release: releaseId,
@@ -1043,38 +1018,45 @@ export const appsService: CoreService = {
               notes: release?.notes,
               entryHash: release?.entryHash,
               workflows: release?.workflows ?? {},
-              /** False when the pointer names a release that no longer exists. */
               resolved: Boolean(release),
             };
           }),
         );
         return {
+          appId: manifest.appId,
           name: manifest.name,
-          /** The channel the live page serves when none is requested. */
           defaultChannel: DEFAULT_CHANNEL,
           channels,
         };
       }
       case "promote": {
-        const manifest = await requireApp(ctx.workspaceId, args["name"]);
+        const manifest = await requireApp(ctx.workspaceId, args);
         const from = channelName(args["from"], "");
         const to = channelName(args["to"], "");
         if (!from || !to) throw new ServiceError("from and to channels are required", 400);
         const releaseId = manifest.channels?.[from];
         if (!releaseId) throw new ServiceError(`Channel ${from} has no release to promote`, 404);
         const updated = await setChannel(ctx.workspaceId, manifest, to, releaseId);
-        return { name: manifest.name, from, to, release: releaseId, channels: updated.channels ?? {} };
+        return {
+          appId: manifest.appId,
+          name: manifest.name,
+          from,
+          to,
+          release: releaseId,
+          channels: updated.channels ?? {},
+        };
       }
       case "rollback": {
-        const manifest = await requireApp(ctx.workspaceId, args["name"]);
+        const manifest = await requireApp(ctx.workspaceId, args);
         const channel = channelName(args["channel"]);
-        const releases = await listReleases(ctx.workspaceId, manifest.name);
+        const releases = await listReleases(ctx.workspaceId, manifest.appId);
         const target = previousRelease(releases, manifest.channels?.[channel], channel);
         if (!target) {
           throw new ServiceError(`No earlier release to roll ${channel} back to`, 404);
         }
         const updated = await setChannel(ctx.workspaceId, manifest, channel, target.id);
         return {
+          appId: manifest.appId,
           name: manifest.name,
           channel,
           release: target.id,
@@ -1086,7 +1068,8 @@ export const appsService: CoreService = {
         const owner = typeof args["owner"] === "string" ? args["owner"] : "";
         if (!owner) throw new ServiceError("owner (the publishing workspace id) is required", 400);
         const name = appName(args["name"]);
-        const manifest = await readApp(owner, name).catch(() => undefined);
+        const appId = await resolveAppRef(owner, name).catch(() => undefined);
+        const manifest = appId ? await readApp(owner, appId).catch(() => undefined) : undefined;
         if (!manifest) throw new ServiceError(`Unknown app: ${owner}/${name}`, 404);
         assertInstallable(manifest);
         const existing = await readInstall(ctx.workspaceId, owner, name);
@@ -1100,10 +1083,10 @@ export const appsService: CoreService = {
         await saveInstall(ctx.workspaceId, install);
         return {
           ...install,
+          appId: manifest.appId,
           title: manifest.title,
           url: livePath(owner, name),
-          /** Where this workspace's copy of the app's data lives. */
-          dataPrefix: `${install.prefix}/data`,
+          dataPrefix: appDataDir(manifest.appId, ctx.userId),
         };
       }
       case "uninstall": {
@@ -1118,14 +1101,17 @@ export const appsService: CoreService = {
         return {
           apps: await Promise.all(
             installs.map(async (install) => {
-              const manifest = await readApp(install.owner, install.name).catch(() => undefined);
+              const appId = await resolveAppRef(install.owner, install.name).catch(() => undefined);
+              const manifest = appId
+                ? await readApp(install.owner, appId).catch(() => undefined)
+                : undefined;
               return {
                 ...install,
+                appId: manifest?.appId,
                 title: manifest?.title,
                 description: manifest?.description,
                 url: livePath(install.owner, install.name),
-                dataPrefix: `${install.prefix}/data`,
-                /** False when the publisher removed the app. */
+                dataPrefix: manifest ? appDataDir(manifest.appId, ctx.userId) : `${install.prefix}/data`,
                 available: Boolean(manifest),
               };
             }),
@@ -1133,18 +1119,11 @@ export const appsService: CoreService = {
         };
       }
       case "remove": {
-        const name = appName(args["name"]);
-        if (isPersonalApp(name)) {
-          throw new ServiceError(
-            `"${PERSONAL_APP_NAME}" is the workspace's built-in app and cannot be removed. ` +
-              `Its workflows disappear from Personal on their own once another app exports them.`,
-            400,
-          );
-        }
-        const removed = await removeApp(ctx.workspaceId, name, {
+        const manifest = await requireApp(ctx.workspaceId, args);
+        const removed = await removeApp(ctx.workspaceId, manifest.appId, {
           purgeData: args["purge_data"] === true,
         });
-        return { name, removed };
+        return { appId: manifest.appId, name: manifest.name, removed };
       }
       case "shares": {
         const config = await readWorkspaceConfig(ctx.workspaceId);
@@ -1185,7 +1164,7 @@ export const appsService: CoreService = {
         return { prefix, removed: true };
       }
       case "versions": {
-        const manifest = await requireApp(ctx.workspaceId, args["name"]);
+        const manifest = await requireApp(ctx.workspaceId, args);
         const versions = await listEntryVersions(ctx.workspaceId, manifest.entry);
         return {
           path: manifest.entry,
@@ -1193,13 +1172,12 @@ export const appsService: CoreService = {
             hash: version.hash,
             updatedAt: version.updatedAt,
             size: version.size,
-            // listVersions is newest-first, so the head is the live version.
             current: index === 0,
           })),
         };
       }
       case "version": {
-        const manifest = await requireApp(ctx.workspaceId, args["name"]);
+        const manifest = await requireApp(ctx.workspaceId, args);
         const hash = typeof args["hash"] === "string" ? args["hash"] : "";
         const file = await readEntryVersion(ctx.workspaceId, manifest.entry, hash);
         if (!file) throw new ServiceError(`Unknown version: ${manifest.name}@${hash}`, 404);
@@ -1212,7 +1190,7 @@ export const appsService: CoreService = {
         };
       }
       case "restore": {
-        const manifest = await requireApp(ctx.workspaceId, args["name"]);
+        const manifest = await requireApp(ctx.workspaceId, args);
         const hash = typeof args["hash"] === "string" ? args["hash"] : "";
         const restored = await restoreEntryVersion(ctx.workspaceId, manifest.entry, hash);
         if (!restored) throw new ServiceError(`Unknown version: ${manifest.name}@${hash}`, 404);

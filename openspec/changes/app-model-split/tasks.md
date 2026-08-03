@@ -11,37 +11,37 @@ else in this change is IW-0-independent. Nuke-and-reseed: no task migrates name-
 
 > Depends-on: - | Touches: server/workspace/src/apps/identity.ts, server/workspace/src/apps/store.ts, server/workspace/src/apps/releases.ts, server/workspace/src/apps/personal.ts, server/workspace/src/apps/service.ts, server/workspace/src/apps/sdk.ts, server/workspace/src/apps/usage.ts, server/workspace/src/routes/live-apps.ts, server/workspace/src/routes/apps.ts, server/workspace/scripts/reseed-apps.ts, server/workspace/tests/app-identity.test.ts, server/workspace/tests/apps*.test.ts, server/workspace/package.json | Verify: pnpm --dir /Users/jacob/Documents/Code/AprovanLabs/aprovan/server/workspace typecheck && pnpm --dir /Users/jacob/Documents/Code/AprovanLabs/aprovan/server/workspace test && ! grep -rn "PERSONAL_APP_NAME\|isPersonalApp\|\.personal" /Users/jacob/Documents/Code/AprovanLabs/aprovan/server/workspace/src
 
-- [ ] 1.1 Create `apps/identity.ts` per the tech-plan interface: `mintAppId`/`mintInstallId`
+- [x] 1.1 Create `apps/identity.ts` per the tech-plan interface: `mintAppId`/`mintInstallId`
       (add the `ulid` dependency), alias records `svc#apps#alias / <name> → {appId}`,
       `resolveAppRef` (ULID passthrough or alias lookup, 404 on miss), `setAlias` (409 on
       collision), `dropAlias`. Unit tests: mint uniqueness/sortability, alias round-trip,
       collision 409 (spec app-identity "mutable alias"; tech-plan D1).
-- [ ] 1.2 Re-key `apps/store.ts`: `AppManifest` gains `appId` + `originAppId?`, loses
+- [x] 1.2 Re-key `apps/store.ts`: `AppManifest` gains `appId` + `originAppId?`, loses
       `dataScope`; manifests stored at `svc#apps / <appId>`; `saveApp` writes manifest +
       alias; `readApp(workspaceId, appId)`; `listApps` unchanged shape but id-keyed; delete
       the legacy folder-shape rebinding in `readApp` (spec app-identity "Nothing name-keyed
       remains"). Releases: scope `svc#apps#releases#<appId>`, `AppRelease` gains embedded
       `manifest` snapshot (tech-plan D2).
-- [ ] 1.3 Re-key per-user data derivation: `appDataDir(id, sub)` → `.apps/<id>/data/<sub>`,
+- [x] 1.3 Re-key per-user data derivation: `appDataDir(id, sub)` → `.apps/<id>/data/<sub>`,
       record scopes `app#<appId>#u#<sub>`; `apps/usage.ts` counters and `apps/sdk.ts`
       generation take ids (tech-plan D3 — guard re-root itself is stream 2; here only the
       writers move).
-- [ ] 1.4 Delete `apps/personal.ts` and every `isPersonalApp`/`PERSONAL_APP_NAME` branch and
+- [x] 1.4 Delete `apps/personal.ts` and every `isPersonalApp`/`PERSONAL_APP_NAME` branch and
       Personal composition in `apps/service.ts` (`describePersonal`, list/summary/get/
       capabilities/data/publish/remove special cases). `apps.list` returns only real apps
       (spec per-user-space "The Personal pseudo-app is deleted").
-- [ ] 1.5 Rewire `apps/service.ts` to ids: every procedure resolves `args.app` via
+- [x] 1.5 Rewire `apps/service.ts` to ids: every procedure resolves `args.app` via
       `resolveAppRef` at the top; add `apps.rename {app, name}` (alias move, 409, keeps
       storage — spec scenario "Rename moves no storage"); publish reuses `appId` on update,
       mints on create; wire shapes gain `appId` (and keep `name`).
-- [ ] 1.6 Routes: `routes/live-apps.ts` resolves `/:workspaceId/:name` through the alias
+- [x] 1.6 Routes: `routes/live-apps.ts` resolves `/:workspaceId/:name` through the alias
       index and adds `/apps/id/:appId` permalink for page, `__project__`, and `__sdk__.*`;
       `routes/apps.ts` (public consumption surface) same treatment (spec app-identity "Live
       URLs keep the alias form").
-- [ ] 1.7 Write `scripts/reseed-apps.ts`: drop name-keyed scopes (`svc#apps` name keys,
+- [x] 1.7 Write `scripts/reseed-apps.ts`: drop name-keyed scopes (`svc#apps` name keys,
       `svc#apps#releases#<name>`, `svc#apps#installed`, `app#<name>#u#*`) for a workspace
       and reseed fixtures with minted ids; wire into `bootstrap:local` (tech-plan Rollout 1).
-- [ ] 1.8 Tests (`app-identity.test.ts` + updates to `apps.test.ts`/`app-domain.test.ts`/
+- [x] 1.8 Tests (`app-identity.test.ts` + updates to `apps.test.ts`/`app-domain.test.ts`/
       `live-apps.test.ts`; delete `apps-personal.test.ts`): publish mints ULID; republish
       keeps it; rename keeps releases + per-user data readable and installs resolvable
       (seed an install record directly); alias collision 409; old alias URL 404s, new alias

@@ -2,6 +2,7 @@
  * Live app pages — published apps as standalone websites:
  *
  *   GET /apps/:workspaceId/:name               — the app page (HTML shell)
+ *   GET /apps/id/:appId                        — durable permalink (same surface)
  *   GET /apps/:workspaceId/:name/__project__   — the app's source project (JSON)
  *   GET /apps/:workspaceId/:name/__sdk__.js    — generated runtime shim
  *   GET /apps/:workspaceId/:name/__sdk__.d.ts  — generated types
@@ -40,6 +41,7 @@ import {
   type AppRelease,
 } from "../apps/releases.js";
 import { generateAppSdk } from "../apps/sdk.js";
+import { resolveAppLocation, resolveAppRef } from "../apps/identity.js";
 import {
   appPathServable,
   callerRole,
@@ -80,6 +82,10 @@ interface LiveApp {
   workspaceId: string;
 }
 
+function toAppPaths(manifest: AppManifest) {
+  return { id: manifest.appId, name: manifest.name, paths: manifest.paths };
+}
+
 type HonoCtx = {
   req: {
     header(name: string): string | undefined;
@@ -89,10 +95,18 @@ type HonoCtx = {
 };
 
 async function resolveLiveApp(c: HonoCtx): Promise<LiveApp> {
+  const appIdParam = c.req.param("appId");
+  if (appIdParam) {
+    const loc = await resolveAppLocation(appIdParam);
+    const manifest = await readApp(loc.workspaceId, appIdParam).catch(() => undefined);
+    if (!manifest?.entry) throw new ServiceError("Not found", 404);
+    return { manifest, workspaceId: loc.workspaceId };
+  }
   const workspaceId = c.req.param("workspaceId");
   const name = c.req.param("name");
   if (!workspaceId || !name) throw new ServiceError("Not found", 404);
-  const manifest = await readApp(workspaceId, name).catch(() => undefined);
+  const appId = await resolveAppRef(workspaceId, name);
+  const manifest = await readApp(workspaceId, appId).catch(() => undefined);
   if (!manifest?.entry) throw new ServiceError("Not found", 404);
   return { manifest, workspaceId };
 }
@@ -162,7 +176,7 @@ async function readPinned(app: LiveApp, path: string, release: AppRelease | unde
 function servableTargets(manifest: AppManifest, relative: string): string[] {
   const targets: string[] = [];
   for (const resolve of [
-    () => resolveAppPath(manifest, relative),
+    () => resolveAppPath(toAppPaths(manifest), relative),
     () => workspacePath(relative),
   ]) {
     try {
@@ -171,7 +185,7 @@ function servableTargets(manifest: AppManifest, relative: string): string[] {
       // Not addressable — fall through to the SPA shell.
     }
   }
-  return targets.filter((path) => appPathServable(manifest, path));
+  return targets.filter((path) => appPathServable(toAppPaths(manifest), path));
 }
 
 function errorResponse(c: { json: (body: unknown, status?: number) => Response }, err: unknown): Response {
@@ -185,7 +199,7 @@ function errorResponse(c: { json: (body: unknown, status?: number) => Response }
 // GET /:workspaceId/:name — the app page
 // ---------------------------------------------------------------------------
 
-liveAppsRouter.get("/:workspaceId/:name", async (c) => {
+async function handleLivePage(c: any) {
   try {
     const app = await resolveLiveApp(c);
     return c.newResponse(buildAppShell(app, channelName(c.req.query("channel"))), 200, {
@@ -195,13 +209,15 @@ liveAppsRouter.get("/:workspaceId/:name", async (c) => {
   } catch (err) {
     return errorResponse(c, err);
   }
-});
+}
+liveAppsRouter.get("/id/:appId", handleLivePage);
+liveAppsRouter.get("/:workspaceId/:name", handleLivePage);
 
 // ---------------------------------------------------------------------------
 // GET /:workspaceId/:name/__project__ — the source project (visibility-gated)
 // ---------------------------------------------------------------------------
 
-liveAppsRouter.get("/:workspaceId/:name/__project__", async (c) => {
+async function handleLiveProject(c: any) {
   try {
     const app = await resolveLiveApp(c);
     await requireViewer(c, app.manifest);
@@ -216,7 +232,7 @@ liveAppsRouter.get("/:workspaceId/:name/__project__", async (c) => {
       manifest.paths.map((prefix) => listAll(store, workspaceId, prefix)),
     );
     const paths = [...new Set(listings.flat().map((entry) => entry.path))].filter((path) =>
-      appPathServable(manifest, path),
+      appPathServable(toAppPaths(manifest), path),
     );
     const files = (
       await Promise.all(
@@ -239,7 +255,9 @@ liveAppsRouter.get("/:workspaceId/:name/__project__", async (c) => {
   } catch (err) {
     return errorResponse(c, err);
   }
-});
+}
+liveAppsRouter.get("/id/:appId/__project__", handleLiveProject);
+liveAppsRouter.get("/:workspaceId/:name/__project__", handleLiveProject);
 
 // ---------------------------------------------------------------------------
 // GET /:workspaceId/:name/__sdk__.js|.d.ts — generated bindings
@@ -267,7 +285,7 @@ async function sdkFor(c: HonoCtx): Promise<{ js: string; dts: string }> {
   return generateAppSdk(app.manifest, workflows, { channel: release?.channel });
 }
 
-liveAppsRouter.get("/:workspaceId/:name/__sdk__.js", async (c) => {
+async function handleLiveSdkJs(c: any) {
   try {
     const { js } = await sdkFor(c);
     return c.newResponse(js, 200, {
@@ -277,9 +295,11 @@ liveAppsRouter.get("/:workspaceId/:name/__sdk__.js", async (c) => {
   } catch (err) {
     return errorResponse(c, err);
   }
-});
+}
+liveAppsRouter.get("/id/:appId/__sdk__.js", handleLiveSdkJs);
+liveAppsRouter.get("/:workspaceId/:name/__sdk__.js", handleLiveSdkJs);
 
-liveAppsRouter.get("/:workspaceId/:name/__sdk__.d.ts", async (c) => {
+async function handleLiveSdkDts(c: any) {
   try {
     const { dts } = await sdkFor(c);
     return c.newResponse(dts, 200, {
@@ -289,13 +309,15 @@ liveAppsRouter.get("/:workspaceId/:name/__sdk__.d.ts", async (c) => {
   } catch (err) {
     return errorResponse(c, err);
   }
-});
+}
+liveAppsRouter.get("/id/:appId/__sdk__.d.ts", handleLiveSdkDts);
+liveAppsRouter.get("/:workspaceId/:name/__sdk__.d.ts", handleLiveSdkDts);
 
 // ---------------------------------------------------------------------------
 // GET /:workspaceId/:name/* — static files, SPA fallback to the page
 // ---------------------------------------------------------------------------
 
-liveAppsRouter.get("/:workspaceId/:name/*", async (c) => {
+async function handleLiveStatic(c: any) {
   try {
     const app = await resolveLiveApp(c);
     const raw = c.req.param();
@@ -321,7 +343,9 @@ liveAppsRouter.get("/:workspaceId/:name/*", async (c) => {
   } catch (err) {
     return errorResponse(c, err);
   }
-});
+}
+liveAppsRouter.get("/id/:appId/*", handleLiveStatic);
+liveAppsRouter.get("/:workspaceId/:name/*", handleLiveStatic);
 
 // ---------------------------------------------------------------------------
 // Shell
@@ -341,10 +365,12 @@ function buildAppShell(app: LiveApp, channel = DEFAULT_CHANNEL): string {
   ];
   const config = {
     app: manifest.name,
+    appId: manifest.appId,
     workspaceId,
     title,
     appBase: `/api/gateway/apps/${workspaceId}/${manifest.name}`,
     liveBase: `/apps/${workspaceId}/${manifest.name}`,
+    permalinkBase: `/apps/id/${manifest.appId}`,
     // The channel the shell asks for; content endpoints resolve the pin (and
     // gate non-default channels on the admin role).
     channel,
