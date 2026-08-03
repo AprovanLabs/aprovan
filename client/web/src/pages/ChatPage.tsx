@@ -119,7 +119,6 @@ export default function ChatPage() {
     activeSession: session.activeSession,
     setActiveSession: session.setActiveSession,
     editSessionOpen: editDraft.editSession !== null,
-    setPeers: session.setPeers,
     setSyncState: session.setSyncState,
   });
 

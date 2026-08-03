@@ -91,21 +91,21 @@ without coordinating._
 
 > Depends-on: 2, 3 | Touches: client/web/src/features/presence/**, client/web/src/features/tabs/TabStrip.tsx, client/web/src/features/sidebar/WorkspaceSidebar.tsx, client/web/src/components/SessionBar.tsx, client/web/src/features/sessions/useDraftSync.ts, client/web/src/features/sessions/useSessionOrchestration.ts, client/web/src/lib/chat-sessions.ts, client/web/src/features/chat/ChatDock.tsx | Verify: cd ~/Documents/Code/AprovanLabs/aprovan/client/web && pnpm build
 
-- [ ] 4.1 Build `features/presence/`: a store/hook layer that owns one `RealtimeClient`,
+- [x] 4.1 Build `features/presence/`: a store/hook layer that owns one `RealtimeClient`,
       derives published focus from `activeTabPath` + `document.visibilityState` (blur on
       hidden/native-tab/no-tab, focus on workspace-file tab), subscribes/unsubscribes
       `presence:<path>` per open workspace-file tab, re-announces on reconnect, and exposes
       `useFilePresence(path): PresencePeer[]` with self filtered out (spec file-presence
       "Client presence follows the active tab and visibility").
       Verify: `cd client/web && pnpm build`
-- [ ] 4.2 Build `PresenceAvatars` (≤3 stacked 16px initial chips + `+n`, deterministic hue
+- [x] 4.2 Build `PresenceAvatars` (≤3 stacked 16px initial chips + `+n`, deterministic hue
       from userId hash, member-name tooltip resolved from the loaded members list with
       neutral-glyph fallback) and `PresenceDot` (6px dot, names tooltip) from the vendored
       shadcn primitives; render `PresenceAvatars` on file tabs in `TabStrip.tsx` and
       `PresenceDot` on open-tab rows in `WorkspaceSidebar.tsx`, per the ux.md surface set —
       zero-peer and disconnected states render nothing.
       Verify: `cd client/web && pnpm build`
-- [ ] 4.3 Delete the legacy client path: the presence heartbeat effect in
+- [x] 4.3 Delete the legacy client path: the presence heartbeat effect in
       `useDraftSync.ts` (and its `setPeers` arg), `heartbeatPresence`/`PresencePeer` and
       the presence section of `lib/chat-sessions.ts` (delete `windowId` too unless a
       non-presence caller exists — verify with grep first), `peers`/`setPeers` in

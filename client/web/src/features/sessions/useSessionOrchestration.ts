@@ -19,7 +19,6 @@ import {
   syncChatSession,
   updateChatSession,
   type ChatSessionInfo,
-  type PresencePeer,
   type SessionMode,
 } from "@/lib/chat-sessions";
 import type { WorkspaceSyncState } from "@/lib/workspace-vfs";
@@ -61,7 +60,6 @@ export function useSessionOrchestration(args: {
   const [sessionChat, setSessionChat] = useState<Chat<UIMessage> | null>(null);
   const [sessionBusy, setSessionBusy] = useState(false);
   const [sessionNotice, setSessionNotice] = useState<string | null>(null);
-  const [peers, setPeers] = useState<PresencePeer[]>([]);
   const [syncState, setSyncState] = useState<WorkspaceSyncState>({ pending: 0, online: true });
   // Sessions that were only ever lazily created but never chatted in don't
   // clutter history; guards double-creation while the first send is in flight
@@ -413,8 +411,6 @@ export function useSessionOrchestration(args: {
     sessionBusy,
     sessionNotice,
     setSessionNotice,
-    peers,
-    setPeers,
     syncState,
     setSyncState,
     mergeState,

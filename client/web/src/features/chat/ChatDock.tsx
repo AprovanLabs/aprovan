@@ -283,7 +283,6 @@ export function ChatDock({
       <SessionBar
         session={session.activeSession}
         sessions={session.visibleSessions}
-        peers={session.peers}
         syncState={session.syncState}
         busy={session.sessionBusy}
         onNew={session.handleNewSession}
