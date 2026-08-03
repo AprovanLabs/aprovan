@@ -266,6 +266,35 @@ export function createIdentityStoreDynamo(): IIdentityStore {
           }),
         );
       },
+      async getMany(subs) {
+        if (subs.length === 0) return [];
+        const { client, BatchGetCommand } = await dynamo();
+        const tableName = DYNAMODB_USERS_TABLE();
+        const unique = [...new Set(subs)];
+        const rows: Array<Pick<UserRecord, "sub" | "email" | "name">> = [];
+        for (let i = 0; i < unique.length; i += 100) {
+          const chunk = unique.slice(i, i + 100);
+          const result = await client.send(
+            new BatchGetCommand({
+              RequestItems: {
+                [tableName]: {
+                  Keys: chunk.map((sub) => ({ sub })),
+                  ProjectionExpression: "#sub, email, #n",
+                  ExpressionAttributeNames: { "#sub": "sub", "#n": "name" },
+                },
+              },
+            }),
+          );
+          for (const item of result.Responses?.[tableName] ?? []) {
+            rows.push({
+              sub: String(item["sub"]),
+              ...(item["email"] !== undefined ? { email: String(item["email"]) } : {}),
+              ...(item["name"] !== undefined ? { name: String(item["name"]) } : {}),
+            });
+          }
+        }
+        return rows;
+      },
       async upsert(user: UserRecord) {
         const { client, PutCommand } = await dynamo();
         await client.send(

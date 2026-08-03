@@ -96,7 +96,7 @@ export interface IIdentityStore {
   users: {
     getActiveWorkspaceId(sub: string): Promise<string | undefined>;
     setActiveWorkspaceId(sub: string, workspaceId: string): Promise<void>;
-    /** Reseed/create path — writes the whole row (app-layer integrity). */
+    getMany(subs: string[]): Promise<Array<Pick<UserRecord, "sub" | "email" | "name">>>;
     upsert(user: UserRecord): Promise<void>;
   };
   workspaces: {

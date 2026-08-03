@@ -17,7 +17,6 @@
  */
 
 import { getRegistryStorage } from "./registry-storage.js";
-import { storeBackend } from "./runtime/config.js";
 import { ServiceError } from "./service-kernel.js";
 import type { GrantSubject, ProfileRow, RegistryStorage } from "@aprovan/registry-server";
 
@@ -30,19 +29,12 @@ export interface GroupProfileSummary {
   credentialLabel?: string;
 }
 
-/** Do profile grants exist on this deployment's backend at all? */
+/** Profiles are available on every store backend (sqlite, dsql, dynamo). */
 export function profileGrantsAvailable(): boolean {
-  return storeBackend() !== "dynamo";
+  return true;
 }
 
-function requireAvailable(): void {
-  if (!profileGrantsAvailable()) {
-    throw new ServiceError(
-      "Profiles need the relational store backend (sqlite/dsql) — the interim dynamo backend has no profile storage (WS-3 D8; retires at cutover).",
-      501,
-    );
-  }
-}
+function requireAvailable(): void {}
 
 async function storage(workspaceId: string): Promise<RegistryStorage> {
   requireAvailable();

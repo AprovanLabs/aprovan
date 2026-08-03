@@ -46,6 +46,8 @@ export interface TestUser {
    * single-workspace fixtures keep working.
    */
   memberships?: TestMembership[];
+  email?: string;
+  name?: string;
 }
 
 export interface TestWorkspace {
@@ -162,6 +164,17 @@ export function setupAuth(opts: SetupAuthOptions): void {
         for (const [tblName, req] of Object.entries(requestItems)) {
           responses[tblName] = [];
           for (const key of req.Keys) {
+            if (tblName === "Users" && typeof key["sub"] === "string") {
+              const user = users.find((u) => u.sub === key["sub"]);
+              if (user) {
+                responses[tblName]!.push({
+                  sub: user.sub,
+                  ...(user.email ? { email: user.email } : {}),
+                  ...(user.name ? { name: user.name } : {}),
+                });
+              }
+              continue;
+            }
             const k = storeKey(tblName, key["PK"], key["SK"]);
             const item = pkSkStore.get(k);
             if (item) responses[tblName]!.push(item);

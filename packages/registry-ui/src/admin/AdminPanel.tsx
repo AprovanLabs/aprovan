@@ -52,6 +52,10 @@ function SectionHeader({
   );
 }
 
+function memberDisplayName(member: Member): string {
+  return member.name?.trim() || member.email?.trim() || member.userId;
+}
+
 function MembersSection({
   client,
 }: {
@@ -108,7 +112,12 @@ function MembersSection({
             <tbody>
               {members.map((m) => (
                 <tr className="border-b last:border-0" key={m.userId}>
-                  <td className="px-3 py-2 font-mono text-xs">{m.userId}</td>
+                  <td className="px-3 py-2">
+                    <div className="text-sm font-medium">{memberDisplayName(m)}</div>
+                    {(m.email || m.name) && (
+                      <div className="font-mono text-xs text-muted-foreground">{m.userId}</div>
+                    )}
+                  </td>
                   <td className="px-3 py-2">
                     <Badge variant={m.role === "admin" ? "default" : "secondary"}>
                       {m.role}

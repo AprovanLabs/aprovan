@@ -228,7 +228,7 @@ describe("tool authorization through the profile join", () => {
 describe("profile admin routes are admin-only", () => {
   const MEMBER_TOKEN = "member-token";
 
-  it("answers 403 for group profile mutations and 501 for workspace profiles on dynamo", async () => {
+  it("answers 403 for group profile mutations; member GET /profiles works on dynamo", async () => {
     process.env["STORE_BACKEND"] = "dynamo";
     process.env["OIDC_ISSUER"] = "https://cognito-idp.us-east-2.amazonaws.com/us-east-2_gp";
     process.env["OIDCAUDIENCE"] = "gp-test-client";
@@ -260,7 +260,7 @@ describe("profile admin routes are admin-only", () => {
           Authorization: `Bearer ${MEMBER_TOKEN}`,
         },
       });
-      expect(profiles.status).toBe(501);
+      expect(profiles.status).toBe(200);
     } finally {
       delete process.env["STORE_BACKEND"];
       delete process.env["OIDC_ISSUER"];

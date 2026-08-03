@@ -32,6 +32,7 @@ vi.mock("@aws-sdk/lib-dynamodb", () => ({
   UpdateCommand: vi.fn((input: unknown) => ({ input })),
   TransactWriteCommand: vi.fn((input: unknown) => ({ input })),
   BatchGetCommand: vi.fn((input: unknown) => ({ input })),
+  DeleteCommand: vi.fn((input: unknown) => ({ input })),
 }));
 
 vi.mock("@aws-sdk/client-dynamodb", () => ({
@@ -208,7 +209,7 @@ describe("members read, only admins write", () => {
   });
 });
 
-describe("unavailable backend answers 501", () => {
+describe("profiles on dynamo backend", () => {
   const MEMBER_TOKEN = "profiles-dynamo-member";
 
   beforeEach(() => {
@@ -217,6 +218,7 @@ describe("unavailable backend answers 501", () => {
       "https://cognito-idp.us-east-2.amazonaws.com/us-east-2_profiles501";
     process.env["OIDCAUDIENCE"] = "profiles-501-client";
     resetIdentityStore();
+    resetRegistryStorage();
     setupAuth({
       mockDdbSend,
       defaultWorkspaceId: "ws-a",
@@ -227,51 +229,20 @@ describe("unavailable backend answers 501", () => {
     });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     delete process.env["STORE_BACKEND"];
     delete process.env["OIDC_ISSUER"];
     delete process.env["OIDCAUDIENCE"];
     resetIdentityStore();
     resetCognitoVerifier();
+    await resetRegistryStorage();
   });
 
-  it("every /profiles route answers 501 with the explanatory message", async () => {
-    const cases: Array<[string, RequestInit]> = [
-      ["", { headers: { Authorization: `Bearer ${MEMBER_TOKEN}` } }],
-      [
-        "",
-        {
-          method: "POST",
-          headers: { Authorization: `Bearer profiles-dynamo-admin` },
-          body: JSON.stringify({
-            name: "x",
-            targetKind: "provider",
-            targetId: "github",
-          }),
-        },
-      ],
-      [
-        "/some-id",
-        {
-          method: "PATCH",
-          headers: { Authorization: `Bearer profiles-dynamo-admin` },
-          body: JSON.stringify({ name: "y" }),
-        },
-      ],
-      [
-        "/some-id",
-        {
-          method: "DELETE",
-          headers: { Authorization: `Bearer profiles-dynamo-admin` },
-        },
-      ],
-    ];
-
-    for (const [path, init] of cases) {
-      const res = await req(`/profiles${path}`, init);
-      expect(res.status).toBe(501);
-      const body = (await res.json()) as { error: string };
-      expect(body.error).toMatch(/relational store backend/i);
-    }
+  it("GET /profiles succeeds with an empty list on dynamo", async () => {
+    const res = await req("/profiles", {
+      headers: { Authorization: `Bearer ${MEMBER_TOKEN}` },
+    });
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { profiles: unknown[] }).profiles).toEqual([]);
   });
 });
