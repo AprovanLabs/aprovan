@@ -180,10 +180,10 @@ may run in parallel otherwise.
 
 > Depends-on: 2, EXTERNAL app-model-split | Touches: client/web/src/components/panels/AppsPanel.tsx (path per IW-1) | Verify: cd ~/Documents/Code/AprovanLabs/aprovan && git grep -q '"apps"' client/web/src/lib/native-surfaces.tsx && pnpm --filter @aprovan/patchwork-web typecheck && pnpm --filter @aprovan/patchwork-web build
 
-- [ ] 9.1 Preflight: verify IW-1 landed — `NATIVE_SURFACES` contains an `apps` entry with a
+- [x] 9.1 Preflight: verify IW-1 landed — `NATIVE_SURFACES` contains an `apps` entry with a
       panel component; record its actual file path and substitute it in this stream.
       Verify: `cd ~/Documents/Code/AprovanLabs/aprovan && git grep -n '"apps"' client/web/src/lib/native-surfaces.tsx`
-- [ ] 9.2 Apply the panel conventions to the apps pane: shell primitives, four states, copy
+- [x] 9.2 Apply the panel conventions to the apps pane: shell primitives, four states, copy
       tone, armed destructive actions — presentation only, no change to IW-1's data
       contracts — specs: panel-conventions "The apps pane conforms once it exists".
       Verify: `cd ~/Documents/Code/AprovanLabs/aprovan && pnpm --filter @aprovan/patchwork-web build`

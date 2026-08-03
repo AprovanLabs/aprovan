@@ -1041,31 +1041,41 @@ function InstallSettingsTab({
         />
       </div>
 
-      <label className="flex items-start gap-2 text-xs">
-        <input
-          checked={editing}
-          onChange={(e) => {
-            if (e.target.checked) {
-              const ok = window.confirm(
-                `Copies the pinned release's source into this workspace${
-                  install.prefix ? ` at ${install.prefix}` : ""
-                }; future updates from the origin will overwrite local edits (or be blocked).`,
-              );
-              if (!ok) return;
-            }
-            setEditing(e.target.checked);
-          }}
-          type="checkbox"
-        />
-        <span>
-          Editing enabled
-          {install.prefix ? (
-            <span className="block text-[0.65rem] text-muted-foreground">
-              prefix: {install.prefix}
-            </span>
-          ) : null}
-        </span>
-      </label>
+      <div className="space-y-1.5">
+        <SectionHeading>Editing</SectionHeading>
+        {editing ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs">Editing enabled</span>
+            {install.prefix ? (
+              <span className="font-mono text-[0.65rem] text-muted-foreground">
+                {install.prefix}
+              </span>
+            ) : null}
+            <button className={SMALL_BUTTON} onClick={() => setEditing(false)} type="button">
+              Disable
+            </button>
+          </div>
+        ) : (
+          <>
+            <p className="text-[0.65rem] text-muted-foreground">
+              Copies the pinned release&apos;s source into this workspace
+              {install.prefix ? (
+                <>
+                  {" "}
+                  at <span className="font-mono">{install.prefix}</span>
+                </>
+              ) : null}
+              . Future updates from the origin may overwrite local edits or be blocked.
+            </p>
+            <ConfirmButton
+              armedLabel="Confirm enable editing?"
+              label="Enable editing"
+              onConfirm={() => setEditing(true)}
+              tone="caution"
+            />
+          </>
+        )}
+      </div>
 
       <ErrorLine error={error} />
       <div className="flex items-center gap-2 border-t pt-2">

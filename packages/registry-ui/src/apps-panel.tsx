@@ -462,7 +462,7 @@ export function AppsPanel({
         catalog.installs.length === 0 &&
         catalog.workflows.length === 0 ? (
           <CreateWorkflowEmpty createWorkflowHref={createWorkflowHref} onCreateWorkflow={onCreateWorkflow}>
-            No apps yet.
+            No apps yet. Create a workflow in chat, or install one from the directory.
           </CreateWorkflowEmpty>
         ) : (
           <Empty>
