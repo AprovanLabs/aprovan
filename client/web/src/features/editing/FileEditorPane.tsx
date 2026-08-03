@@ -2,13 +2,14 @@ import {
   CodeBlockView,
   MarkdownPreview,
   MediaPreview,
+  ViewModeToggle,
   WidgetPreview,
   getFileType,
   markdownRoundTrips,
   type DefaultView,
 } from "@aprovan/patchwork-editor";
 import type { Compiler } from "@aprovan/patchwork-compiler";
-import { AlertCircle, Code, Eye, FileCode, Pencil } from "lucide-react";
+import { AlertCircle, FileCode, Pencil } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SaveStateChip, type ChipState } from "./SaveStateChip";
 import { useDirectSave } from "./useDirectSave";
@@ -223,22 +224,11 @@ export function FileEditorPane({
             onOpenFile={onOpenFile}
           />
           {fileType.canToggleView && (
-            <button
-              type="button"
+            <ViewModeToggle
+              active={view === "preview" || view === "rich"}
+              label={toggleLabel}
               onClick={toggleView}
-              className={`w-[5.5rem] px-2 py-1 text-xs rounded flex items-center gap-1 ${
-                view === "preview" || view === "rich"
-                  ? "bg-primary text-primary-foreground"
-                  : "hover:bg-primary/20 text-primary"
-              }`}
-            >
-              {view === "preview" || view === "rich" ? (
-                <Eye className="h-3 w-3" />
-              ) : (
-                <Code className="h-3 w-3" />
-              )}
-              {toggleLabel}
-            </button>
+            />
           )}
           {fileType.category === "compilable" && onOpenEditor && (
             <button

@@ -4,6 +4,7 @@ export {
   type EditMessage,
 } from "./lib/edit-prompt";
 export { CodePreview, type WidgetVfs } from "./components/CodePreview";
+export { ViewModeToggle, type ViewModeToggleProps } from "./components/ViewModeToggle";
 export { WidgetPreview } from "./components/WidgetPreview";
 export { MobileDrawer, type MobileDrawerProps } from "./components/MobileDrawer";
 export { MarkdownEditor } from "./components/MarkdownEditor";
