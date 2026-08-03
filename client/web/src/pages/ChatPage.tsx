@@ -317,6 +317,9 @@ export default function ChatPage() {
                 deleteWorkspaceEntry={explorer.deleteWorkspaceEntry}
                 createWorkspaceFile={explorer.createWorkspaceFile}
                 refreshWorkspace={explorer.refreshWorkspace}
+                expandWorkspaceDirectory={
+                  explorer.lazyTree ? explorer.expandWorkspaceDirectory : undefined
+                }
                 activeSurfaceId={tabs.activeSurfaceId}
                 openNativeTab={tabs.openNativeTab}
               />

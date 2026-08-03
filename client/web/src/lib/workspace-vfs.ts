@@ -26,6 +26,24 @@ const watchers = new Set<WatchCallback>();
 const normalize = (path: string) => path.replace(/^\/+|\/+$/g, "");
 const split = (path: string) => normalize(path).split("/").filter(Boolean);
 
+/**
+ * Workspaces with more paths than this use prefix-on-expand lazy tree loading
+ * in the sidebar (openspec product-ux-followup-2 tech-plan D6). Under the
+ * threshold the client keeps the eager full flat list it has always used.
+ */
+export const LAZY_TREE_THRESHOLD = 500;
+
+export interface WorkspaceListPage {
+  paths: string[];
+  cursor?: string;
+}
+
+export function mergeWorkspacePaths(existing: string[], added: string[]): string[] {
+  const merged = new Set(existing);
+  for (const path of added) merged.add(path);
+  return [...merged].sort();
+}
+
 // ---------------------------------------------------------------------------
 // Active session (VCS overlay scope)
 // ---------------------------------------------------------------------------
@@ -145,8 +163,11 @@ const mimeType = (path: string): string =>
   MIME_BY_EXTENSION[path.split(".").pop() ?? ""] ?? "text/plain";
 
 interface WorkspaceBackend {
-  /** Every file path, sorted, optionally under a prefix. */
-  list(prefix?: string): Promise<string[]>;
+  /** File paths under a prefix, sorted. Paginate with limit/cursor when given. */
+  list(
+    prefix?: string,
+    opts?: { limit?: number; cursor?: string },
+  ): Promise<WorkspaceListPage>;
   read(path: string): Promise<string>;
   write(path: string, content: string): Promise<void>;
   /** Delete a file, or a whole subtree with recursive. */
@@ -192,10 +213,21 @@ async function opfsList(
 }
 
 const opfsBackend: WorkspaceBackend = {
-  async list(prefix = "") {
+  async list(prefix = "", opts) {
     const all = await opfsList();
     const scope = normalize(prefix);
-    return scope ? all.filter((p) => p === scope || p.startsWith(`${scope}/`)) : all;
+    const scoped = scope
+      ? all.filter((p) => p === scope || p.startsWith(`${scope}/`))
+      : all;
+    if (!opts?.limit) return { paths: scoped };
+    const after = opts.cursor ?? "";
+    const start = after ? scoped.findIndex((p) => p > after) : 0;
+    const slice = scoped.slice(start < 0 ? scoped.length : start, start + opts.limit);
+    const cursor =
+      start >= 0 && start + opts.limit < scoped.length
+        ? slice[slice.length - 1]
+        : undefined;
+    return { paths: slice, ...(cursor ? { cursor } : {}) };
   },
   async read(path) {
     const parts = split(path);
@@ -228,16 +260,25 @@ const opfsBackend: WorkspaceBackend = {
 // ---------------------------------------------------------------------------
 
 const gatewayBackend: WorkspaceBackend = {
-  async list(prefix = "") {
-    const query = prefix ? `?prefix=${encodeURIComponent(normalize(prefix))}` : "";
+  async list(prefix = "", opts) {
+    const params = new URLSearchParams();
+    const scope = normalize(prefix);
+    if (scope) params.set("prefix", scope);
+    if (opts?.limit) params.set("limit", String(opts.limit));
+    if (opts?.cursor) params.set("cursor", opts.cursor);
+    const query = params.toString();
     const response = await gatewayFetch(
-      `${GATEWAY_BASE}/fs${query}${stagedSessionQuery(!query)}`,
+      `${GATEWAY_BASE}/fs${query ? `?${query}` : ""}${stagedSessionQuery(!query)}`,
     );
     if (!response.ok) throw new Error(`fs list failed (${response.status})`);
-    const { entries } = (await response.json()) as {
+    const body = (await response.json()) as {
       entries: Array<{ path: string }>;
+      cursor?: string;
     };
-    return entries.map((entry) => entry.path);
+    return {
+      paths: body.entries.map((entry) => entry.path),
+      ...(body.cursor ? { cursor: body.cursor } : {}),
+    };
   },
   async read(path) {
     const response = await gatewayFetch(
@@ -395,12 +436,12 @@ function noteOnline(): void {
 // ---------------------------------------------------------------------------
 
 const syncedBackend: WorkspaceBackend = {
-  async list(prefix = "") {
+  async list(prefix = "", opts) {
     // Staged session scope: gateway only — no OPFS merge, no journal (see
     // setActiveVfsSession).
-    if (isStagedScope()) return gatewayBackend.list(prefix);
+    if (isStagedScope()) return gatewayBackend.list(prefix, opts);
     try {
-      const remote = await gatewayBackend.list(prefix);
+      const remote = await gatewayBackend.list(prefix, opts);
       noteOnline();
       const scope = normalize(prefix);
       const inScope = (path: string) =>
@@ -409,7 +450,7 @@ const syncedBackend: WorkspaceBackend = {
         pending.filter((entry) => entry.op === "remove").map((entry) => entry.path),
       );
       const merged = new Set(
-        remote.filter(
+        remote.paths.filter(
           (path) =>
             !removed.has(path) &&
             ![...removed].some((removedPath) => path.startsWith(`${removedPath}/`)),
@@ -418,9 +459,18 @@ const syncedBackend: WorkspaceBackend = {
       for (const entry of pending) {
         if (entry.op === "write" && inScope(entry.path)) merged.add(entry.path);
       }
-      return [...merged].sort();
+      const paths = [...merged].sort();
+      if (!opts?.limit) return { paths };
+      const after = opts.cursor ?? "";
+      const start = after ? paths.findIndex((p) => p > after) : 0;
+      const slice = paths.slice(start < 0 ? paths.length : start, start + opts.limit);
+      const cursor =
+        start >= 0 && start + opts.limit < paths.length
+          ? slice[slice.length - 1]
+          : undefined;
+      return { paths: slice, ...(cursor ? { cursor } : {}) };
     } catch {
-      return opfsBackend.list(prefix);
+      return opfsBackend.list(prefix, opts);
     }
   },
   async read(path) {
@@ -484,7 +534,7 @@ async function migrateOpfsToGateway(): Promise<void> {
     return; // No OPFS support — nothing to migrate.
   }
   if (localPaths.length === 0) return;
-  const remotePaths = new Set(await gatewayBackend.list());
+  const remotePaths = new Set((await gatewayBackend.list()).paths);
   const missing = localPaths.filter((path) => !remotePaths.has(path));
   await Promise.all(
     missing.map(async (path) => {
@@ -583,7 +633,7 @@ export async function deleteWorkspacePath(
   noteLocalWrite(target);
   const store = await backend();
   const removed = options.recursive
-    ? (await store.list(target)).filter((p) => p === target || p.startsWith(`${target}/`))
+    ? (await store.list(target)).paths.filter((p) => p === target || p.startsWith(`${target}/`))
     : [target];
   await store.remove(target, options.recursive);
   for (const removedPath of removed.length > 0 ? removed : [target]) {
@@ -591,15 +641,60 @@ export async function deleteWorkspacePath(
   }
 }
 
+export async function listWorkspacePathsPage(
+  prefix = "",
+  opts?: { limit?: number; cursor?: string },
+): Promise<WorkspaceListPage> {
+  return (await backend()).list(prefix, opts);
+}
+
+/** Drain every page under a prefix (used when a lazy tree directory expands). */
+export async function listWorkspacePathsUnderPrefix(prefix = ""): Promise<string[]> {
+  const paths: string[] = [];
+  let cursor: string | undefined;
+  do {
+    const page = await listWorkspacePathsPage(prefix, {
+      limit: 1000,
+      ...(cursor ? { cursor } : {}),
+    });
+    paths.push(...page.paths);
+    cursor = page.cursor;
+  } while (cursor);
+  return paths;
+}
+
+/**
+ * Probe whether the workspace exceeds {@link LAZY_TREE_THRESHOLD}. Returns the
+ * first page of paths when large (for lazy-tree seeding) or the full list when
+ * small.
+ */
+export async function probeWorkspacePaths(): Promise<{
+  lazy: boolean;
+  paths: string[];
+}> {
+  const page = await listWorkspacePathsPage("", { limit: LAZY_TREE_THRESHOLD + 1 });
+  if (page.cursor) return { lazy: true, paths: page.paths };
+  return { lazy: false, paths: page.paths };
+}
+
 export async function listWorkspacePaths(): Promise<string[]> {
-  return (await backend()).list();
+  const page = await listWorkspacePathsPage();
+  if (!page.cursor) return page.paths;
+  const paths = [...page.paths];
+  let cursor: string | undefined = page.cursor;
+  while (cursor) {
+    const next = await listWorkspacePathsPage("", { limit: 1000, cursor });
+    paths.push(...next.paths);
+    cursor = next.cursor;
+  }
+  return paths;
 }
 
 export async function loadWorkspaceDirectoryProject(
   directoryPath: string,
 ): Promise<VirtualProject | null> {
   const prefix = normalize(directoryPath);
-  const paths = await (await backend()).list(prefix);
+  const paths = (await (await backend()).list(prefix)).paths;
   if (!paths.length) return null;
   const files = new Map<string, VirtualFile>();
   await Promise.all(

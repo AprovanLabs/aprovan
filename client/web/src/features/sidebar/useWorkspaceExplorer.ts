@@ -4,6 +4,9 @@ import { publishNotification, resetNotifications } from "@/lib/notifications";
 import {
   deleteWorkspacePath,
   listWorkspacePaths,
+  listWorkspacePathsUnderPrefix,
+  mergeWorkspacePaths,
+  probeWorkspacePaths,
   resetStore,
   subscribeToWorkspaceChanges,
   wasRecentLocalWrite,
@@ -38,11 +41,14 @@ export function useWorkspaceExplorer(args: {
   const [workspaceActivePath, setWorkspaceActivePath] = useState("");
   const [workspaceLoading, setWorkspaceLoading] = useState(false);
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
+  const [lazyTree, setLazyTree] = useState(false);
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(() =>
     localStorage.getItem(ACTIVE_WORKSPACE_KEY)
   );
   // Deduplicate listWorkspacePaths() calls when multiple files change in the same poll batch.
   const pendingTreeRefreshRef = useRef(false);
+  const lazyTreeRef = useRef(false);
+  const loadedPrefixesRef = useRef(new Set<string>());
 
   const [pinnedPaths, setPinnedPaths] = useState<Map<string, boolean>>(() => {
     try {
@@ -76,22 +82,46 @@ export function useWorkspaceExplorer(args: {
     });
   }, []);
 
+  const loadWorkspaceListing = useCallback(async () => {
+    const probe = await probeWorkspacePaths();
+    lazyTreeRef.current = probe.lazy;
+    setLazyTree(probe.lazy);
+    loadedPrefixesRef.current = new Set([""]);
+    if (probe.lazy) {
+      setWorkspaceFiles(probe.paths);
+      return;
+    }
+    setWorkspaceFiles(await listWorkspacePaths());
+  }, []);
+
   const refreshWorkspace = useCallback(async () => {
     setWorkspaceLoading(true);
     setWorkspaceError(null);
     try {
-      // The tree is fed the full flat path list; the filter narrows it
-      // client-side, so always reload the complete set.
-      setWorkspaceFiles(await listWorkspacePaths());
+      await loadWorkspaceListing();
     } catch (err) {
       setWorkspaceError(err instanceof Error ? err.message : "Failed to load workspace");
     } finally {
       setWorkspaceLoading(false);
     }
+  }, [loadWorkspaceListing]);
+
+  const expandWorkspaceDirectory = useCallback((prefix: string) => {
+    if (!lazyTreeRef.current) return;
+    const normalized = prefix.replace(/^\/+|\/+$/g, "");
+    if (loadedPrefixesRef.current.has(normalized)) return;
+    loadedPrefixesRef.current.add(normalized);
+    void listWorkspacePathsUnderPrefix(normalized)
+      .then((paths) => {
+        setWorkspaceFiles((prev) => mergeWorkspacePaths(prev, paths));
+      })
+      .catch(() => {
+        loadedPrefixesRef.current.delete(normalized);
+      });
   }, []);
 
   useEffect(() => {
-    return subscribeToWorkspaceChanges((_event, changedPath) => {
+    return subscribeToWorkspaceChanges((event, changedPath) => {
       // A file changed under an open tab. Tabs are preview surfaces (real
       // editing happens in the edit window, isolated in its own draft), so
       // auto-sync from the workspace instead of blocking on a banner — and
@@ -108,6 +138,21 @@ export function useWorkspaceExplorer(args: {
           });
           bridgeRef.current?.reloadStaleTab(changedPath, { external: true });
         }
+      }
+
+      if (lazyTreeRef.current) {
+        if (event === "delete" && changedPath) {
+          setWorkspaceFiles((prev) =>
+            prev.filter(
+              (path) => path !== changedPath && !path.startsWith(`${changedPath}/`),
+            ),
+          );
+        } else if (event === "update" && changedPath) {
+          setWorkspaceFiles((prev) =>
+            prev.includes(changedPath) ? prev : mergeWorkspacePaths(prev, [changedPath]),
+          );
+        }
+        return;
       }
 
       // Debounce the full tree refresh — all files from a single poll batch
@@ -128,19 +173,17 @@ export function useWorkspaceExplorer(args: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Seed the tree with the full path list on mount and whenever the active
-  // workspace switches.
+  // Seed the tree on mount and whenever the active workspace switches.
   useEffect(() => {
     setWorkspaceLoading(true);
     setWorkspaceError(null);
 
-    listWorkspacePaths()
-      .then(setWorkspaceFiles)
+    loadWorkspaceListing()
       .catch((err) => {
         setWorkspaceError(err instanceof Error ? err.message : "Failed to load workspace");
       })
       .finally(() => setWorkspaceLoading(false));
-  }, [activeWorkspaceId]);
+  }, [activeWorkspaceId, loadWorkspaceListing]);
 
   // "New file" from the sidebar tree: validate synchronously (so the inline
   // input can show the message without an extra round trip) and fire the
@@ -205,8 +248,10 @@ export function useWorkspaceExplorer(args: {
     setWorkspaceActivePath,
     workspaceLoading,
     workspaceError,
+    lazyTree,
     activeWorkspaceId,
     refreshWorkspace,
+    expandWorkspaceDirectory,
     deleteWorkspaceEntry,
     createWorkspaceFile,
     pinnedPaths,
