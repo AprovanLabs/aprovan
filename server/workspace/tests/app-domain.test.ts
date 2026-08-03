@@ -287,8 +287,8 @@ describe("generated SDK", () => {
   });
 });
 
-describe("install (interim, pre-stream-3)", () => {
-  it("records an install and keeps origin-hosted keyvalue under appId scopes", async () => {
+describe("install lifecycle", () => {
+  it("records a ULID install and partitions data under installId", async () => {
     await putFile("apps/tmpl/index.tsx", "export default () => null;");
     const published = await data<{ appId: string }>(
       await manage("apps/publish", {
@@ -305,20 +305,26 @@ describe("install (interim, pre-stream-3)", () => {
     );
     expect(owned.value).toBe(1);
 
-    const install = await data<{ prefix: string; appId: string; dataPrefix: string }>(
-      await manage("apps/install", { owner: "local", name: "tmpl", prefix: "installed/tmpl" }),
-    );
-    expect(install.appId).toBe(published.appId);
-    expect(install.dataPrefix).toContain(`.apps/${published.appId}/data/`);
+    const install = await data<{
+      installId: string;
+      originAppId: string;
+      dataPrefix: string;
+    }>(await manage("apps/install", { app: "tmpl" }));
+    expect(install.originAppId).toBe(published.appId);
+    expect(install.dataPrefix).toContain(`.apps/${install.installId}/data/`);
 
-    const listed = await data<{ apps: Array<{ name: string; owner: string; available: boolean }> }>(
-      await manage("apps/installed", {}),
-    );
-    expect(listed.apps).toEqual([
-      expect.objectContaining({ name: "tmpl", owner: "local", available: true }),
+    const listed = await data<{
+      installs: Array<{ installId: string; available: boolean; originAppId: string }>;
+    }>(await manage("apps/installed", {}));
+    expect(listed.installs).toEqual([
+      expect.objectContaining({
+        installId: install.installId,
+        originAppId: published.appId,
+        available: true,
+      }),
     ]);
 
-    await manage("apps/uninstall", { owner: "local", name: "tmpl" });
+    await manage("apps/uninstall", { install: install.installId });
   });
 });
 

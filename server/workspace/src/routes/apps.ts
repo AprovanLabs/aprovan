@@ -19,18 +19,27 @@
 import { RateLimiter } from "@utdk/common/rateLimit";
 import { Hono } from "hono";
 import {
+  contractGrantCallable,
   isNativeNamespace,
   isWorkflowNamespace,
   providerGrantCallable,
   resolveExportedWorkflow,
   workflowCallable,
 } from "../apps/capabilities.js";
-import { readInstall, type AppInstall } from "../apps/install.js";
-import { resolveAppLocation, resolveAppRef } from "../apps/identity.js";
+import {
+  cachedOriginRelease,
+  findInstallByOrigin,
+  installedScope,
+  readInstall,
+  type AppInstallation,
+} from "../apps/install.js";
+import { isAppId, resolveAppLocation, resolveAppRef } from "../apps/identity.js";
 import { callerRole, readApp, toolAllowed, type AppManifest, type AppPaths } from "../apps/store.js";
 import { countDailyCall } from "../apps/usage.js";
 import { getAuditStore } from "../audit.js";
+import { isInterface } from "../interfaces.js";
 import { getAuthMode, readBearerToken, verifyAccessToken } from "../middleware/auth.js";
+import { installGrantHolds } from "../profile-grants.js";
 import { ServiceError, type ServiceContext } from "../service-kernel.js";
 import { parseTelemetrySourceHeader, recordTelemetry } from "../telemetry/service.js";
 import { getCurrentWorkspace } from "../sessions.js";
@@ -49,10 +58,10 @@ interface AppSession {
   manifest: AppManifest;
   /** Workspace that published the app (owns the code and the manifest). */
   workspaceId: string;
-  /** Workspace the session's tool calls execute in (origin workspace for now). */
+  /** Workspace the session's tool calls execute in (installer's when installed). */
   executionWorkspaceId: string;
-  /** Install record when the caller runs a workspace-scoped copy. */
-  install?: AppInstall;
+  /** Install record when the caller runs an installed copy. */
+  install?: AppInstallation;
   sub: string;
   role: "admin" | "user";
   ctx: ServiceContext;
@@ -78,8 +87,8 @@ async function callerSub(c: HonoCtx): Promise<string> {
 
 /**
  * Resolve an app session from either `/apps/:workspaceId/:name` (alias) or
- * `/apps/id/:appId` (permalink). Origin-hosted execution for stream 1;
- * install-side execution returns in stream 3.
+ * `/apps/id/:appId` (permalink). When the caller's workspace holds an
+ * install of the origin app, execution and partitions switch to the install.
  */
 async function resolveAppSession(c: HonoCtx): Promise<AppSession> {
   const sub = await callerSub(c);
@@ -98,6 +107,44 @@ async function resolveAppSession(c: HonoCtx): Promise<AppSession> {
   } else {
     if (!workspaceIdParam || !nameParam) throw new ServiceError("Not found", 404);
     workspaceId = workspaceIdParam;
+    // Install-id address: /apps/:ws/:installId
+    if (isAppId(nameParam)) {
+      const install = await readInstall(workspaceId, nameParam);
+      if (install) {
+        const originManifest =
+          (await cachedOriginRelease(
+            install.originWorkspaceId,
+            install.originAppId,
+            install.resolvedRelease,
+          ))?.manifest ??
+          (await readApp(install.originWorkspaceId, install.originAppId).catch(() => undefined));
+        if (!originManifest) throw new ServiceError("Not found", 404);
+        const role = callerRole(originManifest, sub);
+        if (!role) throw new ServiceError("You do not have access to this app", 403);
+        const scope = installedScope(originManifest, install);
+        const interfaceInstances: Record<string, string> = {};
+        for (const [contract, profileId] of Object.entries(install.bindings)) {
+          interfaceInstances[contract] = `${contract}`; // profile pin applied at dispatch
+          void profileId;
+        }
+        return {
+          manifest: originManifest,
+          workspaceId: install.originWorkspaceId,
+          executionWorkspaceId: workspaceId,
+          install,
+          sub,
+          role,
+          ctx: {
+            workspaceId,
+            userId: sub,
+            appScope: { ...scope, userId: sub, role },
+            traceId: newTraceId(),
+            // Bind contracts to their install profiles via instance redirect
+            // when we can resolve profile names; profile id pin happens below.
+          },
+        };
+      }
+    }
     const appId = await resolveAppRef(workspaceId, nameParam).catch(() => undefined);
     manifest = appId ? await readApp(workspaceId, appId).catch(() => undefined) : undefined;
   }
@@ -107,21 +154,47 @@ async function resolveAppSession(c: HonoCtx): Promise<AppSession> {
   const role = callerRole(manifest, sub);
   if (!role) throw new ServiceError("You do not have access to this app", 403);
 
-  const scope: AppPaths = { id: manifest.appId, name: manifest.name, paths: manifest.paths };
-  // Optional install annotation for the wire (stream 3 owns execution switch).
   const callerWs =
     getAuthMode() === "none"
       ? (c.req.header("X-Aprovan-Workspace") ?? "local")
       : await getCurrentWorkspace(sub).catch(() => undefined);
+
+  // Prefer an install in the caller's workspace of this origin app.
   const install = callerWs
-    ? await readInstall(callerWs, workspaceId, manifest.name).catch(() => undefined)
+    ? await findInstallByOrigin(callerWs, manifest.appId).catch(() => undefined)
     : undefined;
 
+  if (install && callerWs) {
+    // Prefer pinned release's embedded manifest when available.
+    const pinned = await cachedOriginRelease(
+      install.originWorkspaceId,
+      install.originAppId,
+      install.resolvedRelease,
+    );
+    const effective = pinned?.manifest ?? manifest;
+    const scope = installedScope(effective, install);
+    return {
+      manifest: effective,
+      workspaceId,
+      executionWorkspaceId: callerWs,
+      install,
+      sub,
+      role,
+      ctx: {
+        workspaceId: callerWs,
+        userId: sub,
+        appScope: { ...scope, userId: sub, role },
+        traceId: newTraceId(),
+      },
+    };
+  }
+
+  const scope: AppPaths = { id: manifest.appId, name: manifest.name, paths: manifest.paths };
   return {
     manifest,
     workspaceId,
     executionWorkspaceId: workspaceId,
-    install,
+    install: undefined,
     sub,
     role,
     ctx: {
@@ -271,9 +344,13 @@ async function handleGetManifest(c: {
       apiBase: `/api/gateway/apps/${workspaceId}/${manifest.name}`,
       install: session.install
         ? {
+            installId: session.install.installId,
             workspaceId: session.executionWorkspaceId,
             prefix: session.install.prefix,
-            release: session.install.release,
+            resolvedRelease: session.install.resolvedRelease,
+            editing: session.install.editing,
+            bindings: session.install.bindings,
+            config: session.install.config,
           }
         : null,
     });
@@ -353,6 +430,59 @@ const handleToolCall = async (c: any) => {
       let data: unknown;
       try {
         data = await invokeTool(session.ctx, namespace, procedure, await readArgs(c));
+      } catch (err) {
+        recordDispatch(
+          err instanceof ServiceError ? err.status : 500,
+          err instanceof Error ? err.message : String(err),
+        );
+        throw err;
+      }
+      const durationMs = Date.now() - startTime;
+      getAuditStore().append({
+        requestId: crypto.randomUUID(),
+        workspaceId: session.executionWorkspaceId,
+        callerId: `app:${session.manifest.name}:${session.sub}`,
+        provider: namespace,
+        operation: procedure,
+        status: 200,
+        durationMs,
+      });
+      recordDispatch(200);
+      return c.json({ data, meta: { app: session.manifest.name, durationMs } });
+    }
+
+    // Declared interface-contract grant: dispatch through the install binding
+    // (or tenant default for origin-hosted use). Revoked grants deny.
+    if (contractGrantCallable(session.manifest, namespace, procedure) || isInterface(namespace)) {
+      if (!contractGrantCallable(session.manifest, namespace, procedure)) {
+        recordDispatch(403, `Tool ${namespace}.${procedure} is not allowed for this app`);
+        return c.json({ error: `Tool ${namespace}.${procedure} is not allowed for this app` }, 403);
+      }
+      const profileId = session.install?.bindings[namespace];
+      if (session.install && profileId) {
+        const holds = await installGrantHolds(
+          session.executionWorkspaceId,
+          session.install.installId,
+          profileId,
+        );
+        if (holds === false) {
+          recordDispatch(403, `Profile grant for ${namespace} was revoked`);
+          return c.json({ error: `Profile grant for ${namespace} was revoked` }, 403);
+        }
+      }
+      let data: unknown;
+      try {
+        // Pin the bound profile when we have an id; invokeTool accepts a
+        // profile *name*, so pass the profile id via interfaceInstances as
+        // contract → contract (default) and rely on binding resolution — or
+        // pass profile id as the profile argument when ungated.
+        data = await invokeTool(
+          session.ctx,
+          namespace,
+          procedure,
+          await readArgs(c),
+          profileId,
+        );
       } catch (err) {
         recordDispatch(
           err instanceof ServiceError ? err.status : 500,

@@ -80,39 +80,39 @@ else in this change is IW-0-independent. Nuke-and-reseed: no task migrates name-
 
 > Depends-on: 2; profile-binding tasks (3.2, 3.3) also require IW-0 execution-plane-unfork merged | Touches: server/workspace/src/apps/capabilities.ts, server/workspace/src/apps/install.ts, server/workspace/src/apps/directory.ts, server/workspace/src/apps/service.ts, server/workspace/src/routes/live-apps.ts, server/workspace/src/profile-grants.ts, server/workspace/tests/app-dependencies.test.ts, server/workspace/tests/app-install.test.ts, server/workspace/tests/app-directory.test.ts | Verify: pnpm --dir /Users/jacob/Documents/Code/AprovanLabs/aprovan/server/workspace typecheck && pnpm --dir /Users/jacob/Documents/Code/AprovanLabs/aprovan/server/workspace test
 
-- [ ] 3.1 Dependencies in `apps/capabilities.ts`: parse/validate `requires` at publish
+- [x] 3.1 Dependencies in `apps/capabilities.ts`: parse/validate `requires` at publish
       (contract must exist in the interface catalog; 400 otherwise); extend
       `assertAllowedTools` to accept exact `contract.procedure` entries for declared
       contracts (wildcards stay rejected with the tier message); `apps.capabilities` gains
       the `dependencies` section (contract, optional, boundProfile?, fulfilled) (spec
       app-dependencies; tech-plan D4).
-- [ ] 3.2 Rewrite `apps/install.ts` to the `AppInstallation` record (tech-plan Interfaces):
+- [x] 3.2 Rewrite `apps/install.ts` to the `AppInstallation` record (tech-plan Interfaces):
       ULID-keyed `svc#installs / <installId>`, `originAppId`/`originWorkspaceId`, pin
       (channel default `live` | release), `resolvedRelease`, `bindings`, `config`,
       `editing: false`, delete `assertInstallable`/`installKey`/`dataScope` gating.
       Binding resolution at install: explicit profile or the contract's tenant `default`
       profile; unfulfilled non-optional requirement → 400 naming the contract (spec
       app-dependencies "Installation binds each interface requirement").
-- [ ] 3.3 Grant mirroring: bind writes `grants.grant(tenant, profileId, {kind: "app", id:
+- [x] 3.3 Grant mirroring: bind writes `grants.grant(tenant, profileId, {kind: "app", id:
       installId})` via registry-storage, unbind revokes; app-session dispatch on a declared
       contract resolves the binding and executes through the profile, denied when the grant
       is revoked; degrade path when `profileGrantsAvailable()` is false: install-side-only
       binding + `fulfilled: "ungated"` in capabilities (tech-plan D5 + risk).
-- [ ] 3.4 Lifecycle procedures in `apps/service.ts`: `apps.install` (any public app, or own
+- [x] 3.4 Lifecycle procedures in `apps/service.ts`: `apps.install` (any public app, or own
       workspace's app; private-elsewhere → 404), `apps.update {install, release?, force?}`
       re-resolving the pin with old→new report and origin-unavailable error, `apps.configure`
       (bindings/config/editing), `apps.uninstall {install, purgeData?}`, `apps.installed`
       with `available` flag (specs app-install-lifecycle; tech-plan D2/D6).
-- [ ] 3.5 Serve-from-origin + fork: default installs serve the pinned release's content from
+- [x] 3.5 Serve-from-origin + fork: default installs serve the pinned release's content from
       the origin workspace's FS (extend `routes/live-apps.ts` resolution; cache immutable
       release lookups); `editing: true` materializes the release's files under the chosen
       prefix and flips serving local; post-edit origin update requires `force` (spec
       "Installs are forks with editing off by default").
-- [ ] 3.6 `apps/directory.ts`: write-through index `svc#directory / <appId>` in the
+- [x] 3.6 `apps/directory.ts`: write-through index `svc#directory / <appId>` in the
       `__deployment__` tenant, synced from `saveApp`/`removeApp`/`setChannel`/visibility
       changes; `apps.directory` merges index + caller's own apps; `__deployment__` rejected
       as a caller workspace id (tech-plan D7).
-- [ ] 3.7 Tests: publish/validate requires; install with default/explicit/missing profile;
+- [x] 3.7 Tests: publish/validate requires; install with default/explicit/missing profile;
       rebind without reinstall; revoke cuts execution; channel update old→new; config
       survives update; private-app install 404; fork materialization + force semantics;
       directory add/remove on visibility flip; two installs distinct (spec scenarios across

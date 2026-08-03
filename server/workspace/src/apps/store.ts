@@ -115,6 +115,11 @@ export interface AppManifest {
    */
   workflows?: string[];
   /**
+   * Interface-contract requirements fulfilled at install by binding a tenant
+   * Profile (see apps/capabilities.ts `requires`).
+   */
+  requires?: AppRequirement[];
+  /**
    * Channel → release id. The live page serves `channels.live`'s pinned
    * content when set (see apps/releases.ts); `?channel=preview` serves
    * `channels.preview` to the app's admins.
@@ -131,6 +136,13 @@ export interface AppManifest {
   createdBy: string;
   createdAt: string;
   updatedAt: string;
+}
+
+/** One interface-contract requirement declared on a manifest. */
+export interface AppRequirement {
+  contract: string;
+  profileName?: string;
+  optional?: boolean;
 }
 
 /**
@@ -360,6 +372,8 @@ export async function saveApp(workspaceId: string, manifest: AppManifest): Promi
   await writeSvcRecord(workspaceId, APPS_SCOPE, manifest.appId, manifest, manifest.createdBy);
   await setAlias(workspaceId, manifest.name, manifest.appId);
   await indexAppLocation(workspaceId, manifest.appId, manifest.name);
+  const { syncDirectoryEntry } = await import("./directory.js");
+  await syncDirectoryEntry(workspaceId, manifest);
 }
 
 /** Read a manifest by durable appId. No name-keyed or legacy-shape rebinding. */
@@ -390,6 +404,8 @@ export async function removeApp(
   if (manifest) {
     await dropAlias(workspaceId, manifest.name);
     await dropAppLocation(manifest.appId);
+    const { dropDirectoryEntry } = await import("./directory.js");
+    await dropDirectoryEntry(manifest.appId);
   }
   if (options.purgeData && manifest) {
     await getFsStore().removePrefix(workspaceId, `${APP_DATA_ROOT}/${manifest.appId}`);
