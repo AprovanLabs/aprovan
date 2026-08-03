@@ -52,7 +52,7 @@ interface TraceRow {
 
 interface TelemetryEvent {
   id: string;
-  kind: "span" | "log";
+  kind: "span" | "log" | "metric";
   traceId?: string;
   name?: string;
   message?: string;
@@ -62,6 +62,9 @@ interface TelemetryEvent {
   at: string;
   error?: { message: string; stack?: string };
   source: TraceSource;
+  metricType?: "counter" | "gauge" | "histogram";
+  value?: number;
+  unit?: string;
   attributes?: Record<string, unknown>;
 }
 
@@ -100,34 +103,74 @@ function FilterChip({
   );
 }
 
-/** One event row inside an expanded trace. */
+function formatMetricValue(value: number | undefined, unit: string | undefined): string | null {
+  if (value === undefined) return null;
+  return unit ? `${value} ${unit}` : String(value);
+}
+
+/** One event row inside an expanded trace. Exhaustive on TelemetryEvent["kind"]. */
 function EventRow({ event }: { event: TelemetryEvent }) {
+  let kindLabel: string;
+  let primary: string;
+  let valueLabel: string | null = null;
+  let showSourceChip = false;
+  let errorBlock: { message: string; stack?: string } | undefined;
+
+  switch (event.kind) {
+    case "span":
+      kindLabel =
+        event.durationMs !== undefined ? `span · ${event.durationMs}ms` : "span";
+      primary = event.message ?? event.name ?? event.id;
+      errorBlock = event.error;
+      break;
+    case "log":
+      kindLabel = `log${event.level ? ` · ${event.level}` : ""}`;
+      primary = event.message ?? event.name ?? event.id;
+      errorBlock = event.error;
+      break;
+    case "metric":
+      kindLabel = event.metricType ? `metric · ${event.metricType}` : "metric";
+      primary = event.name ?? event.id;
+      valueLabel = formatMetricValue(event.value, event.unit);
+      showSourceChip = true;
+      break;
+    default: {
+      const _exhaustive: never = event.kind;
+      void _exhaustive;
+      return null;
+    }
+  }
+
   return (
     <div className="border-t px-2 py-1.5 text-xs first:border-t-0">
       <div className="flex flex-wrap items-center gap-1.5">
         <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
-          {event.kind === "span"
-            ? event.durationMs !== undefined
-              ? `span · ${event.durationMs}ms`
-              : "span"
-            : `log${event.level ? ` · ${event.level}` : ""}`}
+          {kindLabel}
         </Badge>
-        <span className="min-w-0 truncate">{event.message ?? event.name ?? event.id}</span>
+        <span className="min-w-0 truncate">{primary}</span>
+        {valueLabel !== null && (
+          <span className="shrink-0 font-mono text-[11px] text-muted-foreground">{valueLabel}</span>
+        )}
+        {showSourceChip && (
+          <Badge variant="secondary" className="shrink-0 px-1.5 py-0 text-[10px]">
+            {SOURCE_LABEL[event.source.type] ?? event.source.type}
+          </Badge>
+        )}
         <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">
           {relativeTime(event.at)}
         </span>
       </div>
-      {event.error && (
+      {errorBlock && (
         <div className="mt-1">
-          <span className="text-destructive">{event.error.message}</span>
-          {event.error.stack && (
+          <span className="text-destructive">{errorBlock.message}</span>
+          {errorBlock.stack && (
             <Collapsible>
               <CollapsibleTrigger className="block text-[11px] text-muted-foreground hover:text-foreground">
                 Show details
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <pre className="mt-1 overflow-x-auto whitespace-pre-wrap rounded bg-muted p-2 text-[11px] text-muted-foreground">
-                  {event.error.stack}
+                  {errorBlock.stack}
                 </pre>
               </CollapsibleContent>
             </Collapsible>
