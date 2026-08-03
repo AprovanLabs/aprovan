@@ -4,12 +4,14 @@ import type {
   AuditEntry,
   GrantSubjectKind,
   Group,
+  GroupProfileSummary,
   Member,
   PermissionGrant,
   Profile,
   ProfileCreateInput,
   ProfileGrant,
   ProfileUpdateInput,
+  ProfileWire,
 } from "./types";
 
 export async function listMembers(client: GatewayClient): Promise<Member[]> {
@@ -196,4 +198,44 @@ export async function listAudit(
     `/audit${query ? `?${query}` : ""}`,
   );
   return data.audit;
+}
+
+/** Workspace profiles for the group attach picker (GET /profiles). */
+export async function listWorkspaceProfiles(
+  client: GatewayClient,
+): Promise<ProfileWire[]> {
+  const data = await client.request<{ profiles: ProfileWire[] }>("/profiles");
+  return data.profiles;
+}
+
+export async function listGroupProfiles(
+  client: GatewayClient,
+  groupId: string,
+): Promise<GroupProfileSummary[]> {
+  const data = await client.request<{ profiles: GroupProfileSummary[] }>(
+    `/groups/${groupId}/profiles`,
+  );
+  return data.profiles;
+}
+
+export async function attachGroupProfile(
+  client: GatewayClient,
+  groupId: string,
+  profileRef: string,
+): Promise<GroupProfileSummary> {
+  return client.request<GroupProfileSummary>(`/groups/${groupId}/profiles`, true, {
+    method: "POST",
+    body: JSON.stringify({ profile: profileRef }),
+  });
+}
+
+export async function detachGroupProfile(
+  client: GatewayClient,
+  groupId: string,
+  profileRef: string,
+): Promise<void> {
+  await client.request<{ removed: boolean }>(`/groups/${groupId}/profiles`, true, {
+    method: "DELETE",
+    body: JSON.stringify({ profile: profileRef }),
+  });
 }

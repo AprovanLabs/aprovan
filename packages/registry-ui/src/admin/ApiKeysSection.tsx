@@ -9,6 +9,7 @@ import {
   Input,
 } from "@aprovan/ui";
 import { useCallback, useEffect, useState } from "react";
+import { ArmedButton } from "../credentials/ArmedButton";
 import { listApiKeys, mintApiKey, revokeApiKey } from "./api";
 import type { ApiKey } from "./types";
 
@@ -55,8 +56,6 @@ export function ApiKeysSection({
   }
 
   async function handleRevoke(key: ApiKey): Promise<void> {
-    const name = key.label ?? key.id;
-    if (!confirm(`Revoke API key "${name}"? This cannot be undone.`)) return;
     try {
       await revokeApiKey(client, key.id);
       setKeys((prev) =>
@@ -151,13 +150,11 @@ export function ApiKeysSection({
                         {new Date(k.createdAt).toLocaleDateString()}
                       </td>
                       <td className="py-2 pr-4">
-                        <Button
-                          onClick={() => void handleRevoke(k)}
-                          size="sm"
-                          variant="destructive"
-                        >
-                          Revoke
-                        </Button>
+                        <ArmedButton
+                          armedLabel="Confirm revoke?"
+                          label="Revoke"
+                          onConfirm={() => void handleRevoke(k)}
+                        />
                       </td>
                     </tr>
                   ))}

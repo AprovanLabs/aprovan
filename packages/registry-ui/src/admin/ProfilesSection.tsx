@@ -9,6 +9,7 @@ import {
   Input,
 } from "@aprovan/ui";
 import { useCallback, useEffect, useState } from "react";
+import { ArmedButton } from "../credentials/ArmedButton";
 import { parseGatewayStatus } from "../credentials/api";
 import {
   addProfileGrant,
@@ -143,7 +144,6 @@ export function ProfilesSection({
   }
 
   async function handleDelete(id: string): Promise<void> {
-    if (!confirm("Delete this profile? This cannot be undone.")) return;
     try {
       await deleteProfile(client, id);
       setProfiles((prev) => prev.filter((p) => p.id !== id));
@@ -312,13 +312,11 @@ export function ProfilesSection({
                   <Button onClick={() => void handleUpdate()} size="sm">
                     Save
                   </Button>
-                  <Button
-                    onClick={() => void handleDelete(selected.id)}
-                    size="sm"
-                    variant="destructive"
-                  >
-                    Delete
-                  </Button>
+                  <ArmedButton
+                    armedLabel="Confirm delete?"
+                    label="Delete"
+                    onConfirm={() => void handleDelete(selected.id)}
+                  />
                 </div>
 
                 <div className="flex flex-col gap-2">
@@ -340,13 +338,11 @@ export function ProfilesSection({
                             key={`${g.subjectKind}:${g.subjectId}`}
                           >
                             {g.subjectKind}:{g.subjectId}
-                            <Button
-                              onClick={() => void handleRevokeGrant(g)}
-                              size="sm"
-                              variant="ghost"
-                            >
-                              Revoke
-                            </Button>
+                            <ArmedButton
+                              armedLabel="Confirm revoke?"
+                              label="Revoke"
+                              onConfirm={() => void handleRevokeGrant(g)}
+                            />
                           </li>
                         ))}
                       </ul>

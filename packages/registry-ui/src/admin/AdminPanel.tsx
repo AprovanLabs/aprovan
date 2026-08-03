@@ -1,15 +1,7 @@
 import type { GatewayClient } from "@aprovan/registry-main";
-import {
-  Badge,
-  Button,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  Input,
-} from "@aprovan/ui";
+import { Badge, Button, Input } from "@aprovan/ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { ArmedButton } from "../credentials/ArmedButton";
 import { parseGatewayStatus } from "../credentials/api";
 import { ApiKeysSection } from "./ApiKeysSection";
 import { AuditSection } from "./AuditSection";
@@ -31,6 +23,7 @@ import {
   DEFAULT_ADMIN_CAPABILITIES,
   tabsForCapabilities,
 } from "./capabilities";
+import { GroupProfilesSection } from "./GroupProfilesSection";
 import { ProfilesSection } from "./ProfilesSection";
 import type { AdminCapability, Group, Member, PermissionGrant } from "./types";
 
@@ -40,6 +33,23 @@ function tabClass(active: boolean): string {
       ? "border-foreground text-foreground"
       : "border-transparent text-muted-foreground hover:text-foreground"
   }`;
+}
+
+function SectionHeader({
+  title,
+  onRefresh,
+}: {
+  title: string;
+  onRefresh: () => void;
+}): React.ReactElement {
+  return (
+    <div className="flex items-center justify-between">
+      <h3 className="text-sm font-semibold">{title}</h3>
+      <Button onClick={onRefresh} size="sm" type="button" variant="outline">
+        Refresh
+      </Button>
+    </div>
+  );
 }
 
 function MembersSection({
@@ -77,60 +87,49 @@ function MembersSection({
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">Workspace members</h3>
-        <Button onClick={() => void load()} size="sm" variant="outline">
-          Refresh
-        </Button>
-      </div>
-      <Card>
-        <CardContent className="p-0">
-          {loading && <p className="px-4 py-3 text-sm text-muted-foreground">Loading…</p>}
-          {error && <p className="px-4 py-3 text-sm text-destructive">{error}</p>}
-          {!loading && members.length === 0 && (
-            <p className="px-4 py-3 text-sm text-muted-foreground">No members found.</p>
-          )}
-          {members.length > 0 && (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-xs text-muted-foreground">
-                    <th className="pb-2 pl-4 pt-3 text-left font-medium">User</th>
-                    <th className="pb-2 pr-4 pt-3 text-left font-medium">Role</th>
-                    <th className="pb-2 pr-4 pt-3 text-left font-medium">Joined</th>
-                    <th className="pb-2 pr-4 pt-3" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {members.map((m) => (
-                    <tr className="border-b last:border-0" key={m.userId}>
-                      <td className="py-2 pl-4 font-mono text-xs">{m.userId}</td>
-                      <td className="py-2 pr-4">
-                        <Badge variant={m.role === "admin" ? "default" : "secondary"}>
-                          {m.role}
-                        </Badge>
-                      </td>
-                      <td className="py-2 pr-4 text-xs text-muted-foreground">
-                        {m.createdAt ? new Date(m.createdAt).toLocaleDateString() : "—"}
-                      </td>
-                      <td className="py-2 pr-4">
-                        <Button
-                          onClick={() => void handleRemove(m.userId)}
-                          size="sm"
-                          variant="destructive"
-                        >
-                          Remove
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+    <div className="flex flex-col gap-3">
+      <SectionHeader onRefresh={() => void load()} title="Members" />
+      {error && <p className="text-sm text-destructive">{error}</p>}
+      {loading ? (
+        <p className="text-sm text-muted-foreground">Loading members…</p>
+      ) : members.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No members found.</p>
+      ) : (
+        <div className="overflow-x-auto rounded-md border">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b text-xs text-muted-foreground">
+                <th className="px-3 py-2 text-left font-medium">User</th>
+                <th className="px-3 py-2 text-left font-medium">Role</th>
+                <th className="px-3 py-2 text-left font-medium">Joined</th>
+                <th className="px-3 py-2" />
+              </tr>
+            </thead>
+            <tbody>
+              {members.map((m) => (
+                <tr className="border-b last:border-0" key={m.userId}>
+                  <td className="px-3 py-2 font-mono text-xs">{m.userId}</td>
+                  <td className="px-3 py-2">
+                    <Badge variant={m.role === "admin" ? "default" : "secondary"}>
+                      {m.role}
+                    </Badge>
+                  </td>
+                  <td className="px-3 py-2 text-xs text-muted-foreground">
+                    {m.createdAt ? new Date(m.createdAt).toLocaleDateString() : "—"}
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    <ArmedButton
+                      armedLabel="Confirm remove?"
+                      label="Remove"
+                      onConfirm={() => void handleRemove(m.userId)}
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
@@ -145,6 +144,7 @@ function GroupsSection({
   const [error, setError] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [groupUsers, setGroupUsers] = useState<string[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
   const [newName, setNewName] = useState("");
   const [newDesc, setNewDesc] = useState("");
   const [editName, setEditName] = useState("");
@@ -171,11 +171,13 @@ function GroupsSection({
       setGroupUsers([]);
       return;
     }
+    setUsersLoading(true);
     void listGroupUsers(client, selectedId)
       .then(setGroupUsers)
       .catch((err) =>
         setError(err instanceof Error ? err.message : "Failed to load group members"),
-      );
+      )
+      .finally(() => setUsersLoading(false));
     const group = groups.find((g) => g.groupId === selectedId);
     setEditName(group?.name ?? "");
   }, [client, selectedId, groups]);
@@ -241,121 +243,126 @@ function GroupsSection({
   const selected = groups.find((g) => g.groupId === selectedId);
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">Groups</h3>
-        <Button onClick={() => void load()} size="sm" variant="outline">
-          Refresh
-        </Button>
-      </div>
-
+    <div className="flex flex-col gap-3">
+      <SectionHeader onRefresh={() => void load()} title="Groups" />
       {error && <p className="text-sm text-destructive">{error}</p>}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm">Create group</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form className="flex flex-wrap items-end gap-3" onSubmit={(e) => void handleCreate(e)}>
-            <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-muted-foreground">Name</span>
-              <Input onChange={(e) => setNewName(e.target.value)} value={newName} />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-muted-foreground">Description</span>
-              <Input onChange={(e) => setNewDesc(e.target.value)} value={newDesc} />
-            </label>
-            <Button disabled={!newName.trim()} type="submit">Create</Button>
-          </form>
-        </CardContent>
-      </Card>
+      <form
+        className="flex flex-wrap items-end gap-2 rounded-md border p-3"
+        onSubmit={(e) => void handleCreate(e)}
+      >
+        <label className="flex min-w-[8rem] flex-1 flex-col gap-1">
+          <span className="text-xs font-medium text-muted-foreground">Name</span>
+          <Input onChange={(e) => setNewName(e.target.value)} value={newName} />
+        </label>
+        <label className="flex min-w-[8rem] flex-1 flex-col gap-1">
+          <span className="text-xs font-medium text-muted-foreground">Description</span>
+          <Input onChange={(e) => setNewDesc(e.target.value)} value={newDesc} />
+        </label>
+        <Button disabled={!newName.trim()} type="submit">
+          Create
+        </Button>
+      </form>
 
       {loading ? (
-        <p className="text-sm text-muted-foreground">Loading…</p>
+        <p className="text-sm text-muted-foreground">Loading groups…</p>
+      ) : groups.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          No groups yet. Create one to organize members and grant profile access.
+        </p>
       ) : (
-        <div className="grid gap-4 lg:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">All groups</CardTitle>
-              <CardDescription>{groups.length} group(s)</CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-2">
-              {groups.length === 0 && (
-                <p className="text-sm text-muted-foreground">No groups yet.</p>
-              )}
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,14rem)_1fr]">
+          <div className="overflow-hidden rounded-md border">
+            <ul className="flex flex-col">
               {groups.map((g) => (
-                <button
-                  className={`flex flex-col rounded-lg border p-3 text-left transition-colors ${
-                    selectedId === g.groupId ? "border-ring bg-accent/50" : "hover:bg-muted/50"
-                  }`}
-                  key={g.groupId}
-                  onClick={() => setSelectedId(g.groupId)}
-                  type="button"
-                >
-                  <span className="font-medium">{g.name}</span>
-                  {g.description && (
-                    <span className="text-xs text-muted-foreground">{g.description}</span>
-                  )}
-                </button>
-              ))}
-            </CardContent>
-          </Card>
-
-          {selected && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm">{selected.name}</CardTitle>
-                <CardDescription className="font-mono text-xs">{selected.groupId}</CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-4">
-                <div className="flex flex-wrap items-end gap-2">
-                  <label className="flex flex-col gap-1 flex-1">
-                    <span className="text-xs font-medium text-muted-foreground">Rename</span>
-                    <Input onChange={(e) => setEditName(e.target.value)} value={editName} />
-                  </label>
-                  <Button onClick={() => void handleUpdate()} size="sm">Save</Button>
-                  <Button
-                    onClick={() => void handleDelete(selected.groupId)}
-                    size="sm"
-                    variant="destructive"
+                <li key={g.groupId}>
+                  <button
+                    className={`flex w-full flex-col border-b px-3 py-2 text-left last:border-0 ${
+                      selectedId === g.groupId
+                        ? "bg-accent/50"
+                        : "hover:bg-muted/40"
+                    }`}
+                    onClick={() => setSelectedId(g.groupId)}
+                    type="button"
                   >
-                    Delete
+                    <span className="truncate text-sm font-medium">{g.name}</span>
+                    {g.description && (
+                      <span className="truncate text-xs text-muted-foreground">
+                        {g.description}
+                      </span>
+                    )}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {selected ? (
+            <div className="flex flex-col gap-4 rounded-md border p-3">
+              <div className="flex flex-wrap items-end gap-2">
+                <label className="flex min-w-[10rem] flex-1 flex-col gap-1">
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {selected.name}
+                  </span>
+                  <Input onChange={(e) => setEditName(e.target.value)} value={editName} />
+                </label>
+                <Button onClick={() => void handleUpdate()} size="sm" type="button">
+                  Save
+                </Button>
+                <ArmedButton
+                  armedLabel="Confirm delete?"
+                  label="Delete"
+                  onConfirm={() => void handleDelete(selected.groupId)}
+                />
+              </div>
+              <p className="font-mono text-[0.65rem] text-muted-foreground">
+                {selected.groupId}
+              </p>
+
+              <div className="flex flex-col gap-2">
+                <h4 className="text-sm font-medium">People</h4>
+                {usersLoading ? (
+                  <p className="text-sm text-muted-foreground">Loading…</p>
+                ) : groupUsers.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No people in this group.</p>
+                ) : (
+                  <div className="overflow-x-auto rounded-md border">
+                    <table className="w-full text-sm">
+                      <tbody>
+                        {groupUsers.map((userId) => (
+                          <tr className="border-b last:border-0" key={userId}>
+                            <td className="px-3 py-1.5 font-mono text-xs">{userId}</td>
+                            <td className="px-3 py-1.5 text-right">
+                              <ArmedButton
+                                armedLabel="Confirm remove?"
+                                label="Remove"
+                                onConfirm={() => void handleRemoveUser(userId)}
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <Input
+                    onChange={(e) => setAddUserId(e.target.value)}
+                    placeholder="User id"
+                    value={addUserId}
+                  />
+                  <Button onClick={() => void handleAddUser()} size="sm" type="button">
+                    Add
                   </Button>
                 </div>
+              </div>
 
-                <div className="flex flex-col gap-2">
-                  <span className="text-sm font-medium">Members</span>
-                  {groupUsers.length === 0 && (
-                    <p className="text-sm text-muted-foreground">No users in this group.</p>
-                  )}
-                  <ul className="flex flex-col gap-1">
-                    {groupUsers.map((userId) => (
-                      <li
-                        className="flex items-center justify-between rounded border px-2 py-1 font-mono text-xs"
-                        key={userId}
-                      >
-                        {userId}
-                        <Button
-                          onClick={() => void handleRemoveUser(userId)}
-                          size="sm"
-                          variant="ghost"
-                        >
-                          Remove
-                        </Button>
-                      </li>
-                    ))}
-                  </ul>
-                  <div className="flex gap-2">
-                    <Input
-                      onChange={(e) => setAddUserId(e.target.value)}
-                      placeholder="User id"
-                      value={addUserId}
-                    />
-                    <Button onClick={() => void handleAddUser()} size="sm">Add</Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+              <GroupProfilesSection client={client} groupId={selected.groupId} />
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Select a group to manage people and profiles.
+            </p>
           )}
         </div>
       )}
@@ -363,7 +370,7 @@ function GroupsSection({
   );
 }
 
-function GrantsSection({
+function AccessSection({
   client,
 }: {
   client: GatewayClient;
@@ -377,11 +384,9 @@ function GrantsSection({
     setLoading(true);
     setError("");
     try {
-      setGrants(
-        await listPermissions(client, callerFilter.trim() || undefined),
-      );
+      setGrants(await listPermissions(client, callerFilter.trim() || undefined));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load tool grants");
+      setError(err instanceof Error ? err.message : "Failed to load access grants");
     } finally {
       setLoading(false);
     }
@@ -401,75 +406,58 @@ function GrantsSection({
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">Tool grants</h3>
-        <Button onClick={() => void load()} size="sm" variant="outline">
-          Refresh
+    <div className="flex flex-col gap-3">
+      <SectionHeader onRefresh={() => void load()} title="Access" />
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-medium text-muted-foreground">Caller filter</span>
+          <Input
+            className="w-48"
+            onChange={(e) => setCallerFilter(e.target.value)}
+            placeholder="user id"
+            value={callerFilter}
+          />
+        </label>
+        <Button onClick={() => void load()} type="button" variant="outline">
+          Apply
         </Button>
       </div>
 
-      <Card>
-        <CardContent className="flex flex-wrap items-end gap-3 pt-4">
-          <label className="flex flex-col gap-1">
-            <span className="text-xs font-medium text-muted-foreground">Caller filter</span>
-            <Input
-              className="w-48"
-              onChange={(e) => setCallerFilter(e.target.value)}
-              placeholder="user id"
-              value={callerFilter}
-            />
-          </label>
-          <Button onClick={() => void load()} variant="outline">Apply</Button>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm">Active grants</CardTitle>
-          <CardDescription>
-            {loading ? "Loading…" : `${grants.length} grant(s)`}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {error && <p className="text-sm text-destructive">{error}</p>}
-          {!loading && grants.length === 0 && (
-            <p className="text-sm text-muted-foreground">No tool grants found.</p>
-          )}
-          {grants.length > 0 && (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-xs text-muted-foreground">
-                    <th className="pb-2 text-left font-medium">Caller</th>
-                    <th className="pb-2 pr-4 text-left font-medium">Provider</th>
-                    <th className="pb-2 pr-4 text-left font-medium">Operation</th>
-                    <th className="pb-2" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {grants.map((g) => (
-                    <tr className="border-b last:border-0" key={g.id}>
-                      <td className="py-2 font-mono text-xs">{g.callerId}</td>
-                      <td className="py-2 pr-4 font-mono text-xs">{g.provider}</td>
-                      <td className="py-2 pr-4 font-mono text-xs">{g.operation}</td>
-                      <td className="py-2">
-                        <Button
-                          onClick={() => void handleRevoke(g.id)}
-                          size="sm"
-                          variant="destructive"
-                        >
-                          Revoke
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {error && <p className="text-sm text-destructive">{error}</p>}
+      {loading ? (
+        <p className="text-sm text-muted-foreground">Loading access grants…</p>
+      ) : grants.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No access grants found.</p>
+      ) : (
+        <div className="overflow-x-auto rounded-md border">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b text-xs text-muted-foreground">
+                <th className="px-3 py-2 text-left font-medium">Caller</th>
+                <th className="px-3 py-2 text-left font-medium">Provider</th>
+                <th className="px-3 py-2 text-left font-medium">Operation</th>
+                <th className="px-3 py-2" />
+              </tr>
+            </thead>
+            <tbody>
+              {grants.map((g) => (
+                <tr className="border-b last:border-0" key={g.id}>
+                  <td className="px-3 py-2 font-mono text-xs">{g.callerId}</td>
+                  <td className="px-3 py-2 font-mono text-xs">{g.provider}</td>
+                  <td className="px-3 py-2 font-mono text-xs">{g.operation}</td>
+                  <td className="px-3 py-2 text-right">
+                    <ArmedButton
+                      armedLabel="Confirm revoke?"
+                      label="Revoke"
+                      onConfirm={() => void handleRevoke(g.id)}
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
@@ -515,15 +503,15 @@ export function AdminPanel({
 
   if (forbidden) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Not authorized</CardTitle>
-          <CardDescription>
-            You do not have permission to manage this workspace. Contact a workspace admin if you
-            need access.
-          </CardDescription>
-        </CardHeader>
-      </Card>
+      <div className="rounded-md border bg-muted/40 p-4 text-sm">
+        <div className="space-y-1">
+          <div className="font-medium text-foreground">Not authorized</div>
+          <div className="text-muted-foreground">
+            You don&apos;t have permission to manage this workspace. Ask a workspace admin
+            if you need access.
+          </div>
+        </div>
+      </div>
     );
   }
 
@@ -532,12 +520,12 @@ export function AdminPanel({
     DEFAULT_ADMIN_CAPABILITIES.every((c, i) => capabilities[i] === c);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
       <div>
         <h2 className="text-lg font-semibold tracking-tight">Admin</h2>
         <p className="text-sm text-muted-foreground">
           {isHostedDefault
-            ? "Members, groups, and tool grants."
+            ? "Members, groups, and access."
             : `${tabs.map((t) => t.label).join(", ")}.`}
         </p>
       </div>
@@ -557,7 +545,7 @@ export function AdminPanel({
 
       {activeTab === "members" && <MembersSection client={client} />}
       {activeTab === "groups" && <GroupsSection client={client} />}
-      {activeTab === "permissions" && <GrantsSection client={client} />}
+      {activeTab === "permissions" && <AccessSection client={client} />}
       {activeTab === "api-keys" && <ApiKeysSection client={client} />}
       {activeTab === "profiles" && <ProfilesSection client={client} />}
       {activeTab === "audit" && <AuditSection client={client} />}
