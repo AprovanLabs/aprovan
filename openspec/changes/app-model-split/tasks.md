@@ -165,17 +165,17 @@ else in this change is IW-0-independent. Nuke-and-reseed: no task migrates name-
 
 > Depends-on: 3, 5 | Touches: server/workspace/tests/app-integration.test.ts, docs/**, openspec/changes/app-model-split/** | Verify: pnpm --dir /Users/jacob/Documents/Code/AprovanLabs/aprovan/server/workspace test && pnpm --dir /Users/jacob/Documents/Code/AprovanLabs/aprovan/client/web build && ! grep -rn "PERSONAL_APP_NAME\|PERSONAL_PREFIX\|isPersonalApp\|\.personal" /Users/jacob/Documents/Code/AprovanLabs/aprovan/server/workspace/src /Users/jacob/Documents/Code/AprovanLabs/aprovan/client/web/src /Users/jacob/Documents/Code/AprovanLabs/aprovan/packages/ui/src /Users/jacob/Documents/Code/AprovanLabs/aprovan/packages/registry-ui/src
 
-- [ ] 6.1 End-to-end integration test: workspace A publishes a public app with `requires:
+- [x] 6.1 End-to-end integration test: workspace A publishes a public app with `requires:
       [{contract: "sql"}]` + a provider grant → B sees it in the directory → installs with
       the default profile → app session reads/writes land in `.apps/<installId>/data/<sub>`
       and `app#<installId>#u#<sub>` → A renames the app → B's install still resolves,
       updates, and serves (the full spec chain across all four server capabilities).
-- [ ] 6.2 Run the reseed script against a seeded legacy-shaped workspace fixture and assert
+- [x] 6.2 Run the reseed script against a seeded legacy-shaped workspace fixture and assert
       a clean boot with zero name-keyed keys remaining (tech-plan Rollout 1).
-- [ ] 6.3 Registry-boundary test: assert the only registry-server calls made by app flows
+- [x] 6.3 Registry-boundary test: assert the only registry-server calls made by app flows
       are profile/grant operations with opaque `{kind: "app", id}` subjects — no manifest,
       name, or app schema crosses (spec app-identity "Registry stays app-ignorant").
-- [ ] 6.4 Docs: update the app-data / native-surfaces docs sections that describe Personal,
+- [x] 6.4 Docs: update the app-data / native-surfaces docs sections that describe Personal,
       `(workspace, name)` identity, `dataScope`, and the sidebar apps group to the shipped
       model; note the inert-bundle export/import as explicit future direction (PRD
       Non-Goals).

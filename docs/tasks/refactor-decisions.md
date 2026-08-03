@@ -160,9 +160,10 @@ edge (registry's workspace depending on `@aprovan/patchwork-compiler`) dies with
 - **Mounts/lineage:** `.services/vcs/mounts.json`, read uncached on every FS op. Commits
   record nothing about mounted refs ("a commit can't pin what it doesn't own"); `config.ref`
   defaults to the moving `main`. Lineage is a WS-6 design item.
-- **Per-user data today:** the synthesized Personal app (`apps/personal.ts`, `.personal/`
-  prefix, record scope `app#personal#u#<sub>`) is the embryo of per-user private data; hiding
-  is list-only — no read authorization on the file plane.
+- **Per-user data today:** ~~the synthesized Personal app (`apps/personal.ts`, `.personal/`
+  prefix, record scope `app#personal#u#<sub>`)~~ **Shipped:** Personal deleted; partitions are
+  `.apps/<id>/data/<sub>` + `.users/<sub>` with record scopes `app#<id>#u#<sub>` — see
+  [app-data.md](../app-data.md).
 
 ## Workstreams
 
