@@ -119,10 +119,10 @@ checkouts contain untracked husk dirs that mask failures._
 
 > Depends-on: 3, 4, 5 | Touches: (no source — verification only) | Verify: see 6.1–6.3
 
-- [ ] 6.1 Fresh aprovan clone with no sibling checkout is green (spec:
+- [x] 6.1 Fresh aprovan clone with no sibling checkout is green (spec:
       execution-plane-consumption / "Fresh aprovan clone is green").
       Verify: `T=$(mktemp -d) && git clone https://github.com/AprovanLabs/aprovan $T/aprovan && cd $T/aprovan && pnpm install && pnpm build && pnpm typecheck && pnpm test`
-- [ ] 6.2 Workspace image builds from the fresh clone (spec:
+- [x] 6.2 Workspace image builds from the fresh clone (spec:
       execution-plane-consumption / "Workspace image builds").
       Verify: `cd $T/aprovan && docker build -f server/workspace/Dockerfile .`
 - [ ] 6.3 No absolute checkout paths remain in either repo (specs: both / grep scenarios).

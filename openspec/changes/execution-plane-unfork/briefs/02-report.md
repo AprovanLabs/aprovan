@@ -1,10 +1,10 @@
 # Brief 02 report — Aprovan npm switch + fork delete
 
 ## Status
-**Streams 4–5: DONE (PR).** Stream 6: worktree green; fresh-clone/docker pending post-merge.
+**Streams 4–5: DONE (PR).** Stream 6: fresh-clone + docker image verified green on the PR branch / after merge.
 
 ## What shipped
-PR: https://github.com/AprovanLabs/aprovan/pull/24
+PR: https://github.com/AprovanLabs/aprovan/pull/24 (merged)
 
 ### Aprovan unfork
 - Repointed `server/workspace` to npm: `@utdk/{agent,llm,sandbox}^0.2.0`,
@@ -52,7 +52,8 @@ Walking up from `@utdk/agent` no longer finds sibling contracts under pnpm.
 | No `workspace:*` → exec-plane packages | **PASS** |
 | `launch.json` has no registry path | **PASS** |
 | Absolute `/Users/` grep | **PARTIAL** — launch.json + deleted utdk clean; pre-existing openspec docs still mention paths |
-| Fresh clone (6.1) / docker image (6.2) | Pending after merge |
+| Fresh clone (6.1) | **PASS** (PR branch clone)
+| Docker workspace image (6.2) | **PASS** |
 
 ## Published versions consumed
 | Package | Version |
