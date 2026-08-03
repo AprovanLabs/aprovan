@@ -1,5 +1,6 @@
 import DOMPurify from 'dompurify';
 import { useCallback, useRef, useEffect, useState, useMemo } from 'react';
+import { useIsDark } from '../../lib/useIsDark';
 import { createHighlighter, type Highlighter, type BundledLanguage } from 'shiki';
 
 // Singleton highlighter instance
@@ -23,7 +24,7 @@ const COMMON_LANGUAGES: BundledLanguage[] = [
 function getHighlighter(): Promise<Highlighter> {
   if (!highlighterPromise) {
     highlighterPromise = createHighlighter({
-      themes: ['github-light'],
+      themes: ['github-light', 'github-dark'],
       langs: COMMON_LANGUAGES,
     });
   }
@@ -68,6 +69,8 @@ export function CodeBlockView({ content, language, editable = false, onChange }:
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [highlighter, setHighlighter] = useState<Highlighter | null>(null);
+  const isDark = useIsDark();
+  const shikiTheme = isDark ? 'github-dark' : 'github-light';
 
   // Load the highlighter
   useEffect(() => {
@@ -120,7 +123,7 @@ export function CodeBlockView({ content, language, editable = false, onChange }:
     try {
       const raw = highlighter.codeToHtml(content, {
         lang: shikiLang,
-        theme: 'github-light',
+        theme: shikiTheme,
       });
       return DOMPurify.sanitize(raw, {
         ALLOWED_TAGS: ['pre', 'code', 'span', 'div'],
@@ -129,12 +132,12 @@ export function CodeBlockView({ content, language, editable = false, onChange }:
     } catch {
       return null;
     }
-  }, [highlighter, content, shikiLang]);
+  }, [highlighter, content, shikiLang, shikiTheme]);
 
   return (
-    <div className="h-full flex flex-col bg-[#ffffff]">
-      <div className="flex items-center justify-between px-4 py-2 bg-[#f6f8fa] border-b border-[#d0d7de] text-xs">
-        <span className="font-mono text-[#57606a]">{langLabel}</span>
+    <div className="h-full flex flex-col bg-card">
+      <div className="flex items-center justify-between px-4 py-2 bg-muted/50 border-b border-border text-xs">
+        <span className="font-mono text-muted-foreground">{langLabel}</span>
       </div>
       <div className="flex-1 overflow-y-auto overflow-x-hidden">
         {editable ? (
@@ -151,7 +154,7 @@ export function CodeBlockView({ content, language, editable = false, onChange }:
                   dangerouslySetInnerHTML={{ __html: highlightedHtml }}
                 />
               ) : (
-                <pre className="text-xs font-mono whitespace-pre-wrap break-words text-[#24292f] m-0 leading-relaxed">
+                <pre className="text-xs font-mono whitespace-pre-wrap break-words text-foreground m-0 leading-relaxed">
                   <code>{content}</code>
                 </pre>
               )}
@@ -166,7 +169,7 @@ export function CodeBlockView({ content, language, editable = false, onChange }:
               spellCheck={false}
               style={{
                 tabSize: 2,
-                caretColor: '#24292f',
+                caretColor: 'var(--foreground)',
                 wordBreak: 'break-word',
                 overflowWrap: 'break-word',
               }}
@@ -180,7 +183,7 @@ export function CodeBlockView({ content, language, editable = false, onChange }:
                 dangerouslySetInnerHTML={{ __html: highlightedHtml }}
               />
             ) : (
-              <pre className="text-xs font-mono whitespace-pre-wrap break-words m-0 leading-relaxed text-[#24292f]">
+              <pre className="text-xs font-mono whitespace-pre-wrap break-words m-0 leading-relaxed text-foreground">
                 <code>{content}</code>
               </pre>
             )}
