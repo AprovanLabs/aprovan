@@ -70,5 +70,5 @@ wave-1 parallel. Do not touch overlapping paths across parallel streams._
 
 > Depends-on: - | Touches: aprovan:packages/registry-ui/src/admin/**, aprovan:server/workspace/src/routes/**, registry:packages/registry-server/src/storage/** | Verify: cd /Users/jacob/Documents/Code/AprovanLabs/aprovan && pnpm --filter @aprovan/registry-ui test && pnpm --filter @aprovan/workspace test
 
-- [ ] 9.1 Extend members API/UI to show email/name primary; userId secondary.
-- [ ] 9.2 Unblock profiles in production storage (implement Dynamo profiles or fix feature detection) so “Profiles aren’t available in this deployment” is not the steady state for prod Dynamo.
+- [x] 9.1 Extend members API/UI to show email/name primary; userId secondary.
+- [x] 9.2 Unblock profiles in production storage (implement Dynamo profiles or fix feature detection) so “Profiles aren’t available in this deployment” is not the steady state for prod Dynamo.
