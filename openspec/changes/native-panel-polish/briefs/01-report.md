@@ -1,7 +1,7 @@
 # Brief 01 report — playground removal + workspace profile CRUD
 
 ## PR
-https://github.com/AprovanLabs/aprovan/pull/TBD
+https://github.com/AprovanLabs/aprovan/pull/21
 
 ## Done
 - Stream 1: removed `playground` native surface, `PlaygroundPanel.tsx`, `lib/playground.ts`,
