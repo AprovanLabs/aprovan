@@ -130,7 +130,8 @@ export function WorkspaceSidebar({
 
 /**
  * Workspace section: one row per native surface (Apps, Data, Agents, …),
- * each opening a `native://` content tab. No embedded explorer or split pane.
+ * each opening a `native://` content tab. Collapsible to its header; the
+ * collapsed flag persists across reloads.
  */
 function WorkspaceSurfaces({
   activeSurfaceId,
@@ -139,27 +140,49 @@ function WorkspaceSurfaces({
   activeSurfaceId: string | null;
   onSelect: (surfaceId: string) => void;
 }) {
+  const [collapsed, setCollapsed] = useState(() => loadWorkspacePaneLayout().collapsed);
+
+  const toggleCollapsed = useCallback(() => {
+    setCollapsed((prev: boolean) => {
+      const next = !prev;
+      saveWorkspacePaneLayout({ collapsed: next });
+      return next;
+    });
+  }, []);
+
   return (
     <section className="shrink-0 border-t">
-      <div className="px-2 py-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        Workspace
-      </div>
-      <div className="space-y-0.5 px-2 pb-2">
-        {NATIVE_SURFACES.map((surface) => (
-          <button
-            key={surface.id}
-            type="button"
-            onClick={() => onSelect(surface.id)}
-            title={surface.description}
-            className={`flex w-full items-center gap-1.5 rounded px-2 py-1 text-left transition-colors ${
-              surface.id === activeSurfaceId ? "bg-muted" : "hover:bg-muted/60"
-            }`}
-          >
-            <surface.icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-            <span className="truncate text-xs">{surface.title}</span>
-          </button>
-        ))}
-      </div>
+      <button
+        type="button"
+        onClick={toggleCollapsed}
+        className="flex w-full items-center gap-1.5 px-2 py-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground"
+        title={collapsed ? "Expand workspace" : "Collapse workspace"}
+      >
+        {collapsed ? (
+          <ChevronRight className="h-3 w-3 shrink-0" />
+        ) : (
+          <ChevronDown className="h-3 w-3 shrink-0" />
+        )}
+        <span>Workspace</span>
+      </button>
+      {!collapsed && (
+        <div className="space-y-0.5 px-2 pb-2">
+          {NATIVE_SURFACES.map((surface) => (
+            <button
+              key={surface.id}
+              type="button"
+              onClick={() => onSelect(surface.id)}
+              title={surface.description}
+              className={`flex w-full items-center gap-1.5 rounded px-2 py-1 text-left transition-colors ${
+                surface.id === activeSurfaceId ? "bg-muted" : "hover:bg-muted/60"
+              }`}
+            >
+              <surface.icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              <span className="truncate text-xs">{surface.title}</span>
+            </button>
+          ))}
+        </div>
+      )}
     </section>
   );
 }
