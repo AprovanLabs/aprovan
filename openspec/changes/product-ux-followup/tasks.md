@@ -6,9 +6,9 @@ _Repos: registry = `/Users/jacob/Documents/Code/AprovanLabs/registry`, aprovan =
 
 > Depends-on: - | Touches: registry:apps/registry/src/layouts/BaseLayout.astro, registry:apps/registry/src/pages/apps.astro, registry:apps/registry/src/pages/workflows.astro, registry:apps/registry/src/components/AppsHost.tsx, registry:apps/registry/astro.config.ts, registry:apps/registry/src/components/shell/** | Verify: cd /Users/jacob/Documents/Code/AprovanLabs/registry && pnpm --filter @aprovan/registry-web typecheck && pnpm --filter @aprovan/registry-web build
 
-- [ ] 1.1 Remove Apps from `BaseLayout.astro` nav; delete or redirect `pages/apps.astro` and update `workflows.astro`; delete `AppsHost.tsx`; drop Apps from PWA precache in `astro.config.ts` (spec: Apps surface removed).
-- [ ] 1.2 Add `HeaderSession.tsx` using `@aprovan/ui/shell` `SessionArea` + existing `useHostedSession` / `useStandaloneSession` (same engines as `SessionGate`); Credentials → catalog `/account/credentials`, Permissions → `/admin/permissions`.
-- [ ] 1.3 Mount `HeaderSession` as `AppHeader` children in `RegistryHeader.tsx` so every catalog page has sign-in/profile chrome (spec: Catalog header session chrome).
+- [x] 1.1 Remove Apps from `BaseLayout.astro` nav; delete or redirect `pages/apps.astro` and update `workflows.astro`; delete `AppsHost.tsx`; drop Apps from PWA precache in `astro.config.ts` (spec: Apps surface removed).
+- [x] 1.2 Add `HeaderSession.tsx` using `@aprovan/ui/shell` `SessionArea` + existing `useHostedSession` / `useStandaloneSession` (same engines as `SessionGate`); Credentials → catalog `/account/credentials`, Permissions → `/admin/permissions`.
+- [x] 1.3 Mount `HeaderSession` as `AppHeader` children in `RegistryHeader.tsx` so every catalog page has sign-in/profile chrome (spec: Catalog header session chrome).
 
 ## 2. Playground session-mode transport
 
