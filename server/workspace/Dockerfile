@@ -3,9 +3,9 @@
 # Build from the aprovan repo root:
 #   docker buildx build -f server/workspace/Dockerfile -t workspace .
 #
-# utdk / registry-server / contract packages are vendored under packages/ in this
-# monorepo (unscoped `utdk` cannot publish to npm). Do not overwrite them from a
-# registry git SHA at build time — that desyncs pnpm-lock.yaml.
+# Execution-plane packages (@utdk/*, @aprovan/registry-server, @aprovan/runtime)
+# resolve from npm via the committed pnpm-lock.yaml. Do not vendor or overwrite
+# them from a registry git SHA at build time.
 
 ARG NODE_VERSION=22.12.0
 ARG PNPM_VERSION=9.15.9

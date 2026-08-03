@@ -19,11 +19,6 @@
       "types": "./dist/ports.d.ts",
       "import": "./dist/ports.js",
       "require": "./dist/ports.cjs"
-    },
-    "./quality": {
-      "types": "./dist/quality.d.ts",
-      "import": "./dist/quality.js",
-      "require": "./dist/quality.cjs"
     }
   },
   "files": [

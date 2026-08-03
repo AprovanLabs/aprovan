@@ -25,6 +25,7 @@ import {
   type ResolvedSandboxImage,
 } from "@utdk/sandbox";
 import { agentsService, readAgentProfile } from "../agents/service.js";
+import { getCredentialStore } from "../credentials.js";
 import { resolveInterfaceForWorkspace } from "../interfaces.js";
 import { ServiceError, type CoreService, type ServiceContext } from "../service-kernel.js";
 import { createSession, requireSession, type ChatSessionRecord } from "../vcs/chat-sessions.js";
@@ -975,6 +976,16 @@ export const sandboxesService: CoreService = {
           createdAt: new Date().toISOString(),
         };
         await saveHost(ctx.workspaceId, host);
+        // Workspace half of the registration: the client token is the
+        // `machine` credential used to enqueue work (see SandboxHostRecord).
+        // Not creatable via POST /credentials — that route rejects interface-
+        // only providers so they never appear under Services → Providers.
+        await getCredentialStore().create(ctx.workspaceId, {
+          provider: host.provider,
+          label: host.name,
+          payload: { type: "bearer_token", token: clientToken },
+          createdBy: ctx.userId,
+        });
         return {
           host: hostSummary(host),
           // Shown exactly once. The relay stores digests only.

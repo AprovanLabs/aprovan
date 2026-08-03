@@ -89,7 +89,7 @@ export async function getOrBuildClient(provider: string): Promise<unknown> {
 
   _buildCallCount++;
 
-  const mod = await import(`utdk/${provider}`) as Record<string, unknown>;
+  const mod = await import(/* @vite-ignore */ `@utdk/clients/${provider}`) as Record<string, unknown>;
   const factoryName = toClientFactoryName(provider);
   const factory = mod[factoryName] as ((opts?: unknown) => Promise<unknown>) | undefined;
 
@@ -124,7 +124,7 @@ export function resetToolCache(): void {
 // Re-export registry type for consumers that need to enumerate providers.
 export function getRegistryProviders(): string[] {
   try {
-    const reg = _require("utdk/registry.json") as RegistryJson;
+    const reg = _require("@utdk/clients/registry.json") as RegistryJson;
     return Object.keys(reg.providers ?? {});
   } catch {
     return [];

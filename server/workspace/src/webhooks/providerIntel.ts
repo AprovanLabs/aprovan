@@ -2,7 +2,7 @@
  * Provider webhook intel — a read-only view over the UTDK bundler's
  * webhook-intel phase (packages/bundler/src/phases/webhookIntel.ts), which
  * ships one `webhooks.json` per provider alongside its generated client
- * (`utdk/<provider>/webhooks.json`). Backs `webhooks.providers`: the
+ * (`@utdk/clients/<provider>/webhooks.json`). Backs `webhooks.providers`: the
  * registration UI's provider picker, event list, and signature/setup
  * guidance.
  *
@@ -84,7 +84,7 @@ function toIntel(provider: string, raw: RawWebhookIntelFile): ProviderWebhookInt
 /** A provider's installed directory, located via its exported `package.json` subpath. */
 function resolveProviderDir(provider: string): string | undefined {
   try {
-    return path.dirname(_require.resolve(`utdk/${provider}/package.json`));
+    return path.dirname(_require.resolve(`@utdk/clients/${provider}/package.json`));
   } catch {
     return undefined;
   }
@@ -105,7 +105,7 @@ async function readProviderIntel(provider: string): Promise<ProviderWebhookIntel
 
 let cache: Promise<ProviderWebhookIntel[]> | undefined;
 
-/** Every provider with webhook intel, loaded lazily from utdk and cached for the process lifetime. */
+/** Every provider with webhook intel, loaded lazily from @utdk/clients and cached for the process lifetime. */
 export function listProviderWebhookIntel(): Promise<ProviderWebhookIntel[]> {
   cache ??= (async () => {
     const providers = getRegistryProviders();
@@ -115,7 +115,7 @@ export function listProviderWebhookIntel(): Promise<ProviderWebhookIntel[]> {
   return cache;
 }
 
-/** Test-only: drop the cache so a test's utdk fixture (or a fresh install) takes effect. */
+/** Test-only: drop the cache so a test's @utdk/clients fixture (or a fresh install) takes effect. */
 export function resetProviderWebhookIntelCache(): void {
   cache = undefined;
 }
