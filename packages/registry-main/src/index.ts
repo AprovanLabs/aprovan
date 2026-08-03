@@ -29,7 +29,21 @@ export interface ToolCallRequest {
 export interface GatewayClientOptions {
   baseUrl: string;
   getToken?: () => string | undefined | Promise<string | undefined>;
+  /** Value sent in {@link GatewayClientOptions.scopeHeader}. */
   getWorkspaceId?: () => string | undefined;
+  /**
+   * Header carrying the bearer token. Default: `"Authorization"`.
+   *
+   * When the gateway sits behind CloudFront with Origin Access Control, OAC's
+   * SigV4 signing overwrites the standard `Authorization` header with its own
+   * signature. Pass `"X-Aprovan-Authorization"` so the user token rides in an
+   * app-specific header that CloudFront forwards untouched (mirrors
+   * `@aprovan/ui/gateway`'s `DEFAULT_AUTH_HEADER`). The gateway reads that
+   * header and falls back to `Authorization` for direct/dev access.
+   */
+  authHeader?: string;
+  /** Header used to pin workspace or tenant scope. Default: `"X-Aprovan-Workspace"`. */
+  scopeHeader?: string;
 }
 
 export class GatewayClient {
@@ -110,10 +124,12 @@ export class GatewayClient {
     const headers = new Headers(init.headers);
     headers.set("Content-Type", "application/json");
     if (authenticated) {
+      const authHeader = this.options.authHeader ?? "Authorization";
+      const scopeHeader = this.options.scopeHeader ?? "X-Aprovan-Workspace";
       const token = await this.options.getToken?.();
-      if (token) headers.set("Authorization", `Bearer ${token}`);
+      if (token) headers.set(authHeader, `Bearer ${token}`);
       const workspace = this.options.getWorkspaceId?.();
-      if (workspace) headers.set("X-Aprovan-Workspace", workspace);
+      if (workspace) headers.set(scopeHeader, workspace);
     }
     const response = await fetch(
       `${this.options.baseUrl.replace(/\/$/, "")}${path}`,
