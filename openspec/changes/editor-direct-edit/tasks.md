@@ -84,23 +84,23 @@ if a stream needs more, fix the tech plan first.
 
 > Depends-on: 1, 2, 3 | Touches: client/web/src/features/editing/FileEditorPane.tsx, client/web/src/features/editing/SaveStateChip.tsx, client/web/src/features/tabs/TabContent.tsx, client/web/src/features/sessions/useEditDraft.ts, client/web/src/features/edit-modal/EditModalHost.tsx | Verify: `pnpm --filter @aprovan/patchwork-web build && ! grep -rn "beginEditDraft" client/web/src && ! grep -n "showPreview" client/web/src/features/edit-modal/EditModalHost.tsx`
 
-- [ ] 4.1 Create `FileEditorPane.tsx` (tech-plan D3): resolves the file type's `defaultView`
+- [x] 4.1 Create `FileEditorPane.tsx` (tech-plan D3): resolves the file type's `defaultView`
       (stream 1), mounts editable `MarkdownPreview` / `CodeBlockView` / `MediaPreview`
       accordingly with the view toggle in the pane header; resolves write policy (stream 3)
       and wires `useDirectSave` (direct), `useLazyDraft` (staged), or read-only. Satisfies
       `specs/workspace-editor-shell` "Files open as editable in-tab panes by default".
-- [ ] 4.2 Create `SaveStateChip.tsx` rendering the single save/draft/read-only indicator from
+- [x] 4.2 Create `SaveStateChip.tsx` rendering the single save/draft/read-only indicator from
       `SaveState`/`DraftState` (reuse `SaveStatusButton` visuals where possible); draft state
       links to the Review & apply dialog (changes list + Apply/Discard, reusing the changes
       rows currently in `SessionBar.tsx` L317–341). Satisfies "Save state is visible and
       singular" and `specs/direct-file-editing` staged-target scenarios.
-- [ ] 4.3 In `TabContent.tsx`, route editable file types (markdown/text/code) to
+- [x] 4.3 In `TabContent.tsx`, route editable file types (markdown/text/code) to
       `FileEditorPane` instead of read-mostly `CodePreview`; keep `CodePreview` for compilable
       files' preview mode under the pane's code/preview toggle (tech-plan Open Question 2
       resolution). Fold the external-change banner (L128–152) into the pane's
       clean-buffer-silent-refresh / dirty-buffer-banner behavior. Satisfies "External changes
       surface through one banner".
-- [ ] 4.4 Rewrite `useEditDraft.ts`: delete `beginEditDraft`-on-open and the
+- [x] 4.4 Rewrite `useEditDraft.ts`: delete `beginEditDraft`-on-open and the
       begin/finish lifecycle (L93–198); `openWorkspaceSession`/`openSharedEditSession` become
       pure open-the-file operations (no session calls). The widget-editor (EditModal) flow
       routes its saves through the same stream-3 hooks by target policy. Migrate its conflict
@@ -110,7 +110,7 @@ if a stream needs more, fix the tech plan first.
       (L77) — view now comes from `fileTypes.ts` (stream 1); keep `showTree` behavior via the
       remaining supported prop surface. Satisfies `specs/file-renderer-defaults` scenario
       "Policy is consulted, not host state".
-- [ ] 4.6 Make the EditModal flow explicit-only: the pane header exposes `Open editor` for
+- [x] 4.6 Make the EditModal flow explicit-only: the pane header exposes `Open editor` for
       compilable files; no default affordance routes plain files to the modal. Satisfies
       `specs/workspace-editor-shell` "EditModal is demoted to an explicit widget-editing flow".
 

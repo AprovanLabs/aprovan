@@ -1,21 +1,30 @@
 import { useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { AppsPanel } from "@aprovan/registry-ui/apps-panel";
 import type { AppsSelection } from "@aprovan/registry-ui/apps-panel";
-import { CodePreview } from "@aprovan/patchwork-editor";
+import { CodePreview, getFileType } from "@aprovan/patchwork-editor";
 import { AlertCircle, Loader2 } from "lucide-react";
 import { PanelTabs } from "@/components/panels/shell";
 import { useCompiler, useServices, useSharedEditSession } from "@/contexts";
+import { FileEditorPane } from "@/features/editing/FileEditorPane";
 import { NATIVE_SURFACES, parseNativeTabPath } from "@/lib/native-surfaces";
 import { editorLogsSource } from "@/lib/telemetry";
 import { invokeAppsTool, invokeWorkflowsTool } from "@/lib/tools";
-import { workspaceWidgetVfs } from "@/lib/workspace-vfs";
+import {
+  createSingleWorkspaceFileProject,
+  workspaceWidgetVfs,
+} from "@/lib/workspace-vfs";
 import { appsTabPath, parseAppsTabPath, type OpenTab } from "./tab-routing";
 import { isNativeTabPath, UnknownNativeSurface } from "./UnknownNativeSurface";
 
+function isEditableTabPath(path: string): boolean {
+  const category = getFileType(path).category;
+  return category === "text" || category === "compilable";
+}
+
 /**
  * Active tab content: dispatches the active tab's pseudo-path to a native
- * surface panel, the shared `AppsPanel`, or a workspace-file `CodePreview`.
- * Owns the app pane's contextual sub-tab state (Details + appTab surfaces).
+ * surface panel, the shared `AppsPanel`, an in-tab `FileEditorPane` for
+ * editable files, or a read-mostly `CodePreview` for media/binary.
  */
 export function TabContent({
   openTabs,
@@ -73,6 +82,16 @@ export function TabContent({
     appsSelection?.kind === "app" && appPaneTab !== "details"
       ? appTabSurfaces.find((surface) => surface.id === appPaneTab)
       : undefined;
+
+  const keepLocal = () => {
+    setOpenTabs((prev) => {
+      const t = prev.get(activeTabPath);
+      if (!t) return prev;
+      const next = new Map(prev);
+      next.set(activeTabPath, { ...t, stale: false });
+      return next;
+    });
+  };
 
   return (
     <div
@@ -133,32 +152,6 @@ export function TabContent({
           makes no sense on a native surface). */}
       {!appsSelection && !nativeSurface && !unknownNative && (
         <>
-          {tab.stale && !tab.loading && (
-            <div className="shrink-0 px-3 py-1.5 text-xs bg-orange-50 dark:bg-orange-950/40 border-b border-orange-200 dark:border-orange-800 flex items-center gap-2 text-orange-700 dark:text-orange-400">
-              <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-              <span>This file was modified externally.</span>
-              <button
-                onClick={() => reloadStaleTab(activeTabPath)}
-                className="ml-auto underline hover:no-underline"
-              >
-                Reload
-              </button>
-              <button
-                onClick={() =>
-                  setOpenTabs((prev) => {
-                    const t = prev.get(activeTabPath);
-                    if (!t) return prev;
-                    const next = new Map(prev);
-                    next.set(activeTabPath, { ...t, stale: false });
-                    return next;
-                  })
-                }
-                className="underline hover:no-underline"
-              >
-                Keep local
-              </button>
-            </div>
-          )}
           {tab.loading ? (
             <div className="p-3 flex items-center gap-2 text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -169,18 +162,65 @@ export function TabContent({
               <AlertCircle className="h-4 w-4 shrink-0" />
               <span>{tab.error}</span>
             </div>
-          ) : (
-            <CodePreview
-              fill
+          ) : isEditableTabPath(activeTabPath) ? (
+            <FileEditorPane
+              path={activeTabPath}
               code={tab.code}
+              stale={tab.stale}
               compiler={compiler}
               services={namespaces}
-              filePath={activeTabPath}
-              onOpenEditSession={openSharedEditSession ?? undefined}
-              vfs={workspaceWidgetVfs}
-              customPreview={customPreview}
-              logsSource={editorLogsSource}
+              onReload={() => reloadStaleTab(activeTabPath)}
+              onKeepLocal={keepLocal}
+              onOpenFile={openWorkspacePreview}
+              onOpenEditor={
+                openSharedEditSession
+                  ? () => {
+                      const entryFile =
+                        activeTabPath.split("/").filter(Boolean).pop() ?? "index.tsx";
+                      const slash = activeTabPath.lastIndexOf("/");
+                      const projectId = slash > 0 ? activeTabPath.slice(0, slash) : "";
+                      void openSharedEditSession({
+                        projectId,
+                        entryFile,
+                        filePath: activeTabPath,
+                        initialCode: tab.code,
+                        initialProject: createSingleWorkspaceFileProject(
+                          activeTabPath,
+                          tab.code,
+                        ),
+                      });
+                    }
+                  : undefined
+              }
             />
+          ) : (
+            <>
+              {tab.stale && (
+                <div className="shrink-0 px-3 py-1.5 text-xs bg-orange-50 dark:bg-orange-950/40 border-b border-orange-200 dark:border-orange-800 flex items-center gap-2 text-orange-700 dark:text-orange-400">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                  <span>This file was modified externally.</span>
+                  <button
+                    onClick={() => reloadStaleTab(activeTabPath)}
+                    className="ml-auto underline hover:no-underline"
+                  >
+                    Reload
+                  </button>
+                  <button onClick={keepLocal} className="underline hover:no-underline">
+                    Keep local
+                  </button>
+                </div>
+              )}
+              <CodePreview
+                fill
+                code={tab.code}
+                compiler={compiler}
+                services={namespaces}
+                filePath={activeTabPath}
+                vfs={workspaceWidgetVfs}
+                customPreview={customPreview}
+                logsSource={editorLogsSource}
+              />
+            </>
           )}
         </>
       )}
