@@ -19,6 +19,7 @@ import {
   FileDiff,
   Loader2,
   MessageSquare,
+  MoreHorizontal,
   Plus,
   RefreshCw,
   RotateCcw,
@@ -36,6 +37,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   changedFileCount,
   relativeTime,
@@ -61,10 +69,6 @@ interface SessionBarProps {
   onOpenWindow: () => void;
   onOpenFile: (path: string) => void;
   onRefreshSessions: () => void;
-  /** Editor preference: keep editor changes as drafts instead of applying
-   *  them to the workspace when the editor closes. */
-  keepEditDrafts: boolean;
-  onKeepEditDraftsChange: (keep: boolean) => void;
 }
 
 /** One quiet signal for "is my work saved" — the whole save-state story
@@ -132,8 +136,6 @@ export function SessionBar({
   onOpenWindow,
   onOpenFile,
   onRefreshSessions,
-  keepEditDrafts,
-  onKeepEditDraftsChange,
 }: SessionBarProps) {
   const [listOpen, setListOpen] = useState(false);
   const [changesOpen, setChangesOpen] = useState(false);
@@ -143,15 +145,17 @@ export function SessionBar({
   const changed = session ? changedFileCount(session) : 0;
   const isOpen = session?.status === "open";
   const isDraft = session?.mode === "staged";
-  const baseAge = relativeTime(session?.baseAt ?? session?.createdAt);
+  // Versioning vocabulary (base-age) is staged-only — never on direct-edit / auto chats.
+  const baseAge = isDraft ? relativeTime(session?.baseAt ?? session?.createdAt) : "";
 
-  const changeRows = session?.changes
-    ? [
-        ...session.changes.added.map((path) => ({ path, label: "new" as const })),
-        ...session.changes.modified.map((path) => ({ path, label: "edited" as const })),
-        ...session.changes.removed.map((path) => ({ path, label: "removed" as const })),
-      ].sort((a, b) => a.path.localeCompare(b.path))
-    : [];
+  const changeRows =
+    isDraft && session?.changes
+      ? [
+          ...session.changes.added.map((path) => ({ path, label: "new" as const })),
+          ...session.changes.modified.map((path) => ({ path, label: "edited" as const })),
+          ...session.changes.removed.map((path) => ({ path, label: "removed" as const })),
+        ].sort((a, b) => a.path.localeCompare(b.path))
+      : [];
 
   return (
     <div className="shrink-0 border-b bg-muted/30 text-xs">
@@ -169,8 +173,7 @@ export function SessionBar({
           <span className="truncate">{session?.title ?? "Chat"}</span>
         </button>
 
-        {/* Non-draft chats (and the main state) have no save-state concept —
-            just the one quiet sync signal. */}
+        {/* Non-draft: one quiet sync signal. Drafts use versioning affordances below. */}
         {!isDraft && <SyncChip state={syncState} />}
 
         {session && (
@@ -195,7 +198,7 @@ export function SessionBar({
                 workspace as of {baseAge}
               </span>
             )}
-            {changed > 0 && (
+            {isDraft && changed > 0 && (
               <button
                 type="button"
                 onClick={() => setChangesOpen((open) => !open)}
@@ -223,55 +226,51 @@ export function SessionBar({
               <Check className="h-3 w-3" /> Apply to workspace
             </Button>
           )}
-          {isOpen && isDraft && (
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-6 w-6 p-0"
-              disabled={busy}
-              onClick={onSync}
-              title="Get latest changes: refresh this draft with what's new in your workspace"
-            >
-              <RefreshCw className="h-3 w-3" />
-            </Button>
-          )}
-          {session && (
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-6 w-6 p-0"
-              onClick={onOpenWindow}
-              title="Open this chat in its own window"
-            >
-              <ExternalLink className="h-3 w-3" />
-            </Button>
-          )}
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-6 w-6 p-0"
-            disabled={busy}
-            onClick={onReset}
-            title="Start over with a fresh chat"
-          >
-            <RotateCcw className="h-3 w-3" />
-          </Button>
-          {isOpen && (
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-6 w-6 p-0"
-              disabled={busy}
-              onClick={onArchive}
-              title={
-                isDraft && changed > 0
-                  ? "Archive this chat — its unapplied changes are kept for reference but never reach your workspace"
-                  : "Archive this chat"
-              }
-            >
-              <X className="h-3 w-3" />
-            </Button>
-          )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 w-6 p-0"
+                title="More session actions"
+                aria-label="More session actions"
+              >
+                <MoreHorizontal className="h-3.5 w-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {session && (
+                <DropdownMenuItem onSelect={onOpenWindow}>
+                  <ExternalLink className="h-3 w-3" /> Open in window
+                </DropdownMenuItem>
+              )}
+              {isOpen && isDraft && (
+                <DropdownMenuItem disabled={busy} onSelect={onSync}>
+                  <RefreshCw className="h-3 w-3" /> Get latest changes
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem disabled={busy} onSelect={onReset}>
+                <RotateCcw className="h-3 w-3" /> Start over
+              </DropdownMenuItem>
+              {isOpen && (
+                <DropdownMenuItem disabled={busy} onSelect={onArchive}>
+                  <X className="h-3 w-3" /> Archive
+                </DropdownMenuItem>
+              )}
+              {session && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    disabled={busy}
+                    destructive
+                    onSelect={() => onDelete(session.id)}
+                  >
+                    <Trash2 className="h-3 w-3" /> Delete chat
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </span>
       </div>
 
@@ -344,19 +343,6 @@ export function SessionBar({
             you apply them — good for experiments, agents, and bigger changes you want to
             review first.
           </p>
-          <label className="flex items-start gap-2 text-xs text-muted-foreground cursor-pointer">
-            <input
-              type="checkbox"
-              className="mt-0.5"
-              checked={keepEditDrafts}
-              onChange={(event) => onKeepEditDraftsChange(event.target.checked)}
-            />
-            <span>
-              Keep editor changes as drafts. The widget editor always works in a draft;
-              normally its saved changes go to your workspace when you close it — check this
-              to keep them here for review instead.
-            </span>
-          </label>
           <div className="max-h-[50vh] overflow-y-auto -mx-1 px-1 space-y-1">
             {sessions.length === 0 && (
               <p className="text-sm text-muted-foreground py-4 text-center">No chats yet.</p>

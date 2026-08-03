@@ -301,8 +301,6 @@ export default function ChatPage() {
                   setInput={setInput}
                   handleSubmit={handleSubmit}
                   openWorkspacePreview={tabs.openWorkspacePreview}
-                  keepEditDrafts={editDraft.keepEditDrafts}
-                  onKeepEditDraftsChange={editDraft.handleKeepEditDraftsChange}
                   onOpenCredentials={(provider) =>
                     tabs.openNativeTab("credentials", provider ? { provider } : undefined)
                   }
