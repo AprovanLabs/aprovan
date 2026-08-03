@@ -1,3 +1,3 @@
-import baseConfig from '@aprovan/eslint-config/base';
+import baseConfig from '../../config/eslint-config/base.mjs';
 
 export default [...baseConfig];
