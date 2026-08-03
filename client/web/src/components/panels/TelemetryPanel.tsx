@@ -13,7 +13,7 @@ import { Activity, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import {
   PanelEmpty,
-  PanelError,
+  PanelErrorWithRetry,
   PanelLoading,
   PanelShell,
   relativeTime,
@@ -68,6 +68,15 @@ interface TelemetryEvent {
 const invokeTelemetry = invokeNamespaceTool("telemetry");
 const SOURCE_FILTERS: ReadonlyArray<"all" | SourceType> = ["all", "tool", "workflow", "widget", "app"];
 
+const SOURCE_LABEL: Record<"all" | SourceType, string> = {
+  all: "All sources",
+  tool: "Tools",
+  workflow: "Workflows",
+  widget: "Widgets",
+  app: "Apps",
+  chat: "Chat",
+};
+
 function FilterChip({
   active,
   onClick,
@@ -114,7 +123,7 @@ function EventRow({ event }: { event: TelemetryEvent }) {
           {event.error.stack && (
             <Collapsible>
               <CollapsibleTrigger className="block text-[11px] text-muted-foreground hover:text-foreground">
-                stack trace
+                Show details
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <pre className="mt-1 overflow-x-auto whitespace-pre-wrap rounded bg-muted p-2 text-[11px] text-muted-foreground">
@@ -146,7 +155,7 @@ function TraceCard({
 }) {
   return (
     <div className="rounded-md border bg-card text-sm">
-      <button onClick={onToggle} className="flex w-full items-center gap-2 px-2.5 py-2 text-left">
+      <button onClick={onToggle} className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left">
         <ChevronRight
           className={`h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform ${
             expanded ? "rotate-90" : ""
@@ -159,7 +168,7 @@ function TraceCard({
         />
         <span className="min-w-0 truncate font-mono text-xs">{trace.name}</span>
         <Badge variant="secondary" className="shrink-0 px-1.5 py-0 text-[10px]">
-          {trace.source.type}
+          {SOURCE_LABEL[trace.source.type] ?? trace.source.type}
         </Badge>
         {trace.source.path && (
           <span className="hidden min-w-0 truncate text-[11px] text-muted-foreground sm:inline">
@@ -180,7 +189,9 @@ function TraceCard({
           ) : eventsLoading || !events ? (
             <div className="px-2 py-1.5 text-xs text-muted-foreground">Loading events…</div>
           ) : events.length === 0 ? (
-            <div className="px-2 py-1.5 text-xs text-muted-foreground">No events recorded.</div>
+            <div className="px-2 py-1.5 text-xs text-muted-foreground">
+              No events were recorded for this run.
+            </div>
           ) : (
             events.map((event) => <EventRow key={event.id} event={event} />)
           )}
@@ -225,21 +236,32 @@ export function TelemetryPanel({ scope: explicitScope }: NativePanelProps) {
       .then((result) => {
         const list = (result as { events: TelemetryEvent[] }).events ?? [];
         setEvents((prev) => ({ ...prev, [traceId]: list }));
+        setEventsError((prev) => {
+          const next = { ...prev };
+          delete next[traceId];
+          return next;
+        });
       })
-      .catch((err) => {
+      .catch(() => {
         setEventsError((prev) => ({
           ...prev,
-          [traceId]: err instanceof Error ? err.message : String(err),
+          [traceId]: "Couldn't load events for this run. Retry by collapsing and expanding again.",
         }));
       })
       .finally(() => setEventsLoading((current) => (current === traceId ? null : current)));
   };
 
+  const emptyCopy = scope
+    ? `Nothing recorded for ${scope.title ?? scope.name} in the last 3 days.`
+    : statusFilter === "error"
+      ? "No errors in the last 3 days."
+      : "Service calls, widget logs, and workflow runs from the last 3 days appear here automatically.";
+
   return (
     <PanelShell
       icon={Activity}
       title="Activity"
-      description="Service calls, widget logs and workflow runs from the last 3 days"
+      description="See what ran, what failed, and where it came from"
       actions={scopeFilter}
       onRefresh={refresh}
       refreshing={loading}
@@ -258,7 +280,7 @@ export function TelemetryPanel({ scope: explicitScope }: NativePanelProps) {
             active={sourceFilter === source}
             onClick={() => setSourceFilter(source)}
           >
-            {source === "all" ? "All" : source}
+            {source === "all" ? "All sources" : SOURCE_LABEL[source]}
           </FilterChip>
         ))}
         {explicitScope && (
@@ -268,15 +290,15 @@ export function TelemetryPanel({ scope: explicitScope }: NativePanelProps) {
         )}
       </div>
       {error ? (
-        <PanelError message={error} />
+        <PanelErrorWithRetry
+          message="Couldn't load activity. Retry, or check your connection."
+          onRetry={refresh}
+          retrying={loading}
+        />
       ) : loading && !data ? (
-        <PanelLoading />
+        <PanelLoading label="Loading activity…" />
       ) : traces.length === 0 ? (
-        <PanelEmpty>
-          {scope
-            ? `Nothing recorded for ${scope.title ?? scope.name} in the last 3 days.`
-            : "Nothing recorded in the last 3 days. Service calls, widget logs and workflow runs land here automatically."}
-        </PanelEmpty>
+        <PanelEmpty>{emptyCopy}</PanelEmpty>
       ) : (
         <div className="flex flex-col gap-1.5 p-3">
           {traces.map((trace) => (

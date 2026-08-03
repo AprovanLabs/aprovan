@@ -11,10 +11,11 @@
  */
 
 import { Check, Copy, KeyRound, Plus, Webhook } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import {
+  ArmedButton,
   PanelEmpty,
-  PanelError,
+  PanelErrorWithRetry,
   PanelLoading,
   PanelShell,
   relativeTime,
@@ -106,32 +107,6 @@ function CopyButton({
       {copied ? <Check className="h-3 w-3" /> : <Icon className="h-3 w-3" />}
       {copied ? "Copied" : label}
     </button>
-  );
-}
-
-/** Two-click destructive confirm: first click arms for 3s. */
-function ConfirmRemoveButton({ onConfirm, disabled }: { onConfirm: () => void; disabled?: boolean }) {
-  const [arming, setArming] = useState(false);
-  const timer = useRef<number | undefined>(undefined);
-  return (
-    <Button
-      variant={arming ? "destructive" : "ghost"}
-      size="sm"
-      disabled={disabled}
-      className="h-7 px-2 text-xs"
-      onClick={() => {
-        if (arming) {
-          window.clearTimeout(timer.current);
-          setArming(false);
-          onConfirm();
-          return;
-        }
-        setArming(true);
-        timer.current = window.setTimeout(() => setArming(false), 3000);
-      }}
-    >
-      {arming ? "Confirm remove?" : "Remove"}
-    </Button>
   );
 }
 
@@ -255,15 +230,15 @@ function WebhookCreateForm({
   const handleSubmit = () => {
     setLocalError(null);
     if (!provider) {
-      setLocalError("Provider is required");
+      setLocalError("Choose a provider, or enter a custom one.");
       return;
     }
     if (!id.trim()) {
-      setLocalError("Webhook id is required");
+      setLocalError("A webhook name is required.");
       return;
     }
     if (selectedWorkflows.length === 0) {
-      setLocalError("Select at least one workflow to trigger");
+      setLocalError("Select at least one workflow to trigger.");
       return;
     }
     const eventList = intel
@@ -272,7 +247,7 @@ function WebhookCreateForm({
     let signature: Record<string, unknown> | undefined;
     if (authMode === "hmac") {
       if (!sigHeader.trim() || !sigSecret.trim()) {
-        setLocalError("Signature header and secret are required for HMAC auth");
+        setLocalError("Signature header and secret are both required for HMAC auth.");
         return;
       }
       signature = { header: sigHeader.trim(), scheme: sigScheme, secret: sigSecret.trim() };
@@ -327,7 +302,7 @@ function WebhookCreateForm({
           </label>
         )}
         <label className="space-y-1">
-          <div className={fieldLabel}>Webhook id</div>
+          <div className={fieldLabel}>Name</div>
           <Input
             value={id}
             onChange={(e) => {
@@ -343,7 +318,7 @@ function WebhookCreateForm({
           <Input
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="What this triggers"
+            placeholder="What this webhook starts"
             className="h-8 text-xs"
           />
         </label>
@@ -362,7 +337,7 @@ function WebhookCreateForm({
                 current.includes(eventId) ? current.filter((e) => e !== eventId) : [...current, eventId],
               )
             }
-            emptyText="No documented events for this provider — leave empty to match all."
+            emptyText="No documented events for this provider. Leave empty to match all."
           />
         ) : (
           <Input
@@ -384,7 +359,7 @@ function WebhookCreateForm({
               current.includes(name) ? current.filter((w) => w !== name) : [...current, name],
             )
           }
-          emptyText="No workflows registered yet."
+          emptyText="No workflows yet. Create one first, then come back."
         />
       </div>
 
@@ -411,7 +386,7 @@ function WebhookCreateForm({
                 setSigTouched(true);
               }}
             />
-            Provider HMAC signature
+            HMAC signature
           </label>
         </div>
         {authMode === "hmac" && (
@@ -500,7 +475,7 @@ function WebhookSuccessCard({
         <span>token: ••••</span>
         <CopyButton
           text={`${url}?token=${registration.token}`}
-          label="copy with token"
+          label="Copy with token"
           title="Copy URL with token appended"
           icon={KeyRound}
         />
@@ -531,7 +506,9 @@ function WebhookCard({ hook, onRemoved }: { hook: WebhookRegistration; onRemoved
     setActionError(null);
     invokeWebhooks("remove", { id: hook.id })
       .then(onRemoved)
-      .catch((err) => setActionError(err instanceof Error ? err.message : String(err)))
+      .catch(() =>
+        setActionError("Couldn't remove this webhook. Retry, or check your connection."),
+      )
       .finally(() => setRemoving(false));
   };
 
@@ -568,7 +545,7 @@ function WebhookCard({ hook, onRemoved }: { hook: WebhookRegistration; onRemoved
         <span>token: ••••</span>
         <CopyButton
           text={`${url}?token=${hook.token}`}
-          label="copy with token"
+          label="Copy with token"
           title="Copy URL with token appended"
           icon={KeyRound}
         />
@@ -583,7 +560,7 @@ function WebhookCard({ hook, onRemoved }: { hook: WebhookRegistration; onRemoved
       )}
       {hook.workflows.length > 0 && (
         <div className="mt-1.5 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
-          <span>Triggers:</span>
+          <span>Triggers</span>
           {hook.workflows.map((workflow) => (
             <Chip key={workflow}>{workflow}</Chip>
           ))}
@@ -591,7 +568,7 @@ function WebhookCard({ hook, onRemoved }: { hook: WebhookRegistration; onRemoved
       )}
 
       <div className="mt-2 text-xs text-muted-foreground">
-        {hook.deliveryCount} deliveries
+        {hook.deliveryCount} {hook.deliveryCount === 1 ? "delivery" : "deliveries"}
         {hook.lastDeliveryAt && ` · last ${relativeTime(hook.lastDeliveryAt)}`}
         {hook.lastEvent && ` · ${hook.lastEvent}`}
       </div>
@@ -599,8 +576,12 @@ function WebhookCard({ hook, onRemoved }: { hook: WebhookRegistration; onRemoved
       {actionError && <div className="mt-1 text-xs text-destructive">{actionError}</div>}
 
       <div className="mt-2 flex items-center gap-2 border-t pt-2">
-        <ConfirmRemoveButton onConfirm={remove} disabled={removing} />
-        <span className="text-[11px] text-muted-foreground">Also remove it at the provider.</span>
+        {!removing && (
+          <ArmedButton label="Remove" armedLabel="Confirm remove?" onConfirm={remove} />
+        )}
+        <span className="text-[11px] text-muted-foreground">
+          Also remove it from the provider.
+        </span>
       </div>
     </div>
   );
@@ -644,7 +625,9 @@ export function WebhooksPanel({ scope: _scope }: NativePanelProps) {
         setCreating(false);
         refresh();
       })
-      .catch((err) => setCreateError(err instanceof Error ? err.message : String(err)))
+      .catch(() =>
+        setCreateError("Couldn't register this webhook. Retry, or check your connection."),
+      )
       .finally(() => setSaving(false));
   };
 
@@ -652,14 +635,18 @@ export function WebhooksPanel({ scope: _scope }: NativePanelProps) {
     <PanelShell
       icon={Webhook}
       title="Webhooks"
-      description="Inbound URLs that trigger workflows"
+      description="Receive events from outside services and start workflows from them"
       onRefresh={refresh}
       refreshing={loading}
     >
       {error ? (
-        <PanelError message={error} />
+        <PanelErrorWithRetry
+          message="Couldn't load webhooks. Retry, or check your connection."
+          onRetry={refresh}
+          retrying={loading}
+        />
       ) : loading && !data ? (
-        <PanelLoading />
+        <PanelLoading label="Loading webhooks…" />
       ) : (
         <div className="flex flex-col gap-2 p-3">
           {justCreated && (
@@ -695,7 +682,8 @@ export function WebhooksPanel({ scope: _scope }: NativePanelProps) {
           )}
           {webhooks.length === 0 && !creating ? (
             <PanelEmpty>
-              No webhooks yet. Create one above to get an inbound URL to paste at the provider.
+              Inbound URLs that start workflows appear here. Create one to get a URL to paste at
+              the provider.
             </PanelEmpty>
           ) : (
             webhooks.map((hook) => <WebhookCard key={hook.id} hook={hook} onRemoved={refresh} />)

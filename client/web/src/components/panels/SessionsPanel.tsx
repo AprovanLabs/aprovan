@@ -22,10 +22,11 @@
  */
 
 import { Check, ChevronDown, ChevronRight, ExternalLink, GitBranch, Loader2 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import {
+  ArmedButton,
   PanelEmpty,
-  PanelError,
+  PanelErrorWithRetry,
   PanelLoading,
   PanelShell,
   PanelTabs,
@@ -80,46 +81,15 @@ const STATUS_DOT: Record<SessionStatus, string> = {
   closed: "bg-muted-foreground",
 };
 
+const EMPTY_COPY: Record<TabId, string> = {
+  open: "Open chats appear here. Start one from the chat pane.",
+  merged: "Chats you've applied to the workspace appear here.",
+  closed: "Archived chats appear here.",
+};
+
 function changeCount(changes: SessionChanges | undefined): number {
   if (!changes) return 0;
   return changes.added.length + changes.modified.length + changes.removed.length;
-}
-
-/** Two-click destructive confirm: first click arms for 3s. */
-function ConfirmButton({
-  label,
-  onConfirm,
-  disabled,
-  title,
-}: {
-  label: string;
-  onConfirm: () => void;
-  disabled?: boolean;
-  title?: string;
-}) {
-  const [arming, setArming] = useState(false);
-  const timer = useRef<number | undefined>(undefined);
-  return (
-    <Button
-      variant={arming ? "destructive" : "ghost"}
-      size="sm"
-      disabled={disabled}
-      className="h-6 px-2 text-[11px]"
-      title={arming ? "Click again to confirm" : title}
-      onClick={() => {
-        if (arming) {
-          window.clearTimeout(timer.current);
-          setArming(false);
-          onConfirm();
-          return;
-        }
-        setArming(true);
-        timer.current = window.setTimeout(() => setArming(false), 3000);
-      }}
-    >
-      {arming ? "Confirm?" : label}
-    </Button>
-  );
 }
 
 /** +added ~modified −removed, compact enough for the collapsed row. */
@@ -204,7 +174,15 @@ function SessionEntry({
     setActionError(null);
     invokeSessions(operation, { id: session.id, ...args })
       .then(onChanged)
-      .catch((err) => setActionError(err instanceof Error ? err.message : String(err)))
+      .catch(() => {
+        const next =
+          operation === "sync"
+            ? "Couldn't get the latest changes. Retry, or check your connection."
+            : operation === "close" && args.stage
+              ? "Couldn't apply this chat to the workspace. Retry, or check your connection."
+              : "Couldn't archive this chat. Retry, or check your connection.";
+        setActionError(next);
+      })
       .finally(() => setBusy(null));
   };
 
@@ -296,16 +274,13 @@ function SessionEntry({
                 Apply to workspace
               </Button>
             )}
-            {isOpen && (
-              <ConfirmButton
+            {isOpen && busy === null && (
+              <ArmedButton
                 label="Archive"
-                disabled={busy !== null}
-                onConfirm={() => run("close", { stage: false })}
-                title={
-                  staged > 0
-                    ? "Archive — closes without applying its changes to the workspace"
-                    : "Archive this chat"
+                armedLabel={
+                  staged > 0 ? "Archive without applying?" : "Confirm archive?"
                 }
+                onConfirm={() => run("close", { stage: false })}
               />
             )}
             <Button
@@ -339,7 +314,7 @@ export function SessionsPanel({ scope: _scope }: NativePanelProps) {
     <PanelShell
       icon={GitBranch}
       title="Sessions"
-      description="Chat sessions as branches — staged diffs and merges"
+      description="Chat history you can stage, apply, and archive"
       onRefresh={refresh}
       refreshing={loading}
     >
@@ -353,11 +328,15 @@ export function SessionsPanel({ scope: _scope }: NativePanelProps) {
         onChange={setTab}
       />
       {error ? (
-        <PanelError message={error} />
+        <PanelErrorWithRetry
+          message="Couldn't load sessions. Retry, or check your connection."
+          onRetry={refresh}
+          retrying={loading}
+        />
       ) : loading && !data ? (
-        <PanelLoading />
+        <PanelLoading label="Loading sessions…" />
       ) : rows.length === 0 ? (
-        <PanelEmpty>No {tab} sessions.</PanelEmpty>
+        <PanelEmpty>{EMPTY_COPY[tab]}</PanelEmpty>
       ) : (
         <div className="divide-y">
           {rows.map((session) => (

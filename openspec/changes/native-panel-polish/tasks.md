@@ -167,13 +167,13 @@ may run in parallel otherwise.
 
 > Depends-on: 2 | Touches: client/web/src/components/panels/NotificationsPanel.tsx, client/web/src/components/panels/TelemetryPanel.tsx, client/web/src/components/panels/WebhooksPanel.tsx, client/web/src/components/panels/SessionsPanel.tsx | Verify: cd ~/Documents/Code/AprovanLabs/aprovan && pnpm --filter @aprovan/patchwork-web typecheck && pnpm --filter @aprovan/patchwork-web build
 
-- [ ] 8.1 NotificationsPanel: ux.md pass (copy, states, density, armed destructive actions).
+- [x] 8.1 NotificationsPanel: ux.md pass (copy, states, density, armed destructive actions).
       Verify: `cd ~/Documents/Code/AprovanLabs/aprovan && ! grep -n "confirm(" client/web/src/components/panels/NotificationsPanel.tsx && pnpm --filter @aprovan/patchwork-web typecheck`
-- [ ] 8.2 TelemetryPanel (Activity): same pass.
+- [x] 8.2 TelemetryPanel (Activity): same pass.
       Verify: `cd ~/Documents/Code/AprovanLabs/aprovan && ! grep -n "confirm(" client/web/src/components/panels/TelemetryPanel.tsx && pnpm --filter @aprovan/patchwork-web typecheck`
-- [ ] 8.3 WebhooksPanel: same pass.
+- [x] 8.3 WebhooksPanel: same pass.
       Verify: `cd ~/Documents/Code/AprovanLabs/aprovan && ! grep -n "confirm(" client/web/src/components/panels/WebhooksPanel.tsx && pnpm --filter @aprovan/patchwork-web typecheck`
-- [ ] 8.4 SessionsPanel: same pass (presentation/copy only — session semantics are IW-2's).
+- [x] 8.4 SessionsPanel: same pass (presentation/copy only — session semantics are IW-2's).
       Verify: `cd ~/Documents/Code/AprovanLabs/aprovan && ! grep -n "confirm(" client/web/src/components/panels/SessionsPanel.tsx && pnpm --filter @aprovan/patchwork-web typecheck`
 
 ## 9. Apps pane conformance (GATED on IW-1)
