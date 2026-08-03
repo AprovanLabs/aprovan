@@ -1,7 +1,7 @@
 # Brief 04 report — Agents pane rebuild
 
 ## PR
-(pending — filled after merge)
+https://github.com/AprovanLabs/aprovan/pull/44
 
 ## Done
 - Stream 4.1: decomposed `AgentsPanel.tsx` into `panels/agents/{index,ProfileList,
