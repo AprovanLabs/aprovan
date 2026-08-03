@@ -39,6 +39,7 @@ export {
   type MediaPreviewProps,
   type FileCategory,
   type FileTypeInfo,
+  type DefaultView,
   type FileEncoding,
   getActiveContent,
   getFiles,
@@ -53,6 +54,8 @@ export {
   getLanguageFromExt,
   getMimeType,
 } from "./components/edit";
+
+export { markdownRoundTrips } from "./components/markdownRoundTrip";
 
 export {
   extractCodeBlocks,

@@ -554,5 +554,12 @@ registerRenderer({
   id: "workflow-script",
   label: "Workflow",
   match: (input) => (input.content && isWorkflowScript(input.path, input.content) ? 100 : 0),
-  Component: ({ input }) => <TailorFlow source={input.content ?? ""} />,
+  Component: ({ input, sizing }) => (
+    <div className={sizing === "fill" ? "flex flex-1 min-h-0 flex-col overflow-auto" : undefined}>
+      <TailorFlow
+        className={sizing === "fill" ? "min-h-0 flex-1" : undefined}
+        source={input.content ?? ""}
+      />
+    </div>
+  ),
 });

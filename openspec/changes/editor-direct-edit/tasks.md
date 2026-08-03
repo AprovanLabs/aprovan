@@ -8,19 +8,19 @@ if a stream needs more, fix the tech plan first.
 
 > Depends-on: - | Touches: packages/editor/src/components/edit/fileTypes.ts, packages/editor/src/components/edit/EditModal.tsx | Verify: `pnpm --filter @aprovan/patchwork-editor build && grep -q "defaultView" packages/editor/src/components/edit/fileTypes.ts`
 
-- [ ] 1.1 Extend `FileTypeInfo` in `fileTypes.ts` with `defaultView: "rich" | "code" |
+- [x] 1.1 Extend `FileTypeInfo` in `fileTypes.ts` with `defaultView: "rich" | "code" |
       "preview" | "media"` and `canToggleView: boolean` per tech-plan D4: `.md` → `rich`
       (toggle to `code`); compilable → `code` (toggle to `preview`); other text → `code`
       (no toggle); media → `media`. Export the `DefaultView` type. Satisfies
       `specs/file-renderer-defaults` "Per-type default views are owned by fileTypes.ts".
-- [ ] 1.2 In `EditModal.tsx`, derive the initial view from `getFileType(activeFile).defaultView`
+- [x] 1.2 In `EditModal.tsx`, derive the initial view from `getFileType(activeFile).defaultView`
       instead of `initialState?.showPreview ?? true` (L91): markdown mounts the editable
       `MarkdownPreview` branch (L402) by default; the header toggle (L309) flips per
       `canToggleView`. Remove the `showPreview` field from `EditModalProps.initialState`
       entirely (do not keep it accepted-but-ignored) so hosts cannot reintroduce the
       regression; the resulting compile error at the host call site is fixed in stream 4.
       Satisfies "Markdown defaults to editable WYSIWYG with a source toggle".
-- [ ] 1.3 Add a serialize-compare round-trip guard for markdown: on mount, serialize the TipTap
+- [x] 1.3 Add a serialize-compare round-trip guard for markdown: on mount, serialize the TipTap
       document back to markdown and compare (whitespace-normalized) to the source; on mismatch
       open in `code` view with a non-blocking notice instead of the rich view. Never write a
       lossy serialization on autosave. Satisfies scenario "Non-round-trippable markdown falls
@@ -30,22 +30,22 @@ if a stream needs more, fix the tech plan first.
 
 > Depends-on: - | Touches: packages/registry-ui/src/**, packages/editor/src/components/CodePreview.tsx, packages/editor/src/components/edit/MediaPreview.tsx | Verify: `pnpm --filter @aprovan/registry-ui build && pnpm --filter @aprovan/registry-ui test && pnpm --filter @aprovan/patchwork-editor build && ! grep -nE "min-h-\[[0-9]+vh\]|max-h-\[[0-9]+vh\]" packages/editor/src/components/CodePreview.tsx packages/editor/src/components/edit/MediaPreview.tsx packages/registry-ui/src/apps-panel.tsx`
 
-- [ ] 2.1 In `packages/registry-ui/src/renderers.tsx`, add `export type RendererSizing =
+- [x] 2.1 In `packages/registry-ui/src/renderers.tsx`, add `export type RendererSizing =
       "fill" | "inline"`, change `RendererDef.Component` props to `{ input: RenderInput;
       sizing: RendererSizing }`, and have `RenderedView({ input, sizing = "inline" })` forward
       it (tech-plan D7). Satisfies `specs/renderer-host-sizing` "Renderers negotiate size with
       the host pane".
-- [ ] 2.2 Update every in-repo `registerRenderer` registration (JSON tree, tabular, chart,
+- [x] 2.2 Update every in-repo `registerRenderer` registration (JSON tree, tabular, chart,
       TailorFlow in `./tailor`, and any others found by `grep -rn "registerRenderer"
       packages/registry-ui client/web`) to the new component signature: `fill` ⇒
       `flex-1 min-h-0 overflow-auto`; `inline` ⇒ natural height, no viewport units.
-- [ ] 2.3 Remove hardcoded viewport caps from renderer/preview bodies: `CodePreview.tsx:424`
+- [x] 2.3 Remove hardcoded viewport caps from renderer/preview bodies: `CodePreview.tsx:424`
       (`min-h-[50vh] max-h-[75vh]` non-fill card variant) and `:514` (`max-h-[60vh]`),
       `MediaPreview.tsx:81` (`max-h-[60vh]`), `apps-panel.tsx:347/354` (`md:max-h-[70vh]`
       non-fill fallbacks). Non-fill hosts now own the bound: give `CodePreview`'s inline card
       a host-suppliable `className`/container contract instead of internal floors. Satisfies
       "No hardcoded viewport-height floors or caps in renderers" (grep gate in Verify).
-- [ ] 2.4 In the chat message renderer path (`client/web/src/features/widgets/
+- [x] 2.4 In the chat message renderer path (`client/web/src/features/widgets/
       ChatArtifactBlock.tsx` and any `RenderedView`/`CodePreview` inline mounts), wrap inline
       renderers in a bounded container (`max-h` supplied by the chat host, overflow-auto) so
       short widgets shrink and tall widgets scroll. Satisfies scenarios "Small widget in chat
@@ -55,25 +55,25 @@ if a stream needs more, fix the tech plan first.
 
 > Depends-on: - | Touches: client/web/src/features/editing/**, client/web/src/features/sessions/conflict-notify.ts | Verify: `pnpm --filter @aprovan/patchwork-web build && test -f client/web/src/features/editing/write-policy.ts && test -f client/web/src/features/editing/useDirectSave.ts && test -f client/web/src/features/editing/useLazyDraft.ts`
 
-- [ ] 3.1 Create `client/web/src/features/editing/write-policy.ts` implementing
+- [x] 3.1 Create `client/web/src/features/editing/write-policy.ts` implementing
       `StagedPrefixSets`, `loadStagedPrefixes()` (apps listing for declared source prefixes +
       `vfs.mounts` procedure for mount prefixes, cached per workspace, refreshed on workspace
       boot / `subscribeToWorkspaceChanges` signal / any 403 write failure), and pure
       `resolveWritePolicy(path, sets)` with longest-prefix matching; non-writable mount ⇒
       `"readonly"` (tech-plan D1). Satisfies `specs/direct-file-editing` "Write policy is
       derived from the target path" and "Read-only mounts stay read-only".
-- [ ] 3.2 Create `useDirectSave.ts` per the tech-plan interface: ~1s idle debounce over
+- [x] 3.2 Create `useDirectSave.ts` per the tech-plan interface: ~1s idle debounce over
       `syncedBackend` writes (`writeFile` from `lib/workspace-vfs`), `flush()` for Cmd/Ctrl+S,
       and the `SaveState` machine including `offline` (journal) and `error` (retry, buffer
       preserved). Satisfies "Direct edits write through the VFS".
-- [ ] 3.3 Create `useLazyDraft.ts` per the tech-plan interface: no session on mount; first
+- [x] 3.3 Create `useLazyDraft.ts` per the tech-plan interface: no session on mount; first
       `save()` creates the staged session (`createChatSession({mode:"staged"})`), calls
       `setActiveVfsSession({id, staged:true})`, then writes; `apply()` runs
       sync-then-close (reusing `syncChatSession`/`closeChatSession` semantics from
       `useEditDraft.finishEditDraft`, L114–198) returning conflicts; `discard()` deletes.
       Draft-creation failure surfaces `error` state and never writes through (tech-plan D2).
       Satisfies "Staged targets get a lazily created draft".
-- [ ] 3.4 Create `client/web/src/features/sessions/conflict-notify.ts` exporting
+- [x] 3.4 Create `client/web/src/features/sessions/conflict-notify.ts` exporting
       `publishConflictNotification({sessionId, sessionTitle, conflicts, origin})` — the single
       constructor of `builtin:merge-conflict` notifications (summary + open-merge link only;
       no inline resolution choices), per tech-plan D6. Satisfies

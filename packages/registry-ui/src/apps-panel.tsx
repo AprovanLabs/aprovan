@@ -336,7 +336,7 @@ export function AppsPanel({
       {/* `fill` hands the height to the host pane: the grid row is pinned to
           the available space (`minmax(0,1fr)`, so it cannot grow to its
           content) and each column scrolls on its own. Without it the columns
-          keep the 70vh cap that a standalone scrolling page needs. */}
+          scroll at natural height — the host owns any viewport bound. */}
       <div
         className={`grid min-h-0 gap-4 md:grid-cols-[minmax(15rem,22rem)_1fr] ${
           fill ? "flex-1 grid-rows-[minmax(0,1fr)]" : ""
@@ -344,14 +344,14 @@ export function AppsPanel({
       >
         <div
           className={`min-h-0 md:border-r md:pr-3 ${
-            fill ? "flex flex-col overflow-hidden" : "md:max-h-[70vh]"
+            fill ? "flex flex-col overflow-hidden" : "overflow-y-auto"
           }`}
         >
           {list}
         </div>
         <div
           className={`min-w-0 ${
-            fill ? "min-h-0 overflow-y-auto" : "md:max-h-[70vh] md:overflow-y-auto"
+            fill ? "min-h-0 overflow-y-auto" : "overflow-y-auto"
           }`}
         >
           {selectedApp && invokeApps ? (

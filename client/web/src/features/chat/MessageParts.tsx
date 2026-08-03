@@ -302,6 +302,7 @@ export function TextPartWithSession({
                 vfs={workspaceWidgetVfs}
                 customPreview={workflowCustomPreview}
                 logsSource={editorLogsSource}
+                className="max-h-[60vh]"
                 onWidgetError={
                   reportWidgetError && messageId
                     ? (error) => reportWidgetError(messageId, { path, error })
