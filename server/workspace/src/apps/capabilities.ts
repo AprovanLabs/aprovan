@@ -81,12 +81,10 @@ export function resolveExportedWorkflow(
 
 export interface NativeCapabilityPartitioning {
   /**
-   * "per-app-user" — owner-hosted apps: every app user gets a private
-   * partition inside the app folder of the publishing workspace.
-   * "per-workspace" — `dataScope: "workspace"` apps: the caller's own
-   * workspace holds the data, so there is nobody else to partition against.
+   * "per-app-user" — every app user gets a private partition under
+   * `.apps/<appId>/data/<user>` in the workspace hosting the session.
    */
-  mode: "per-app-user" | "per-workspace";
+  mode: "per-app-user";
   /** Where a write physically lands, as a path template. */
   path: string;
   description: string;
@@ -107,18 +105,14 @@ interface NativeSpec {
   procedures: string[];
   /**
    * FS-path-shaped partitioning (vfs, events — still file/append-log backed).
-   * `<root>` is substituted with the app's data root at describe time.
+   * `<root>` is substituted with `.apps/<appId>/data` at describe time.
    * Mutually exclusive with `recordsPartition` below.
    */
-  ownerPath?: string;
-  workspacePath?: string;
+  fsPath?: string;
   /**
-   * Record-store partitioning (keyvalue — see records.ts). Unlike the FS
-   * paths above, this string is identical regardless of `dataScope`: an app
-   * session only ever addresses its own `app#<name>#u#<self>` scope: what
-   * `dataScope` changes is which workspace's *tenancy* stores the rows, not
-   * the scope key itself, and the Access pane reports the scope, not the
-   * tenant. `<name>` is substituted with the app's name at describe time.
+   * Record-store partitioning (keyvalue — see records.ts). An app session
+   * only ever addresses its own `app#<appId>#u#<self>` scope. `<appId>` is
+   * substituted at describe time.
    */
   recordsPartition?: string;
   partitionNote: string;
@@ -129,17 +123,16 @@ const NATIVE_SPECS: Record<NativeAppNamespace, NativeSpec> = {
     description:
       "The app's own folder as a filesystem. Relative paths resolve under the app root; `~/<path>` reaches another declared prefix or a workspace share.",
     procedures: ["list", "read", "write", "delete"],
-    ownerPath: "<root>/",
-    workspacePath: "<prefix>/",
+    fsPath: "<root>/",
     partitionNote:
       "Reads and writes are confined to the app's declared prefixes, and each user's file partition " +
-      "(<root>/data/<user>) is read-enforced: readable and writable only by that user — other members " +
+      "(.apps/<appId>/data/<user>) is read-enforced: readable and writable only by that user — other members " +
       "get 404 — with app-admin access only through the audited apps.data procedure. Never served over HTTP.",
   },
   keyvalue: {
     description: "Per-user JSON key/value storage, accumulated in the record store.",
     procedures: ["get", "set", "delete", "list"],
-    recordsPartition: "app#<name>#u#<you>",
+    recordsPartition: "app#<appId>#u#<you>",
     partitionNote:
       "Keys are transparently namespaced and read-enforced — an app user can only ever read and write " +
       "their own partition, and the app's admins reach a user's data only through the audited apps.data " +
@@ -149,8 +142,7 @@ const NATIVE_SPECS: Record<NativeAppNamespace, NativeSpec> = {
     description:
       "Named event channels. Emissions trigger the workspace's subscribed workflows (depth-capped).",
     procedures: ["emit", "list"],
-    ownerPath: ".services/events/<channel>.jsonl (owning workspace)",
-    workspacePath: ".services/events/<channel>.jsonl (caller workspace)",
+    fsPath: ".services/events/<channel>.jsonl (owning workspace)",
     partitionNote:
       "Channels are workspace-wide: emissions are visible to the workspace that hosts the app's data.",
   },
@@ -174,8 +166,7 @@ const NATIVE_SPECS: Record<NativeAppNamespace, NativeSpec> = {
     description:
       "Named agent profiles: provider/model/prompt plus capability grants. Read-only for apps — resolve an assignee's configuration; managing profiles is member-only.",
     procedures: ["get", "list", "runs"],
-    ownerPath: ".services/agents/ (owning workspace)",
-    workspacePath: ".services/agents/ (caller workspace)",
+    fsPath: ".services/agents/ (owning workspace)",
     partitionNote:
       "Apps can read profiles and executions but never create, update, or delete them — a grant is something a member gives, not something an app mints.",
   },
@@ -203,11 +194,10 @@ export function effectiveRateLimit(manifest: AppManifest): {
 /**
  * The native half of `apps.capabilities`: one descriptor per allow-listed
  * native namespace, with the procedures this app may actually call and where
- * its data lands under the manifest's `dataScope`.
+ * its data lands under `.apps/<appId>/data/<user>`.
  */
 export function nativeCapabilities(manifest: AppManifest): NativeCapability[] {
-  const workspaceScoped = (manifest.dataScope ?? "owner") === "workspace";
-  const root = manifest.paths?.[0] ?? `apps/${manifest.name}`;
+  const root = `.apps/${manifest.appId}/data`;
   const rateLimit = effectiveRateLimit(manifest);
 
   const capabilities: NativeCapability[] = [];
@@ -218,22 +208,16 @@ export function nativeCapabilities(manifest: AppManifest): NativeCapability[] {
     );
     if (procedures.length === 0) continue;
     const path = spec.recordsPartition
-      ? `records: ${spec.recordsPartition.replace("<name>", manifest.name)}`
-      : workspaceScoped
-        ? spec.workspacePath!.replace("<prefix>", "<installPrefix>")
-        : spec.ownerPath!.replace("<root>", root);
+      ? `records: ${spec.recordsPartition.replace("<appId>", manifest.appId)}`
+      : spec.fsPath!.replace("<root>", root);
     const description = spec.recordsPartition
-      ? workspaceScoped
-        ? `Records live in the caller's own workspace's record store. ${spec.partitionNote}`
-        : `Records live in the publishing workspace's record store. ${spec.partitionNote}`
-      : workspaceScoped
-        ? `Data lives in the caller's own workspace under the install prefix. ${spec.partitionNote}`
-        : `Data lives in the publishing workspace, inside the app's folder. ${spec.partitionNote}`;
+      ? `Records live in the hosting workspace's record store. ${spec.partitionNote}`
+      : `Data lives under ${root}/<user> in the hosting workspace. ${spec.partitionNote}`;
     capabilities.push({
       namespace,
       description: spec.description,
       procedures,
-      partitioning: { mode: workspaceScoped ? "per-workspace" : "per-app-user", path, description },
+      partitioning: { mode: "per-app-user", path, description },
       rateLimit,
     });
   }

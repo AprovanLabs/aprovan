@@ -2,7 +2,7 @@
   "name": "@aprovan/workspace",
   "version": "0.1.0",
   "type": "module",
-  "description": "The Aprovan workspace \u2014 chat, apps, workflows, MCP, and the credential/permission gateway in one process",
+  "description": "The Aprovan workspace — chat, apps, workflows, MCP, and the credential/permission gateway in one process",
   "license": "MIT",
   "bin": {
     "workspace": "./dist/cli.js"
@@ -73,6 +73,7 @@
     "hono": "^4.6.20",
     "quickjs-emscripten-core": "0.32.0",
     "tslib": "^2.8.1",
+    "ulid": "^3.0.2",
     "ws": "^8.18.0",
     "zod": "3.25.76"
   },

@@ -71,3 +71,18 @@ try {
 }
 
 console.log("local AWS-parity stack ready");
+
+// Nuke-and-reseed app scopes onto the id-keyed model (app-model-split).
+try {
+  const { spawnSync } = await import("node:child_process");
+  const result = spawnSync(
+    process.execPath,
+    ["--import", "tsx", new URL("./reseed-apps.ts", import.meta.url).pathname, "local"],
+    { stdio: "inherit", env: process.env },
+  );
+  if (result.status !== 0) {
+    console.warn("reseed-apps exited non-zero — continuing bootstrap");
+  }
+} catch (err) {
+  console.warn("reseed-apps skipped:", err instanceof Error ? err.message : err);
+}

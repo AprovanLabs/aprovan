@@ -1,6 +1,6 @@
 /**
  * The apps/workflows domain model: the native allow-list, workflows as
- * namespace procedures, releases + channels, dataScope, trace propagation,
+ * namespace procedures, releases + channels, install, trace propagation,
  * and the generated SDK. See docs/apps-and-workflows.md.
  */
 
@@ -103,7 +103,7 @@ describe("native allow-list", () => {
     expect(keyvalue?.partitioning.mode).toBe("per-app-user");
     // keyvalue is record-store-backed (see docs/app-data.md): a scope
     // string, not a workspace file path.
-    expect(keyvalue?.partitioning.path).toBe("records: app#caps#u#<you>");
+    expect(keyvalue?.partitioning.path).toMatch(/^records: app#[0-9A-HJKMNP-TV-Z]{26}#u#<you>$/);
     expect(keyvalue?.rateLimit.rps).toBe(5);
     // vfs is not allow-listed here, so it is not reported as reachable.
     expect(caps.native.some((n) => n.namespace === "vfs")).toBe(false);
@@ -287,37 +287,29 @@ describe("generated SDK", () => {
   });
 });
 
-describe("dataScope: workspace", () => {
-  it("stores an installed app's data under the caller's install prefix", async () => {
+describe("install (interim, pre-stream-3)", () => {
+  it("records an install and keeps origin-hosted keyvalue under appId scopes", async () => {
     await putFile("apps/tmpl/index.tsx", "export default () => null;");
-    await manage("apps/publish", {
-      name: "tmpl",
-      dir: "apps/tmpl",
-      data_scope: "workspace",
-      allowed_tools: ["keyvalue.*"],
-      rate_limit: { rps: 100, burst: 200 },
-    });
+    const published = await data<{ appId: string }>(
+      await manage("apps/publish", {
+        name: "tmpl",
+        dir: "apps/tmpl",
+        allowed_tools: ["keyvalue.*"],
+        rate_limit: { rps: 100, burst: 200 },
+      }),
+    );
 
-    // Before installing: owner-hosted behaviour, partitioned per app user in
-    // the record store (scope app#tmpl#u#alice — see docs/app-data.md; no
-    // longer a workspace file, so this round-trips through keyvalue itself
-    // rather than peeking at a path).
     await appCall("alice", "tmpl/tools/keyvalue/set", { args: { key: "k", value: 1 } });
     const owned = await data<{ value: number }>(
       await appCall("alice", "tmpl/tools/keyvalue/get", { args: { key: "k" } }),
     );
     expect(owned.value).toBe(1);
 
-    const install = await data<{ prefix: string; dataPrefix: string }>(
+    const install = await data<{ prefix: string; appId: string; dataPrefix: string }>(
       await manage("apps/install", { owner: "local", name: "tmpl", prefix: "installed/tmpl" }),
     );
-    expect(install.dataPrefix).toBe("installed/tmpl/data");
-
-    await appCall("alice", "tmpl/tools/keyvalue/set", { args: { key: "k", value: 2 } });
-    const installed = await data<{ value: number }>(
-      await appCall("alice", "tmpl/tools/keyvalue/get", { args: { key: "k" } }),
-    );
-    expect(installed.value).toBe(2);
+    expect(install.appId).toBe(published.appId);
+    expect(install.dataPrefix).toContain(`.apps/${published.appId}/data/`);
 
     const listed = await data<{ apps: Array<{ name: string; owner: string; available: boolean }> }>(
       await manage("apps/installed", {}),
@@ -326,24 +318,7 @@ describe("dataScope: workspace", () => {
       expect.objectContaining({ name: "tmpl", owner: "local", available: true }),
     ]);
 
-    // Uninstalling returns the app to owner-hosted behaviour.
     await manage("apps/uninstall", { owner: "local", name: "tmpl" });
-    await appCall("alice", "tmpl/tools/keyvalue/set", { args: { key: "k", value: 3 } });
-    const again = await data<{ value: number }>(
-      await appCall("alice", "tmpl/tools/keyvalue/get", { args: { key: "k" } }),
-    );
-    expect(again.value).toBe(3);
-  });
-
-  it("refuses to install an owner-hosted app", async () => {
-    await putFile("apps/hosted/index.tsx", "export default () => null;");
-    await manage("apps/publish", {
-      name: "hosted",
-      dir: "apps/hosted",
-      allowed_tools: ["keyvalue.*"],
-    });
-    const res = await manage("apps/install", { owner: "local", name: "hosted" });
-    expect(res.status).toBe(400);
   });
 });
 
@@ -369,7 +344,7 @@ describe("apps.list composition", () => {
     const list = await data<{
       apps: Array<{
         name: string;
-        dataScope: string;
+        appId: string;
         url: string;
         channels: Record<string, string>;
         workflows: Array<{
@@ -383,7 +358,7 @@ describe("apps.list composition", () => {
     }>(await manage("apps/list", {}));
 
     const app = list.apps.find((a) => a.name === "listing");
-    expect(app?.dataScope).toBe("owner");
+    expect(app?.appId).toBeTruthy();
     expect(app?.url).toBe("/apps/local/listing");
     expect(app?.workflows[0]).toMatchObject({
       name: "listed-wf",

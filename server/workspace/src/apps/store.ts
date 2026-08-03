@@ -10,18 +10,10 @@
  * what the live site serves AND what an app session may read/write — one
  * prefix rule, two consumers (see {@link appPathAllowed}).
  *
- * Everything the app stores lives under the primary prefix at
- * `<paths[0]>/data/<user>` ({@link appDataDir}) and is never served. The
- * owning workspace is the app's "account": its credentials execute the app's
- * workflows, its FS stores the app's data, and its members administer the
- * bundle. Consumers are any authenticated users — membership NOT required —
- * mediated exclusively through the app surface (allow-listed tools, per-user
- * data partitions, per-user rate limits).
- *
- * Manifests are stored in the record store under `svc#apps` in the owner
- * workspace tenant. Workspace-level sharing of paths *outside* an app's
- * declared prefixes is declared in the `svc#workspace` config record (see
- * WorkspaceConfig).
+ * Per-user data lives under `.apps/<appId>/data/<user>` ({@link appDataDir}),
+ * decoupled from authored source paths. Manifests are stored under
+ * `svc#apps / <appId>`; `(workspaceId, name)` is a mutable alias only
+ * (see apps/identity.ts).
  *
  * The UI `entry` is an ordinary FS file, so its content is version history for
  * free (the FS store content-versions every write). The helpers at the bottom
@@ -38,6 +30,13 @@ import {
   svcScope,
   writeSvcRecord,
 } from "../svc-records.js";
+import {
+  dropAlias,
+  dropAppLocation,
+  indexAppLocation,
+  setAlias,
+  type AppId,
+} from "./identity.js";
 
 const APPS_SCOPE = svcScope("apps");
 const WORKSPACE_SCOPE = svcScope("workspace");
@@ -49,6 +48,9 @@ const WORKSPACE_CONFIG_KEY = "config";
  * other ambiguity is a 400 rather than a guess.
  */
 export const ENTRY_CANDIDATES = ["index.tsx", "index.ts", "widget.tsx"];
+
+/** File-plane root for per-app per-user partitions (`.apps/<id>/data/<sub>/…`). */
+export const APP_DATA_ROOT = ".apps";
 
 export interface AppRoles {
   /** Cognito subs with the app's admin role. */
@@ -70,21 +72,13 @@ export interface AppRateLimit {
   daily?: number;
 }
 
-/**
- * Where an app user's data physically lands.
- *
- * - `"owner"` (default): the publishing workspace stores every user's
- *   partition (`<paths[0]>/data/<userSub>`) and its credentials execute —
- *   a hosted service.
- * - `"workspace"`: the app is a template. A caller installs it
- *   (`apps.install`) into their OWN workspace, data lands under
- *   `<installPrefix>/data`, and execution uses the caller's credentials —
- *   a self-deployed app, carrying no publisher liability.
- */
-export type AppDataScope = "owner" | "workspace";
-
 export interface AppManifest {
+  /** Durable ULID identity — storage key for this manifest. */
+  appId: AppId;
+  /** Current mutable alias (display / live URL); the alias index is authoritative. */
   name: string;
+  /** Set when this app was forked from another. */
+  originAppId?: AppId;
   title?: string;
   description?: string;
   /**
@@ -93,10 +87,8 @@ export interface AppManifest {
    */
   entry: string;
   /**
-   * Workspace path prefixes this app publishes. `paths[0]` (always the
-   * entry's folder) is the app's primary root: its data partition and its
-   * app-relative vfs paths hang off it. Additional prefixes let an app ship
-   * shared code/assets (e.g. "lib/charts") without copying them.
+   * Workspace path prefixes this app publishes. Authored source only — data
+   * partitions hang off {@link APP_DATA_ROOT}, not these paths.
    */
   paths: string[];
   /**
@@ -115,8 +107,6 @@ export interface AppManifest {
    * workspace-internal.
    */
   workflows?: string[];
-  /** Where this app's user data lives (default "owner"). */
-  dataScope?: AppDataScope;
   /**
    * Channel → release id. The live page serves `channels.live`'s pinned
    * content when set (see apps/releases.ts); `?channel=preview` serves
@@ -170,7 +160,7 @@ export function appName(value: unknown): string {
  * its tool namespaces).
  */
 export function workspacePath(value: unknown, label = "path"): string {
-  const path = typeof value === "string" ? normalizeFsPath(value) : null;
+  const path = typeof value !== "string" ? null : normalizeFsPath(value);
   if (!path) {
     throw new ServiceError(`${label} must be a workspace path (e.g. apps/liift4/widget.tsx)`, 400);
   }
@@ -192,39 +182,33 @@ export function pathDir(path: string, label = "entry"): string {
 /**
  * The path binding of a published app — a manifest, or the app-session scope
  * derived from one (see ServiceContext.appScope). Everything path-related is
- * decided from these two fields alone.
+ * decided from these fields alone. `id` is the ULID used for partition roots
+ * (appId for origin-hosted use, installId once installs mint their own).
  */
 export interface AppPaths {
+  id: string;
   name: string;
   paths: string[];
-  /**
-   * Owner-hosted apps partition per app user under the app folder;
-   * workspace-scoped installs already sit in the user's own workspace, so
-   * their data root has nothing to partition against (see {@link appDataDir}).
-   */
-  dataScope?: AppDataScope;
 }
 
-/** The app's primary prefix: where its data and app-relative paths live. */
+/** The app's primary authored-source prefix. */
 export function appRoot(app: AppPaths): string {
   const root = app.paths?.[0];
   if (!root) throw new ServiceError(`App ${app.name} has no published paths`, 400);
   return root;
 }
 
-/** The per-app data partition root — served to nobody, ever. */
-export function appDataRoot(app: AppPaths): string {
-  return `${appRoot(app)}/data`;
+/** Per-app data partition container: `.apps/<id>/data`. */
+export function appDataRoot(id: string): string {
+  return `${APP_DATA_ROOT}/${id}/data`;
 }
 
 /**
- * The data folder a session's writes land in: per-(app, user) inside the
- * app's primary prefix for owner-hosted apps, and the install prefix's own
- * `data/` for a workspace-scoped install (the workspace *is* the user).
+ * The data folder a session's writes land in: `.apps/<id>/data/<userSub>`.
+ * `<id>` is the app ULID (origin-hosted) or install ULID (installed).
  */
-export function appDataDir(app: AppPaths, userId: string): string {
-  const root = appDataRoot(app);
-  return app.dataScope === "workspace" ? root : `${root}/${userId}`;
+export function appDataDir(id: string, userSub: string): string {
+  return `${appDataRoot(id)}/${userSub}`;
 }
 
 const underPrefix = (path: string, prefix: string): boolean =>
@@ -232,30 +216,17 @@ const underPrefix = (path: string, prefix: string): boolean =>
 
 // ---------------------------------------------------------------------------
 // File-plane hiding — the data-partition prefixes a workspace *listing*
-// should never surface (see docs/app-data.md, "The file plane forgets app
-// data"). Now that `keyvalue` routes through the record store
-// (services.ts/records.ts), nothing new lands under these prefixes, but
-// existing per-user data written before the migration is still readable at
-// its exact path for backward compatibility — only *listings* (vfs.list, the
-// chat file tree at GET /fs) hide it, so a workspace member can no longer
-// browse another user's partition by prefix, but neither surface 404s on a
-// path it already knows.
-//
-// `.personal/data` mirrors apps/personal.ts's PERSONAL_PREFIX literally
-// rather than importing it: personal.ts imports `listApps` from this module,
-// so importing back would recreate the very module-cycle service-kernel.ts's
-// header warns about.
+// should never surface. Stream 2 re-roots the guard structurally; here the
+// writers have moved to `.apps/<id>/data`, so listings hide those prefixes
+// derived from each published app's id.
 // ---------------------------------------------------------------------------
 
-const PERSONAL_DATA_PREFIX = ".personal/data";
 const HIDDEN_PREFIX_CACHE_TTL_MS = 30_000;
 const hiddenPrefixCache = new Map<string, { prefixes: string[]; expiresAt: number }>();
 
 /**
  * Every data-partition prefix hidden from workspace listings: each published
- * app's `<paths[0]>/data` plus Personal's own `.personal/data`. Cached briefly
- * per workspace — defense-in-depth hiding can afford to lag a publish by a
- * few seconds, and every listing call would otherwise re-read every manifest.
+ * app's `.apps/<appId>/data`. Cached briefly per workspace.
  */
 export async function hiddenDataPrefixes(workspaceId: string): Promise<string[]> {
   const now = Date.now();
@@ -263,7 +234,7 @@ export async function hiddenDataPrefixes(workspaceId: string): Promise<string[]>
   if (cached && cached.expiresAt > now) return cached.prefixes;
 
   const manifests = await listApps(workspaceId).catch(() => []);
-  const prefixes = [PERSONAL_DATA_PREFIX, ...manifests.map((manifest) => appDataRoot(manifest))];
+  const prefixes = manifests.map((manifest) => appDataRoot(manifest.appId));
   hiddenPrefixCache.set(workspaceId, { prefixes, expiresAt: now + HIDDEN_PREFIX_CACHE_TTL_MS });
   return prefixes;
 }
@@ -273,8 +244,7 @@ export function isHiddenDataPath(path: string, prefixes: readonly string[]): boo
   return prefixes.some((prefix) => underPrefix(path, prefix));
 }
 
-/** Reset the hidden-prefix cache (tests only — publishing an app mid-test
- * would otherwise read a stale prefix list). */
+/** Reset the hidden-prefix cache (tests only). */
 export function resetHiddenDataPrefixCache(): void {
   hiddenPrefixCache.clear();
 }
@@ -282,12 +252,6 @@ export function resetHiddenDataPrefixCache(): void {
 // ---------------------------------------------------------------------------
 // Per-user partition authorization — hiding grown into enforcement
 // (specs per-user-data; tech-plan data-auth-model D1/D2).
-//
-// REPO CONVENTION: every exact-path FS entry point (tool plane, HTTP plane,
-// any future route or verb) MUST call `assertPartitionAccess` (or the pure
-// `partitionAccess`) before touching the store. The store itself carries no
-// principal (WS-5 replaces the backends), so this guard above `IFsStore` is
-// the single place partition policy lives.
 // ---------------------------------------------------------------------------
 
 export type PartitionAccess = "open" | "own" | "foreign";
@@ -295,9 +259,8 @@ export type PartitionAccess = "open" | "own" | "foreign";
 /**
  * Pure partition rule: is `path` inside a per-user data partition, and whose?
  * The owner is the first path segment after the hidden data prefix
- * (`.personal/data/<sub>/…`, `<appRoot>/data/<sub>/…`). A path that IS a
- * hidden prefix (the partition container itself) belongs to nobody and is
- * "open" — enforcement is per-owner, not per-container.
+ * (`.apps/<id>/data/<sub>/…`). A path that IS a hidden prefix (the partition
+ * container itself) belongs to nobody and is "open".
  */
 export function partitionAccess(
   path: string,
@@ -315,9 +278,7 @@ export function partitionAccess(
 
 /**
  * Throws `ServiceError("Not found: <path>", 404)` when `path` sits inside
- * another user's data partition — deny-as-404, byte-identical to a
- * nonexistent path, so foreign partitions are unprobeable (D2). Owners pass;
- * paths outside every partition pass.
+ * another user's data partition — deny-as-404.
  */
 export async function assertPartitionAccess(
   workspaceId: string,
@@ -331,8 +292,8 @@ export async function assertPartitionAccess(
 }
 
 /**
- * Resolve an app-relative path (as an app session or the live site addresses
- * it) to its absolute workspace path under the app's primary prefix.
+ * Resolve an app-relative path to its absolute workspace path under the
+ * app's primary authored prefix.
  */
 export function resolveAppPath(app: AppPaths, relative: string): string {
   return workspacePath(`${appRoot(app)}/${relative}`, "path");
@@ -348,12 +309,11 @@ export function appPathAllowed(app: AppPaths, path: string): boolean {
 }
 
 /**
- * Is `path` publishable over HTTP? Declared prefixes minus the data
- * partition — per-user app data is co-located with the code but never
- * leaves through the live site or `__project__`.
+ * Is `path` publishable over HTTP? Declared prefixes minus the ID-keyed data
+ * partition — per-user app data is never served through the live site.
  */
 export function appPathServable(app: AppPaths, path: string): boolean {
-  return appPathAllowed(app, path) && !underPrefix(path, appDataRoot(app));
+  return appPathAllowed(app, path) && !underPrefix(path, appDataRoot(app.id));
 }
 
 /**
@@ -386,64 +346,49 @@ export async function resolveAppEntry(workspaceId: string, target: unknown): Pro
   );
 }
 
+/** Persist a manifest by appId and refresh its name→appId alias. */
 export async function saveApp(workspaceId: string, manifest: AppManifest): Promise<void> {
-  await writeSvcRecord(workspaceId, APPS_SCOPE, manifest.name, manifest, manifest.createdBy);
+  await writeSvcRecord(workspaceId, APPS_SCOPE, manifest.appId, manifest, manifest.createdBy);
+  await setAlias(workspaceId, manifest.name, manifest.appId);
+  await indexAppLocation(workspaceId, manifest.appId, manifest.name);
   // The hidden-prefix cache now feeds *enforcement* (partitionAccess), not
   // just listing cosmetics — a publish must be visible to the very next
   // guard check in this process, not after the TTL.
   hiddenPrefixCache.delete(workspaceId);
 }
 
-/**
- * Read a manifest, *resolving* its path binding rather than trusting whatever
- * shape is on disk. Manifests written before apps declared `entry`/`paths`
- * only name a folder, so resolve that once and rewrite in place — a published
- * app should never 404 on a stale shape, and this is the only place that has
- * to know the old one.
- */
+/** Read a manifest by durable appId. No name-keyed or legacy-shape rebinding. */
 export async function readApp(
   workspaceId: string,
-  name: string,
+  appId: string,
 ): Promise<AppManifest | undefined> {
-  const stored = await readSvcRecord<AppManifest & { dir?: string }>(
-    workspaceId,
-    APPS_SCOPE,
-    name,
-  );
-  if (!stored) return undefined;
-  if (stored.entry && stored.paths?.length) return stored;
-
-  const entry = await resolveAppEntry(workspaceId, stored.entry ?? stored.dir);
-  const { dir: _legacy, ...rest } = stored;
-  const bound: AppManifest = { ...rest, entry, paths: [pathDir(entry)] };
-  await saveApp(workspaceId, bound);
-  return bound;
+  return readSvcRecord<AppManifest>(workspaceId, APPS_SCOPE, appId);
 }
 
 export async function listApps(workspaceId: string): Promise<AppManifest[]> {
   const entries = await listSvcRecords<AppManifest>(workspaceId, APPS_SCOPE);
-  // Re-resolve through readApp so legacy folder-shaped manifests rebind.
-  const manifests = await Promise.all(entries.map((entry) => readApp(workspaceId, entry.key)));
-  return manifests.filter((m): m is AppManifest => Boolean(m));
+  return entries.map((entry) => entry.value).filter((m): m is AppManifest => Boolean(m?.appId));
 }
 
 export interface RemoveAppOptions {
-  /** Also delete the app's primary prefix (UI, data partitions, everything). */
+  /** Also delete the app's ID-keyed data root (`.apps/<appId>`). */
   purgeData?: boolean;
 }
 
 export async function removeApp(
   workspaceId: string,
-  name: string,
+  appId: string,
   options: RemoveAppOptions = {},
 ): Promise<boolean> {
-  const manifest = await readApp(workspaceId, name);
-  const removed = await deleteSvcRecord(workspaceId, APPS_SCOPE, name);
+  const manifest = await readApp(workspaceId, appId);
+  const removed = await deleteSvcRecord(workspaceId, APPS_SCOPE, appId);
+  if (manifest) {
+    await dropAlias(workspaceId, manifest.name);
+    await dropAppLocation(manifest.appId);
+  }
   hiddenPrefixCache.delete(workspaceId);
-  // Only the primary prefix is purged: secondary prefixes are shared library
-  // paths this app doesn't own.
   if (options.purgeData && manifest) {
-    await getFsStore().removePrefix(workspaceId, appRoot(manifest));
+    await getFsStore().removePrefix(workspaceId, `${APP_DATA_ROOT}/${manifest.appId}`);
   }
   return removed;
 }
@@ -523,8 +468,7 @@ export function shareAllows(
 
 /**
  * May an app session touch this workspace path? Its declared prefixes are
- * its own turf (read and write); everything else must be shared explicitly
- * in `.services/workspace.json`.
+ * its own turf (read and write); everything else must be shared explicitly.
  */
 export function appFsAllowed(
   app: AppPaths,

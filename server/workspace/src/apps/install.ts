@@ -1,22 +1,12 @@
 /**
- * Install records — the caller side of `dataScope: "workspace"`.
+ * Install records — interim pre-stream-3 shape.
  *
- * An owner-hosted app (`dataScope: "owner"`, the default) needs no install:
- * the publishing workspace stores everyone's partition. A workspace-scoped app
- * is a *template* — the code is published, the workspace is brought by the
- * user — so a caller records an install in their OWN workspace, under the
- * `svc#apps#installed` record scope:
- *
- *   svc#apps#installed / <owner>.<name>
- *     { owner, name, release, prefix, installedAt }
- *
- * With that record present, the app session's `appScope` resolves data and the
- * native namespaces into the *caller's* workspace under `<prefix>/data`, and
- * every execution uses the caller's credentials. Without one, behaviour is
- * unchanged: owner-hosted.
+ * Stream 3 rewrites this to ULID-keyed `svc#installs / <installId>` with pins,
+ * bindings, and lineage. Until then installs remain name-keyed under
+ * `svc#apps#installed` for the existing install/uninstall procedures; session
+ * partitions always use the origin `appId` (dataScope is gone).
  */
 
-import { ServiceError } from "../service-kernel.js";
 import {
   deleteSvcRecord,
   listSvcRecords,
@@ -34,7 +24,7 @@ export interface AppInstall {
   name: string;
   /** Release id pinned at install time (null when the app has no releases). */
   release: string | null;
-  /** Prefix in the installing workspace holding the app's data. */
+  /** Prefix in the installing workspace holding authored fork material (stream 3). */
   prefix: string;
   installedAt: string;
 }
@@ -89,20 +79,15 @@ export async function listInstalls(workspaceId: string): Promise<AppInstall[]> {
 }
 
 /**
- * The path binding an installed session uses: the install prefix stands in for
- * the app's published folder, so `keyvalue` lands at `<prefix>/data/<key>` and
- * relative `vfs` paths resolve under `<prefix>/`.
+ * Path binding for an installed session: authored paths use the install
+ * prefix; partition roots still derive from the origin `appId` until stream 3
+ * mints installIds.
  */
 export function installedScope(manifest: AppManifest, install: AppInstall): AppPaths {
-  return { name: manifest.name, paths: [install.prefix], dataScope: "workspace" };
+  return { id: manifest.appId, name: manifest.name, paths: [install.prefix] };
 }
 
-/** Reject an install of an app that isn't a template. */
-export function assertInstallable(manifest: AppManifest): void {
-  if ((manifest.dataScope ?? "owner") !== "workspace") {
-    throw new ServiceError(
-      `App ${manifest.name} is owner-hosted (dataScope "owner") — its data lives in the publishing workspace, so there is nothing to install. Open it instead.`,
-      400,
-    );
-  }
+/** Install is available for any published app (dataScope deleted). */
+export function assertInstallable(_manifest: AppManifest): void {
+  // Stream 3 replaces this with visibility / dependency checks.
 }

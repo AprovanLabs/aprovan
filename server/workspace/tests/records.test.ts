@@ -65,7 +65,7 @@ async function data<T>(res: Response): Promise<T> {
 async function publishFolderApp(
   name: string,
   overrides: Record<string, unknown> = {},
-): Promise<void> {
+): Promise<{ appId: string }> {
   await putFile(`apps/${name}/index.tsx`, "export default () => null;");
   const res = await manage("apps/publish", {
     name,
@@ -75,6 +75,8 @@ async function publishFolderApp(
     ...overrides,
   });
   expect(res.status).toBe(200);
+  const body = (await res.json()) as { data: { appId: string } };
+  return { appId: body.data.appId };
 }
 
 // ---------------------------------------------------------------------------
@@ -125,7 +127,7 @@ describe("RecordStoreSqlite", () => {
 
 describe("keyvalue scope isolation", () => {
   it("never lets two app users of the same app see each other's keys", async () => {
-    await publishFolderApp("tracker");
+    const { appId } = await publishFolderApp("tracker");
     await appCall("alice", "tracker/tools/keyvalue/set", { args: { key: "state", value: "alice-data" } });
     await appCall("bob", "tracker/tools/keyvalue/set", { args: { key: "state", value: "bob-data" } });
 
@@ -138,10 +140,9 @@ describe("keyvalue scope isolation", () => {
     expect(alice.value).toBe("alice-data");
     expect(bob.value).toBe("bob-data");
 
-    // Directly against the record store: two distinct scopes under one tenant.
     const records = getRecordStore();
-    expect((await records.get("local", "app#tracker#u#alice", "state"))?.value).toBe("alice-data");
-    expect((await records.get("local", "app#tracker#u#bob", "state"))?.value).toBe("bob-data");
+    expect((await records.get("local", `app#${appId}#u#alice`, "state"))?.value).toBe("alice-data");
+    expect((await records.get("local", `app#${appId}#u#bob`, "state"))?.value).toBe("bob-data");
   });
 
   it("never lets two different apps' same-named keys collide", async () => {
@@ -161,7 +162,7 @@ describe("keyvalue scope isolation", () => {
   });
 
   it("keeps the shared workspace KV (scope 'ws') separate from every app scope", async () => {
-    await publishFolderApp("sidecar");
+    const { appId } = await publishFolderApp("sidecar");
     await manage("keyvalue/set", { key: "shared", value: "workspace-value" });
     await appCall("alice", "sidecar/tools/keyvalue/set", { args: { key: "shared", value: "app-value" } });
 
@@ -174,7 +175,7 @@ describe("keyvalue scope isolation", () => {
 
     const records = getRecordStore();
     expect((await records.get("local", "ws", "shared"))?.value).toBe("workspace-value");
-    expect((await records.get("local", "app#sidecar#u#alice", "shared"))?.value).toBe("app-value");
+    expect((await records.get("local", `app#${appId}#u#alice`, "shared"))?.value).toBe("app-value");
   });
 });
 
@@ -196,24 +197,20 @@ describe("lazy migration fallback", () => {
     expect(again.value).toBe("old-value");
   });
 
-  it("migrates a legacy per-app-user FS key co-located with the app", async () => {
-    await publishFolderApp("legacy-app");
+  it("migrates a legacy per-app-user FS key under the ID-keyed data root", async () => {
+    const { appId } = await publishFolderApp("legacy-app");
     const store = getFsStore();
-    await store.write(
-      "local",
-      "apps/legacy-app/data/alice/old-state",
-      JSON.stringify({ weeks: 9 }),
-      "application/json",
-    );
+    const legacyPath = `.apps/${appId}/data/alice/old-state`;
+    await store.write("local", legacyPath, JSON.stringify({ weeks: 9 }), "application/json");
 
     const got = await data<{ value: { weeks: number } }>(
       await appCall("alice", "legacy-app/tools/keyvalue/get", { args: { key: "old-state" } }),
     );
     expect(got.value).toEqual({ weeks: 9 });
     expect(
-      (await getRecordStore().get("local", "app#legacy-app#u#alice", "old-state"))?.value,
+      (await getRecordStore().get("local", `app#${appId}#u#alice`, "old-state"))?.value,
     ).toEqual({ weeks: 9 });
-    expect(await store.read("local", "apps/legacy-app/data/alice/old-state")).toBeUndefined();
+    expect(await store.read("local", legacyPath)).toBeUndefined();
   });
 
   it("keyvalue.list merges not-yet-migrated legacy keys with record-store keys", async () => {
@@ -233,59 +230,53 @@ describe("lazy migration fallback", () => {
 });
 
 describe("the file plane forgets app data", () => {
-  it("hiddenDataPrefixes covers every published app's data root", async () => {
-    await publishFolderApp("hidden-one");
+  it("hiddenDataPrefixes covers every published app's ID-keyed data root", async () => {
+    const { appId } = await publishFolderApp("hidden-one");
     resetHiddenDataPrefixCache();
     const prefixes = await hiddenDataPrefixes("local");
-    expect(prefixes).toContain("apps/hidden-one/data");
-    expect(prefixes).toContain(".personal/data");
+    expect(prefixes).toContain(`.apps/${appId}/data`);
+    expect(prefixes.every((p) => p.startsWith(".apps/"))).toBe(true);
   });
 
-  it("vfs.list hides an app's data directory but reads/writes to it still work", async () => {
-    await publishFolderApp("visible-app");
+  it("vfs.list hides an app's ID-keyed data directory", async () => {
+    const { appId } = await publishFolderApp("visible-app");
     await appCall("alice", "visible-app/tools/keyvalue/set", { args: { key: "state", value: 1 } });
-    // Seed a legacy-shaped file directly so there is something to hide even
-    // before any lazy-migration read has swept it away.
-    await getFsStore().write(
-      "local",
-      "apps/visible-app/data/alice/leftover",
-      JSON.stringify("leftover"),
-      "application/json",
-    );
+    const partitionFile = `.apps/${appId}/data/alice/leftover`;
+    await getFsStore().write("local", partitionFile, JSON.stringify("leftover"), "application/json");
 
     const listing = await data<{ entries: Array<{ path: string }> }>(
+      await manage("vfs/list", { prefix: ".apps" }),
+    );
+    expect(listing.entries.some((e) => e.path.startsWith(`.apps/${appId}/data/`))).toBe(false);
+
+    const authored = await data<{ entries: Array<{ path: string }> }>(
       await manage("vfs/list", { prefix: "apps/visible-app" }),
     );
-    expect(listing.entries.some((e) => e.path.startsWith("apps/visible-app/data/"))).toBe(false);
-    // The app's own file (not under data/) is still listed normally.
-    expect(listing.entries.some((e) => e.path === "apps/visible-app/index.tsx")).toBe(true);
+    expect(authored.entries.some((e) => e.path === "apps/visible-app/index.tsx")).toBe(true);
 
-    // Hiding grew into enforcement (specs per-user-data): a direct read of
-    // ANOTHER user's partition by exact path now 404s like a missing file.
-    // The partition owner's own app session still reads it (lazy migration).
-    const direct = await manage("vfs/read", { path: "apps/visible-app/data/alice/leftover" });
+    const direct = await manage("vfs/read", { path: partitionFile });
     expect(direct.status).toBe(404);
   });
 
   it("GET /fs (the chat file tree route) hides the same prefixes", async () => {
-    await publishFolderApp("tree-app");
+    const { appId } = await publishFolderApp("tree-app");
     await getFsStore().write(
       "local",
-      "apps/tree-app/data/alice/leftover",
+      `.apps/${appId}/data/alice/leftover`,
       JSON.stringify("leftover"),
       "application/json",
     );
 
     const res = await createApp().request("/fs");
     const body = (await res.json()) as { entries: Array<{ path: string }> };
-    expect(body.entries.some((e) => e.path.startsWith("apps/tree-app/data/"))).toBe(false);
+    expect(body.entries.some((e) => e.path.startsWith(`.apps/${appId}/data/`))).toBe(false);
     expect(body.entries.some((e) => e.path === "apps/tree-app/index.tsx")).toBe(true);
   });
 });
 
 describe("apps.data admin procedure", () => {
   it("is gated on the app's admin role and audits every call", async () => {
-    await publishFolderApp("admin-app", { roles: { admins: ["local"] } });
+    const { appId } = await publishFolderApp("admin-app", { roles: { admins: ["local"] } });
     await appCall("alice", "admin-app/tools/keyvalue/set", { args: { key: "state", value: 1 } });
     await appCall("alice", "admin-app/tools/keyvalue/set", { args: { key: "other", value: 2 } });
     await appCall("bob", "admin-app/tools/keyvalue/set", { args: { key: "state", value: 3 } });
@@ -318,12 +309,12 @@ describe("apps.data admin procedure", () => {
     expect(detailed).toHaveLength(3);
     for (const [entry] of detailed) {
       expect(entry).toMatchObject({ workspaceId: "local", callerId: "local", provider: "apps" });
-      expect(String(entry.operation)).toContain("admin-app");
+      expect(String(entry.operation)).toContain(appId);
     }
     expect(detailed.map(([entry]) => entry.operation)).toEqual([
-      "data:admin-app",
-      "data:admin-app:alice",
-      "data:admin-app:alice:state",
+      `data:${appId}`,
+      `data:${appId}:alice`,
+      `data:${appId}:alice:state`,
     ]);
 
     auditSpy.mockRestore();
@@ -336,12 +327,9 @@ describe("apps.data admin procedure", () => {
     expect(res.status).toBe(403);
   });
 
-  it("rejects personal outright — personal data has no admin override", async () => {
-    await appCall("local", "personal/tools/keyvalue/set", { args: { key: "note", value: "hi" } });
-    const res = await manage("apps/data", { name: "personal" });
-    expect(res.status).toBe(403);
-    const body = (await res.json()) as { error?: string };
-    expect(body.error).toMatch(/no admin override/i);
+  it("404s when the app alias is unknown", async () => {
+    const res = await manage("apps/data", { name: "no-such-app" });
+    expect(res.status).toBe(404);
   });
 
   it("requires `user` when `key` is given", async () => {
@@ -377,14 +365,12 @@ describe("reserved svc# scopes", () => {
   });
 
   it("keeps app-session keyvalue confined to its app scope, never svc#", async () => {
-    await publishFolderApp("scope-probe");
+    const { appId } = await publishFolderApp("scope-probe");
     await appCall("user-1", "scope-probe/tools/keyvalue/set", {
       args: { key: "state", value: 1 },
     });
     const store = getRecordStore();
-    // The write landed in the app partition; the svc# namespace holds no key
-    // an app session could have created.
-    const appKeys = await store.list("local", "app#scope-probe#u#user-1");
+    const appKeys = await store.list("local", `app#${appId}#u#user-1`);
     expect(appKeys).toContain("state");
     const chatKeys = await store.list("local", "svc#chat#sessions", "state");
     expect(chatKeys).toEqual([]);

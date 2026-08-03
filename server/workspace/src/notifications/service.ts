@@ -251,7 +251,7 @@ export const notificationsService: CoreService = {
             widget = { ...widget, path: resolveAppPath(ctx.appScope, widget.path) };
           }
           if (choices) {
-            const manifest = await readApp(ctx.workspaceId, ctx.appScope.name);
+            const manifest = await readApp(ctx.workspaceId, ctx.appScope.id);
             if (!manifest) {
               throw new ServiceError("App manifest unavailable — choices rejected", 403);
             }
