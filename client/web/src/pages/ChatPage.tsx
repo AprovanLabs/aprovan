@@ -134,7 +134,7 @@ export default function ChatPage() {
 
   const layout = useChatPanelLayout();
 
-  const { handleSubmit, createWorkflowInChat } = useChatSubmit({
+  const { handleSubmit, createWorkflowInChat, publishFlowInChat } = useChatSubmit({
     input,
     setInput,
     sendMessage,
@@ -168,15 +168,23 @@ export default function ChatPage() {
   );
 
   // Native panels are self-contained; the few page-only actions they need
-  // (switch chat, open a file) ride this one additive context.
+  // (switch chat, open a file, prefill composer) ride this one additive context.
   const panelHostActions = useMemo(
     () => ({
       onOpenSession: (id: string) => void session.openSession(id),
       onOpenFile: (path: string) => tabs.openWorkspacePreview(path),
       onOpenCredentials: (provider?: string) =>
         tabs.openNativeTab("credentials", provider ? { provider } : undefined),
+      onCreateWorkflow: createWorkflowInChat,
+      onPublishFlow: publishFlowInChat,
     }),
-    [session.openSession, tabs.openWorkspacePreview, tabs.openNativeTab]
+    [
+      session.openSession,
+      tabs.openWorkspacePreview,
+      tabs.openNativeTab,
+      createWorkflowInChat,
+      publishFlowInChat,
+    ]
   );
 
   return (
@@ -224,8 +232,8 @@ export default function ChatPage() {
             />
           </AppHeader>
 
-          {/* One catalog for both Apps surfaces: the sidebar explorer and the
-              full panel in a tab share one apps/workflows list + refresh. */}
+          {/* One catalog for the Apps native surface and any leftover apps://
+              tabs: shared apps/workflows list + refresh. */}
           <AppsCatalogProvider invoke={invokeWorkflowsTool} invokeApps={invokeAppsTool}>
             <div className="flex-1 min-h-0 flex relative">
               <WorkspaceSidebar
@@ -243,9 +251,6 @@ export default function ChatPage() {
                 deleteWorkspaceEntry={explorer.deleteWorkspaceEntry}
                 createWorkspaceFile={explorer.createWorkspaceFile}
                 refreshWorkspace={explorer.refreshWorkspace}
-                activeAppsSelection={tabs.activeAppsSelection}
-                openAppsTab={tabs.openAppsTab}
-                createWorkflowInChat={createWorkflowInChat}
                 activeSurfaceId={tabs.activeSurfaceId}
                 openNativeTab={tabs.openNativeTab}
               />
@@ -278,6 +283,7 @@ export default function ChatPage() {
                       retitleAppsTab={tabs.retitleAppsTab}
                       closeTab={tabs.closeTab}
                       createWorkflowInChat={createWorkflowInChat}
+                      publishFlowInChat={publishFlowInChat}
                       customPreview={workflowCustomPreview} loadScript={loadWorkflowScript}
                     />
                   </div>

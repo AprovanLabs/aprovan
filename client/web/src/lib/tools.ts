@@ -9,9 +9,9 @@
  * procedure and a workflow are indistinguishable at the call site.
  *
  * These transports live in `lib/` rather than next to a component because
- * they outlive components: the sidebar explorer, the full-pane AppsPanel and
- * anything else that renders a shared `@aprovan/registry-ui` panel all inject
- * the *same* function, and the shared panels never fetch on their own.
+ * they outlive components: the Apps native surface, leftover apps:// tabs,
+ * and anything else that renders a shared `@aprovan/registry-ui` panel all
+ * inject the *same* function, and the shared panels never fetch on their own.
  */
 
 import { GATEWAY_BASE } from "./gateway";

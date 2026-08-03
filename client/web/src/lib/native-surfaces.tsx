@@ -18,12 +18,14 @@ import {
   GitBranch,
   GitCompareArrows,
   KeyRound,
+  LayoutGrid,
   Plug,
   Shield,
   Webhook,
 } from "lucide-react";
 import { AdminPermissionsPanel } from "../components/panels/AdminPermissionsPanel";
 import { AgentsPanel } from "../components/panels/AgentsPanel";
+import { AppsPanel } from "../components/panels/AppsPanel";
 import { CredentialsPanel } from "../components/panels/CredentialsPanel";
 import { InterfacesPanel } from "../components/panels/InterfacesPanel";
 import { KeyValuePanel } from "../components/panels/KeyValuePanel";
@@ -60,6 +62,13 @@ export interface NativeSurfaceDef {
  * read as the same thing.
  */
 export const NATIVE_SURFACES: NativeSurfaceDef[] = [
+  {
+    id: "apps",
+    title: "Apps",
+    icon: LayoutGrid,
+    description: "Your apps, installations, private flows, and the directory",
+    Panel: AppsPanel,
+  },
   {
     id: "keyvalue",
     title: "Data",

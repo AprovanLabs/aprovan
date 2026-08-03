@@ -146,19 +146,19 @@ else in this change is IW-0-independent. Nuke-and-reseed: no task migrates name-
 
 > Depends-on: 4 | Touches: client/web/src/lib/native-surfaces.tsx, client/web/src/components/SidebarApps.tsx, client/web/src/components/ChatPage.tsx, client/web/src/lib/private-partition.ts, client/web/src/lib/tools.ts, client/web/src/components/panels/** | Verify: pnpm --dir /Users/jacob/Documents/Code/AprovanLabs/aprovan/client/web build && ! grep -rn "SidebarApps\|patchwork:sidebar-apps\|\.personal" /Users/jacob/Documents/Code/AprovanLabs/aprovan/client/web/src
 
-- [ ] 5.1 Add the `apps` surface: new `components/panels/AppsPanel.tsx` thin wrapper (the
+- [x] 5.1 Add the `apps` surface: new `components/panels/AppsPanel.tsx` thin wrapper (the
       credentials-panel pattern — inject transports, host the registry-ui pane variant) and
       the `{id: "apps", title: "Apps", icon: LayoutGrid, Panel: AppsPanel}` entry first in
       `NATIVE_SURFACES` (spec apps-native-surface "apps is a native surface"; tech-plan D9).
-- [ ] 5.2 Delete `SidebarApps.tsx`; keep the plain surface rows (relocate
+- [x] 5.2 Delete `SidebarApps.tsx`; keep the plain surface rows (relocate
       `WorkspaceSurfaces` into the sidebar host), drop the split-pane geometry, drag
       handle, persisted `patchwork:sidebar-apps` layout, and the ChatPage props that only
       fed it (selection mirroring, `onOpenScript` into the sidebar) (spec "The SidebarApps
       sub-group is deleted").
-- [ ] 5.3 Re-root `lib/private-partition.ts` to `.users/<sub>` (constant + detection +
+- [x] 5.3 Re-root `lib/private-partition.ts` to `.users/<sub>` (constant + detection +
       display mapping unchanged otherwise); confirm tree rendering and raw-path round-trip
       (spec per-user-space "Client private-section mapping follows the new root").
-- [ ] 5.4 Publish-funnel copy: the "share a flow" affordance in the apps pane's Your-flows
+- [x] 5.4 Publish-funnel copy: the "share a flow" affordance in the apps pane's Your-flows
       group prefills an `apps.publish` chat prompt (ux.md private-space flow step 3).
 
 ## 6. Integration, reseed verification, docs

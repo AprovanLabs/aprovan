@@ -19,7 +19,7 @@ import type { useChatProviders } from "./useChatSubmit";
 // While a tab has content on screen (open, not collapsed), the preview gets
 // the room by default — the chat below it shrinks to a strip (composer +
 // an "Expand chat" toggle). Expanding switches to a fixed-height chat dock
-// with a drag handle, same recipe as SidebarApps' resizable section. Closing
+// with a drag handle. Closing
 // or collapsing every tab always hands the chat its full height back,
 // independent of this persisted preference — see `hasContentTab` at the call
 // site.

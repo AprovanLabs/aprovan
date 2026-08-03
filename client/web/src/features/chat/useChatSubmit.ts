@@ -185,16 +185,16 @@ export function useChatSubmit(args: {
     ]
   );
 
-  // The apps explorer's empty states funnel here instead of showing dev
-  // jargon: "create a workflow" means "describe it to chat" on this surface,
-  // so prefill the composer, surface the chat (it may be docked behind an
-  // open tab), and let the user finish the sentence.
+  // The apps pane's empty states funnel here instead of showing dev jargon:
+  // "create a workflow" means "describe it to chat" on this surface, so
+  // prefill the composer, surface the chat (it may be docked behind an open
+  // tab), and let the user finish the sentence.
   const createWorkflowInChat = useCallback(
     (appName?: string) => {
       closeSidebar();
       setChatPanel((prev) => (prev.expanded ? prev : { ...prev, expanded: true }));
       setInput(
-        appName && appName !== "personal"
+        appName
           ? `Create a new workflow for the ${appName} app that `
           : "Create a new workflow that "
       );
@@ -203,5 +203,21 @@ export function useChatSubmit(args: {
     [closeSidebar]
   );
 
-  return { handleSubmit, createWorkflowInChat };
+  // Your-flows share path: publishing is the only way to make a private flow
+  // visible to others — prefill an apps.publish prompt and open the composer.
+  const publishFlowInChat = useCallback(
+    (workflowName: string) => {
+      closeSidebar();
+      setChatPanel((prev) => (prev.expanded ? prev : { ...prev, expanded: true }));
+      setInput(
+        workflowName
+          ? `Publish an app that exports the workflow "${workflowName}" (apps.publish)`
+          : "Publish an app that exports this workflow (apps.publish)"
+      );
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [closeSidebar]
+  );
+
+  return { handleSubmit, createWorkflowInChat, publishFlowInChat };
 }
