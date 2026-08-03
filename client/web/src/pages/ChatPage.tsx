@@ -135,7 +135,12 @@ export default function ChatPage() {
     sessionChat: session.sessionChat,
   });
 
-  const layout = useChatPanelLayout();
+  const splitRowRef = useRef<HTMLDivElement>(null);
+  const getSplitRowWidth = useCallback(
+    () => splitRowRef.current?.clientWidth ?? 960,
+    []
+  );
+  const layout = useChatPanelLayout(getSplitRowWidth);
 
   const dockFilePath =
     tabs.activeTabPath && !isVirtualTabPath(tabs.activeTabPath) ? tabs.activeTabPath : null;
@@ -316,7 +321,7 @@ export default function ChatPage() {
                 openNativeTab={tabs.openNativeTab}
               />
 
-              <div className="flex-1 min-w-0 min-h-0 flex relative">
+              <div ref={splitRowRef} className="flex-1 min-w-0 min-h-0 flex relative">
                 {/* File / tab pane — stays editable while the chat dock is open. */}
                 <div
                   className={`min-w-0 min-h-0 flex flex-col ${

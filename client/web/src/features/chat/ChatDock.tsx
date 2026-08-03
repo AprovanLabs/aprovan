@@ -87,11 +87,11 @@ const clamp = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), Math.max(min, max));
 
 /**
- * Side-dock open/width state + horizontal drag. `chatDockRef` is the dock
- * element; its parent is the shared row used to bound how far the drag can
- * grow the chat.
+ * Side-dock open/width state + horizontal drag. `getSplitRowWidth` must
+ * measure the full content+chat row (from ChatPage's `splitRowRef`), not the
+ * dock's own width-constrained wrapper.
  */
-export function useChatPanelLayout() {
+export function useChatPanelLayout(getSplitRowWidth: () => number) {
   const [chatPanel, setChatPanel] = useState<ChatPanelLayout>(() => loadChatPanelLayout());
   const [chatDragging, setChatDragging] = useState(false);
   const chatDockRef = useRef<HTMLDivElement>(null);
@@ -126,9 +126,8 @@ export function useChatPanelLayout() {
 
   /** Upper bound for the chat dock: whatever leaves the file pane usable. */
   const maxChatWidth = useCallback(() => {
-    const row = chatDockRef.current?.parentElement;
-    return Math.max(MIN_CHAT_WIDTH, (row?.clientWidth ?? 960) - MIN_PREVIEW_WIDTH);
-  }, []);
+    return Math.max(MIN_CHAT_WIDTH, getSplitRowWidth() - MIN_PREVIEW_WIDTH);
+  }, [getSplitRowWidth]);
 
   const resizeChatBy = useCallback(
     (delta: number) => {
