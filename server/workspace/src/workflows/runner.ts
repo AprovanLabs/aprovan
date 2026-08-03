@@ -73,7 +73,7 @@ function utdkProviderNames(): Promise<Set<string>> {
     try {
       const { createRequire } = await import("node:module");
       const require = createRequire(import.meta.url);
-      const registry = require("utdk/registry.json") as {
+      const registry = require("@utdk/clients/registry.json") as {
         providers?: Record<string, unknown>;
       };
       const names = new Set<string>();

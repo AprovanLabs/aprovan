@@ -43,7 +43,6 @@ function ensureSymlink(cwd: string, linkPath: string, target: string): void {
 
 export function bootstrap(): void {
   const cwd = process.cwd();
-  const venvBin = join(cwd, ".venv", "bin");
   console.log(`Bootstrapping repository at ${cwd}\n`);
 
   // Create .agents/context folder

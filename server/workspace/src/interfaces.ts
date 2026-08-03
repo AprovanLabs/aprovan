@@ -39,9 +39,9 @@
  */
 
 import { createRequire } from "node:module";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-import { loadCompatDocuments } from "@utdk/common/compat";
+import { loadCompatDocuments, parseCompatDocument } from "@utdk/common/compat";
 import type { CompatDocument, CompatEntry } from "@utdk/common/compat";
 import { getFsStore } from "./fs-store.js";
 import { getCredentialStore } from "./credentials.js";
@@ -171,20 +171,60 @@ export function parseInterfaceNamespace(namespace: string): InterfaceNamespace |
   return { interfaceId, instance: namespace, name };
 }
 
+/** Contract packages whose `compat.json` feeds the workspace interface catalog. */
+const CONTRACT_PACKAGES = [
+  "@utdk/agent",
+  "@utdk/llm",
+  "@utdk/sql",
+  "@utdk/sandbox",
+  "@utdk/vcs",
+  "@utdk/keyvalue",
+  "@utdk/events",
+  "@utdk/vfs",
+  "@utdk/telemetry",
+] as const;
+
 /**
- * Locate `packages/contracts/` (or, in a deployed install, the `@utdk` scope
- * directory) by walking up from the resolved `@utdk/agent` entry point — a
- * declared dependency whose realpath lands inside the contracts directory in
- * the monorepo and inside `node_modules/@utdk` when installed from tarballs.
- * The compat loader filters on the `utdk.contract` manifest marker, so
- * non-contract neighbours (`common`, `mcp-core`) are ignored either way.
+ * Load compat documents from the monorepo `packages/contracts/` tree when
+ * present; otherwise resolve each published `@utdk/*` contract package
+ * individually. pnpm isolates packages so walking up from `@utdk/agent` no
+ * longer finds sibling contracts under `node_modules/@utdk`.
  */
-function resolveContractsDir(): string {
+function loadWorkspaceCompatDocuments(): Map<string, CompatDocument> {
   const monorepoContracts = path.resolve(import.meta.dirname, "..", "..", "..", "packages", "contracts");
-  if (existsSync(monorepoContracts)) return monorepoContracts;
+  if (existsSync(monorepoContracts)) return loadCompatDocuments(monorepoContracts);
+
   const require = createRequire(import.meta.url);
-  // <contracts dir>/agent/dist/index.js → up three.
-  return path.resolve(require.resolve("@utdk/agent"), "..", "..", "..");
+  const documents = new Map<string, CompatDocument>();
+  for (const pkg of CONTRACT_PACKAGES) {
+    let root: string;
+    try {
+      root = path.resolve(require.resolve(pkg), "..", "..");
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === "MODULE_NOT_FOUND") continue;
+      throw err;
+    }
+    const manifestPath = path.join(root, "package.json");
+    if (!existsSync(manifestPath)) continue;
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as {
+      utdk?: { contract?: string };
+    };
+    const contract = manifest.utdk?.contract;
+    if (typeof contract !== "string" || contract === "") continue;
+    const compatPath = path.join(root, "compat.json");
+    if (!existsSync(compatPath)) continue;
+    const document = parseCompatDocument(
+      JSON.parse(readFileSync(compatPath, "utf8")) as unknown,
+      compatPath,
+    );
+    if (document.interface.id !== contract) {
+      throw new Error(
+        `Invalid compat document ${compatPath}: interface.id "${document.interface.id}" does not match the package's utdk.contract marker "${contract}"`,
+      );
+    }
+    documents.set(contract, document);
+  }
+  return documents;
 }
 
 /** Pre-instance catalog order; contracts beyond it sort alphabetically after. */
@@ -196,7 +236,7 @@ const INTERFACE_ORDER = ["llm", "sql", "sandbox", "vcs", "agent"];
  * malformed document fails loudly here, at import — never as silently
  * dropped entries.
  */
-const compatDocuments: CompatDocument[] = [...loadCompatDocuments(resolveContractsDir()).values()].sort(
+const compatDocuments: CompatDocument[] = [...loadWorkspaceCompatDocuments().values()].sort(
   (left, right) => {
     const l = INTERFACE_ORDER.indexOf(left.interface.id);
     const r = INTERFACE_ORDER.indexOf(right.interface.id);

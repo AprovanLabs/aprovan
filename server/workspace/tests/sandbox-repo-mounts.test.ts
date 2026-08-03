@@ -394,9 +394,7 @@ describe("repo mounts on a machine host (git clone)", () => {
     const registered = await data<Registered>(
       await call("sandboxes/registerHost", { name: "desk", root: "/tmp/aprovan-work" }),
     );
-    // The CLI's registration flow: the client token becomes the machine
-    // credential, and the sandbox interface binds to the machine provider.
-    expect((await saveCredential("machine", registered.clientToken)).status).toBeLessThan(300);
+    // registerHost persists the client token as the machine credential.
     await call("interfaces/bind", { interface: "sandbox", provider: "machine" });
 
     const seen: LeasedOp[] = [];

@@ -345,7 +345,7 @@ describe("sandboxes.schedule { agent } on a machine host", () => {
         images: [NODE_IMAGE],
       }),
     );
-    expect((await saveCredential("machine", registered.clientToken)).status).toBeLessThan(300);
+    // registerHost persists the client token as the machine credential.
     await call("interfaces/bind", { interface: "sandbox", provider: "machine" });
     await asAgent(registered, "advert", { tools: ["node", "git"], platform: "darwin/arm64" });
 

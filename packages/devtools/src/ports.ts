@@ -20,6 +20,14 @@
 
 import { createServer } from "node:net";
 
+/** Conventional offsets from an allocated base port for local Aprovan services. */
+export const SERVICE_OFFSETS = {
+  client: 0,
+  stitchery: 1,
+  copilotProxy: 2,
+  extra: 3,
+} as const;
+
 export interface PortAllocationOptions {
   /** Starting port number */
   base: number;

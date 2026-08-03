@@ -77,29 +77,29 @@ checkouts contain untracked husk dirs that mask failures._
 
 > Depends-on: 3 | Touches: aprovan/packages/{utdk,contracts,runtime,bundler,mcp,mcp-core,registry-server}/**, aprovan/server/workspace/package.json, aprovan/server/workspace/Dockerfile, aprovan/client/web/package.json, aprovan/package.json, aprovan/pnpm-workspace.yaml, aprovan/pnpm-lock.yaml | Verify: cd /Users/jacob/Documents/Code/AprovanLabs/aprovan && pnpm install && pnpm build && pnpm typecheck && pnpm test
 
-- [ ] 4.1 Repoint dependencies to npm semver (tech-plan D5): in
+- [x] 4.1 Repoint dependencies to npm semver (tech-plan D5): in
       `server/workspace/package.json` set `@utdk/agent ^0.2.0`, `@utdk/llm ^0.2.0`,
       `@utdk/sandbox ^0.2.0`, `@utdk/common ^0.1.0`, `@utdk/mcp-core ^0.1.0`,
       `utdk ^0.1.0`, `@aprovan/registry-server ^0.1.1`; in `client/web/package.json` set
       `@aprovan/runtime ^0.1.0` (spec: execution-plane-consumption / "Execution-plane
       dependencies resolve from npm only").
-- [ ] 4.2 Remove the root `package.json` `pnpm.overrides` entries for `@utdk/common` and
+- [x] 4.2 Remove the root `package.json` `pnpm.overrides` entries for `@utdk/common` and
       `@utdk/mcp-core` (tech-plan D5).
-- [ ] 4.3 Delete `packages/utdk`, `packages/contracts`, `packages/runtime`,
+- [x] 4.3 Delete `packages/utdk`, `packages/contracts`, `packages/runtime`,
       `packages/bundler`, `packages/mcp`, `packages/mcp-core`,
       `packages/registry-server`; remove the `!packages/utdk/dist/**` glob from
       `pnpm-workspace.yaml` (tech-plan D6; spec: execution-plane-consumption / "Forked
       directories are gone").
-- [ ] 4.4 Update the vendoring rationale comment at the top of
+- [x] 4.4 Update the vendoring rationale comment at the top of
       `server/workspace/Dockerfile` to state execution-plane packages come from npm via
       the committed lockfile; no build-instruction changes expected (spec:
       execution-plane-consumption / "Workspace image builds").
-- [ ] 4.5 Run `pnpm install` and commit the refreshed `aprovan/pnpm-lock.yaml`; confirm
+- [x] 4.5 Run `pnpm install` and commit the refreshed `aprovan/pnpm-lock.yaml`; confirm
       via `grep` that no `workspace:*` reference to `utdk`, `@utdk/*`,
       `@aprovan/registry-server`, or `@aprovan/runtime` remains (spec:
       execution-plane-consumption / "No workspace links to the execution plane").
       Verify: `cd /Users/jacob/Documents/Code/AprovanLabs/aprovan && ! git grep -n "workspace:\*" -- "**/package.json" | grep -E "utdk|registry-server|@aprovan/runtime"`
-- [ ] 4.6 Embedded-server smoke against npm packages (spec: execution-plane-consumption /
+- [x] 4.6 Embedded-server smoke against npm packages (spec: execution-plane-consumption /
       "Embedded registry server still works"): start the local gateway and dispatch one
       tool call through the embedded registry server, exercising `utdk/registry.json`
       resolution and `executorInstance` sharing.
@@ -109,7 +109,7 @@ checkouts contain untracked husk dirs that mask failures._
 
 > Depends-on: - | Touches: aprovan/.claude/launch.json | Verify: cd /Users/jacob/Documents/Code/AprovanLabs/aprovan && ! grep -n "AprovanLabs/registry" .claude/launch.json && python3 -m json.tool .claude/launch.json >/dev/null
 
-- [ ] 5.1 Rewrite the `gateway-local-scratch` configuration to launch aprovan's own
+- [x] 5.1 Rewrite the `gateway-local-scratch` configuration to launch aprovan's own
       server per tech-plan D7: `env APROVAN_ENV=off WORKSPACE_MODE=local
       WORKSPACE_PORT=4010 WORKSPACE_DATA_DIR=/tmp/patchwork-gateway-scratch pnpm --filter
       @aprovan/workspace exec tsx src/cli.ts start`, port 4010 unchanged (spec:
