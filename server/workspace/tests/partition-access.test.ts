@@ -5,7 +5,7 @@
  * in listings; snapshots never touch partitions; audited `apps.data` is the
  * only sanctioned admin path to app file partitions.
  *
- * Roots are ID-keyed: `.apps/<appId>/data/<sub>/…`.
+ * Roots are structural: `.apps/<appId>/data/<sub>/…` and `.users/<sub>/…`.
  */
 
 import { mkdtempSync, rmSync } from "node:fs";
@@ -74,7 +74,7 @@ async function publishApp(
 }
 
 describe("partitionAccess (pure)", () => {
-  const hidden = [".apps/01APPID000000000000000000/data"] as const;
+  const hidden = [".apps", ".users"] as const;
 
   it("paths outside every hidden prefix are open", () => {
     expect(partitionAccess("notes.md", "alice", hidden)).toBe("open");
@@ -84,15 +84,19 @@ describe("partitionAccess (pure)", () => {
 
   it("the partition container itself is open (owned by nobody)", () => {
     expect(partitionAccess(".apps/01APPID000000000000000000/data", "alice", hidden)).toBe("open");
+    expect(partitionAccess(".apps", "alice", hidden)).toBe("open");
+    expect(partitionAccess(".users", "alice", hidden)).toBe("open");
   });
 
-  it("owner = first segment after the prefix; own vs foreign", () => {
+  it("owner = <sub> segment under .apps/<id>/data and .users", () => {
     expect(
       partitionAccess(".apps/01APPID000000000000000000/data/alice/notes.md", "alice", hidden),
     ).toBe("own");
     expect(
       partitionAccess(".apps/01APPID000000000000000000/data/alice/notes.md", "bob", hidden),
     ).toBe("foreign");
+    expect(partitionAccess(".users/alice/draft.md", "alice", hidden)).toBe("own");
+    expect(partitionAccess(".users/alice/draft.md", "bob", hidden)).toBe("foreign");
   });
 
   it("the partition-root path (no trailing content) belongs to its sub", () => {
@@ -102,6 +106,8 @@ describe("partitionAccess (pure)", () => {
     expect(partitionAccess(".apps/01APPID000000000000000000/data/alice", "bob", hidden)).toBe(
       "foreign",
     );
+    expect(partitionAccess(".users/alice", "alice", hidden)).toBe("own");
+    expect(partitionAccess(".users/alice", "bob", hidden)).toBe("foreign");
   });
 });
 
@@ -212,7 +218,12 @@ describe("snapshots and restores never touch partitions", () => {
       path: `.apps/${appId}/data/local/own-note.md`,
       content: "own",
     });
+    await manage("vfs/write", {
+      path: ".users/local/private.md",
+      content: "private",
+    });
     await store.write("local", `.apps/${appId}/data/alice/foreign.md`, "foreign");
+    await store.write("local", ".users/alice/foreign.md", "foreign-user");
 
     const commit = await data<{ commit: { id: string } }>(
       await manage("vfs/commit", { message: "partition test" }),
@@ -224,12 +235,14 @@ describe("snapshots and restores never touch partitions", () => {
     expect(show.entries.some((entry) => entry.path.startsWith(`.apps/${appId}/data/`))).toBe(
       false,
     );
+    expect(show.entries.some((entry) => entry.path.startsWith(".users/"))).toBe(false);
     expect(show.entries.some((entry) => entry.path === "src/app.ts")).toBe(true);
 
     const full = await data<{ restored: string[] }>(
       await manage("vfs/restore", { commit: commit.commit.id }),
     );
     expect(full.restored.some((path) => path.startsWith(`.apps/${appId}/data/`))).toBe(false);
+    expect(full.restored.some((path) => path.startsWith(".users/"))).toBe(false);
   });
 });
 
@@ -268,6 +281,22 @@ describe("apps.data file-partition access", () => {
   it("404s unknown apps", async () => {
     const res = await manage("apps/data", { name: "no-such-app" });
     expect(res.status).toBe(404);
+  });
+
+  it("accepts appId and cannot reach the private .users space", async () => {
+    const { appId } = await publishApp("fp-id", { roles: { admins: ["local"] } });
+    await getFsStore().write("local", `.apps/${appId}/data/alice/ok.md`, "ok");
+    const byId = await manage("apps/data", { app: appId, user: "alice", path: "ok.md" });
+    expect(byId.status).toBe(200);
+    expect((await data<{ content: string | null }>(byId)).content).toBe("ok");
+
+    // Path escape is rejected; there is no procedure that serves `.users/**`.
+    const escape = await manage("apps/data", {
+      app: appId,
+      user: "alice",
+      path: "../../../.users/alice/secret.md",
+    });
+    expect(escape.status).toBe(400);
   });
 
   it("rejects `path` together with `key`, and `path` escaping the partition", async () => {

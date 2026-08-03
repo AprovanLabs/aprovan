@@ -28,6 +28,7 @@ import {
   svcScope,
   writeSvcRecord,
 } from "../svc-records.js";
+import { listApps } from "../apps/store.js";
 
 const WF_SCOPE = svcScope("workflows");
 const RUNS_MAX_RETAINED = 100;
@@ -183,6 +184,73 @@ export async function listRegistrations(
 ): Promise<WorkflowRegistration[]> {
   const entries = await listSvcRecords<WorkflowRegistration>(workspaceId, WF_SCOPE);
   return entries.map((entry) => entry.value);
+}
+
+/**
+ * Workflow name → appIds that export it. Built from published app manifests
+ * (tech-plan D8 — exporting is the only way to share a workflow).
+ */
+export async function exportedByIndex(
+  workspaceId: string,
+): Promise<Map<string, string[]>> {
+  const index = new Map<string, string[]>();
+  for (const app of await listApps(workspaceId)) {
+    for (const name of app.workflows ?? []) {
+      const list = index.get(name) ?? [];
+      list.push(app.appId);
+      index.set(name, list);
+    }
+  }
+  return index;
+}
+
+/**
+ * Unbundled workflows are creator-private; exporting from any app flips them
+ * visible to every workspace member.
+ */
+export function workflowVisibleTo(
+  registration: WorkflowRegistration,
+  callerSub: string,
+  exportedBy: readonly string[],
+): boolean {
+  return registration.createdBy === callerSub || exportedBy.length > 0;
+}
+
+/** Registrations the caller may see, each annotated with exporting app ids. */
+export async function listVisibleRegistrations(
+  workspaceId: string,
+  callerSub: string,
+): Promise<Array<WorkflowRegistration & { exportedBy: string[] }>> {
+  const [registrations, index] = await Promise.all([
+    listRegistrations(workspaceId),
+    exportedByIndex(workspaceId),
+  ]);
+  return registrations
+    .map((registration) => ({
+      ...registration,
+      exportedBy: index.get(registration.name) ?? [],
+    }))
+    .filter((registration) =>
+      workflowVisibleTo(registration, callerSub, registration.exportedBy),
+    );
+}
+
+/**
+ * Load a registration the caller may access; unexported foreign workflows
+ * answer not-found (same as missing).
+ */
+export async function requireVisibleRegistration(
+  workspaceId: string,
+  name: string,
+  callerSub: string,
+): Promise<WorkflowRegistration & { exportedBy: string[] }> {
+  const registration = await readRegistration(workspaceId, name);
+  if (!registration) throw new ServiceError(`Unknown workflow: ${name}`, 404);
+  const exportedBy = (await exportedByIndex(workspaceId)).get(name) ?? [];
+  if (!workflowVisibleTo(registration, callerSub, exportedBy)) {
+    throw new ServiceError(`Unknown workflow: ${name}`, 404);
+  }
+  return { ...registration, exportedBy };
 }
 
 export async function removeRegistration(

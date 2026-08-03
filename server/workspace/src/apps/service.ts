@@ -897,6 +897,8 @@ export const appsService: CoreService = {
 
         const records = getRecordStore();
         const tenant = ctx.workspaceId;
+        // Per-app partitions only (`app#<appId>#u#` / `.apps/<appId>/data/<user>`).
+        // The private `.users/**` space has no admin procedure.
         const scopePrefix = `app#${manifest.appId}#u#`;
 
         let result: Record<string, unknown>;

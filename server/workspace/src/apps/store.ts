@@ -10,10 +10,11 @@
  * what the live site serves AND what an app session may read/write — one
  * prefix rule, two consumers (see {@link appPathAllowed}).
  *
- * Per-user data lives under `.apps/<appId>/data/<user>` ({@link appDataDir}),
- * decoupled from authored source paths. Manifests are stored under
- * `svc#apps / <appId>`; `(workspaceId, name)` is a mutable alias only
- * (see apps/identity.ts).
+ * Per-user app data lives under `.apps/<appId>/data/<user>` ({@link appDataDir});
+ * each member's private space is `.users/<user>` ({@link userSpaceDir}). Both
+ * are enforced structurally by the partition guard — no manifest listing.
+ * Manifests are stored under `svc#apps / <appId>`; `(workspaceId, name)` is a
+ * mutable alias only (see apps/identity.ts).
  *
  * The UI `entry` is an ordinary FS file, so its content is version history for
  * free (the FS store content-versions every write). The helpers at the bottom
@@ -51,6 +52,12 @@ export const ENTRY_CANDIDATES = ["index.tsx", "index.ts", "widget.tsx"];
 
 /** File-plane root for per-app per-user partitions (`.apps/<id>/data/<sub>/…`). */
 export const APP_DATA_ROOT = ".apps";
+
+/** File-plane root for each member's private space (`.users/<sub>/…`). */
+export const USER_SPACE_ROOT = ".users";
+
+/** Structural roots the partition guard + snapshots hide — no manifest listing. */
+export const STRUCTURAL_HIDDEN_ROOTS = [APP_DATA_ROOT, USER_SPACE_ROOT] as const;
 
 export interface AppRoles {
   /** Cognito subs with the app's admin role. */
@@ -211,66 +218,68 @@ export function appDataDir(id: string, userSub: string): string {
   return `${appDataRoot(id)}/${userSub}`;
 }
 
+/** A member's private file-plane space: `.users/<userSub>`. */
+export function userSpaceDir(userSub: string): string {
+  return `${USER_SPACE_ROOT}/${userSub}`;
+}
+
 const underPrefix = (path: string, prefix: string): boolean =>
   path === prefix || path.startsWith(`${prefix}/`);
 
 // ---------------------------------------------------------------------------
-// File-plane hiding — the data-partition prefixes a workspace *listing*
-// should never surface. Stream 2 re-roots the guard structurally; here the
-// writers have moved to `.apps/<id>/data`, so listings hide those prefixes
-// derived from each published app's id.
+// File-plane hiding — structural roots `.apps` / `.users`. No manifest
+// listing: the guard matches path shape alone (tech-plan D3).
 // ---------------------------------------------------------------------------
 
-const HIDDEN_PREFIX_CACHE_TTL_MS = 30_000;
-const hiddenPrefixCache = new Map<string, { prefixes: string[]; expiresAt: number }>();
-
 /**
- * Every data-partition prefix hidden from workspace listings: each published
- * app's `.apps/<appId>/data`. Cached briefly per workspace.
+ * Structural roots hidden from snapshots and fed into the partition guard.
+ * Signature kept async for callers; `workspaceId` is unused (no cache / list).
  */
-export async function hiddenDataPrefixes(workspaceId: string): Promise<string[]> {
-  const now = Date.now();
-  const cached = hiddenPrefixCache.get(workspaceId);
-  if (cached && cached.expiresAt > now) return cached.prefixes;
-
-  const manifests = await listApps(workspaceId).catch(() => []);
-  const prefixes = manifests.map((manifest) => appDataRoot(manifest.appId));
-  hiddenPrefixCache.set(workspaceId, { prefixes, expiresAt: now + HIDDEN_PREFIX_CACHE_TTL_MS });
-  return prefixes;
+export async function hiddenDataPrefixes(_workspaceId?: string): Promise<string[]> {
+  return [...STRUCTURAL_HIDDEN_ROOTS];
 }
 
-/** Does `path` fall under one of the workspace's hidden data prefixes? */
+/** Does `path` fall under one of the structural hidden roots? */
 export function isHiddenDataPath(path: string, prefixes: readonly string[]): boolean {
   return prefixes.some((prefix) => underPrefix(path, prefix));
 }
 
-/** Reset the hidden-prefix cache (tests only). */
+/** No-op: structural roots need no cache (tests still call this). */
 export function resetHiddenDataPrefixCache(): void {
-  hiddenPrefixCache.clear();
+  // intentionally empty
 }
 
 // ---------------------------------------------------------------------------
 // Per-user partition authorization — hiding grown into enforcement
-// (specs per-user-data; tech-plan data-auth-model D1/D2).
+// (specs per-user-space; tech-plan D3).
 // ---------------------------------------------------------------------------
 
 export type PartitionAccess = "open" | "own" | "foreign";
 
 /**
- * Pure partition rule: is `path` inside a per-user data partition, and whose?
- * The owner is the first path segment after the hidden data prefix
- * (`.apps/<id>/data/<sub>/…`). A path that IS a hidden prefix (the partition
- * container itself) belongs to nobody and is "open".
+ * Pure partition rule over the two structural roots:
+ *   `.apps/<id>/data/<sub>/…`  — owner is `<sub>`
+ *   `.users/<sub>/…`           — owner is `<sub>`
+ * Partition containers (`.apps`, `.apps/<id>`, `.apps/<id>/data`, `.users`)
+ * belong to nobody ("open"). `hiddenPrefixes` is retained for call-site
+ * compatibility; matching is structural and ignores the list contents.
  */
 export function partitionAccess(
   path: string,
   callerSub: string,
-  hiddenPrefixes: readonly string[],
+  _hiddenPrefixes?: readonly string[],
 ): PartitionAccess {
-  for (const prefix of hiddenPrefixes) {
-    if (!underPrefix(path, prefix)) continue;
-    if (path === prefix) return "open";
-    const owner = path.slice(prefix.length + 1).split("/", 1)[0];
+  if (underPrefix(path, APP_DATA_ROOT)) {
+    if (path === APP_DATA_ROOT) return "open";
+    const parts = path.slice(APP_DATA_ROOT.length + 1).split("/");
+    // Expect <id>/data/<sub>/… — shorter paths are containers, not partitions.
+    if (parts.length < 3 || parts[1] !== "data") return "open";
+    const owner = parts[2]!;
+    return owner === callerSub ? "own" : "foreign";
+  }
+  if (underPrefix(path, USER_SPACE_ROOT)) {
+    if (path === USER_SPACE_ROOT) return "open";
+    const owner = path.slice(USER_SPACE_ROOT.length + 1).split("/", 1)[0]!;
     return owner === callerSub ? "own" : "foreign";
   }
   return "open";
@@ -351,10 +360,6 @@ export async function saveApp(workspaceId: string, manifest: AppManifest): Promi
   await writeSvcRecord(workspaceId, APPS_SCOPE, manifest.appId, manifest, manifest.createdBy);
   await setAlias(workspaceId, manifest.name, manifest.appId);
   await indexAppLocation(workspaceId, manifest.appId, manifest.name);
-  // The hidden-prefix cache now feeds *enforcement* (partitionAccess), not
-  // just listing cosmetics — a publish must be visible to the very next
-  // guard check in this process, not after the TTL.
-  hiddenPrefixCache.delete(workspaceId);
 }
 
 /** Read a manifest by durable appId. No name-keyed or legacy-shape rebinding. */
@@ -386,7 +391,6 @@ export async function removeApp(
     await dropAlias(workspaceId, manifest.name);
     await dropAppLocation(manifest.appId);
   }
-  hiddenPrefixCache.delete(workspaceId);
   if (options.purgeData && manifest) {
     await getFsStore().removePrefix(workspaceId, `${APP_DATA_ROOT}/${manifest.appId}`);
   }

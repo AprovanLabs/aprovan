@@ -8,8 +8,9 @@
  * registrations, runs, jobs, cursors, and settings all live in the record
  * store under `svc#...` scopes instead of `.services/**` VFS files. The
  * `svc#` prefix is disjoint from the caller-reachable scopes (`ws`,
- * `app#<name>#u#<sub>`), and {@link assertCallerScope} is the shared guard
- * the keyvalue/records service surfaces use to keep it that way.
+ * `app#<id>#u#<sub>`, `user#<sub>`), and {@link assertCallerScope} is the
+ * shared guard the keyvalue/records service surfaces use to keep it that way.
+ * `user#` scopes are self-addressed only (no admin override).
  *
  * Everything here is a thin convenience over {@link getRecordStore} — one
  * scope-builder plus JSON document helpers, so each subsystem's store module
@@ -34,14 +35,32 @@ export function svcScope(subsystem: string, ...qualifiers: string[]): string {
   return [SVC_SCOPE_PREFIX + subsystem, ...qualifiers].join("#");
 }
 
+/** Private per-user record scope: `user#<sub>`. */
+export function userRecordScope(userSub: string): string {
+  return `user#${userSub}`;
+}
+
 /**
- * Reject caller-supplied scopes that address the reserved namespace. Called
- * by every service surface that turns caller input into a record scope — app
- * sessions and workspace callers remain confined to `ws`/`app#...`.
+ * Reject caller-supplied scopes that address the reserved namespace, and keep
+ * `user#` self-addressed only. Called by every service surface that turns
+ * caller input into a record scope — app sessions and workspace callers remain
+ * confined to `ws`/`app#...`/`user#<self>`.
+ *
+ * Pass `callerSub` whenever the scope might be `user#…` (required for those).
  */
-export function assertCallerScope(scope: string, label = "scope"): void {
+export function assertCallerScope(
+  scope: string,
+  label = "scope",
+  callerSub?: string,
+): void {
   if (isSystemScope(scope)) {
     throw new ServiceError(`${label} must not address the reserved svc# namespace`, 403);
+  }
+  if (scope.startsWith("user#")) {
+    const owner = scope.slice("user#".length);
+    if (!owner || !callerSub || owner !== callerSub) {
+      throw new ServiceError(`${label} user# scope is only addressable by its owner`, 403);
+    }
   }
 }
 
