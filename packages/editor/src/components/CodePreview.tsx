@@ -52,10 +52,15 @@ interface CodePreviewProps {
   vfs: WidgetVfs;
   /**
    * Stretch to the parent instead of sizing to the content. Inline in a chat
-   * message the preview caps itself at 60vh; in a dedicated preview pane the
+   * message the host owns the height bound; in a dedicated preview pane the
    * pane owns the height and the body scrolls inside it.
    */
   fill?: boolean;
+  /**
+   * Extra classes for the non-fill body. Hosts supply height bounds
+   * (e.g. max-h) here — the preview itself no longer hardcodes viewport units.
+   */
+  className?: string;
   /**
    * App-supplied preview override. Called before the built-in preview
    * renderers; returning a node replaces the preview body (e.g. patchwork
@@ -139,6 +144,7 @@ export function CodePreview({
   vfs,
   customPreview,
   fill = false,
+  className,
   logsSource,
 }: CodePreviewProps) {
   const [isEditing, setIsEditing] = useState(false);
@@ -414,14 +420,11 @@ export function CodePreview({
   }, [onOpenEditSession, getProjectId, getEntryFile, currentCode, filePath]);
 
   // In fill mode the surrounding pane already draws the frame and owns the
-  // height; inline in a message the preview is its own bordered card. A
-  // fixed 400px floor left most widgets cramped on anything but a small
-  // screen — the min is viewport-relative instead, so the widget claims a
-  // generous share of the chat screen while still leaving room to scroll to
-  // the composer for a widget taller than that.
+  // height; inline in a message the host wraps the preview in a bounded
+  // container — no viewport floors/caps here.
   const bodyClass = fill
     ? 'flex flex-col flex-1 min-h-0 overflow-y-auto bg-card'
-    : 'flex flex-col min-h-[50vh] max-h-[75vh] overflow-y-auto bg-card';
+    : `flex flex-col overflow-y-auto bg-card${className ? ` ${className}` : ''}`;
 
   return (
     <>
@@ -511,7 +514,7 @@ export function CodePreview({
             className={
               fill
                 ? 'flex-1 min-h-0 overflow-auto bg-muted/30'
-                : 'bg-muted/30 overflow-auto max-h-[60vh]'
+                : `bg-muted/30 overflow-auto${className ? ` ${className}` : ''}`
             }
           >
             <CodeBlockView

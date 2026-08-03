@@ -78,13 +78,12 @@ export function MediaPreview({ content, mimeType, fileName }: MediaPreviewProps)
 
   return (
     <div className="flex flex-col items-center justify-center h-full p-8 bg-muted/20">
-      <div className="flex-1 flex items-center justify-center w-full max-h-[60vh] overflow-hidden">
+      <div className="flex-1 flex items-center justify-center w-full min-h-0 overflow-hidden">
         {isImage && (
           <img
             src={dataUrl}
             alt={fileName}
             className="max-w-full max-h-full object-contain rounded shadow-sm"
-            style={{ maxHeight: 'calc(60vh - 2rem)' }}
           />
         )}
         {isVideo && (
@@ -92,7 +91,6 @@ export function MediaPreview({ content, mimeType, fileName }: MediaPreviewProps)
             src={dataUrl}
             controls
             className="max-w-full max-h-full rounded shadow-sm"
-            style={{ maxHeight: 'calc(60vh - 2rem)' }}
           >
             Your browser does not support video playback.
           </video>

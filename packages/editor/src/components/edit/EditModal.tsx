@@ -18,13 +18,25 @@ import { SaveStatusButton, type SaveStatus } from '../SaveStatusButton';
 import { CodeBlockView } from './CodeBlockView';
 import { EditHistory } from './EditHistory';
 import { LogsPanel, type EditorLogsSource } from './LogsPanel';
-import { getFileType, isCompilable, isMarkdownFile, getMimeType } from './fileTypes';
+import { getFileType, isMarkdownFile, getMimeType, type DefaultView } from './fileTypes';
 import { MediaPreview } from './MediaPreview';
 import { SaveConfirmDialog } from './SaveConfirmDialog';
 import { getActiveContent, getFiles } from './types';
 import { useEditSession, type UseEditSessionOptions } from './useEditSession';
 import { WorkspaceTree } from './WorkspaceTree';
+import { markdownRoundTrips } from '../markdownRoundTrip';
 import type { VirtualProject } from '@aprovan/patchwork-compiler';
+
+function toggleDefaultView(current: DefaultView, info: { defaultView: DefaultView; canToggleView: boolean; category: string }): DefaultView {
+  if (!info.canToggleView) return current;
+  if (info.defaultView === 'rich') {
+    return current === 'rich' ? 'code' : 'rich';
+  }
+  if (info.category === 'compilable') {
+    return current === 'preview' ? 'code' : 'preview';
+  }
+  return current;
+}
 
 /** Read a picked media file as bare base64 (no data-URL prefix) for replaceFile. */
 function fileToBase64(file: File): Promise<string> {
@@ -51,7 +63,6 @@ export interface EditModalProps extends UseEditSessionOptions {
   initialTreePath?: string;
   initialState?: Partial<{
     showTree: boolean;
-    showPreview: boolean;
   }>;
   hideFileTree?: boolean;
   /** Host-supplied controls rendered above the edit composer (e.g. an
@@ -88,7 +99,6 @@ export function EditModal({
   logs,
   ...sessionOptions
 }: EditModalProps) {
-  const [showPreview, setShowPreview] = useState(initialState?.showPreview ?? true);
   const [showTree, setShowTree] = useState(
     hideFileTree ? false : (initialState?.showTree ?? false)
   );
@@ -108,6 +118,8 @@ export function EditModal({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [pendingClose, setPendingClose] = useState<{ code: string; count: number } | null>(null);
   const [treePath, setTreePath] = useState(initialTreePath ?? '');
+  const [view, setView] = useState<DefaultView>('code');
+  const [roundTripNotice, setRoundTripNotice] = useState<string | null>(null);
   const wasOpenRef = useRef(false);
   const currentCodeRef = useRef<string>('');
 
@@ -129,9 +141,28 @@ export function EditModal({
   const hasChanges = code !== (session.originalProject.files.get(session.activeFile)?.content ?? '');
 
   const fileType = useMemo(() => getFileType(session.activeFile), [session.activeFile]);
-  const isCompilableFile = isCompilable(session.activeFile);
   const isMarkdown = isMarkdownFile(session.activeFile);
-  const showPreviewToggle = isCompilableFile || isMarkdown;
+
+  // Derive the initial view from fileTypes policy whenever the active file
+  // changes. Markdown that cannot round-trip through TipTap falls back to
+  // source with a non-blocking notice — never open rich and rewrite.
+  useEffect(() => {
+    const info = getFileType(session.activeFile);
+    if (info.defaultView === 'rich' && isMarkdownFile(session.activeFile)) {
+      if (!markdownRoundTrips(code)) {
+        setView('code');
+        setRoundTripNotice(
+          'This markdown uses syntax the rich editor can’t preserve — opened as source.'
+        );
+        return;
+      }
+    }
+    setView(info.defaultView);
+    setRoundTripNotice(null);
+    // Only re-resolve when the active file changes; `code` is read from the
+    // render that switched files.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session.activeFile]);
 
   const handleSubmit = () => {
     if (!editInput.trim() || session.isApplying) return;
@@ -306,13 +337,21 @@ export function EditModal({
                 tone="primary"
               />
             )}
-            {showPreviewToggle && (
+            {fileType.canToggleView && (
               <button
-                onClick={() => setShowPreview(!showPreview)}
-                className={`w-[5rem] px-2 py-1 text-xs rounded flex items-center gap-1 ${showPreview ? 'bg-primary text-primary-foreground' : 'hover:bg-primary/20 text-primary'}`}
+                onClick={() => setView((current) => toggleDefaultView(current, fileType))}
+                className={`w-[5rem] px-2 py-1 text-xs rounded flex items-center gap-1 ${
+                  view === 'rich' || view === 'preview'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'hover:bg-primary/20 text-primary'
+                }`}
               >
-                {showPreview ? <Eye className="h-3 w-3" /> : <Code className="h-3 w-3" />}
-                {showPreview ? 'Preview' : 'Code'}
+                {view === 'rich' || view === 'preview' ? (
+                  <Eye className="h-3 w-3" />
+                ) : (
+                  <Code className="h-3 w-3" />
+                )}
+                {view === 'rich' || view === 'preview' ? 'Preview' : 'Code'}
               </button>
             )}
             <button
@@ -372,7 +411,12 @@ export function EditModal({
             </MobileDrawer>
           )}
           <div className="flex-1 min-w-0 overflow-auto">
-            {fileType.category === 'compilable' && showPreview ? (
+            {roundTripNotice && (
+              <div className="px-4 py-2 bg-muted/60 text-muted-foreground text-xs border-b">
+                {roundTripNotice}
+              </div>
+            )}
+            {fileType.category === 'compilable' && view === 'preview' ? (
               <div className="bg-card h-full relative">
                 {previewError && renderError ? (
                   renderError(previewError)
@@ -392,14 +436,14 @@ export function EditModal({
                   <div className="p-4" key={hashCode(code)}>{renderPreview(code)}</div>
                 )}
               </div>
-            ) : fileType.category === 'compilable' && !showPreview ? (
+            ) : fileType.category === 'compilable' && view === 'code' ? (
               <CodeBlockView
                 content={code}
                 language={fileType.language}
                 editable
                 onChange={session.updateActiveFile}
               />
-            ) : isMarkdown && showPreview ? (
+            ) : isMarkdown && view === 'rich' ? (
               <div className="p-4 prose prose-sm dark:prose-invert max-w-none h-full overflow-auto">
                 <MarkdownPreview
                   value={code}

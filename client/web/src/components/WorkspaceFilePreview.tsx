@@ -16,11 +16,13 @@ import "@xyflow/react/dist/style.css";
 export function WorkspaceFilePreview({
   code,
   filePath,
+  sizing = "inline",
 }: {
   code: string;
   filePath?: string;
+  sizing?: "fill" | "inline";
 }) {
   const input: RenderInput = { path: filePath, content: code };
   if (!resolveRenderer(input)) return null;
-  return <RenderedView input={input} />;
+  return <RenderedView input={input} sizing={sizing} />;
 }

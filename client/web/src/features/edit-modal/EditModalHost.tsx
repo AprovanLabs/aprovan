@@ -74,7 +74,7 @@ export function EditModalHost({
       editTransport={editTransport}
       logs={editorLogsSource(editSession.workspacePath ?? editSession.initialActiveFile)}
       // Edit means edit: land in the code view, not the preview.
-      initialState={{ showPreview: false, showTree: true }}
+      initialState={{ showTree: true }}
       compile={async (code) => {
         if (!compiler) return { success: true };
         try {

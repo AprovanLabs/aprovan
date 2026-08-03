@@ -15,7 +15,7 @@
  */
 
 import * as React from "react";
-import { JsonView, resolveRenderer } from "./renderers";
+import { JsonView, RenderedView, resolveRenderer } from "./renderers";
 
 // ---------------------------------------------------------------------------
 // Neutral model
@@ -231,10 +231,8 @@ function formatJson(value: unknown): string {
  * fallback for structured values and a plain block for primitives.
  */
 function ResultView({ result }: { result: unknown }) {
-  const rendered = resolveRenderer({ data: result });
-  if (rendered) {
-    const Component = rendered.Component;
-    return <Component input={{ data: result }} />;
+  if (resolveRenderer({ data: result })) {
+    return <RenderedView input={{ data: result }} sizing="inline" />;
   }
   if (typeof result === "object" && result !== null) {
     return <JsonView value={result} />;

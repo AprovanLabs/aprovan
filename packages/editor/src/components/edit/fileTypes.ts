@@ -1,9 +1,15 @@
 export type FileCategory = "compilable" | "text" | "media" | "binary";
 
+export type DefaultView = "rich" | "code" | "preview" | "media";
+
 export interface FileTypeInfo {
   category: FileCategory;
   language: string | null;
   mimeType: string;
+  /** Which editing/preview surface opens by default for this type. */
+  defaultView: DefaultView;
+  /** Whether the surface exposes a view toggle (md rich↔code, compilable code↔preview). */
+  canToggleView: boolean;
 }
 
 const COMPILABLE_EXTENSIONS = [".tsx", ".jsx", ".ts", ".js"];
@@ -86,6 +92,18 @@ export function getFileType(path: string): FileTypeInfo {
       category: "compilable",
       language: EXTENSION_TO_LANGUAGE[ext] ?? null,
       mimeType: EXTENSION_TO_MIME[ext] ?? "text/plain",
+      defaultView: "code",
+      canToggleView: true,
+    };
+  }
+
+  if (ext === ".md") {
+    return {
+      category: "text",
+      language: "markdown",
+      mimeType: "text/markdown",
+      defaultView: "rich",
+      canToggleView: true,
     };
   }
 
@@ -94,6 +112,8 @@ export function getFileType(path: string): FileTypeInfo {
       category: "text",
       language: EXTENSION_TO_LANGUAGE[ext] ?? null,
       mimeType: EXTENSION_TO_MIME[ext] ?? "text/plain",
+      defaultView: "code",
+      canToggleView: false,
     };
   }
 
@@ -102,6 +122,8 @@ export function getFileType(path: string): FileTypeInfo {
       category: "media",
       language: ext === ".svg" ? "xml" : null,
       mimeType: EXTENSION_TO_MIME[ext] ?? "application/octet-stream",
+      defaultView: "media",
+      canToggleView: false,
     };
   }
 
@@ -109,6 +131,8 @@ export function getFileType(path: string): FileTypeInfo {
     category: "binary",
     language: null,
     mimeType: "application/octet-stream",
+    defaultView: "code",
+    canToggleView: false,
   };
 }
 

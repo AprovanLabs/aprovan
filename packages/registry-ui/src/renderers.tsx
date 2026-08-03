@@ -86,8 +86,10 @@ export interface RendererDef {
   label: string;
   /** Match score for the input; highest wins, values <= 0 never match. */
   match: (input: RenderInput) => number;
-  Component: React.ComponentType<{ input: RenderInput }>;
+  Component: React.ComponentType<{ input: RenderInput; sizing: RendererSizing }>;
 }
+
+export type RendererSizing = "fill" | "inline";
 
 const renderers: RendererDef[] = [];
 
@@ -114,12 +116,23 @@ export function resolveRenderer(input: RenderInput): RendererDef | undefined {
   return best;
 }
 
+/** Host-owned sizing class: fill scrolls inside the pane; inline sizes to content. */
+function sizingClass(sizing: RendererSizing): string {
+  return sizing === "fill" ? "flex-1 min-h-0 overflow-auto" : "";
+}
+
 /** Render an input through the registry; null when nothing matches. */
-export function RenderedView({ input }: { input: RenderInput }): React.ReactElement | null {
+export function RenderedView({
+  input,
+  sizing = "inline",
+}: {
+  input: RenderInput;
+  sizing?: RendererSizing;
+}): React.ReactElement | null {
   const def = resolveRenderer(input);
   if (!def) return null;
   const Component = def.Component;
-  return <Component input={input} />;
+  return <Component input={input} sizing={sizing} />;
 }
 
 // ---------------------------------------------------------------------------
@@ -219,7 +232,11 @@ registerRenderer({
       return 0;
     }
   },
-  Component: ({ input }) => <JsonView value={JSON.parse(input.content ?? "null")} />,
+  Component: ({ input, sizing }) => (
+    <div className={sizingClass(sizing)}>
+      <JsonView value={JSON.parse(input.content ?? "null")} />
+    </div>
+  ),
 });
 
 // ---------------------------------------------------------------------------
@@ -304,7 +321,11 @@ registerRenderer({
   id: "tabular",
   label: "Table",
   match: (input) => (asTabularData(input.data) ? 80 : 0),
-  Component: ({ input }) => <DataTable data={asTabularData(input.data)!} />,
+  Component: ({ input, sizing }) => (
+    <div className={sizingClass(sizing)}>
+      <DataTable data={asTabularData(input.data)!} />
+    </div>
+  ),
 });
 
 // ---------------------------------------------------------------------------
@@ -477,7 +498,11 @@ registerRenderer({
   id: "chart",
   label: "Chart",
   match: (input) => (asChartSpec(input.data) ? 90 : 0),
-  Component: ({ input }) => <Chart spec={asChartSpec(input.data)!} />,
+  Component: ({ input, sizing }) => (
+    <div className={sizingClass(sizing)}>
+      <Chart spec={asChartSpec(input.data)!} />
+    </div>
+  ),
 });
 
 // ---------------------------------------------------------------------------
@@ -510,11 +535,13 @@ registerRenderer({
   id: "plot",
   label: "Plot",
   match: (input) => (looksLikePlotSpec(input.data) ? 95 : 0),
-  Component: ({ input }) => (
-    <React.Suspense
-      fallback={<p className="text-xs text-muted-foreground">Loading plot renderer…</p>}
-    >
-      <LazyPlotView spec={(input.data as { plot: import("./plot-view").PlotSpec }).plot} />
-    </React.Suspense>
+  Component: ({ input, sizing }) => (
+    <div className={sizingClass(sizing)}>
+      <React.Suspense
+        fallback={<p className="text-xs text-muted-foreground">Loading plot renderer…</p>}
+      >
+        <LazyPlotView spec={(input.data as { plot: import("./plot-view").PlotSpec }).plot} />
+      </React.Suspense>
+    </div>
   ),
 });
