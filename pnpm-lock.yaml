@@ -643,8 +643,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/compiler
       '@aprovan/registry-server':
-        specifier: ^0.1.4
-        version: 0.1.4(zod@3.25.76)
+        specifier: ^0.2.1
+        version: 0.2.1(zod@3.25.76)
       '@aprovan/sandbox-bashkit':
         specifier: workspace:*
         version: link:../../packages/sandbox-bashkit
@@ -820,8 +820,8 @@ packages:
     peerDependencies:
       ajv: '>=8'
 
-  '@aprovan/registry-server@0.1.4':
-    resolution: {integrity: sha512-CN+haR3ICpYk3cTs3MR3gDefrIBVISNavtcIrmcl5CJk5BW3OoJdQuCdh6s608tESo6ainuj9DX2cjKYFLs5BQ==}
+  '@aprovan/registry-server@0.2.1':
+    resolution: {integrity: sha512-Y1qcTCx8FLrR4CA/XRhhXr1kSM0lYwr0VWZ4yi6vwVoh/CaeYSCu/DcGwrVUdhTuDpvWuKD3HQGGXl/GNNh4Fg==}
     engines: {node: '>=20.0.0'}
 
   '@aprovan/runtime@0.1.0':
@@ -5101,6 +5101,7 @@ packages:
 
   constructs@10.8.0:
     resolution: {integrity: sha512-pJHp2CxvTG0ttp52rZvQfkbspPLZzttWPooIRLBwlZK8rV7ZhkjIkyZWJhIfBDC4YdcwIDmXyUFr1ieJaqjBbg==}
+    deprecated: This version has a bug that breaks downstream jsii consumers
 
   content-disposition@1.1.0:
     resolution: {integrity: sha512-5jRCH9Z/+DRP7rkvY83B+yGIGX96OYdJmzngqnw2SBSxqCFPd0w2km3s5iawpGX8krnwSGmF0FW5Nhr0Hfai3g==}
@@ -8306,7 +8307,7 @@ snapshots:
       jsonpointer: 5.0.1
       leven: 3.1.0
 
-  '@aprovan/registry-server@0.1.4(zod@3.25.76)':
+  '@aprovan/registry-server@0.2.1(zod@3.25.76)':
     dependencies:
       '@hono/node-server': 1.19.17(hono@4.12.33)
       '@jitl/quickjs-wasmfile-debug-asyncify': 0.32.0
@@ -13093,6 +13094,14 @@ snapshots:
       chai: 5.3.3
       tinyrainbow: 2.0.0
 
+  '@vitest/mocker@2.1.5(vite@5.4.21(@types/node@22.19.11)(lightningcss@1.32.0)(terser@5.49.0))':
+    dependencies:
+      '@vitest/spy': 2.1.5
+      estree-walker: 3.0.3
+      magic-string: 0.30.21
+    optionalDependencies:
+      vite: 5.4.21(@types/node@22.19.11)(lightningcss@1.32.0)(terser@5.49.0)
+
   '@vitest/mocker@2.1.5(vite@5.4.21(@types/node@25.9.5)(lightningcss@1.32.0)(terser@5.49.0))':
     dependencies:
       '@vitest/spy': 2.1.5
@@ -17192,7 +17201,7 @@ snapshots:
   vitest@2.1.5(@types/node@22.19.11)(lightningcss@1.32.0)(terser@5.49.0):
     dependencies:
       '@vitest/expect': 2.1.5
-      '@vitest/mocker': 2.1.5(vite@5.4.21(@types/node@25.9.5)(lightningcss@1.32.0)(terser@5.49.0))
+      '@vitest/mocker': 2.1.5(vite@5.4.21(@types/node@22.19.11)(lightningcss@1.32.0)(terser@5.49.0))
       '@vitest/pretty-format': 2.1.9
       '@vitest/runner': 2.1.5
       '@vitest/snapshot': 2.1.5
