@@ -1,5 +1,6 @@
 import { MobileDrawer, WorkspaceTree } from "@aprovan/patchwork-editor";
-import { useMemo } from "react";
+import { ChevronDown, ChevronRight } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
 import { usePresenceTitleMap } from "@/features/presence";
 import {
   fromDisplayPath,
@@ -9,6 +10,28 @@ import {
   PRIVATE_SECTION_LABEL,
 } from "@/lib/private-partition";
 import { NATIVE_SURFACES } from "@/lib/native-surfaces";
+
+
+const WORKSPACE_PANE_KEY = "patchwork:workspace-pane";
+
+function loadWorkspacePaneLayout(): { collapsed: boolean } {
+  try {
+    const raw = localStorage.getItem(WORKSPACE_PANE_KEY);
+    if (!raw) return { collapsed: false };
+    const parsed = JSON.parse(raw) as { collapsed?: unknown };
+    return { collapsed: parsed.collapsed === true };
+  } catch {
+    return { collapsed: false };
+  }
+}
+
+function saveWorkspacePaneLayout(layout: { collapsed: boolean }): void {
+  try {
+    localStorage.setItem(WORKSPACE_PANE_KEY, JSON.stringify(layout));
+  } catch {
+    // ignore quota / private mode
+  }
+}
 
 /**
  * The workspace explorer column: file tree + plain Workspace surface rows,
