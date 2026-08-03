@@ -124,10 +124,10 @@ aprovan fork of the contract package is a verbatim mirror until IW-0 lands.
 
 > Depends-on: 5 | Touches: aprovan/client/web/src/components/panels/** (telemetry panel only) | Verify: cd /Users/jacob/Documents/Code/AprovanLabs/aprovan && pnpm --filter @aprovan/patchwork-web build
 
-- [ ] 7.1 Render `metric` events in the Activity panel list (name, value + unit, source
+- [x] 7.1 Render `metric` events in the Activity panel list (name, value + unit, source
       chip; log-row composition per ux.md); existing source/status filters must not break
       on the new kind, and trace grouping must not count metrics as errors.
-- [ ] 7.2 Make the panel's per-kind rendering an exhaustive `switch` on
+- [x] 7.2 Make the panel's per-kind rendering an exhaustive `switch` on
       `TelemetryEvent["kind"]` (compile-time `never` check), so a future fourth kind
       fails typecheck rather than rendering blank — verified by the build. (The web
       package has no test runner; do not introduce one here.)
