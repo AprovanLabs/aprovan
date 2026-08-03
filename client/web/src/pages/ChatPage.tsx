@@ -10,6 +10,7 @@ import { ServicesMenu } from "@/components/ServicesMenu";
 import SessionControls from "@/components/SessionControls";
 import { PatchworkCtx, SharedEditSessionCtx, WidgetErrorReporterCtx } from "@/contexts";
 import { ChatDock, useChatPanelLayout } from "@/features/chat/ChatDock";
+import { useChatFileContext } from "@/features/chat/chat-file-context";
 import { useChatTransport, useEditTransport } from "@/features/chat/chat-transport";
 import { APROVAN_LOGO } from "@/features/chat/MessageParts";
 import { useChatProviders, useChatSubmit } from "@/features/chat/useChatSubmit";
@@ -68,12 +69,14 @@ export default function ChatPage() {
 
   const bootstrap = useCompilerBootstrap({ refreshWorkspace: explorer.refreshWorkspace });
   const providers = useChatProviders();
+  const contextFilesRef = useRef<string[]>([]);
   const transport = useChatTransport({
     chatProviderRef: providers.chatProviderRef,
     chatModelRef: providers.chatModelRef,
     imagePromptsRef: bootstrap.imagePromptsRef,
     namespaces: bootstrap.namespaces,
     services: bootstrap.services,
+    contextFilesRef,
   });
   const editTransport = useEditTransport({
     chatProviderRef: providers.chatProviderRef,
@@ -137,6 +140,8 @@ export default function ChatPage() {
   const dockFilePath =
     tabs.activeTabPath && !isVirtualTabPath(tabs.activeTabPath) ? tabs.activeTabPath : null;
 
+  const chatFileContext = useChatFileContext(dockFilePath);
+
   const { handleSubmit, createWorkflowInChat, publishFlowInChat } = useChatSubmit({
     input,
     setInput,
@@ -152,6 +157,8 @@ export default function ChatPage() {
     setChatPanel: layout.setChatPanel,
     closeSidebar,
     filePath: dockFilePath,
+    pinnedPaths: chatFileContext.pinnedPaths,
+    contextFilesRef,
   });
 
   pageBridgeRef.current = {
@@ -210,6 +217,11 @@ export default function ChatPage() {
     hasContentTab,
     layout,
     filePath: dockFilePath,
+    workspacePaths: explorer.workspaceFiles,
+    pinnedPaths: chatFileContext.pinnedPaths,
+    onTogglePin: chatFileContext.togglePin,
+    onUnpin: chatFileContext.unpin,
+    isPinned: chatFileContext.isPinned,
     onClose: hasContentTab ? layout.closeChat : undefined,
     session,
     providers,

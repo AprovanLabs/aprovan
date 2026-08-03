@@ -13,6 +13,7 @@ import {
   type ChatSessionInfo,
 } from "@/lib/chat-sessions";
 import { saveChatPanelLayout, type ChatPanelLayout } from "./ChatDock";
+import { buildContextFiles, formatContextFilesPrefix } from "./chat-file-context";
 
 // Chat rides the gateway's `tools/:provider/createChatCompletion` operation.
 // A provider is usable once a credential for it exists in the active
@@ -118,8 +119,10 @@ export function useChatSubmit(args: {
   armSendWindow: () => void;
   setChatPanel: Dispatch<SetStateAction<ChatPanelLayout>>;
   closeSidebar: () => void;
-  /** Active file the dock is scoped to — carried into the first message. */
+  /** Active file the dock is scoped to — included in send-time context. */
   filePath?: string | null;
+  pinnedPaths: string[];
+  contextFilesRef: React.MutableRefObject<string[]>;
 }) {
   const {
     input,
@@ -136,6 +139,8 @@ export function useChatSubmit(args: {
     setChatPanel,
     closeSidebar,
     filePath,
+    pinnedPaths,
+    contextFilesRef,
   } = args;
 
   const handleSubmit = useCallback(
@@ -163,10 +168,13 @@ export function useChatSubmit(args: {
       // A real user message arms the self-heal loop for the replies that
       // follow, and resets its consecutive-auto-fix budget.
       armSendWindow();
-      const text =
-        filePath && !input.includes(filePath)
-          ? `Regarding \`${filePath}\`:\n\n${input}`
-          : input;
+      const contextFiles = buildContextFiles({
+        pinnedPaths,
+        text: input,
+        activePath: filePath,
+      });
+      contextFilesRef.current = contextFiles;
+      const text = formatContextFilesPrefix(contextFiles) + input;
       sendMessage({ text });
       setInput("");
       // Sending while the dock is closed would hide the streaming reply —
@@ -190,6 +198,8 @@ export function useChatSubmit(args: {
       refreshSessions,
       armSendWindow,
       filePath,
+      pinnedPaths,
+      contextFilesRef,
     ]
   );
 

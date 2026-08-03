@@ -59,8 +59,16 @@ export function useChatTransport(args: {
   imagePromptsRef: React.MutableRefObject<string>;
   namespaces: string[];
   services: ServiceInfo[];
+  contextFilesRef: React.MutableRefObject<string[]>;
 }) {
-  const { chatProviderRef, chatModelRef, imagePromptsRef, namespaces, services } = args;
+  const {
+    chatProviderRef,
+    chatModelRef,
+    imagePromptsRef,
+    namespaces,
+    services,
+    contextFilesRef,
+  } = args;
 
   // Prompt composition inputs, read at send time: per-image runtime prompts
   // (from each image's manifest), the live namespace list, and compact tool
@@ -84,6 +92,9 @@ export function useChatTransport(args: {
           body: {
             messages,
             ...(chatModelRef.current ? { model: chatModelRef.current } : {}),
+            ...(contextFilesRef.current.length > 0
+              ? { contextFiles: contextFilesRef.current }
+              : {}),
             // The wrapper prompt is server-managed (PostHog → WFS fallback);
             // the client only supplies the runtime-derived vars.
             prompt: {
