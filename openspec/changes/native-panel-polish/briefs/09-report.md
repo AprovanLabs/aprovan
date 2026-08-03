@@ -1,7 +1,7 @@
 # Brief 09 report — Apps pane conformance
 
 ## PR
-<!-- filled after merge -->
+https://github.com/AprovanLabs/aprovan/pull/42
 
 ## Done
 - **9.1 Preflight:** `NATIVE_SURFACES` has `{id: "apps", Panel: AppsPanel}`; panel path is
