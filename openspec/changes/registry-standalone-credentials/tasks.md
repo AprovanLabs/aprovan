@@ -66,34 +66,34 @@ Repos: registry = `/Users/jacob/Documents/Code/AprovanLabs/registry`, aprovan =
 
 > Depends-on: 4 | Touches: registry:apps/registry/** | Verify: cd /Users/jacob/Documents/Code/AprovanLabs/registry && pnpm --filter @aprovan/registry-web typecheck && pnpm --filter @aprovan/registry-web build && ! grep -rn "PUBLIC_ACCOUNT_HOST\|MovedNotice\|moved to the Aprovan product app" apps/registry/src
 
-- [ ] 5.1 Bump `apps/registry` deps to the published `@aprovan/registry-main` /
+- [x] 5.1 Bump `apps/registry` deps to the published `@aprovan/registry-main` /
   `@aprovan/registry-ui` minors; add the session module skeleton
   `src/lib/session/{types,hosted,standalone}.ts` per tech-plan interface 5.
-- [ ] 5.2 Replace `PUBLIC_ACCOUNT_HOST` with `PUBLIC_SESSION_MODE` (D1): update
+- [x] 5.2 Replace `PUBLIC_ACCOUNT_HOST` with `PUBLIC_SESSION_MODE` (D1): update
   `env.d.ts`, `.env.example`, `lib/gateway-session.ts` (`isStandaloneCatalogHost` becomes
   mode resolution); delete `lib/account-host.ts`, `components/MovedNotice.astro`, and
   every moved-notice branch in `pages/account/credentials.astro`,
   `pages/account/oauth-callback.astro`, `pages/admin/permissions.astro`,
   `pages/auth/callback.astro` (spec scenarios: Legacy variable retired, Moved notice
   eradicated).
-- [ ] 5.3 Implement `StandaloneSession`: `/auth/config` discovery, none auto-advance,
+- [x] 5.3 Implement `StandaloneSession`: `/auth/config` discovery, none auto-advance,
   api-key/token entry, optional PKCE when `browserClientId` advertised, `/whoami`
   identity, widget client with `{ scopeHeader: "X-Registry-Tenant" }` (spec: Standalone
   session — registry-server pluggable auth).
-- [ ] 5.4 Implement `HostedSession`: restore Cognito PKCE via published `@aprovan/ui/auth`
+- [x] 5.4 Implement `HostedSession`: restore Cognito PKCE via published `@aprovan/ui/auth`
   (shape from registry git history `51e9ab1:apps/registry/src/lib/auth.ts`), live
   `pages/auth/callback.astro`, `useGatewaySession` workspace resolution, widget client
   with `{ authHeader: "X-Aprovan-Authorization" }` (spec: Hosted session — shared Cognito
   pool and product gateway).
-- [ ] 5.5 Rework `SessionGate` over the `CatalogSession` state machine (D2): signin card
+- [x] 5.5 Rework `SessionGate` over the `CatalogSession` state machine (D2): signin card
   variants, scope picker (hosted), identity strip + sign-out, unreachable/retry; hosts
   (`CredentialsHost`, `AdminHost`, `OAuthCallbackHost`) stay mode-agnostic one-liners
   except `AdminHost` passing the mode's capability list (spec: Unified session gate
   contract; Admin page composes to backend capability).
-- [ ] 5.6 Verify OAuth callback in both modes uses `${base}/account/oauth-callback` and
+- [x] 5.6 Verify OAuth callback in both modes uses `${base}/account/oauth-callback` and
   posts through the gate's client (D7); adjust `CredentialsHost`'s
   `oauthRedirectPath` only if the base-path handling moved.
-- [ ] 5.7 Standalone e2e smoke (script or vitest + preview server): boot
+- [x] 5.7 Standalone e2e smoke (script or vitest + preview server): boot
   `@aprovan/registry-server` in auth-none, build catalog with
   `PUBLIC_SESSION_MODE=standalone PUBLIC_GATEWAY_URL=http://localhost:PORT`, assert
   `/account/credentials` serves the live host bundle and a credential add/list/revoke
@@ -103,12 +103,12 @@ Repos: registry = `/Users/jacob/Documents/Code/AprovanLabs/registry`, aprovan =
 
 > Depends-on: 5 | Touches: registry:.github/workflows/registry-deploy.yml | Verify: grep -q "PUBLIC_SESSION_MODE" /Users/jacob/Documents/Code/AprovanLabs/registry/.github/workflows/registry-deploy.yml && ! grep -q "PUBLIC_ACCOUNT_HOST" /Users/jacob/Documents/Code/AprovanLabs/registry/.github/workflows/registry-deploy.yml
 
-- [ ] 6.1 Set `PUBLIC_SESSION_MODE=hosted` in `registry-deploy.yml` (drop any
+- [x] 6.1 Set `PUBLIC_SESSION_MODE=hosted` in `registry-deploy.yml` (drop any
   `PUBLIC_ACCOUNT_HOST` reference); confirm `PUBLIC_COGNITO_AUTHORITY/CLIENT_ID` repo vars
   are still wired and the Cognito app client still lists
   `https://aprovan.com/registry/auth/callback` (aprovan
   `infra/aws/aws/src/stacks/main.ts:171` — read-only check, no infra change expected).
-- [ ] 6.2 Post-deploy smoke (owner-run, documented in the PR): silent SSO from a live
+- [x] 6.2 Post-deploy smoke (owner-run, documented in the PR): silent SSO from a live
   product session, credential added on the catalog appears in the workspace app's native
   panel, authenticated call traverses CloudFront via `X-Aprovan-Authorization` (spec
   scenarios: Silent SSO, Hosted user sees the shared store, Transport headers under
@@ -118,9 +118,9 @@ Repos: registry = `/Users/jacob/Documents/Code/AprovanLabs/registry`, aprovan =
 
 > Depends-on: 5 | Touches: - | Verify: cd /Users/jacob/Documents/Code/AprovanLabs/registry && ! git worktree list | grep -q registry-product-plane-split && ! git branch -a | grep -q product-plane-removal
 
-- [ ] 7.1 Salvage audit (D6): `git log main..product-plane-removal` + diff review
+- [x] 7.1 Salvage audit (D6): `git log main..product-plane-removal` + diff review
   confirming no unique fixes beyond deletions this change supersedes; record the result in
   the PR description.
-- [ ] 7.2 Close the branch's PR as superseded by this change; remove the worktree
+- [x] 7.2 Close the branch's PR as superseded by this change; remove the worktree
   (`git worktree remove /private/tmp/registry-product-plane-split`), delete local and
   remote `product-plane-removal`.
