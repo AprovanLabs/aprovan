@@ -1,7 +1,7 @@
 # Brief 02 report — panel conventions (shell primitives + registry copy)
 
 ## PR
-(pending)
+https://github.com/AprovanLabs/aprovan/pull/37
 
 ## Done
 - Stream 2.1: additive `PanelUnavailable` (calm capability-gap card) and `ArmedButton`
