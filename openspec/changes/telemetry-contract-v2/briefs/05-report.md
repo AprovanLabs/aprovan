@@ -1,7 +1,7 @@
 # Report: Brief 05 — native export + metric kind
 
 ## PR
-https://github.com/AprovanLabs/aprovan/pull/TBD
+https://github.com/AprovanLabs/aprovan/pull/61
 
 Branch: `iw5/telemetry-native`
 Worktree: `/tmp/iw5-telemetry-native`
