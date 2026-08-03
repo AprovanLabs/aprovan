@@ -39,9 +39,9 @@ wave-1 parallel. Do not touch overlapping paths across parallel streams._
 
 > Depends-on: - | Touches: aprovan:packages/editor/src/components/edit/CodeBlockView.tsx, aprovan:packages/editor/src/components/edit/fileTypes.ts, aprovan:packages/editor/src/components/CodePreview.tsx, aprovan:packages/editor/src/components/MarkdownPreview.tsx, aprovan:packages/editor/src/components/edit/WorkspaceTree.tsx | Verify: cd /Users/jacob/Documents/Code/AprovanLabs/aprovan && pnpm --filter @aprovan/patchwork-editor build && rg -n "github-dark|defaultView" packages/editor/src && ! rg -n "Open in editor" packages/editor/src/components/edit/WorkspaceTree.tsx
 
-- [ ] 5.1 Theme-aware shiki in `CodeBlockView` (dark → github-dark; light → github-light); ensure CodePreview doesn’t force a light canvas.
-- [ ] 5.2 Ensure `.md` `defaultView: "rich"` and hosts honor it (coordinate with editor-direct-edit if FileEditorPane already owns this — finish any gap only).
-- [ ] 5.3 Default `openInEditorTitle` to `"Edit"` in WorkspaceTree.
+- [x] 5.1 Theme-aware shiki in `CodeBlockView` (dark → github-dark; light → github-light); ensure CodePreview doesn’t force a light canvas.
+- [x] 5.2 Ensure `.md` `defaultView: "rich"` and hosts honor it (coordinate with editor-direct-edit if FileEditorPane already owns this — finish any gap only).
+- [x] 5.3 Default `openInEditorTitle` to `"Edit"` in WorkspaceTree.
 
 ## 6. Native Runtime / VCS / LLM
 
@@ -64,7 +64,7 @@ wave-1 parallel. Do not touch overlapping paths across parallel streams._
 
 > Depends-on: - | Touches: aprovan:client/web/src/components/SidebarApps.tsx, aprovan:client/web/src/features/sidebar/WorkspaceSidebar.tsx | Verify: cd /Users/jacob/Documents/Code/AprovanLabs/aprovan && pnpm --filter @aprovan/patchwork-web typecheck && rg -n "collapsed|Collapse workspace" client/web/src/components/SidebarApps.tsx client/web/src/features/sidebar
 
-- [ ] 8.1 Ensure the workspaces region the user sees is collapsible with persisted state (extend SidebarApps or the workspaces switcher — whichever lacks it).
+- [x] 8.1 Ensure the workspaces region the user sees is collapsible with persisted state (extend SidebarApps or the workspaces switcher — whichever lacks it).
 
 ## 9. Members human identity + profiles availability
 
