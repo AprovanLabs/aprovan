@@ -2,7 +2,7 @@ import { useChat } from "@ai-sdk/react";
 import { AppsCatalogProvider } from "@aprovan/registry-ui/apps-panel";
 import "@aprovan/registry-ui/tailor";
 import { AppHeader, aprovanApps } from "@aprovan/ui/shell";
-import { PanelLeft } from "lucide-react";
+import { MessageSquare, PanelLeft } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { NotificationsBell } from "@/components/NotificationsBell";
 import { PanelHostProvider } from "@/components/panels/shell";
@@ -23,6 +23,7 @@ import { useWorkspaceExplorer, type ExplorerPageBridge } from "@/features/sideba
 import { WorkspaceSidebar } from "@/features/sidebar/WorkspaceSidebar";
 import { TabContent } from "@/features/tabs/TabContent";
 import { TabStrip } from "@/features/tabs/TabStrip";
+import { isVirtualTabPath } from "@/features/tabs/tab-routing";
 import { useTabs } from "@/features/tabs/useTabs";
 import { loadWorkflowScript, workflowCustomPreview } from "@/features/widgets/ChatWorkflowPreview";
 import { NotificationPathWidget } from "@/features/widgets/NotificationPathWidget";
@@ -133,6 +134,9 @@ export default function ChatPage() {
 
   const layout = useChatPanelLayout();
 
+  const dockFilePath =
+    tabs.activeTabPath && !isVirtualTabPath(tabs.activeTabPath) ? tabs.activeTabPath : null;
+
   const { handleSubmit, createWorkflowInChat, publishFlowInChat } = useChatSubmit({
     input,
     setInput,
@@ -147,6 +151,7 @@ export default function ChatPage() {
     armSendWindow,
     setChatPanel: layout.setChatPanel,
     closeSidebar,
+    filePath: dockFilePath,
   });
 
   pageBridgeRef.current = {
@@ -186,6 +191,40 @@ export default function ChatPage() {
     ]
   );
 
+  const hasContentTab = tabs.hasContentTab;
+  const chatDockOpen = !hasContentTab || layout.chatPanel.open;
+
+  // One ChatDock instance: desktop side column vs mobile bottom sheet.
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches
+  );
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 767px)");
+    const update = () => setIsMobile(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+
+  const chatDockProps = {
+    hasContentTab,
+    layout,
+    filePath: dockFilePath,
+    onClose: hasContentTab ? layout.closeChat : undefined,
+    session,
+    providers,
+    messages,
+    status,
+    error,
+    compilerError: bootstrap.compilerError,
+    input,
+    setInput,
+    handleSubmit,
+    openWorkspacePreview: tabs.openWorkspacePreview,
+    onOpenCredentials: (provider?: string) =>
+      tabs.openNativeTab("credentials", provider ? { provider } : undefined),
+  };
+
   return (
     <PatchworkCtx.Provider value={patchworkCtx}>
       <SharedEditSessionCtx.Provider value={editDraft.openSharedEditSession}>
@@ -224,6 +263,17 @@ export default function ChatPage() {
               services={bootstrap.services}
               onOpenCredentials={(provider) => tabs.openNativeTab("credentials", { provider })}
             />
+            {/* Global chat entry when a content tab is open and the dock is closed. */}
+            {hasContentTab && !layout.chatPanel.open && (
+              <button
+                type="button"
+                onClick={layout.openChat}
+                className="p-1.5 rounded hover:bg-muted"
+                title="Open chat"
+              >
+                <MessageSquare className="h-4 w-4" />
+              </button>
+            )}
             <SessionControls
               onLoad={explorer.handleWorkspaceLoad}
               onSwitch={explorer.handleWorkspaceSwitch}
@@ -254,57 +304,72 @@ export default function ChatPage() {
                 openNativeTab={tabs.openNativeTab}
               />
 
-              <div className="flex-1 min-w-0 min-h-0 flex flex-col">
-                {tabs.openTabs.size > 0 && (
-                  <div
-                    // Fills whatever the chat dock below doesn't claim.
-                    className={`flex flex-col border-b bg-muted/10 ${
-                      tabs.previewCollapsed ? "shrink-0" : "flex-1 min-h-0"
-                    }`}
-                  >
-                    <TabStrip
-                      openTabs={tabs.openTabs}
-                      activeTabPath={tabs.activeTabPath}
-                      previewCollapsed={tabs.previewCollapsed}
-                      onSelectTab={tabs.selectTab}
-                      onCloseTab={tabs.closeTab}
-                      onCloseAllTabs={tabs.closeAllTabs}
-                      onReloadStaleTab={tabs.reloadStaleTab}
-                      onTogglePreviewCollapsed={() => tabs.setPreviewCollapsed((p) => !p)}
-                    />
-                    <TabContent
-                      openTabs={tabs.openTabs}
-                      setOpenTabs={tabs.setOpenTabs}
-                      activeTabPath={tabs.activeTabPath}
-                      previewCollapsed={tabs.previewCollapsed}
-                      reloadStaleTab={tabs.reloadStaleTab}
-                      openWorkspacePreview={tabs.openWorkspacePreview}
-                      retitleAppsTab={tabs.retitleAppsTab}
-                      closeTab={tabs.closeTab}
-                      createWorkflowInChat={createWorkflowInChat}
-                      publishFlowInChat={publishFlowInChat}
-                      customPreview={workflowCustomPreview} loadScript={loadWorkflowScript}
-                    />
-                  </div>
+              <div className="flex-1 min-w-0 min-h-0 flex relative">
+                {/* File / tab pane — stays editable while the chat dock is open. */}
+                <div
+                  className={`min-w-0 min-h-0 flex flex-col ${
+                    hasContentTab ? "flex-1" : chatDockOpen ? "hidden" : "flex-1"
+                  }`}
+                >
+                  {tabs.openTabs.size > 0 && (
+                    <div
+                      className={`flex flex-col border-b bg-muted/10 ${
+                        tabs.previewCollapsed ? "shrink-0" : "flex-1 min-h-0"
+                      }`}
+                    >
+                      <TabStrip
+                        openTabs={tabs.openTabs}
+                        activeTabPath={tabs.activeTabPath}
+                        previewCollapsed={tabs.previewCollapsed}
+                        onSelectTab={tabs.selectTab}
+                        onCloseTab={tabs.closeTab}
+                        onCloseAllTabs={tabs.closeAllTabs}
+                        onReloadStaleTab={tabs.reloadStaleTab}
+                        onTogglePreviewCollapsed={() => tabs.setPreviewCollapsed((p) => !p)}
+                      />
+                      <TabContent
+                        openTabs={tabs.openTabs}
+                        setOpenTabs={tabs.setOpenTabs}
+                        activeTabPath={tabs.activeTabPath}
+                        previewCollapsed={tabs.previewCollapsed}
+                        reloadStaleTab={tabs.reloadStaleTab}
+                        openWorkspacePreview={tabs.openWorkspacePreview}
+                        retitleAppsTab={tabs.retitleAppsTab}
+                        closeTab={tabs.closeTab}
+                        createWorkflowInChat={createWorkflowInChat}
+                        publishFlowInChat={publishFlowInChat}
+                        customPreview={workflowCustomPreview}
+                        loadScript={loadWorkflowScript}
+                        onOpenChat={layout.openChat}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Opt-in chat dock beside the file pane (side column / bottom sheet). */}
+                {hasContentTab && layout.chatPanel.open && (
+                  <>
+                    {isMobile && (
+                      <div
+                        className="absolute inset-0 z-20 bg-black/40"
+                        onClick={layout.closeChat}
+                      />
+                    )}
+                    <div
+                      className={
+                        isMobile
+                          ? "absolute inset-x-0 bottom-0 z-30 flex flex-col min-h-0 h-[min(60vh,32rem)] border-t bg-background rounded-t-lg shadow-lg"
+                          : "relative shrink-0 flex flex-col border-l min-h-0"
+                      }
+                      style={isMobile ? undefined : { width: layout.chatPanel.splitWidth }}
+                    >
+                      <ChatDock {...chatDockProps} />
+                    </div>
+                  </>
                 )}
 
-                <ChatDock
-                  hasContentTab={tabs.hasContentTab}
-                  layout={layout}
-                  session={session}
-                  providers={providers}
-                  messages={messages}
-                  status={status}
-                  error={error}
-                  compilerError={bootstrap.compilerError}
-                  input={input}
-                  setInput={setInput}
-                  handleSubmit={handleSubmit}
-                  openWorkspacePreview={tabs.openWorkspacePreview}
-                  onOpenCredentials={(provider) =>
-                    tabs.openNativeTab("credentials", provider ? { provider } : undefined)
-                  }
-                />
+                {/* No content tab: chat fills the main column (workspace-wide). */}
+                {!hasContentTab && <ChatDock {...chatDockProps} />}
               </div>
             </div>
           </AppsCatalogProvider>
