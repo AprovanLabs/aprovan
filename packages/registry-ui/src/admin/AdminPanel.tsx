@@ -9,8 +9,10 @@ import {
   CardTitle,
   Input,
 } from "@aprovan/ui";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { parseGatewayStatus } from "../credentials/api";
+import { ApiKeysSection } from "./ApiKeysSection";
+import { AuditSection } from "./AuditSection";
 import {
   addUserToGroup,
   createGroup,
@@ -24,15 +26,13 @@ import {
   revokePermission,
   updateGroup,
 } from "./api";
-import type { Group, Member, PermissionGrant } from "./types";
-
-type Tab = "members" | "groups" | "grants";
-
-const TABS: { id: Tab; label: string }[] = [
-  { id: "members", label: "Members" },
-  { id: "groups", label: "Groups" },
-  { id: "grants", label: "Tool grants" },
-];
+import {
+  checkAdminAccess,
+  DEFAULT_ADMIN_CAPABILITIES,
+  tabsForCapabilities,
+} from "./capabilities";
+import { ProfilesSection } from "./ProfilesSection";
+import type { AdminCapability, Group, Member, PermissionGrant } from "./types";
 
 function tabClass(active: boolean): string {
   return `px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
@@ -476,15 +476,30 @@ function GrantsSection({
 
 export interface AdminPanelProps {
   client: GatewayClient;
+  /** Sections to render. Default: hosted members/groups/permissions. */
+  capabilities?: ReadonlyArray<AdminCapability>;
 }
 
-export function AdminPanel({ client }: AdminPanelProps): React.ReactElement {
-  const [activeTab, setActiveTab] = useState<Tab>("members");
+export function AdminPanel({
+  client,
+  capabilities = DEFAULT_ADMIN_CAPABILITIES,
+}: AdminPanelProps): React.ReactElement {
+  const tabs = useMemo(() => tabsForCapabilities(capabilities), [capabilities]);
+  const [activeTab, setActiveTab] = useState<AdminCapability>(
+    () => tabs[0]?.id ?? "members",
+  );
   const [forbidden, setForbidden] = useState(false);
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    void listMembers(client)
+    if (!tabs.some((t) => t.id === activeTab) && tabs[0]) {
+      setActiveTab(tabs[0].id);
+    }
+  }, [tabs, activeTab]);
+
+  useEffect(() => {
+    setChecking(true);
+    void checkAdminAccess(client, capabilities)
       .then(() => {
         setForbidden(false);
       })
@@ -492,7 +507,7 @@ export function AdminPanel({ client }: AdminPanelProps): React.ReactElement {
         if (parseGatewayStatus(err) === 403) setForbidden(true);
       })
       .finally(() => setChecking(false));
-  }, [client]);
+  }, [client, capabilities]);
 
   if (checking) {
     return <p className="text-sm text-muted-foreground">Checking permissions…</p>;
@@ -512,15 +527,23 @@ export function AdminPanel({ client }: AdminPanelProps): React.ReactElement {
     );
   }
 
+  const isHostedDefault =
+    capabilities.length === DEFAULT_ADMIN_CAPABILITIES.length &&
+    DEFAULT_ADMIN_CAPABILITIES.every((c, i) => capabilities[i] === c);
+
   return (
     <div className="flex flex-col gap-6">
       <div>
         <h2 className="text-lg font-semibold tracking-tight">Admin</h2>
-        <p className="text-sm text-muted-foreground">Members, groups, and tool grants.</p>
+        <p className="text-sm text-muted-foreground">
+          {isHostedDefault
+            ? "Members, groups, and tool grants."
+            : `${tabs.map((t) => t.label).join(", ")}.`}
+        </p>
       </div>
 
       <div className="flex flex-wrap items-center gap-1 border-b">
-        {TABS.map((t) => (
+        {tabs.map((t) => (
           <button
             className={tabClass(activeTab === t.id)}
             key={t.id}
@@ -534,7 +557,10 @@ export function AdminPanel({ client }: AdminPanelProps): React.ReactElement {
 
       {activeTab === "members" && <MembersSection client={client} />}
       {activeTab === "groups" && <GroupsSection client={client} />}
-      {activeTab === "grants" && <GrantsSection client={client} />}
+      {activeTab === "permissions" && <GrantsSection client={client} />}
+      {activeTab === "api-keys" && <ApiKeysSection client={client} />}
+      {activeTab === "profiles" && <ProfilesSection client={client} />}
+      {activeTab === "audit" && <AuditSection client={client} />}
     </div>
   );
 }

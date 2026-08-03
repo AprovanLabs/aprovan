@@ -67,10 +67,16 @@ export {
 
 export {
   AdminPanel,
+  DEFAULT_ADMIN_CAPABILITIES,
+  type AdminCapability,
   type AdminPanelProps,
+  type ApiKey,
+  type AuditEntry,
   type Group,
   type Member,
   type PermissionGrant,
+  type Profile,
+  type ProfileGrant,
 } from "./admin";
 
 // ---------------------------------------------------------------------------

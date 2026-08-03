@@ -1,5 +1,16 @@
 import type { GatewayClient } from "@aprovan/registry-main";
-import type { Group, Member, PermissionGrant } from "./types";
+import type {
+  ApiKey,
+  AuditEntry,
+  GrantSubjectKind,
+  Group,
+  Member,
+  PermissionGrant,
+  Profile,
+  ProfileCreateInput,
+  ProfileGrant,
+  ProfileUpdateInput,
+} from "./types";
 
 export async function listMembers(client: GatewayClient): Promise<Member[]> {
   const data = await client.request<{ members: Member[] }>("/members");
@@ -83,4 +94,106 @@ export async function listPermissions(
 
 export async function revokePermission(client: GatewayClient, id: string): Promise<void> {
   await client.request<void>(`/permissions/${id}`, true, { method: "DELETE" });
+}
+
+export async function listApiKeys(client: GatewayClient): Promise<ApiKey[]> {
+  const data = await client.request<{ keys: ApiKey[] }>("/api-keys");
+  return data.keys;
+}
+
+export async function mintApiKey(
+  client: GatewayClient,
+  input: { label?: string } = {},
+): Promise<{ key: ApiKey; plaintext: string }> {
+  return client.request<{ key: ApiKey; plaintext: string }>("/api-keys", true, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function revokeApiKey(client: GatewayClient, id: string): Promise<void> {
+  await client.request<{ revoked: boolean }>(`/api-keys/${id}`, true, { method: "DELETE" });
+}
+
+export async function listProfiles(client: GatewayClient): Promise<Profile[]> {
+  const data = await client.request<{ profiles: Profile[] }>("/profiles");
+  return data.profiles;
+}
+
+export async function createProfile(
+  client: GatewayClient,
+  input: ProfileCreateInput,
+): Promise<Profile> {
+  const data = await client.request<{ profile: Profile }>("/profiles", true, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  return data.profile;
+}
+
+export async function updateProfile(
+  client: GatewayClient,
+  id: string,
+  input: ProfileUpdateInput,
+): Promise<Profile> {
+  const data = await client.request<{ profile: Profile }>(`/profiles/${id}`, true, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+  return data.profile;
+}
+
+export async function deleteProfile(client: GatewayClient, id: string): Promise<void> {
+  await client.request<{ ok: boolean }>(`/profiles/${id}`, true, { method: "DELETE" });
+}
+
+export async function listProfileGrants(
+  client: GatewayClient,
+  profileId: string,
+): Promise<ProfileGrant[]> {
+  const data = await client.request<{ grants: ProfileGrant[] }>(
+    `/profiles/${profileId}/grants`,
+  );
+  return data.grants;
+}
+
+export async function addProfileGrant(
+  client: GatewayClient,
+  profileId: string,
+  subject: { kind: GrantSubjectKind; id: string },
+): Promise<ProfileGrant> {
+  const data = await client.request<{ grant: ProfileGrant }>(
+    `/profiles/${profileId}/grants`,
+    true,
+    {
+      method: "POST",
+      body: JSON.stringify({ subject }),
+    },
+  );
+  return data.grant;
+}
+
+export async function revokeProfileGrant(
+  client: GatewayClient,
+  profileId: string,
+  subject: { kind: GrantSubjectKind; id: string },
+): Promise<void> {
+  await client.request<{ revoked: boolean }>(`/profiles/${profileId}/grants`, true, {
+    method: "DELETE",
+    body: JSON.stringify({ subject }),
+  });
+}
+
+export async function listAudit(
+  client: GatewayClient,
+  filter?: { since?: string; limit?: number },
+): Promise<AuditEntry[]> {
+  const params = new URLSearchParams();
+  if (filter?.since) params.set("since", filter.since);
+  if (filter?.limit !== undefined) params.set("limit", String(filter.limit));
+  const query = params.toString();
+  const data = await client.request<{ audit: AuditEntry[] }>(
+    `/audit${query ? `?${query}` : ""}`,
+  );
+  return data.audit;
 }
