@@ -32,7 +32,10 @@ describe("core service namespaces", () => {
     expect(((await get.json()) as { data: { value: unknown } }).data.value).toEqual({ a: 1 });
 
     const list = await call("keyvalue/list", {});
-    expect(((await list.json()) as { data: { keys: string[] } }).data.keys).toContain("draft");
+    const listKeys = ((await list.json()) as { data: { keys: Array<string | { key: string }> } })
+      .data.keys;
+    const names = listKeys.map((row) => (typeof row === "string" ? row : row.key));
+    expect(names).toContain("draft");
 
     const del = await call("keyvalue/delete", { key: "draft" });
     expect(((await del.json()) as { data: { deleted: boolean } }).data.deleted).toBe(true);
