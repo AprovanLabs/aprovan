@@ -37,43 +37,43 @@
 
 > Depends-on: 3 | Touches: server/workspace/src/services.ts, server/workspace/src/vcs/**, server/workspace/src/apps/capabilities.ts, server/workspace/tests/** | Verify: `pnpm --filter @aprovan/workspace test`
 
-- [ ] 5.1 Move commit, history, show, comparison, references, and restoration to the version-control namespace.
-- [ ] 5.2 Reduce the file namespace to its contract's operations.
-- [ ] 5.3 Remove the workspace-only guard, now redundant — the operations it protected are no longer reachable there.
-- [ ] 5.4 Remove the file-namespace procedure allow-list in the application capability model, now identical to the contract.
-- [ ] 5.5 Confirm mount management is gone from the file namespace and served by path-keyed profiles from `profiles-unified`.
-- [ ] 5.6 Add tests for all `vfs-vcs-split` scenarios.
+- [x] 5.1 Move commit, history, show, comparison, references, and restoration to the version-control namespace.
+- [x] 5.2 Reduce the file namespace to its contract's operations.
+- [x] 5.3 Remove the workspace-only guard, now redundant — the operations it protected are no longer reachable there.
+- [x] 5.4 Remove the file-namespace procedure allow-list in the application capability model, now identical to the contract.
+- [x] 5.5 Confirm mount management is gone from the file namespace and served by path-keyed profiles from `profiles-unified`.
+- [x] 5.6 Add tests for all `vfs-vcs-split` scenarios.
 
 ## 6. Platform namespaces become plugins
 
 > Depends-on: 4, 5 | Touches: server/workspace/src/service-kernel.ts, server/workspace/src/services.ts, server/workspace/src/routes/tools.ts, server/workspace/src/registry-embed.ts, server/workspace/src/{apps,workflows,sandboxes,agents,notifications,telemetry,webhooks}/**, server/workspace/src/{sync.ts,interfaces-service.ts} | Verify: `pnpm --filter @aprovan/workspace test`
 
-- [ ] 6.1 Register each Aprovan-only namespace through the plugin registry established by `tools-global`.
-- [ ] 6.2 Delete the enumerated first-party service list and the branch that resolves those names ahead of interfaces.
-- [ ] 6.3 Replace the build-time consistency check that list provided — a name declared without an implementation must still fail the build.
-- [ ] 6.4 Keep namespace classification published, so a services surface can still group first-party namespaces.
-- [ ] 6.5 Add tests for the first three `platform-namespace-plugins` scenarios.
+- [x] 6.1 Register each Aprovan-only namespace through the plugin registry established by `tools-global`.
+- [x] 6.2 Delete the enumerated first-party service list and the branch that resolves those names ahead of interfaces.
+- [x] 6.3 Replace the build-time consistency check that list provided — a name declared without an implementation must still fail the build.
+- [x] 6.4 Keep namespace classification published, so a services surface can still group first-party namespaces.
+- [x] 6.5 Add tests for the first three `platform-namespace-plugins` scenarios.
 
 ## 7. Platform output schemas
 
 > Depends-on: 1, 6 | Touches: server/workspace/src/{services.ts,workflows/service.ts,apps/service.ts,sandboxes/service.ts,agents/service.ts,sync.ts,webhooks/service.ts,interfaces-service.ts,telemetry/service.ts,notifications/service.ts,vcs/sessions-service.ts} | Verify: `pnpm --filter @aprovan/workspace test`
 
-- [ ] 7.1 Batch one — the flat-literal services: key-value, events, registry, webhooks, notifications, interfaces, telemetry (23 operations).
-- [ ] 7.2 Batch two — workflows and sync (15 operations); the sync run result is a union over its destination kind and needs a judgement call.
-- [ ] 7.3 Batch three — sessions (11 operations), unblocked by task 1.2.
-- [ ] 7.4 Batch four — applications (25 operations); three summariser helpers already carry inferred shapes to read off. Voluminous; budget accordingly.
-- [ ] 7.5 Batch five — files and version control after the split; the listing and read operations have argument-dependent shapes needing judgement.
-- [ ] 7.6 Batch six — the non-passthrough agent and sandbox operations, unblocked by task 1.1.
-- [ ] 7.7 Split the argument-dependent application data operation into one operation per result shape (satisfies `platform-namespace-plugins` / "Argument-dependent results are separated").
-- [ ] 7.8 Mark the seven driver-passthrough operations, declaring their contract's shape as advisory rather than guaranteed.
-- [ ] 7.9 Add the regression test: every platform operation either declares an output schema or is marked passthrough.
+- [x] 7.1 Batch one — the flat-literal services: key-value, events, registry, webhooks, notifications, interfaces, telemetry (23 operations).
+- [x] 7.2 Batch two — workflows and sync (15 operations); the sync run result is a union over its destination kind and needs a judgement call.
+- [x] 7.3 Batch three — sessions (11 operations), unblocked by task 1.2.
+- [x] 7.4 Batch four — applications (25 operations); three summariser helpers already carry inferred shapes to read off. Voluminous; budget accordingly.
+- [x] 7.5 Batch five — files and version control after the split; the listing and read operations have argument-dependent shapes needing judgement.
+- [x] 7.6 Batch six — the non-passthrough agent and sandbox operations, unblocked by task 1.1.
+- [x] 7.7 Split the argument-dependent application data operation into one operation per result shape (satisfies `platform-namespace-plugins` / "Argument-dependent results are separated").
+- [x] 7.8 Mark the seven driver-passthrough operations, declaring their contract's shape as advisory rather than guaranteed.
+- [x] 7.9 Add the regression test: every platform operation either declares an output schema or is marked passthrough.
 
 ## 8. Update callers and reseed
 
 > Depends-on: 5, 6, 7 | Touches: client/web/src/**, packages/registry-ui/src/**, server/workspace/examples/**, server/workspace/scripts/seed-*.ts, data/prompts/** | Verify: `pnpm check-types && pnpm --filter @aprovan/workspace test`
 
-- [ ] 8.1 Update every caller of a changed result shape — key-value read and write, key-value list, file read, file list, file delete, and the event record.
-- [ ] 8.2 Update callers of the version-control operations to the new namespace.
-- [ ] 8.3 Update the seeded example content and the widget authoring prompt for the new namespaces and shapes.
-- [ ] 8.4 Flip the gateway's catalog-derived tool entries from an undefined output schema to the real one now served by `utdk-output-schemas`.
-- [ ] 8.5 Reseed examples and prompts; verify against the reference snapshot that no content depends on a removed shape.
+- [x] 8.1 Update every caller of a changed result shape — key-value read and write, key-value list, file read, file list, file delete, and the event record.
+- [x] 8.2 Update callers of the version-control operations to the new namespace.
+- [x] 8.3 Update the seeded example content and the widget authoring prompt for the new namespaces and shapes.
+- [x] 8.4 Flip the gateway's catalog-derived tool entries from an undefined output schema to the real one now served by `utdk-output-schemas`.
+- [x] 8.5 Reseed examples and prompts; verify against the reference snapshot that no content depends on a removed shape.

@@ -21,7 +21,6 @@
 
 import type { ServiceContext as RegistryServiceContext } from "@aprovan/registry-server";
 import type { AppPaths } from "./apps/store.js";
-import type { ToolEntry } from "./routes/tools.js";
 
 /**
  * The kernel contract's canonical home is now `@aprovan/registry-server`
@@ -112,11 +111,22 @@ export interface CoreServiceMeta {
   icon: string;
 }
 
+/** Tool metadata declared by a core/plugin service (provider filled at install). */
+export interface ServiceToolEntry {
+  name: string;
+  operation: string;
+  description?: string;
+  inputSchema?: unknown;
+  outputSchema?: unknown;
+  passthrough?: boolean;
+  streaming?: boolean;
+}
+
 export interface CoreService {
   /** Identity + one-line description for discovery and UI. */
   meta: CoreServiceMeta;
   /** Tool entries advertised in discovery (`GET /tools`). */
-  tools: Omit<ToolEntry, "provider">[];
+  tools: ServiceToolEntry[];
   call(
     ctx: ServiceContext,
     procedure: string,
@@ -125,95 +135,19 @@ export interface CoreService {
 }
 
 /**
- * The core namespaces, and the single source of truth for what they are.
- * `services.ts` types `CORE_SERVICES` as `Record<CoreServiceName, CoreService>`,
- * so adding a name here without wiring a service (or wiring one that isn't
- * named here) is a compile error rather than a runtime surprise.
- *
- * Callers that only need the *names* — the sandbox deciding which globals to
- * inject, discovery, allow-list validation — read this instead of reaching
- * back into `services.ts` for `Object.keys(CORE_SERVICES)`.
+ * Platform plugin names — Aprovan-only namespaces. Interface driver ids
+ * (`vfs`, `vcs`, `keyvalue`, `events`, `telemetry`) are intentionally absent
+ * so the intersection with interface ids is empty (native-interface-provider
+ * / "No shadowed names"). Installation and lookup live in
+ * `platform-plugins.ts`; these aliases keep existing call sites compiling
+ * during the stream-6 rename.
  */
-export const CORE_SERVICE_NAMES = [
-  "keyvalue",
-  "events",
-  "vfs",
-  "registry",
-  "workflows",
-  "apps",
-  "webhooks",
-  "interfaces",
-  "profiles",
-  "sync",
-  "sessions",
-  "notifications",
-  "telemetry",
-  "agents",
-  "sandboxes",
-] as const;
-
-export type CoreServiceName = (typeof CORE_SERVICE_NAMES)[number];
-
-export function isCoreServiceName(name: string): name is CoreServiceName {
-  return (CORE_SERVICE_NAMES as readonly string[]).includes(name);
-}
-
-// ---------------------------------------------------------------------------
-// Registry
-// ---------------------------------------------------------------------------
-
-/**
- * Lookup lives here rather than in `services.ts` because two of its own
- * upstream modules — the workflow runner and sync — need to dispatch to a
- * sibling namespace. Reaching back for `CORE_SERVICES` is what made those
- * imports cyclic; reading from the kernel does not.
- *
- * `services.ts` fills this in at module init via {@link installCoreServices},
- * and is the only module allowed to.
- */
-let installed: Record<CoreServiceName, CoreService> | null = null;
-
-export function installCoreServices(services: Record<CoreServiceName, CoreService>): void {
-  installed = services;
-}
-
-/**
- * The service for a namespace, or `undefined` when the namespace is not a
- * core service at all (the caller then tries providers and LLM aliases).
- *
- * A *known* core namespace requested before `services.ts` has been loaded is
- * a wiring bug, not a missing namespace, so it throws instead of returning
- * `undefined` — an empty registry must not read as "no such tool".
- */
-export function getCoreService(namespace: string): CoreService | undefined {
-  if (!isCoreServiceName(namespace)) return undefined;
-  if (!installed) {
-    throw new Error(
-      `Core service "${namespace}" was requested before services.ts was loaded. ` +
-        `Import "./services.js" (or an app entrypoint) before dispatching.`,
-    );
-  }
-  return installed[namespace];
-}
-
-/** Discovery entries for every core service (always available, no credential). */
-export function coreToolEntries(): ToolEntry[] {
-  if (!installed) return [];
-  return Object.entries(installed).flatMap(([provider, service]) =>
-    service.tools.map((tool) => ({ ...tool, provider })),
-  );
-}
-
-/**
- * Each core namespace's identity, for the namespace catalog (`GET
- * /tools/namespaces`). Separate from {@link coreToolEntries} because a client
- * that only wants to *classify* namespaces shouldn't have to page through
- * every operation's JSON schema to do it.
- */
-export function coreServiceMeta(): Array<CoreServiceMeta & { id: CoreServiceName }> {
-  if (!installed) return [];
-  return Object.entries(installed).map(([id, service]) => ({
-    id: id as CoreServiceName,
-    ...service.meta,
-  }));
-}
+export {
+  PLATFORM_PLUGIN_NAMES as CORE_SERVICE_NAMES,
+  type PlatformPluginName as CoreServiceName,
+  isPlatformPluginName as isCoreServiceName,
+  getPlatformPlugin as getCoreService,
+  installPlatformPlugins as installCoreServices,
+  platformToolEntries as coreToolEntries,
+  platformPluginMeta as coreServiceMeta,
+} from "./platform-plugins.js";

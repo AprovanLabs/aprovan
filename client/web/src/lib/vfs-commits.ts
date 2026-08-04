@@ -1,5 +1,5 @@
 /**
- * Commit detail over the gateway's `vfs.show` — the client surface for mount
+ * Commit detail over the gateway's `vcs.show` — the client surface for mount
  * lineage (registry specs/mount-lineage): commits carry per-mount provenance
  * (`{prefix, source, originDomain, retrievedAt}`) and their snapshot carries
  * the deterministic version tokens. Pre-lineage commits return neither field
@@ -8,7 +8,7 @@
 
 import { invokeNamespaceTool } from "./tools";
 
-const invokeVfsTool = invokeNamespaceTool("vfs");
+const invokeVcsTool = invokeNamespaceTool("vcs");
 
 export interface MountLineageEntry {
   prefix: string;
@@ -39,7 +39,20 @@ export interface CommitDetail {
 }
 
 export async function fetchCommitDetail(commit: string): Promise<CommitDetail> {
-  return (await invokeVfsTool("show", { commit })) as CommitDetail;
+  const raw = (await invokeVcsTool("show", { commit })) as {
+    commit: CommitDetail["commit"];
+    files?: string[];
+    entries?: Array<{ path: string }>;
+    mounts?: MountLineageEntry[];
+    changes?: unknown;
+  };
+  return {
+    commit: raw.commit,
+    entries:
+      raw.entries ??
+      (raw.files ?? []).map((path) => ({ path })),
+    ...(raw.mounts ? { mounts: raw.mounts } : {}),
+  };
 }
 
 /** One renderable mounted-content row: provenance joined with its token. */

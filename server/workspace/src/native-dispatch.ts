@@ -43,8 +43,12 @@ import {
 
 export { NATIVE_PROVIDER_ID, isNativeInterface };
 
-const KV_SCOPE = "ws";
 const EVENTS_MAX_RETAINED = 500;
+
+function kvScopeFor(ctx: ServiceContext): string {
+  if (ctx.appScope) return `app#${ctx.appScope.id}#u#${ctx.appScope.userId}`;
+  return "ws";
+}
 
 function eventsScope(channel: string): string {
   return `svc#events#${channel}`;
@@ -162,16 +166,19 @@ function vfsBackend(workspaceId: string, store: IFsStore) {
   };
 }
 
-function keyvalueBackend(workspaceId: string, userId: string, records: IRecordStore) {
+function keyvalueBackend(ctx: ServiceContext, records: IRecordStore) {
+  const workspaceId = ctx.workspaceId;
+  const userId = ctx.userId;
+  const scope = kvScopeFor(ctx);
   return {
     supportsTtl: true as const,
     async get(key: string) {
-      const hit = await records.get(workspaceId, KV_SCOPE, key);
+      const hit = await records.get(workspaceId, scope, key);
       if (!hit) return undefined;
       return { value: hit.value, updatedAt: hit.updatedAt };
     },
     async set(key: string, value: unknown, ttlSeconds?: number) {
-      const entry = await records.set(workspaceId, KV_SCOPE, key, value, userId, {
+      const entry = await records.set(workspaceId, scope, key, value, userId, {
         ...(ttlSeconds !== undefined
           ? { expiresAtEpochSeconds: Math.floor(Date.now() / 1000) + ttlSeconds }
           : {}),
@@ -185,10 +192,10 @@ function keyvalueBackend(workspaceId: string, userId: string, records: IRecordSt
       };
     },
     async delete(key: string) {
-      return records.delete(workspaceId, KV_SCOPE, key);
+      return records.delete(workspaceId, scope, key);
     },
     async list(args: { prefix?: string; cursor?: string; limit: number }): Promise<KeyValueListResult> {
-      const keys = (await records.list(workspaceId, KV_SCOPE, args.prefix ?? "")).sort();
+      const keys = (await records.list(workspaceId, scope, args.prefix ?? "")).sort();
       let start = 0;
       if (args.cursor) {
         const idx = keys.indexOf(args.cursor);
@@ -197,7 +204,7 @@ function keyvalueBackend(workspaceId: string, userId: string, records: IRecordSt
       const pageKeys = keys.slice(start, start + args.limit);
       const rows: KeyValueListResult["keys"] = [];
       for (const key of pageKeys) {
-        const hit = await records.get(workspaceId, KV_SCOPE, key);
+        const hit = await records.get(workspaceId, scope, key);
         rows.push({
           key,
           ...(hit ? { updatedAt: hit.updatedAt } : {}),
@@ -209,7 +216,9 @@ function keyvalueBackend(workspaceId: string, userId: string, records: IRecordSt
   };
 }
 
-function eventsBackend(workspaceId: string, userId: string, records: IRecordStore) {
+function eventsBackend(ctx: ServiceContext, records: IRecordStore) {
+  const workspaceId = ctx.workspaceId;
+  const userId = ctx.userId;
   return {
     async emit(args: { channel: string; type: string; payload?: unknown }) {
       const scope = eventsScope(args.channel);
@@ -229,6 +238,12 @@ function eventsBackend(workspaceId: string, userId: string, records: IRecordStor
       for (const stale of keys.slice(0, Math.max(0, keys.length + 1 - EVENTS_MAX_RETAINED))) {
         void records.delete(workspaceId, scope, stale).catch(() => undefined);
       }
+      // Product fan-out: subscribed workflows (same as the former core service).
+      void import("./workflows/runner.js")
+        .then(({ triggerEventWorkflows }) =>
+          triggerEventWorkflows(ctx, args.channel, args.payload, ctx.workflowDepth ?? 0),
+        )
+        .catch(() => undefined);
       return { id, channel: args.channel, timestamp };
     },
     async list(args: {
@@ -362,17 +377,15 @@ function buildNativeContext(ctx: ServiceContext): NativeDispatchContext {
     vfs: createNativeVfs({ backend: vfsBackend(ctx.workspaceId, fs) }),
     vcs: createNativeVcs({ backend: vcsBackend(ctx.workspaceId, ctx.userId) }),
     keyvalue: createNativeKeyValue({
-      backend: keyvalueBackend(ctx.workspaceId, ctx.userId, records),
+      backend: keyvalueBackend(ctx, records),
       providerLabel: NATIVE_PROVIDER_ID,
     }),
     events: createNativeEvents({
-      backend: eventsBackend(ctx.workspaceId, ctx.userId, records),
+      backend: eventsBackend(ctx, records),
     }),
     telemetry: createNativeTelemetry({
       backend: {
         async export(args) {
-          // Delegate to the telemetry core service so the activity store stays
-          // the single writer (query/traces remain on the service surface).
           const { telemetryService } = await import("./telemetry/service.js");
           return (await telemetryService.call(ctx, "export", args as Record<string, unknown>)) as {
             accepted: { spans: number; logs: number; metrics: number };
@@ -396,7 +409,38 @@ export async function dispatchAprovanNativeOp(
     throw new ServiceError(`Not a native interface: ${interfaceId}`, 404);
   }
   try {
-    return await dispatchNativeOp(interfaceId, operation, args, buildNativeContext(ctx));
+    // Telemetry product ops (emit/query/traces) stay on the activity store;
+    // only `export` is the rebindable contract surface.
+    if (interfaceId === "telemetry" && operation !== "export") {
+      const { telemetryService } = await import("./telemetry/service.js");
+      return telemetryService.call(ctx, operation, args);
+    }
+    // VFS product surface: partitions, service-path hiding, sessions, commit
+    // pins, mounts. Adapt delete to the contract's boolean `deleted`.
+    if (interfaceId === "vfs") {
+      const { vfsProductService } = await import("./services.js");
+      const result = await vfsProductService.call(ctx, operation, args);
+      if (operation === "delete" && result && typeof result === "object") {
+        const row = result as { deleted?: unknown };
+        if (typeof row.deleted === "string") {
+          return { deleted: true, path: row.deleted };
+        }
+      }
+      return result;
+    }
+    // Key-value product surface: app partitions + legacy FS migration, adapted
+    // to contract shapes (`found`, list rows, write timestamps).
+    if (interfaceId === "keyvalue") {
+      const { keyvalueProductService } = await import("./services.js");
+      const result = await keyvalueProductService.call(ctx, operation, args);
+      return adaptKeyvalueProductResult(operation, result);
+    }
+    // Default `type` for events.emit when callers still pass only channel+payload.
+    const normalizedArgs =
+      interfaceId === "events" && operation === "emit" && typeof args["type"] !== "string"
+        ? { ...args, type: typeof args["channel"] === "string" ? args["channel"] : "event" }
+        : args;
+    return await dispatchNativeOp(interfaceId, operation, normalizedArgs, buildNativeContext(ctx));
   } catch (err) {
     if (err instanceof ServiceError) throw err;
     const status =
@@ -412,4 +456,36 @@ export async function dispatchAprovanNativeOp(
 
 export function isAprovanNativeBinding(interfaceId: string, provider: string): boolean {
   return provider === NATIVE_PROVIDER_ID && isNativeInterface(interfaceId);
+}
+
+/** Map first-party keyvalue results onto `@utdk/keyvalue` contract shapes. */
+function adaptKeyvalueProductResult(operation: string, result: unknown): unknown {
+  if (!result || typeof result !== "object") return result;
+  const row = result as Record<string, unknown>;
+  switch (operation) {
+    case "get": {
+      const value = row["value"];
+      const found = value !== null && value !== undefined;
+      return {
+        key: row["key"],
+        value: found ? value : null,
+        found,
+      };
+    }
+    case "set": {
+      return {
+        key: row["key"],
+        updatedAt: typeof row["updatedAt"] === "string" ? row["updatedAt"] : new Date().toISOString(),
+      };
+    }
+    case "list": {
+      const keys = row["keys"];
+      if (!Array.isArray(keys)) return result;
+      return {
+        keys: keys.map((k) => (typeof k === "string" ? { key: k } : k)),
+      };
+    }
+    default:
+      return result;
+  }
 }

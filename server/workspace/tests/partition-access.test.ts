@@ -226,20 +226,18 @@ describe("snapshots and restores never touch partitions", () => {
     await store.write("local", ".users/alice/foreign.md", "foreign-user");
 
     const commit = await data<{ commit: { id: string } }>(
-      await manage("vfs/commit", { message: "partition test" }),
+      await manage("vcs/commit", { message: "partition test" }),
     );
 
-    const show = await data<{ entries: Array<{ path: string }> }>(
-      await manage("vfs/show", { commit: commit.commit.id }),
+    const show = await data<{ files: string[] }>(
+      await manage("vcs/show", { commit: commit.commit.id }),
     );
-    expect(show.entries.some((entry) => entry.path.startsWith(`.apps/${appId}/data/`))).toBe(
-      false,
-    );
-    expect(show.entries.some((entry) => entry.path.startsWith(".users/"))).toBe(false);
-    expect(show.entries.some((entry) => entry.path === "src/app.ts")).toBe(true);
+    expect(show.files.some((path) => path.startsWith(`.apps/${appId}/data/`))).toBe(false);
+    expect(show.files.some((path) => path.startsWith(".users/"))).toBe(false);
+    expect(show.files.some((path) => path === "src/app.ts")).toBe(true);
 
     const full = await data<{ restored: string[] }>(
-      await manage("vfs/restore", { commit: commit.commit.id }),
+      await manage("vcs/restore", { commit: commit.commit.id }),
     );
     expect(full.restored.some((path) => path.startsWith(`.apps/${appId}/data/`))).toBe(false);
     expect(full.restored.some((path) => path.startsWith(".users/"))).toBe(false);

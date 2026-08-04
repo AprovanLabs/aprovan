@@ -16,7 +16,7 @@ export {
   type WritePolicy,
 } from "./write-policy-resolve";
 
-const invokeVfsTool = invokeNamespaceTool("vfs");
+const invokeProfilesTool = invokeNamespaceTool("profiles");
 
 const EMPTY_SETS: StagedPrefixSets = {
   appPrefixes: [],
@@ -46,7 +46,7 @@ function ensureRefreshSubscription(): void {
 }
 
 /**
- * Refresh from the apps listing + `vfs.mounts`; cached per workspace.
+ * Refresh from the apps listing + path-keyed profiles (mounts); cached per workspace.
  * Pass `force` after a 403 write failure or known app/mount mutation.
  */
 export async function loadStagedPrefixes(force?: boolean): Promise<StagedPrefixSets> {
@@ -81,15 +81,15 @@ export async function loadStagedPrefixes(force?: boolean): Promise<StagedPrefixS
     }
 
     try {
-      const mountsResult = (await invokeVfsTool("mounts", {})) as {
-        mounts?: Array<{ prefix?: string; mode?: string }>;
+      // Mounts are path-keyed profiles (profiles-unified), not vfs operations.
+      const profilesResult = (await invokeProfilesTool("list", {})) as {
+        profiles?: Array<{ path?: string; options?: { mode?: string } }>;
       };
-      for (const mount of mountsResult.mounts ?? []) {
-        if (typeof mount.prefix !== "string" || !mount.prefix) continue;
+      for (const profile of profilesResult.profiles ?? []) {
+        if (typeof profile.path !== "string" || !profile.path) continue;
         mounts.push({
-          prefix: mount.prefix,
-          // v1 server writes always 403; mode is future-proofing for writable mounts.
-          writable: mount.mode === "readwrite",
+          prefix: profile.path,
+          writable: profile.options?.mode === "readwrite",
         });
       }
     } catch {

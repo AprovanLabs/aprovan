@@ -173,7 +173,8 @@ export function groupNamespaces(
         : degraded && isFallbackInterface(namespace)
           ? "interface"
           : undefined);
-    if (kind === "core") core.push(namespace);
+    // `plugin` is the stream-6 wire value; `core` kept for older gateways.
+    if (kind === "core" || kind === "plugin") core.push(namespace);
     else if (kind === "interface") {
       if (isNativeInterface(namespace)) core.push(namespace);
       else interfaces.push(namespace);
