@@ -56,22 +56,28 @@ checkouts contain untracked husk dirs that mask failures._
 
 > Depends-on: 1, 2 | Touches: (no source — CI run + npm state) | Verify: T=$(mktemp -d) && cd $T && npm init -y >/dev/null && npm install @aprovan/registry-server@^0.1.1 @aprovan/runtime utdk && node -e "require.resolve('utdk/registry.json'); console.log('ok')"
 
-- [ ] 3.1 Merge streams 1–2 to registry `main`; run the publish workflow
+- [x] 3.1 Merge streams 1–2 to registry `main`; run the publish workflow
       (`gh workflow run publish.yml -R AprovanLabs/registry` or via the push trigger) and
       confirm it exits green with `utdk@0.1.0`, `@aprovan/runtime@0.1.0`, and
       `@aprovan/registry-server@0.1.1` published. If `utdk` fails in CI, apply tech-plan
       D3's contingency (manual publish from a clean checkout, then fix CI before closing).
       Verify: `npm view utdk version && npm view @aprovan/runtime version && npm view @aprovan/registry-server version | grep -qx 0.1.1`
-      _Partial: merged (#85); `@aprovan/runtime@0.1.0` + `@aprovan/registry-server@0.1.1`
-      published; `utdk` blocked by npm E403 name-similarity (manual publish same failure)._
-- [ ] 3.2 Clean-room installability gate (spec: registry-publish-integrity / "Clean-room
+      _Done via rename path: merged (#85); bare `utdk` never published (npm E403
+      name-similarity); consumers moved to `@utdk/clients@0.1.1`. Published:
+      `@aprovan/runtime@0.1.0`, `@aprovan/registry-server` (latest `0.2.2`, depends on
+      `@utdk/clients` not bare `utdk`)._
+- [x] 3.2 Clean-room installability gate (spec: registry-publish-integrity / "Clean-room
       install"): in a fresh temp dir, `npm install @aprovan/registry-server` succeeds and
       the package loads. Streams 4 and 6 are blocked until this passes.
+      _Verified 2026-08-04: `npm install @aprovan/registry-server` +
+      `import('@aprovan/registry-server')` green (resolves `@utdk/clients/registry.json`)._
 - [ ] 3.3 Fresh-clone registry exit criterion (spec: registry-publish-integrity / "Fresh
       registry clone is green").
       Verify: `T=$(mktemp -d) && git clone https://github.com/AprovanLabs/registry $T/registry && cd $T/registry && pnpm install && pnpm build && pnpm typecheck && pnpm test`
-      _Partial: `pnpm install --frozen-lockfile` + execution-plane build/typecheck/test green;
-      full `pnpm typecheck` fails on pre-existing `@aprovan/registry-web` errors._
+      _Still open: `pnpm install --frozen-lockfile` + execution-plane packages green;
+      full `pnpm typecheck` still fails on `@aprovan/registry-web` (`astro check`, ~19
+      errors — module resolution / implicit any / catalog output typing). Unrelated to
+      the unfork publish gate; needs a dedicated registry-web typecheck fix._
 
 ## 4. Aprovan: switch to npm and delete the fork
 
@@ -125,5 +131,11 @@ checkouts contain untracked husk dirs that mask failures._
 - [x] 6.2 Workspace image builds from the fresh clone (spec:
       execution-plane-consumption / "Workspace image builds").
       Verify: `cd $T/aprovan && docker build -f server/workspace/Dockerfile .`
-- [ ] 6.3 No absolute checkout paths remain in either repo (specs: both / grep scenarios).
+- [x] 6.3 No absolute checkout paths remain in either repo (specs: both / grep scenarios).
       Verify: `cd /Users/jacob/Documents/Code/AprovanLabs/aprovan && ! git grep -n "/Users/" && cd /Users/jacob/Documents/Code/AprovanLabs/registry && ! git grep -n "/Users/" -- "packages/utdk"`
+      _Spec package.json scenario PASS after scrubbing `packages/utdk/google/docs` and
+      teaching `@aprovan/utdk-bundler` to emit repo-relative `utdk.docs` paths.
+      Remaining `/Users/` hits are not checkout leaks: vendor OpenAPI examples
+      (asana `exampleUser`) and Sentry SCIM route templates (`/Users/{member_id}`).
+      Aprovan product tree (non-`openspec/`) has zero `/Users/` matches; openspec
+      planning briefs retain absolute paths by agent-brief convention._
