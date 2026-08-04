@@ -1,12 +1,12 @@
 import type { AgentProfile, Draft } from "./types";
 
-function formatLlmPin(value: AgentProfile["llm"]): string {
+export function formatLlmPin(value: AgentProfile["llm"]): string {
   if (!value) return "llm";
   if (typeof value === "string") return value;
   return value.profile ? `${value.interface}:${value.profile}` : value.interface;
 }
 
-function formatLlmPins(values: AgentProfile["llmCandidates"]): string {
+export function formatLlmPins(values: AgentProfile["llmCandidates"]): string {
   return (values ?? []).map((v) => formatLlmPin(v)).join(", ");
 }
 
