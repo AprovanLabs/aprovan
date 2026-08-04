@@ -64,12 +64,12 @@ export {
   hasCodeBlock,
   getCodeBlockLanguages,
   extractProject,
-  parseUsesAttribute,
+  scanToolsAccess,
   type TextPart,
   type CodePart,
   type ParsedPart,
   type ExtractOptions,
-  type WidgetDependency,
+  type ToolsAccessScan,
 } from "./lib/code-extractor";
 
 export {

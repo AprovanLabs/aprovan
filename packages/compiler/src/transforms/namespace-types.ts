@@ -67,6 +67,7 @@ export interface NamespaceTypesOptions {
    * where the data physically lands, how it is partitioned, anything the
    * caller knows and this generator cannot.
    */
+  notes?: Record<string, string>;
   /**
    * Per-namespace declaration overrides from plugin registration (override `types`).
    */
