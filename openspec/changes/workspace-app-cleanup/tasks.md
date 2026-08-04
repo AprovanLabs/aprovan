@@ -215,7 +215,9 @@ them, per `tech-plan.md`'s Rollout section.
       all three namespaces, full session lifecycle, edit modal open/save/discard,
       notifications bell widget render). This is the acceptance gate for "zero user-visible
       behavior change" per the PRD — there is no automated UI test suite to substitute for
-      it.
+      it. Owner checklist: `briefs/smoke-checklist.md` (partial pass already recorded in
+      `briefs/00-report.md`; LLM-dependent flows still open — do not close this task until
+      the checklist is fully checked).
 
 ## 12. Final repo-wide verification
 
