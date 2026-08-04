@@ -282,9 +282,9 @@ importers:
 
   packages/cli:
     dependencies:
-      '@aprovan/sandbox-host':
+      '@aprovan/native':
         specifier: workspace:*
-        version: link:../sandbox-host
+        version: link:../native
     devDependencies:
       '@types/node':
         specifier: ^25.5.0
@@ -498,6 +498,37 @@ importers:
         specifier: ^5.7.3
         version: 5.9.3
 
+  packages/native:
+    dependencies:
+      '@everruns/bashkit-wasm':
+        specifier: ^0.14.4
+        version: 0.14.5
+      '@utdk/events':
+        specifier: ^0.2.0
+        version: 0.2.0
+      '@utdk/keyvalue':
+        specifier: ^0.2.0
+        version: 0.2.0
+      '@utdk/sandbox':
+        specifier: ^0.2.0
+        version: 0.2.0
+      '@utdk/telemetry':
+        specifier: ^0.3.0
+        version: 0.3.0
+      '@utdk/vfs':
+        specifier: ^0.2.0
+        version: 0.2.0
+    devDependencies:
+      '@types/node':
+        specifier: ^25.5.0
+        version: 25.9.5
+      typescript:
+        specifier: ^5.7.3
+        version: 5.9.3
+      vitest:
+        specifier: 2.1.5
+        version: 2.1.5(@types/node@25.9.5)(happy-dom@20.11.1)(jsdom@30.0.1)(lightningcss@1.32.0)(terser@5.49.0)
+
   packages/node:
     dependencies:
       '@aws-sdk/client-ssm':
@@ -563,43 +594,6 @@ importers:
         specifier: 2.1.5
         version: 2.1.5(@types/node@25.9.5)(happy-dom@20.11.1)(jsdom@30.0.1)(lightningcss@1.32.0)(terser@5.49.0)
 
-  packages/sandbox-bashkit:
-    dependencies:
-      '@everruns/bashkit-wasm':
-        specifier: ^0.14.4
-        version: 0.14.5
-      '@utdk/sandbox':
-        specifier: ^0.2.0
-        version: 0.2.0
-    devDependencies:
-      '@types/node':
-        specifier: ^25.5.0
-        version: 25.9.5
-      typescript:
-        specifier: ^5.7.3
-        version: 5.9.3
-      vitest:
-        specifier: 2.1.5
-        version: 2.1.5(@types/node@25.9.5)(happy-dom@20.11.1)(jsdom@30.0.1)(lightningcss@1.32.0)(terser@5.49.0)
-
-  packages/sandbox-host:
-    dependencies:
-      '@utdk/sandbox':
-        specifier: ^0.2.0
-        version: 0.2.0
-    devDependencies:
-      '@types/node':
-        specifier: ^25.5.0
-        version: 25.9.5
-      typescript:
-        specifier: ^5.7.3
-        version: 5.9.3
-      vitest:
-        specifier: 2.1.5
-        version: 2.1.5(@types/node@25.9.5)(happy-dom@20.11.1)(jsdom@30.0.1)(lightningcss@1.32.0)(terser@5.49.0)
-
-  packages/sandbox-image-node: {}
-
   packages/ui:
     dependencies:
       '@aprovan/patchwork':
@@ -639,6 +633,9 @@ importers:
 
   server/workspace:
     dependencies:
+      '@aprovan/native':
+        specifier: workspace:*
+        version: link:../../packages/native
       '@aprovan/node':
         specifier: workspace:*
         version: link:../../packages/node
@@ -648,9 +645,6 @@ importers:
       '@aprovan/registry-server':
         specifier: ^0.2.2
         version: 0.2.2(zod@3.25.76)
-      '@aprovan/sandbox-bashkit':
-        specifier: workspace:*
-        version: link:../../packages/sandbox-bashkit
       '@aws-sdk/client-cognito-identity-provider':
         specifier: ^3.1077.0
         version: 3.1101.0
@@ -13142,14 +13136,6 @@ snapshots:
       chai: 5.3.3
       tinyrainbow: 2.0.0
 
-  '@vitest/mocker@2.1.5(vite@5.4.21(@types/node@22.19.11)(lightningcss@1.32.0)(terser@5.49.0))':
-    dependencies:
-      '@vitest/spy': 2.1.5
-      estree-walker: 3.0.3
-      magic-string: 0.30.21
-    optionalDependencies:
-      vite: 5.4.21(@types/node@22.19.11)(lightningcss@1.32.0)(terser@5.49.0)
-
   '@vitest/mocker@2.1.5(vite@5.4.21(@types/node@25.9.5)(lightningcss@1.32.0)(terser@5.49.0))':
     dependencies:
       '@vitest/spy': 2.1.5
@@ -16896,7 +16882,7 @@ snapshots:
   vitest@2.1.5(@types/node@22.19.11)(happy-dom@20.11.1)(jsdom@30.0.1)(lightningcss@1.32.0)(terser@5.49.0):
     dependencies:
       '@vitest/expect': 2.1.5
-      '@vitest/mocker': 2.1.5(vite@5.4.21(@types/node@22.19.11)(lightningcss@1.32.0)(terser@5.49.0))
+      '@vitest/mocker': 2.1.5(vite@5.4.21(@types/node@25.9.5)(lightningcss@1.32.0)(terser@5.49.0))
       '@vitest/pretty-format': 2.1.9
       '@vitest/runner': 2.1.5
       '@vitest/snapshot': 2.1.5

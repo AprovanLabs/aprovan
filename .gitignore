@@ -152,3 +152,6 @@ hardcopy.yaml
 # Generated widget HTML artifacts
 .artifacts/
 .claude/settings.local.json
+
+# Local dual-worktree link to registry contracts (stream 4 verify)
+packages/contracts

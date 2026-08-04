@@ -43,6 +43,6 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
-    "@aprovan/sandbox-host": "workspace:*"
+    "@aprovan/native": "workspace:*"
   }
 }

@@ -357,7 +357,7 @@ async function interfaceNamespaces(
  * Real UTDK providers that also appear in a compat list (github, openai, …)
  * still list normally.
  */
-const INTERFACE_ONLY_PROVIDERS = new Set(["machine", "native", "bashkit", "harness"]);
+const INTERFACE_ONLY_PROVIDERS = new Set(["machine", "native", "bashkit", "harness", "aprovan"]);
 
 export function shouldListCredentialAsProvider(provider: string): boolean {
   if (isInterface(provider)) return false;
@@ -584,7 +584,13 @@ async function describeNamespaces(workspaceId: string): Promise<NamespaceInfo[]>
         // connectable vendor — same INTERFACE_ONLY treatment as agent's
         // in-process runner, but filtered from listings so named instances
         // only offer real backends (datadog, sentry, …).
-        .filter((entry) => !(parsed.interfaceId === "telemetry" && entry.provider === "native"))
+        .filter(
+          (entry) =>
+            !(
+              parsed.interfaceId === "telemetry" &&
+              (entry.provider === "native" || entry.provider === "aprovan")
+            ),
+        )
         .map((entry) => ({
           provider: entry.provider,
           label: entry.label,
@@ -773,8 +779,10 @@ toolsRouter.post("/:provider/:operation{.*}", rateLimitByUserId, async (c) => {
   // The agent interface's `native` entry is this process: dispatch
   // short-circuits in-process below (after authz + body validation), the
   // same way the workflow twin does in workflows/invoke.ts. No module, no
-  // credential, no isolate.
+  // credential, no isolate. The five Aprovan-native contracts (`aprovan`
+  // provider) take the same path for the same reason.
   let nativeAgentInterface = false;
+  let aprovanNativeInterface: string | undefined;
   const requestNamespace = provider;
   if (provider && operation && parseInterfaceNamespace(provider)) {
     try {
@@ -795,6 +803,12 @@ toolsRouter.post("/:provider/:operation{.*}", rateLimitByUserId, async (c) => {
       }
       nativeAgentInterface =
         resolved.def.id === "agent" && resolved.compat.provider === "native";
+      if (resolved.compat.provider === "aprovan") {
+        const { isAprovanNativeBinding } = await import("../native-dispatch.js");
+        if (isAprovanNativeBinding(resolved.def.id, resolved.compat.provider)) {
+          aprovanNativeInterface = resolved.def.id;
+        }
+      }
       interfaceDefaults = resolved.def.defaultsFor.includes(operation)
         ? { ...resolved.options, ...(callSiteOptions ?? {}) }
         : callSiteOptions;
@@ -858,6 +872,33 @@ toolsRouter.post("/:provider/:operation{.*}", rateLimitByUserId, async (c) => {
       const { dispatchNativeAgentOp } = await import("../agents/runner.js");
       const data = await dispatchNativeAgentOp(
         { workspaceId, userId: callerId },
+        operation,
+        nativeArgs,
+      );
+      const durationMs = Date.now() - startTime;
+      getAuditStore().append({ requestId, workspaceId, callerId, provider, operation, status: 200, durationMs });
+      recordDispatch(200, durationMs);
+      return c.json({ data, meta: { requestId, durationMs } });
+    } catch (err) {
+      const status = err instanceof ServiceError ? err.status : 500;
+      const message = err instanceof Error ? err.message : String(err);
+      getAuditStore().append({ requestId, workspaceId, callerId, provider, operation, status });
+      recordDispatch(status, Date.now() - startTime, message);
+      return c.json({ error: message }, status as 400);
+    }
+  }
+  // In-process short-circuit for the Aprovan native provider (vfs/vcs/
+  // keyvalue/events/telemetry) — credentialless, no isolate.
+  if (aprovanNativeInterface) {
+    try {
+      const nativeArgs = {
+        ...(interfaceDefaults ?? {}),
+        ...(body.args as Record<string, unknown>),
+      };
+      const { dispatchAprovanNativeOp } = await import("../native-dispatch.js");
+      const data = await dispatchAprovanNativeOp(
+        { workspaceId, userId: callerId },
+        aprovanNativeInterface,
         operation,
         nativeArgs,
       );

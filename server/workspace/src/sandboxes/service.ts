@@ -84,7 +84,7 @@ const INTERFACE = "sandbox";
  * all would leave a machine unable to take any scheduled run, which is never
  * what someone registering a machine meant.
  */
-const DEFAULT_IMAGE = "@aprovan/sandbox-image-node";
+const DEFAULT_IMAGE = "@aprovan/native";
 
 /**
  * Resolved image descriptors, keyed by `<provider>:<spec>`. Descriptors are
@@ -132,7 +132,7 @@ function timeoutOf(args: Record<string, unknown>): number | undefined {
  * API and it lives in this process, so routing an HTTP request from the
  * gateway back to the gateway would add a network round trip per file — and
  * materializing a mount is one write per file. The published
- * `@aprovan/sandbox-host` client exists for callers that genuinely are
+ * `@aprovan/native/host` client exists for callers that genuinely are
  * elsewhere (another deployment, a script), and takes the HTTP path.
  */
 function driverFor(ctx: ServiceContext, target: { provider: string; hostId?: string }): SandboxCall {
@@ -400,7 +400,7 @@ export const sandboxesService: CoreService = {
       inputSchema: {
         type: "object",
         properties: {
-          image: { type: "string", description: "Image package spec, e.g. @aprovan/sandbox-image-node" },
+          image: { type: "string", description: "Image package spec, e.g. @aprovan/native" },
           name: { type: "string" },
           mounts: {
             type: "array",

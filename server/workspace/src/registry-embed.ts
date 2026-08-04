@@ -12,6 +12,7 @@ import {
   type RegistryServer,
 } from "@aprovan/registry-server";
 import { dispatchNativeAgentOp } from "./agents/runner.js";
+import { dispatchAprovanNativeOp } from "./native-dispatch.js";
 import { getExecutor } from "./isolate.js";
 import { getAuthMode } from "./middleware/auth.js";
 import { getRegistryStorage } from "./registry-storage.js";
@@ -92,6 +93,16 @@ async function bootRegistryServer(): Promise<RegistryServer> {
     compatDispatch: {
       agent: async (ctx, operation, args) =>
         dispatchNativeAgentOp(ctx, operation, args as Record<string, unknown>),
+      vfs: async (ctx, operation, args) =>
+        dispatchAprovanNativeOp(ctx, "vfs", operation, args as Record<string, unknown>),
+      vcs: async (ctx, operation, args) =>
+        dispatchAprovanNativeOp(ctx, "vcs", operation, args as Record<string, unknown>),
+      keyvalue: async (ctx, operation, args) =>
+        dispatchAprovanNativeOp(ctx, "keyvalue", operation, args as Record<string, unknown>),
+      events: async (ctx, operation, args) =>
+        dispatchAprovanNativeOp(ctx, "events", operation, args as Record<string, unknown>),
+      telemetry: async (ctx, operation, args) =>
+        dispatchAprovanNativeOp(ctx, "telemetry", operation, args as Record<string, unknown>),
     },
     telemetry: {
       otlpEndpoint: process.env["OTEL_EXPORTER_OTLP_ENDPOINT"],

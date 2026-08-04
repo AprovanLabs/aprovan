@@ -1,5 +1,5 @@
 /**
- * `@aprovan/sandbox-host` — running Aprovan sandboxes on a machine you own.
+ * `@aprovan/native/host` — running Aprovan sandboxes on a machine you own.
  *
  * First-party, deliberately *not* in the `utdk/*` catalogue: UTDK is the
  * vendor namespace, and a laptop has no vendor. What is shared is the

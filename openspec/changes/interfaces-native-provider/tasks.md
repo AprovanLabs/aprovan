@@ -2,36 +2,36 @@
 
 > Depends-on: - | Touches: server/workspace/src/sandboxes/service.ts, server/workspace/src/vcs/sessions-service.ts | Verify: `pnpm --filter @aprovan/workspace test && pnpm check-types`
 
-- [ ] 1.1 Replace the sandbox summariser's opaque record return with the shape it actually produces; it also spreads an open-ended record, which must be narrowed.
-- [ ] 1.2 Replace the session helper's opaque promise return with the shape it actually produces — eleven operations' schemas are blocked behind this one signature.
-- [ ] 1.3 Fix the downstream type errors both changes surface.
+- [x] 1.1 Replace the sandbox summariser's opaque record return with the shape it actually produces; it also spreads an open-ended record, which must be narrowed.
+- [x] 1.2 Replace the session helper's opaque promise return with the shape it actually produces — eleven operations' schemas are blocked behind this one signature.
+- [x] 1.3 Fix the downstream type errors both changes surface.
 
 ## 2. Create `@aprovan/native`
 
 > Depends-on: - | Touches: packages/native/**, packages/sandbox-bashkit/** (delete), packages/sandbox-host/** (delete), packages/sandbox-image-node/** (delete), .github/workflows/** | Verify: `pnpm --filter @aprovan/native build && pnpm check-types`
 
-- [ ] 2.1 Create the package; move the three sandbox packages into it and retire them.
-- [ ] 2.2 Add a test asserting nothing in the package is importable by sandboxed widget code.
-- [ ] 2.3 Update the publish workflow's package list.
+- [x] 2.1 Create the package; move the three sandbox packages into it and retire them.
+- [x] 2.2 Add a test asserting nothing in the package is importable by sandboxed widget code.
+- [x] 2.3 Update the publish workflow's package list.
 
 ## 3. Implement the contracts
 
 > Depends-on: 1, 2 | Touches: packages/native/src/**, packages/native/__tests__/** | Verify: `pnpm --filter @aprovan/native test`
 
-- [ ] 3.1 Implement the file contract over workspace storage, including the operation the first-party surface never had.
-- [ ] 3.2 Implement the version-control contract over the workspace commit store.
-- [ ] 3.3 Implement the key-value contract, adding the field that distinguishes a missing key from a stored empty value — this is a correctness fix, not only a shape change.
-- [ ] 3.4 Implement the event contract, reconciling the record's field names and adding the fields the contract declares.
-- [ ] 3.5 Implement the telemetry contract — the one pair that already agrees; confirm rather than change.
-- [ ] 3.6 Add a conformance test per contract asserting every declared operation is implemented and every result matches the declared shape (satisfies `native-interface-provider` / "First-party results match their contracts").
+- [x] 3.1 Implement the file contract over workspace storage, including the operation the first-party surface never had.
+- [x] 3.2 Implement the version-control contract over the workspace commit store.
+- [x] 3.3 Implement the key-value contract, adding the field that distinguishes a missing key from a stored empty value — this is a correctness fix, not only a shape change.
+- [x] 3.4 Implement the event contract, reconciling the record's field names and adding the fields the contract declares.
+- [x] 3.5 Implement the telemetry contract — the one pair that already agrees; confirm rather than change.
+- [x] 3.6 Add a conformance test per contract asserting every declared operation is implemented and every result matches the declared shape (satisfies `native-interface-provider` / "First-party results match their contracts").
 
 ## 4. Register as default bindings
 
 > Depends-on: 3 | Touches: registry/packages/contracts/{vfs,vcs,keyvalue,events,telemetry}/compat.json, server/workspace/src/interfaces.ts | Verify: `pnpm --filter @aprovan/workspace test`
 
-- [ ] 4.1 Add a credentialless compat entry per contract for the Aprovan provider, using the module-specifier form that already points outside the catalogue.
-- [ ] 4.2 Short-circuit these entries in process, matching the existing pattern for the contracts that already do this — an isolate-hosted module cannot reach workspace storage.
-- [ ] 4.3 Verify default resolution reaches the native provider, and that a profile bound to a third party reaches that instead, with the same shapes.
+- [x] 4.1 Add a credentialless compat entry per contract for the Aprovan provider, using the module-specifier form that already points outside the catalogue.
+- [x] 4.2 Short-circuit these entries in process, matching the existing pattern for the contracts that already do this — an isolate-hosted module cannot reach workspace storage.
+- [x] 4.3 Verify default resolution reaches the native provider, and that a profile bound to a third party reaches that instead, with the same shapes.
 
 ## 5. Split version control off the file namespace
 
