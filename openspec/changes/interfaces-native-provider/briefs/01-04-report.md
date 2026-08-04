@@ -37,8 +37,8 @@ Foundation streams 1–4 complete on `iw7/interfaces-native` (aprovan + registry
 | Full workspace suite | pre-existing failures unrelated to this change (workflows/sandboxes mocks) |
 
 ## PRs
-- Aprovan: (filled after open)
-- Registry: (filled after open)
+- Aprovan: https://github.com/AprovanLabs/aprovan/pull/86
+- Registry: https://github.com/AprovanLabs/registry/pull/123
 
 ## Blockers for streams 5–8
 1. **`@utdk/vcs` vs workspace commit ops** — Native vcs implements workspace commit/log/show/diff/branches/restore (tech-plan). Frozen `@utdk/vcs` is Git hosting (repos/PRs). Rebinding `vcs` to GitHub cannot share one operation surface until a contract decision (split interface ids, or reshape one side). Stream 5 should resolve this before moving ops off `vfs`.
