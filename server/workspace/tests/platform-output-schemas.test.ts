@@ -22,7 +22,18 @@ describe("platform output schemas", () => {
     }
   });
 
-  it("marks the seven driver-passthrough sandbox operations", () => {
+  it("marks the seven driver-passthrough operations", () => {
+    expect([...PASSTHROUGH_OPS].sort()).toEqual(
+      [
+        "agents.cancelRun",
+        "agents.getRun",
+        "agents.run",
+        "sandboxes.exec",
+        "sandboxes.expose",
+        "sandboxes.read",
+        "sandboxes.write",
+      ].sort(),
+    );
     const entries = platformToolEntries();
     for (const name of PASSTHROUGH_OPS) {
       const entry = entries.find((e) => e.name === name);

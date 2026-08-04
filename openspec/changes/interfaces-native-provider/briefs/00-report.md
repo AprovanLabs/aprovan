@@ -25,7 +25,8 @@ Streams 5–8 complete on `iw7/interfaces-native` (aprovan). Registry PR from st
 
 ### Stream 7 — Platform output schemas
 - `platform-output-schemas.ts` seals schemas onto all ~98 platform tools at install.
-- Seven sandbox driver passthroughs marked (`passthrough: true` + advisory schema).
+- Seven driver passthroughs marked (`passthrough: true` + advisory schema):
+  `sandboxes.{exec,read,write,expose}` + `agents.{run,getRun,cancelRun}`.
 - `apps.data` split → `dataUsers` / `dataKeys` / `dataGet` / `dataRead` (legacy `data` still dispatched).
 - Regression: `tests/platform-output-schemas.test.ts`.
 

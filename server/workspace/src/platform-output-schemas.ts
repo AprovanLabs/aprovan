@@ -21,15 +21,18 @@ const arr = (items: Record<string, unknown> = { type: "object" }): Record<string
   items,
 });
 
-/** Seven sandboxes ops that forward to a bound driver — advisory shapes only. */
+/**
+ * Seven ops that forward to a bound driver/interface — advisory shapes only:
+ * sandboxes exec/read/write/expose + agents run/getRun/cancelRun.
+ */
 export const PASSTHROUGH_OPS = new Set([
   "sandboxes.exec",
   "sandboxes.read",
   "sandboxes.write",
-  "sandboxes.tree",
-  "sandboxes.sync",
-  "sandboxes.commit",
   "sandboxes.expose",
+  "agents.run",
+  "agents.getRun",
+  "agents.cancelRun",
 ]);
 
 /** Determinable schemas keyed by `namespace.operation` tool name. */
@@ -167,6 +170,9 @@ const SCHEMAS: Record<string, Record<string, unknown>> = {
   "sandboxes.create": obj({ sandbox: { type: "object" } }, ["sandbox"]),
   "sandboxes.list": obj({ sandboxes: arr() }, ["sandboxes"]),
   "sandboxes.get": obj({ sandbox: { type: "object" } }, ["sandbox"]),
+  "sandboxes.tree": obj({ entries: arr() }),
+  "sandboxes.sync": obj({ synced: { type: "number" } }),
+  "sandboxes.commit": obj({ commit: { type: "object" } }),
   "sandboxes.destroy": obj({ destroyed: { type: "boolean" } }, ["destroyed"]),
   "sandboxes.image": obj({ image: { type: "object" } }, ["image"]),
   "sandboxes.schedule": obj({ schedule: { type: "object" } }, ["schedule"]),
@@ -177,7 +183,7 @@ const SCHEMAS: Record<string, Record<string, unknown>> = {
   "sandboxes.hosts": obj({ hosts: arr() }, ["hosts"]),
   "sandboxes.registerHost": obj({ host: { type: "object" } }, ["host"]),
   "sandboxes.revokeHost": obj({ revoked: { type: "boolean" } }, ["revoked"]),
-  // Passthrough advisory shapes (same keys as contract-ish results).
+  // Passthrough advisory shapes.
   "sandboxes.exec": obj({
     stdout: { type: "string" },
     stderr: { type: "string" },
@@ -185,9 +191,6 @@ const SCHEMAS: Record<string, Record<string, unknown>> = {
   }),
   "sandboxes.read": obj({ path: { type: "string" }, content: { type: "string" } }),
   "sandboxes.write": obj({ path: { type: "string" }, ok: { type: "boolean" } }),
-  "sandboxes.tree": obj({ entries: arr() }),
-  "sandboxes.sync": obj({ synced: { type: "number" } }),
-  "sandboxes.commit": obj({ commit: { type: "object" } }),
   "sandboxes.expose": obj({ url: { type: "string" }, port: { type: "number" } }),
 };
 
