@@ -475,7 +475,7 @@ export function generateNamespaceTypes(
 
   const serviceRoot = options.serviceRoot ?? "tools";
   const rootMembers = namespaces
-    .map((namespace) => `  ${namespace}: import(${JSON.stringify(namespace)}).default;`)
+    .map((namespace) => `  ${namespace}: typeof import(${JSON.stringify(namespace)}).default;`)
     .join("\n");
   const globalRoot =
     namespaces.length > 0

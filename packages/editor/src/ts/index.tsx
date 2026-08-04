@@ -34,17 +34,18 @@ const DEFAULT_COMPILER_OPTIONS: ts.CompilerOptions = {
   moduleResolution: ts.ModuleResolutionKind.Bundler,
   allowArbitraryExtensions: true,
   noImplicitAny: false,
+  jsx: ts.JsxEmit.ReactJSX,
 };
 
 /**
- * Imports with no better match resolve as `any` instead of erroring —
- * sandbox scripts import providers by bare name and typing coverage is
- * incremental. Mounted `.d.ts` files always win over this wildcard.
+ * Imports with no better match resolve as open modules instead of erroring —
+ * sandbox scripts import providers / `react` by bare name and typing coverage
+ * is incremental. An empty `declare module "*"` keeps named imports
+ * (`import { useState } from "react"`) valid as `any`; a default-only wildcard
+ * made TypeScript report them as `Module '"*"' has no exported member …`.
+ * Mounted `.d.ts` files always win over this wildcard.
  */
-export const AMBIENT_FALLBACK = `declare module "*" {
-  const value: any;
-  export default value;
-}`;
+export const AMBIENT_FALLBACK = `declare module "*";`;
 
 export const AMBIENT_FALLBACK_PATH = "/ambient-fallback.d.ts";
 

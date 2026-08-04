@@ -212,16 +212,17 @@ describe("generateNamespaceTypes", () => {
     const dts = generateNamespaceTypes(["github.repos.list"]);
     expect(dts).toContain('declare module "github"');
     expect(dts).toContain("(args?: Record<string, unknown>): Promise<unknown>;");
-    expect(dts).toContain("[procedure: string]: Procedure;");
+    expect(dts).toContain("[procedure: string]: Procedure | ProfileClient | GithubNamespace | ((...args: never[]) => unknown);");
     expect(dts).toContain("client: ProfileClient;");
-    expect(dts).toContain("type ProfileClient = (name: string) => Promise<GithubNamespace>;");
+    expect(dts).toContain("type ProfileClient = {");
+    expect(dts).toContain("(name?: string): GithubNamespace;");
   });
 
   it("emits the service root as a global declaration", () => {
     const dts = generateNamespaceTypes(["vfs", "github.repos.list"]);
     expect(dts).toContain("declare const tools: {");
-    expect(dts).toContain('vfs: import("vfs").default;');
-    expect(dts).toContain('github: import("github").default;');
+    expect(dts).toContain('vfs: typeof import("vfs").default;');
+    expect(dts).toContain('github: typeof import("github").default;');
   });
 
   it("uses a single PascalCase derivation for structural type names", () => {
@@ -241,8 +242,8 @@ describe("generateNamespaceTypes", () => {
       pluginDeclarations: { notify: plugin },
     });
     expect(dts).toContain(plugin);
-    expect(dts).toContain('notify: import("notify").default;');
-    expect(dts).toContain('vfs: import("vfs").default;');
+    expect(dts).toContain('notify: typeof import("notify").default;');
+    expect(dts).toContain('vfs: typeof import("vfs").default;');
   });
 
   it("merges overrideTypes with pluginDeclarations", () => {
