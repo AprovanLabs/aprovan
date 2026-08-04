@@ -14,13 +14,15 @@ t=0   utdk-output-schemas ──────────────────
 - Keep third-party **interface** compat adapters; reconsider only for non-interface natives.
 - All other OQs: accept recommendations (recorded in each change).
 
-## Wave 0 — IN FLIGHT
-| Brief | Change | Streams | Model | Repo | Status |
-|-------|--------|---------|-------|------|--------|
-| tools-global/00-full | tools-global | 1–8 | opus | aprovan (+registry) | dispatching |
-| utdk-output-schemas/01 | output slot | 1 | sonnet | registry | dispatching |
-| utdk-output-schemas/02 | envelope ADR | 2 | composer | registry | dispatching |
-| utdk-output-schemas/03 | response extraction | 3 | opus | registry | dispatching |
+## Wave 0 — IN FLIGHT (local worktree agents; cloud blocked on multi-root)
+| Brief | Change | Streams | Model | Agent | Status |
+|-------|--------|---------|-------|-------|--------|
+| tools-global/00-full | tools-global | 1–8 | opus | [tools-global](7ae3c853-ce3a-47fd-a158-81d0beab8b62) | running |
+| utdk-output-schemas/01 | output slot | 1 | sonnet | [slot](cf898327-85e4-4f52-b06c-e52bd1879d2e) | running |
+| utdk-output-schemas/02 | envelope ADR | 2 | composer | [adr](42a3b88d-ce67-42fa-8d59-fd85d7ce2987) | running |
+| utdk-output-schemas/03 | response extraction | 3 | opus | [extract](f05bfe45-7dc9-4f56-aa44-1bfa89a185bc) | running |
+
+Wave-1/2 briefs pre-written under each change `briefs/00-full.md` (gated).
 
 ### Wave 0b (after 03 merges)
 | Brief | Streams | Notes |
