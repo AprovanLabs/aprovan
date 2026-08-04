@@ -9,7 +9,6 @@ import {
   cdnTransformPlugin,
   ALIAS_MODULE_NAMESPACE,
 } from "./transforms/cdn.js";
-import { namespaceImportPlugin } from "./transforms/namespaces.js";
 import { vfsPlugin } from "./transforms/vfs.js";
 import { createSingleFileProject } from "./vfs/project.js";
 import type {
@@ -301,10 +300,6 @@ class PatchworkCompiler implements Compiler {
       sourcemap: "inline",
       plugins: [
         vfsPlugin(project, { aliases }),
-        // Before the CDN plugin: a bare specifier naming an injected service
-        // namespace is the SDK import, not an npm package. Everything else
-        // still falls through to esm.sh.
-        namespaceImportPlugin({ services: manifest.services }),
         cdnTransformPlugin({
           packages,
           globals,

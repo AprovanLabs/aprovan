@@ -11,13 +11,13 @@
 
 > Depends-on: 1 | Touches: packages/compiler/src/mount/**, packages/compiler/src/transforms/namespaces.ts, packages/compiler/src/index.ts, packages/compiler/src/__tests__/namespaces.test.ts | Verify: `pnpm --filter @aprovan/patchwork-compiler test`
 
-- [ ] 2.1 Add `assembleTools({ namespaces, plugins, transport })` as the single constructor of namespace proxies; make it the only place a proxy is built in this package.
-- [ ] 2.2 Make each namespace node callable at depth 0 (configure → return node) and dispatching at depth ≥ 1, per tech-plan D2. Depth-0 invocation currently throws; replace that behavior.
-- [ ] 2.3 Change `generateIframeBridgeScript` to install a single `globalThis.tools` instead of one global per namespace.
-- [ ] 2.4 Change `mountEmbedded` to install and tear down `tools` only; delete `injectNamespaceGlobals` / `removeNamespaceGlobals` per-namespace paths.
-- [ ] 2.5 Delete `namespaceImportPlugin`, `generateNamespaceModule`, and `NAMESPACE_MODULE_NAMESPACE`; remove their registration from the esbuild plugin list.
-- [ ] 2.6 Rewrite `__tests__/namespaces.test.ts` against `tools` (8 existing fixtures assert bare-specifier compilation and must be replaced, not adapted).
-- [ ] 2.7 Add tests for the three `tools-namespace-root` scenarios that are compiler-observable: root-anchored dispatch, bare global absent, bare specifier not intercepted.
+- [x] 2.1 Add `assembleTools({ namespaces, plugins, transport })` as the single constructor of namespace proxies; make it the only place a proxy is built in this package.
+- [x] 2.2 Make each namespace node callable at depth 0 (configure → return node) and dispatching at depth ≥ 1, per tech-plan D2. Depth-0 invocation currently throws; replace that behavior.
+- [x] 2.3 Change `generateIframeBridgeScript` to install a single `globalThis.tools` instead of one global per namespace.
+- [x] 2.4 Change `mountEmbedded` to install and tear down `tools` only; delete `injectNamespaceGlobals` / `removeNamespaceGlobals` per-namespace paths.
+- [x] 2.5 Delete `namespaceImportPlugin`, `generateNamespaceModule`, and `NAMESPACE_MODULE_NAMESPACE`; remove their registration from the esbuild plugin list.
+- [x] 2.6 Rewrite `__tests__/namespaces.test.ts` against `tools` (8 existing fixtures assert bare-specifier compilation and must be replaced, not adapted).
+- [x] 2.7 Add tests for the three `tools-namespace-root` scenarios that are compiler-observable: root-anchored dispatch, bare global absent, bare specifier not intercepted.
 
 ## 3. Workflow sandbox installs `tools`
 

@@ -117,104 +117,6 @@ export function createHttpProxy(
 }
 
 /**
- * Creates a proxy that enables fluent method chaining for dynamic field access.
- *
- * This allows arbitrary nested property access that resolves to a callable function,
- * supporting patterns like `proxy.foo()`, `proxy.foo.bar()`, `proxy.bar.baz.qux()`.
- *
- * Used to create global namespace objects that proxy calls to a service backend.
- */
-export function createFieldAccessProxy<T = unknown>(
-  namespace: string,
-  handler: (
-    namespace: string,
-    methodPath: string,
-    ...args: T[]
-  ) => Promise<unknown>,
-): Record<string, (...args: T[]) => Promise<unknown>> {
-  function createNestedProxy(path: string): (...args: T[]) => Promise<unknown> {
-    const fn = (...args: T[]) => handler(namespace, path, ...args);
-
-    return new Proxy(fn, {
-      get(_, nestedName: string) {
-        if (typeof nestedName === "symbol") return undefined;
-        const newPath = path ? `${path}.${nestedName}` : nestedName;
-        return createNestedProxy(newPath);
-      },
-    }) as (...args: T[]) => Promise<unknown>;
-  }
-
-  return new Proxy(
-    {},
-    {
-      get(_, fieldName: string) {
-        if (typeof fieldName === "symbol") return undefined;
-        return createNestedProxy(fieldName);
-      },
-    },
-  );
-}
-
-/**
- * Create namespace globals that proxy calls to a service proxy
- *
- * Creates dynamic proxy objects for each namespace that support arbitrary
- * nested method calls. This replaces the old static method registration.
- *
- * @param services - Array of service names (e.g., ['git', 'github'])
- * @param proxy - The service proxy to forward calls to
- * @returns Record of namespace names to proxy objects
- *
- * @example
- * ```typescript
- * const namespaces = generateNamespaceGlobals(['git', 'github'], proxy);
- * // namespaces.git.status() calls proxy.call('git', 'status', [])
- * // namespaces.github.repos.list_for_user({ username: 'x' })
- * //   calls proxy.call('github', 'repos.list_for_user', [{ username: 'x' }])
- * ```
- */
-export function generateNamespaceGlobals(
-  services: string[],
-  proxy: Proxy,
-): Record<string, unknown> {
-  const namespaces: Record<string, unknown> = {};
-  const uniqueNamespaces = extractNamespaces(services);
-
-  for (const namespace of uniqueNamespaces) {
-    namespaces[namespace] = createFieldAccessProxy(
-      namespace,
-      (ns, method, ...args) => proxy.call(ns, method, args),
-    );
-  }
-
-  return namespaces;
-}
-
-/**
- * Inject namespace globals into a window object
- */
-export function injectNamespaceGlobals(
-  target: Window | typeof globalThis,
-  namespaces: Record<string, unknown>,
-): void {
-  for (const [name, value] of Object.entries(namespaces)) {
-    (target as Record<string, unknown>)[name] = value;
-  }
-}
-
-/**
- * Remove namespace globals from a window object
- */
-export function removeNamespaceGlobals(
-  target: Window | typeof globalThis,
-  namespaceNames: string[],
-): void {
-  for (const name of namespaceNames) {
-    delete (target as Record<string, unknown>)[name];
-  }
-}
-
-/**
  * Extract unique namespace names from services array.
  *
  * Defined in `namespace-core.ts` (a leaf module the dependency-free
@@ -432,8 +334,8 @@ export function createIframeProxy(): Proxy {
  */
 export function generateIframeBridgeScript(services: string[]): string {
   const uniqueNamespaces = extractNamespaces(services);
-  const namespaceAssignments = uniqueNamespaces
-    .map((ns) => `window.${ns} = createNamespaceProxy('${ns}');`)
+  const toolsAssignments = uniqueNamespaces
+    .map((ns) => `tools[${JSON.stringify(ns)}] = createNamespaceNode(${JSON.stringify(ns)});`)
     .join("\n  ");
 
   return `
@@ -514,11 +416,15 @@ export function generateIframeBridgeScript(services: string[]): string {
     });
   }
 
-  // Create a dynamic proxy for a namespace that supports arbitrary nested method calls
-  function createNamespaceProxy(namespace) {
+  // Callable namespace node: depth-0 invocation configures; depth >= 1 dispatches.
+  function createNamespaceNode(namespace) {
     function createNestedProxy(path) {
       var fn = function() {
-        return proxyCall(namespace, path, Array.prototype.slice.call(arguments));
+        var args = Array.prototype.slice.call(arguments);
+        if (!path) {
+          return createNamespaceNode(namespace);
+        }
+        return proxyCall(namespace, path, args);
       };
 
       return new Proxy(fn, {
@@ -530,15 +436,12 @@ export function generateIframeBridgeScript(services: string[]): string {
       });
     }
 
-    return new Proxy({}, {
-      get: function(_, fieldName) {
-        if (typeof fieldName === 'symbol') return undefined;
-        return createNestedProxy(fieldName);
-      }
-    });
+    return createNestedProxy('');
   }
 
-  ${namespaceAssignments}
+  var tools = {};
+  ${toolsAssignments}
+  window.tools = tools;
 })();
 `;
 }

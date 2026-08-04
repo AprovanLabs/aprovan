@@ -11,11 +11,19 @@ export {
   DEV_SANDBOX,
 } from "./iframe.js";
 export {
+  assembleTools,
+  createCallableNamespaceNode,
+  installTools,
+  removeTools,
+} from "./assemble-tools.js";
+export type {
+  AssembleToolsOptions,
+  NamespaceNode,
+  ToolsPlugins,
+  ToolsTransport,
+} from "./assemble-tools.js";
+export {
   createHttpProxy,
-  createFieldAccessProxy,
-  generateNamespaceGlobals,
-  injectNamespaceGlobals,
-  removeNamespaceGlobals,
   extractNamespaces,
   ParentBridge,
   createIframeProxy,

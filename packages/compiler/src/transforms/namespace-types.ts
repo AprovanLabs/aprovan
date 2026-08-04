@@ -1,7 +1,7 @@
 /**
  * Ambient types for the namespaces a widget can import.
  *
- * `namespaceImportPlugin` makes `import vfs from "vfs"` *compile*; this makes
+ * `generateNamespaceTypes` makes `import vfs from "vfs"` *compile*; this makes
  * it *typed*. The gateway serves the output as an app's `__sdk__.d.ts`
  * (registry/docs/apps-and-workflows.md, "The app SDK"), so this is deliberately
  * a pure string-producing function: no fetch, no filesystem, no gateway
