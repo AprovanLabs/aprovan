@@ -598,8 +598,6 @@ export function getRecordStore(): IRecordStore {
     switch (storeBackend()) {
       case "dsql":
         return new RecordStoreDsql();
-      case "dynamo":
-        return new RecordStoreDynamodb();
       case "sqlite":
         return new RecordStoreSqlite();
     }

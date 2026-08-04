@@ -8,7 +8,6 @@
 
 import { invalidatePrincipal } from "../auth-cache.js";
 import { storeBackend } from "../runtime/config.js";
-import { createIdentityStoreDynamo } from "./dynamo.js";
 import {
   createDsqlIdentityClient,
   createIdentityStoreSql,
@@ -76,8 +75,6 @@ export function getIdentityStore(): IIdentityStore {
       switch (storeBackend()) {
         case "dsql":
           return createIdentityStoreSql(createDsqlIdentityClient());
-        case "dynamo":
-          return createIdentityStoreDynamo();
         case "sqlite":
           return createIdentityStoreSql(createSqliteIdentityClient());
       }

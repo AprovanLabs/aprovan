@@ -25,7 +25,6 @@ import { getFsStore } from "./fs-store.js";
 import { getCredentialStore } from "./credentials.js";
 import { listLlmProviders } from "./llm.js";
 import { getRegistryStorage } from "./registry-storage.js";
-import { storeBackend } from "./runtime/config.js";
 import { ServiceError } from "./service-kernel.js";
 
 const BINDINGS_PATH = ".services/bindings.json";
@@ -257,20 +256,13 @@ export function isInterface(id: string): boolean {
 }
 
 /**
- * The WS-3 dispatch-plane cutover, bindings half: on the durable backends
- * (sqlite locally, dsql in cloud) a workspace binding IS a registry-server
- * profile row — `(tenant, targetKind "interface", targetId, name)` with the
- * default instance stored under the package's reserved name `"default"` and
- * `sql:analytics` under `"analytics"`. `.services/bindings.json` is a
- * tombstone: read once, imported into profiles, deleted. Only the interim
- * dynamo backend still reads the file (the package has no Dynamo driver by
- * design), and that path dies wholesale when the cutover flips to dsql.
+ * The WS-3 dispatch-plane cutover, bindings half: a workspace binding IS a
+ * registry-server profile row — `(tenant, targetKind "interface", targetId,
+ * name)` with the default instance stored under the package's reserved name
+ * `"default"` and `sql:analytics` under `"analytics"`. `.services/bindings.json`
+ * is a tombstone: read once, imported into profiles, deleted.
  */
 const DEFAULT_PROFILE_NAME = "default";
-
-function usesLegacyBindingsFile(): boolean {
-  return storeBackend() === "dynamo";
-}
 
 function splitInstance(instance: string): { interfaceId: string; name: string } {
   // Legacy colon keys from pre-migration bindings may still appear during
@@ -396,7 +388,6 @@ async function writeProfileBinding(
 export async function readBindings(
   workspaceId: string,
 ): Promise<Record<string, InterfaceBinding>> {
-  if (usesLegacyBindingsFile()) return readLegacyBindingsFile(workspaceId);
   return readProfileBindings(workspaceId);
 }
 
@@ -435,23 +426,7 @@ export async function writeBinding(
   binding: InterfaceBinding | null,
   updatedBy = "workspace",
 ): Promise<void> {
-  if (!usesLegacyBindingsFile()) {
-    await writeProfileBinding(workspaceId, instance, binding, updatedBy);
-    return;
-  }
-  // Interim dynamo backend: the legacy file, exactly as before the cutover.
-  const bindings = await readLegacyBindingsFile(workspaceId);
-  if (binding) {
-    bindings[instance] = binding;
-  } else {
-    delete bindings[instance];
-  }
-  await getFsStore().write(
-    workspaceId,
-    BINDINGS_PATH,
-    JSON.stringify({ bindings }, null, 2),
-    "application/json",
-  );
+  await writeProfileBinding(workspaceId, instance, binding, updatedBy);
 }
 
 export interface ResolvedInterface {

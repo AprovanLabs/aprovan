@@ -99,12 +99,8 @@ export async function startWorkspace(
   const cron = config.cron.enabled ? startCronScheduler() : undefined;
 
   // Warm the embedded registry server so first tool dispatch does not pay boot.
-  // The interim dynamo backend has no registry-server storage driver (WS-3 D8).
-  const { storeBackend } = await import("./runtime/config.js");
-  if (storeBackend() !== "dynamo") {
-    const { getRegistryServer } = await import("./registry-embed.js");
-    await getRegistryServer();
-  }
+  const { getRegistryServer } = await import("./registry-embed.js");
+  await getRegistryServer();
 
   let stopping: Promise<void> | undefined;
   const stop = (): Promise<void> => {

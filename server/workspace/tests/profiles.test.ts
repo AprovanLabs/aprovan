@@ -6,7 +6,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
 import { CredentialService } from "@aprovan/registry-server";
 import { resetIdentityStore } from "../src/identity/store.js";
@@ -18,26 +18,6 @@ import {
 import { getRegistryStorage, resetRegistryStorage } from "../src/registry-storage.js";
 import { setCurrentWorkspace } from "../src/sessions.js";
 import { setActiveWorkspaceId } from "../src/users.js";
-import { setupAuth } from "./helpers.js";
-
-const mockDdbSend = vi.fn();
-
-vi.mock("@aws-sdk/lib-dynamodb", () => ({
-  DynamoDBDocumentClient: {
-    from: vi.fn(() => ({ send: mockDdbSend })),
-  },
-  QueryCommand: vi.fn((input: unknown) => ({ input })),
-  PutCommand: vi.fn((input: unknown) => ({ input })),
-  GetCommand: vi.fn((input: unknown) => ({ input })),
-  UpdateCommand: vi.fn((input: unknown) => ({ input })),
-  TransactWriteCommand: vi.fn((input: unknown) => ({ input })),
-  BatchGetCommand: vi.fn((input: unknown) => ({ input })),
-  DeleteCommand: vi.fn((input: unknown) => ({ input })),
-}));
-
-vi.mock("@aws-sdk/client-dynamodb", () => ({
-  DynamoDBClient: vi.fn(() => ({})),
-}));
 
 let dataDir: string;
 
@@ -206,43 +186,5 @@ describe("members read, only admins write", () => {
     const names = ((await after.json()) as { profiles: ProfileWire[] }).profiles.map((p) => p.name);
     expect(names).not.toContain("sneaky");
     expect(names.length).toBe(beforeCount);
-  });
-});
-
-describe("profiles on dynamo backend", () => {
-  const MEMBER_TOKEN = "profiles-dynamo-member";
-
-  beforeEach(() => {
-    process.env["STORE_BACKEND"] = "dynamo";
-    process.env["OIDC_ISSUER"] =
-      "https://cognito-idp.us-east-2.amazonaws.com/us-east-2_profiles501";
-    process.env["OIDCAUDIENCE"] = "profiles-501-client";
-    resetIdentityStore();
-    resetRegistryStorage();
-    setupAuth({
-      mockDdbSend,
-      defaultWorkspaceId: "ws-a",
-      users: [
-        { sub: "plain-member", token: MEMBER_TOKEN, role: "member", workspaceId: "ws-a" },
-        { sub: "admin-user", token: "profiles-dynamo-admin", role: "admin", workspaceId: "ws-a" },
-      ],
-    });
-  });
-
-  afterEach(async () => {
-    delete process.env["STORE_BACKEND"];
-    delete process.env["OIDC_ISSUER"];
-    delete process.env["OIDCAUDIENCE"];
-    resetIdentityStore();
-    resetCognitoVerifier();
-    await resetRegistryStorage();
-  });
-
-  it("GET /profiles succeeds with an empty list on dynamo", async () => {
-    const res = await req("/profiles", {
-      headers: { Authorization: `Bearer ${MEMBER_TOKEN}` },
-    });
-    expect(res.status).toBe(200);
-    expect(((await res.json()) as { profiles: unknown[] }).profiles).toEqual([]);
   });
 });

@@ -20,15 +20,17 @@ import type Database from "better-sqlite3";
  * and reads default to the newest, so history is free and writes are
  * idempotent. Prefix listing doubles as readdir.
  *
- * Two backends behind {@link IFsStore} (selected by `WORKSPACE_MODE` via
+ * Two backends behind {@link IFsStore} (selected by `storeBackend()` via
  * runtime/config.ts, same switch as the credential/audit/record stores):
  *
  * - **SQLite** (local mode): one table in the workspace db.
- * - **S3 + DynamoDB** (aws mode, or local compose with MinIO/dynamodb-local):
- *   content-addressed blobs in S3 (`blobs/<workspace>/<hash>`), pointer +
- *   version index items in the `FsFiles` table. Large/binary uploads go
+ * - **DSQL + S3** (aws mode): metadata in Aurora DSQL, content-addressed
+ *   blobs in S3 (`blobs/<workspace>/<hash>`). Large/binary uploads go
  *   straight to S3 via presigned PUT (`createUpload`) and are registered
  *   with `completeUpload`.
+ *
+ * `FsStoreS3` (Dynamo index + S3 blobs) remains for snapshot/cutover tooling
+ * and is not wired into {@link getFsStore}.
  */
 
 const loadSqlite = (): typeof import("better-sqlite3") => {
@@ -962,8 +964,6 @@ export function getFsStore(): IFsStore {
     switch (storeBackend()) {
       case "dsql":
         return new FsStoreDsql();
-      case "dynamo":
-        return new FsStoreS3();
       case "sqlite":
         return new FsStoreSqlite();
     }

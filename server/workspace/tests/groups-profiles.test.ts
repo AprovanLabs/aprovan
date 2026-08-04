@@ -14,31 +14,12 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/app.js";
 import { mayInvokeTool } from "../src/authorize.js";
-import { resetIdentityStore } from "../src/identity/store.js";
-import { resetCognitoVerifier } from "../src/middleware/auth.js";
+import { getIdentityStore, resetIdentityStore } from "../src/identity/store.js";
+import { putMembership } from "../src/memberships.js";
+import { resetCognitoVerifier, setCognitoVerifier } from "../src/middleware/auth.js";
 import { getRegistryStorage, resetRegistryStorage } from "../src/registry-storage.js";
-import { setupAuth } from "./helpers.js";
-
-// The DDB document-client mock is only exercised by the final requireAdmin
-// suite (which pins STORE_BACKEND=dynamo); the sqlite-backed tests above it
-// never touch these modules.
-const mockDdbSend = vi.fn();
-
-vi.mock("@aws-sdk/lib-dynamodb", () => ({
-  DynamoDBDocumentClient: {
-    from: vi.fn(() => ({ send: mockDdbSend })),
-  },
-  QueryCommand: vi.fn((input: unknown) => ({ input })),
-  PutCommand: vi.fn((input: unknown) => ({ input })),
-  GetCommand: vi.fn((input: unknown) => ({ input })),
-  UpdateCommand: vi.fn((input: unknown) => ({ input })),
-  TransactWriteCommand: vi.fn((input: unknown) => ({ input })),
-  BatchGetCommand: vi.fn((input: unknown) => ({ input })),
-}));
-
-vi.mock("@aws-sdk/client-dynamodb", () => ({
-  DynamoDBClient: vi.fn(() => ({})),
-}));
+import { setCurrentWorkspace } from "../src/sessions.js";
+import { setActiveWorkspaceId } from "../src/users.js";
 
 let dataDir: string;
 
@@ -221,27 +202,32 @@ describe("tool authorization through the profile join", () => {
 });
 
 // ---------------------------------------------------------------------------
-// requireAdmin gate — exercised through the Cognito-mocked auth stack on the
-// interim dynamo identity backend (the 403 fires before any storage access).
+// requireAdmin gate — Cognito member cannot mutate group profiles.
 // ---------------------------------------------------------------------------
 
 describe("profile admin routes are admin-only", () => {
   const MEMBER_TOKEN = "member-token";
+  const WS = "ws-a";
 
-  it("answers 403 for group profile mutations; member GET /profiles works on dynamo", async () => {
-    process.env["STORE_BACKEND"] = "dynamo";
+  it("answers 403 for group profile mutations; member GET /profiles works", async () => {
     process.env["OIDC_ISSUER"] = "https://cognito-idp.us-east-2.amazonaws.com/us-east-2_gp";
     process.env["OIDCAUDIENCE"] = "gp-test-client";
     resetIdentityStore();
-    setupAuth({
-      mockDdbSend,
-      defaultWorkspaceId: "ws-a",
-      users: [{ sub: "plain-member", token: MEMBER_TOKEN, role: "member", workspaceId: "ws-a" }],
+    setCognitoVerifier({
+      async verify(token: string) {
+        if (token === MEMBER_TOKEN) return { sub: "plain-member" };
+        throw new Error("invalid_token");
+      },
+      async hydrate() {},
     });
+    await getIdentityStore().workspaces.put({ workspaceId: WS, name: "A" });
+    await putMembership({ workspaceId: WS, userId: "plain-member", role: "member" });
+    await setCurrentWorkspace("plain-member", WS);
+    await setActiveWorkspaceId("plain-member", WS);
     try {
       for (const [path, init] of [
-        ["/groups/some-group/profiles", {}],
-        ["/groups/some-group/profiles", { method: "POST", body: JSON.stringify({ profile: "x" }) }],
+        [`/groups/some-group/profiles`, {}],
+        [`/groups/some-group/profiles`, { method: "POST", body: JSON.stringify({ profile: "x" }) }],
       ] as const) {
         const res = await createApp().request(path, {
           headers: {
@@ -253,7 +239,6 @@ describe("profile admin routes are admin-only", () => {
         expect(res.status).toBe(403);
       }
 
-      // GET /profiles is member-readable but gated by the relational backend.
       const profiles = await createApp().request("/profiles", {
         headers: {
           "Content-Type": "application/json",
@@ -262,7 +247,6 @@ describe("profile admin routes are admin-only", () => {
       });
       expect(profiles.status).toBe(200);
     } finally {
-      delete process.env["STORE_BACKEND"];
       delete process.env["OIDC_ISSUER"];
       delete process.env["OIDCAUDIENCE"];
       resetIdentityStore();

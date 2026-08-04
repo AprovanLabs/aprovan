@@ -210,16 +210,16 @@ export function isAwsMode(): boolean {
 // Store backend — the three-way switch (tech-plan §6, specs/fs-metadata-store)
 // ---------------------------------------------------------------------------
 
-export type StoreBackend = "sqlite" | "dynamo" | "dsql";
+export type StoreBackend = "sqlite" | "dsql";
 
 /**
  * Which backend the five store factories use (`fs-store`, `records`,
  * `credentials`, `audit`, `identity`). Replaces `isAwsMode()` at those
  * factories:
  *
- *   STORE_BACKEND = "sqlite" | "dynamo" | "dsql"
+ *   STORE_BACKEND = "sqlite" | "dsql"
  *     default: sqlite when WORKSPACE_MODE=local; dsql when aws.
- *     dynamo remains for rollback / pre-cutover mirrors only.
+ *     Dynamo was retired after the DSQL cutover — `STORE_BACKEND=dynamo` throws.
  *
  * Lazy module loading is preserved per backend: sqlite loads no AWS SDK and
  * no `pg`; dsql loads `pg` (and the DSQL signer) only. `dsql` still rides S3
@@ -232,6 +232,9 @@ export type StoreBackend = "sqlite" | "dynamo" | "dsql";
 export function storeBackend(): StoreBackend {
   const raw = process.env["STORE_BACKEND"]?.trim().toLowerCase();
   if (!raw) return isAwsMode() ? "dsql" : "sqlite";
-  if (raw === "sqlite" || raw === "dynamo" || raw === "dsql") return raw;
-  throw new Error(`STORE_BACKEND must be "sqlite", "dynamo", or "dsql" (got "${raw}")`);
+  if (raw === "dynamo") {
+    throw new Error("Dynamo store backend retired after DSQL cutover");
+  }
+  if (raw === "sqlite" || raw === "dsql") return raw;
+  throw new Error(`STORE_BACKEND must be "sqlite" or "dsql" (got "${raw}")`);
 }

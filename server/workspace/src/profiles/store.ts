@@ -17,7 +17,6 @@
 import { getRegistryStorage } from "../registry-storage.js";
 import { isInterface } from "../interfaces.js";
 import { ServiceError } from "../service-kernel.js";
-import { storeBackend } from "../runtime/config.js";
 import {
   DEFAULT_PROFILE_NAME,
   type ProfileOptions,
@@ -256,5 +255,5 @@ export async function listProfileNames(
 
 /** Whether the durable backends (sqlite/dsql) are available for profile storage. */
 export function profilesAvailable(): boolean {
-  return storeBackend() !== "dynamo";
+  return true;
 }
