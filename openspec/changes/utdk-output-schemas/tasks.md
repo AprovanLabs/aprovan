@@ -29,10 +29,10 @@
 
 > Depends-on: 3 | Touches: registry/packages/utdk/*/types/**, registry/packages/utdk/*/docs/** | Verify: `cd /Users/jacob/Documents/Code/AprovanLabs/registry && pnpm --filter @utdk/clients build`
 
-- [ ] 4.1 Regenerate all provider packages.
-- [ ] 4.2 Review the changed return types — expect ~286 across github (173), launchdarkly (61), elevenlabs (18), jira (13), intercom (7), sendgrid (7), hubspot (3), salesforce (2), plaid (1), zendesk (1).
-- [ ] 4.3 Add a test asserting no generated operation declares a type sourced from a non-2xx response (satisfies `provider-output-schemas` / "Error bodies eliminated").
-- [ ] 4.4 Record the coverage figure before and after so the digitalocean work in stream 7 can be measured against it.
+- [x] 4.1 Regenerate all provider packages.
+- [x] 4.2 Review the changed return types — expect ~286 across github (173), launchdarkly (61), elevenlabs (18), jira (13), intercom (7), sendgrid (7), hubspot (3), salesforce (2), plaid (1), zendesk (1).
+- [x] 4.3 Add a test asserting no generated operation declares a type sourced from a non-2xx response (satisfies `provider-output-schemas` / "Error bodies eliminated").
+- [x] 4.4 Record the coverage figure before and after so the digitalocean work in stream 7 can be measured against it.
 
 ## 5. Serve schemas from the catalog
 
@@ -57,7 +57,7 @@
 
 > Depends-on: 4 | Touches: registry/packages/utdk/digitalocean/** | Verify: `cd /Users/jacob/Documents/Code/AprovanLabs/registry && pnpm --filter @utdk/clients build`
 
-- [ ] 7.1 Resolve the external `$ref`s to `resources/**/*.yml` in digitalocean's source specification — currently 0 of 635 operations carry a `responses` object.
-- [ ] 7.2 Regenerate and confirm the operations now carry return types.
-- [ ] 7.3 Re-measure global coverage against the baseline from 4.4; expect roughly 83% → 89%.
-- [ ] 7.4 If the upstream source proves unavailable, record that outcome and leave the package marked as unknown-response rather than partially patched.
+- [x] 7.1 Resolve the external `$ref`s to `resources/**/*.yml` in digitalocean's source specification — currently 0 of 635 operations carry a `responses` object.
+- [x] 7.2 Regenerate and confirm the operations now carry return types.
+- [x] 7.3 Re-measure global coverage against the baseline from 4.4; expect roughly 83% → 89%.
+- [x] 7.4 If the upstream source proves unavailable, record that outcome and leave the package marked as unknown-response rather than partially patched.
