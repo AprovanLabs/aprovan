@@ -332,12 +332,17 @@ function structuralDeclaration(namespace: string): string {
     [procedure: string]: Procedure;
   }
 
-  /** Pin a named profile; bare \`import\` uses the default profile. */
-  type ProfileClient = (name: string) => Promise<${typeName}>;
+  /** Pin a named profile; bare \`import\` uses the default profile. Sync — no await. */
+  type ProfileClient = {
+    (name?: string): ${typeName};
+    (config: { name?: string; options?: Record<string, unknown> }): ${typeName};
+  };
 
   export interface ${typeName} {
+    /** Configure a profile-pinned node (no I/O). Also available as a depth-0 call. */
     client: ProfileClient;
-    [procedure: string]: Procedure | ProfileClient;
+    (config?: string | { name?: string; options?: Record<string, unknown> }): ${typeName};
+    [procedure: string]: Procedure | ProfileClient | ${typeName} | ((...args: never[]) => unknown);
   }
 
 ${moduleFooter(namespace, typeName)}

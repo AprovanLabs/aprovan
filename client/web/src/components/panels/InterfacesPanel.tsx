@@ -2,20 +2,15 @@
  * InterfacesPanel — native surface over the gateway `interfaces` namespace.
  *
  * An interface is one tool contract (`sql.query`, `llm.createChatCompletion`)
- * with several implementations; a *binding* picks which one, and a named
- * profile lets a workspace have more than one at a time — `sql` for
- * production, `sql:analytics` for the warehouse, each with its own
- * credential. That is the whole model, and until now it had no UI at all:
- * `interfaces.bind` was reachable only as a chat tool call, so "swap this
- * workspace's SQL backend" was something you had to know to ask for.
+ * with several implementations; a *profile* picks which one. Named profiles
+ * (`profiles.set { namespace: "sql", name: "analytics", … }`) let a workspace
+ * hold more than one at a time — production and warehouse — each with its
+ * own credential. Configure via `profiles.set` / `profiles.remove`; discover
+ * via `interfaces.list`.
  *
- * The panel is one list over one call (`interfaces.list`): each interface as
- * a card — what it is for, which provider answers today, which providers
- * exist (connected, built-in, or declared-but-not-ready) — with its named
- * profiles nested beneath. Editing is inline: pick a provider, pick a
- * credential when the workspace holds more than one for it, set the options
- * that ride the binding (model/tier for llm, host/database for sql,
- * image/region for sandbox, API root for vcs).
+ * The panel is one list over `interfaces.list`: each interface as a card with
+ * its named profiles nested beneath. Editing is inline: pick a provider,
+ * pick a credential, set options (model/tier for llm, host for sql, …).
  */
 
 import { Loader2, Plug, Plus, type LucideIcon } from "lucide-react";
@@ -46,22 +41,21 @@ interface InterfaceCompat {
   unavailable?: string;
 }
 
+interface InterfaceProfile {
+  name: string | null;
+  provider: string | null;
+  credentialId: string | null;
+  options: Record<string, unknown>;
+  connected: boolean;
+}
+
 interface InterfaceDef {
   id: string;
   label: string;
   description: string;
-  binding: { provider: string; credentialId?: string; options?: Record<string, unknown> } | null;
+  binding: { provider: string | null; credentialId?: string | null; options?: Record<string, unknown> } | null;
   compat: InterfaceCompat[];
-}
-
-interface InterfaceInstance {
-  namespace: string;
-  interface: string;
-  name: string | null;
-  provider: string;
-  credentialId: string | null;
-  options: Record<string, unknown>;
-  connected: boolean;
+  profiles?: InterfaceProfile[];
 }
 
 interface CredentialSummary {
@@ -72,11 +66,11 @@ interface CredentialSummary {
 
 interface InterfacesListing {
   interfaces: InterfaceDef[];
-  instances: InterfaceInstance[];
   credentials: CredentialSummary[];
 }
 
 const invokeInterfaces = invokeNamespaceTool("interfaces");
+const invokeProfiles = invokeNamespaceTool("profiles");
 
 interface OptionField {
   key: string;
@@ -404,17 +398,20 @@ function InterfaceCard({
   const activeLabel = active?.label ?? def.binding?.provider;
   const pinned = credentials.find((entry) => entry.id === def.binding?.credentialId);
 
-  const run = (operation: string, args: Record<string, unknown>) => {
+  const runProfile = (
+    operation: "set" | "remove",
+    args: Record<string, unknown>,
+  ) => {
     setBusy(true);
     setActionError(null);
-    invokeInterfaces(operation, args)
+    invokeProfiles(operation, args)
       .then(() => {
         setEditing(false);
         setAdding(false);
         setInstanceName("");
         onChanged();
       })
-      .catch(() => setActionError("Couldn't update this interface. Retry, or check your connection."))
+      .catch(() => setActionError("Couldn't update this profile. Retry, or check your connection."))
       .finally(() => setBusy(false));
   };
 
@@ -462,12 +459,12 @@ function InterfaceCard({
           interfaceId={def.id}
           compat={def.compat}
           credentials={credentials}
-          provider={def.binding?.provider ?? active?.provider ?? def.compat[0]?.provider ?? ""}
+          provider={(def.binding?.provider ?? active?.provider ?? def.compat[0]?.provider) || ""}
           credentialId={def.binding?.credentialId ?? null}
           options={def.binding?.options ?? {}}
           saving={busy}
           onCancel={() => setEditing(false)}
-          onSave={(next) => run("bind", { interface: def.id, ...next })}
+          onSave={(next) => runProfile("set", { namespace: def.id, provider: next.provider, credential: next.credential ?? undefined, options: next.options })}
         />
       ) : adding ? (
         <div className="mt-2 space-y-2 border-t pt-2">
@@ -479,7 +476,7 @@ function InterfaceCard({
           />
           {instanceName.trim() && (
             <p className="font-mono text-[11px] text-muted-foreground">
-              → {def.id}:{instanceName.trim()}
+              profile: {JSON.stringify(instanceName.trim())}
             </p>
           )}
           <BindingForm
@@ -496,7 +493,13 @@ function InterfaceCard({
             }}
             onSave={(next) =>
               instanceName.trim()
-                ? run("bind", { interface: def.id, as: instanceName.trim(), ...next })
+                ? runProfile("set", {
+                    namespace: def.id,
+                    name: instanceName.trim(),
+                    provider: next.provider,
+                    credential: next.credential ?? undefined,
+                    options: next.options,
+                  })
                 : setActionError("Name the profile first")
             }
           />
@@ -530,7 +533,7 @@ function InterfaceCard({
               <ArmedButton
                 label="Clear"
                 armedLabel="Confirm clear?"
-                onConfirm={() => run("unbind", { interface: def.id })}
+                onConfirm={() => runProfile("remove", { namespace: def.id })}
               />
             )}
           </div>
@@ -540,13 +543,15 @@ function InterfaceCard({
   );
 }
 
-function InstanceRow({
-  instance,
+function ProfileRow({
+  interfaceId,
+  profile,
   def,
   credentials,
   onChanged,
 }: {
-  instance: InterfaceInstance;
+  interfaceId: string;
+  profile: InterfaceProfile;
   def: InterfaceDef | undefined;
   credentials: CredentialSummary[];
   onChanged: () => void;
@@ -554,13 +559,13 @@ function InstanceRow({
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
-  const credential = credentials.find((entry) => entry.id === instance.credentialId);
-  const compat = def?.compat.find((entry) => entry.provider === instance.provider);
+  const credential = credentials.find((entry) => entry.id === profile.credentialId);
+  const compat = def?.compat.find((entry) => entry.provider === (profile.provider ?? ""));
 
-  const run = (operation: string, args: Record<string, unknown>) => {
+  const runProfile = (operation: "set" | "remove", args: Record<string, unknown>) => {
     setBusy(true);
     setActionError(null);
-    invokeInterfaces(operation, args)
+    invokeProfiles(operation, args)
       .then(() => {
         setEditing(false);
         onChanged();
@@ -572,18 +577,18 @@ function InstanceRow({
   return (
     <div className="rounded-md border bg-card p-3 text-sm">
       <div className="flex flex-wrap items-center gap-1.5">
-        <code className="font-mono font-semibold">{instance.namespace}</code>
+        <code className="font-mono font-semibold">{profile.name}</code>
         <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
-          → {compat?.label ?? instance.provider}
+          → {compat?.label ?? profile.provider}
         </Badge>
         <span
           className={`h-1.5 w-1.5 rounded-full ${
-            instance.connected || compat?.credentialless ? "bg-emerald-500" : "bg-amber-500"
+            profile.connected || compat?.credentialless ? "bg-emerald-500" : "bg-amber-500"
           }`}
           title={
             compat?.credentialless
               ? "built in — needs no credential"
-              : instance.connected
+              : profile.connected
                 ? "credential present"
                 : "no credential for this provider"
           }
@@ -597,25 +602,31 @@ function InstanceRow({
           </span>
         )}
       </div>
-      {summarize(instance.options) && (
+      {summarize(profile.options) && (
         <p className="mt-1 font-mono text-[11px] text-muted-foreground">
-          {summarize(instance.options)}
+          {summarize(profile.options)}
         </p>
       )}
       {actionError && <div className="mt-1 text-xs text-destructive">{actionError}</div>}
 
       {editing && def ? (
         <BindingForm
-          interfaceId={instance.interface}
+          interfaceId={interfaceId}
           compat={def.compat}
           credentials={credentials}
-          provider={instance.provider}
-          credentialId={instance.credentialId}
-          options={instance.options}
+          provider={profile.provider ?? ""}
+          credentialId={profile.credentialId}
+          options={profile.options}
           saving={busy}
           onCancel={() => setEditing(false)}
           onSave={(next) =>
-            run("bind", { interface: instance.interface, as: instance.name, ...next })
+            runProfile("set", {
+              namespace: interfaceId,
+              name: profile.name ?? undefined,
+              provider: next.provider,
+              credential: next.credential ?? undefined,
+              options: next.options,
+            })
           }
         />
       ) : (
@@ -634,7 +645,10 @@ function InstanceRow({
               label="Remove"
               armedLabel="Confirm remove?"
               onConfirm={() =>
-                run("unbind", { interface: instance.interface, as: instance.name })
+                runProfile("remove", {
+                  namespace: interfaceId,
+                  name: profile.name ?? undefined,
+                })
               }
             />
           )}
@@ -679,14 +693,6 @@ export function InterfacesPanel({
     return all.filter((def) => filterIds.has(def.id));
   }, [data?.interfaces, filterIds]);
   const credentials = data?.credentials ?? [];
-  const named = useMemo(() => {
-    const instances = (data?.instances ?? []).filter((instance) => instance.name);
-    if (!filterIds) return instances;
-    return instances.filter((instance) => filterIds.has(instance.interface));
-  }, [data?.instances, filterIds]);
-  const orphans = named.filter(
-    (instance) => !interfaces.some((def) => def.id === instance.interface),
-  );
 
   return (
     <PanelShell
@@ -709,16 +715,17 @@ export function InterfacesPanel({
       ) : (
         <div className="flex flex-col gap-3 p-3">
           {interfaces.map((def) => {
-            const profiles = named.filter((instance) => instance.interface === def.id);
+            const named = (def.profiles ?? []).filter((profile) => profile.name);
             return (
               <div key={def.id} className="flex flex-col gap-1.5">
                 <InterfaceCard def={def} credentials={credentials} onChanged={refresh} />
-                {profiles.length > 0 && (
+                {named.length > 0 && (
                   <div className="ml-3 flex flex-col gap-1.5">
-                    {profiles.map((instance) => (
-                      <InstanceRow
-                        key={instance.namespace}
-                        instance={instance}
+                    {named.map((profile) => (
+                      <ProfileRow
+                        key={profile.name ?? "default"}
+                        interfaceId={def.id}
+                        profile={profile}
                         def={def}
                         credentials={credentials}
                         onChanged={refresh}
@@ -729,15 +736,6 @@ export function InterfacesPanel({
               </div>
             );
           })}
-          {orphans.map((instance) => (
-            <InstanceRow
-              key={instance.namespace}
-              instance={instance}
-              def={undefined}
-              credentials={credentials}
-              onChanged={refresh}
-            />
-          ))}
         </div>
       )}
     </PanelShell>

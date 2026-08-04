@@ -30,6 +30,7 @@ export {
 export type {
   AssembleToolsOptions,
   NamespaceNode,
+  ToolsCallPin,
   ToolsTransport,
 } from "./assemble-tools.js";
 export {

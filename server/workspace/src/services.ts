@@ -30,6 +30,7 @@ import {
 } from "./apps/store.js";
 import { getFsStore, isServicePath, listAll, normalizeFsPath } from "./fs-store.js";
 import { interfacesService } from "./interfaces-service.js";
+import { profilesService } from "./profiles-service.js";
 import {
   commitTree,
   diffSnapshots,
@@ -40,12 +41,10 @@ import {
   restoreCommit,
 } from "./vcs/store.js";
 import {
-  addMount,
   assertNotMounted,
   mountEntries,
   mountRead,
   readMounts,
-  removeMount,
 } from "./vcs/mounts.js";
 import { getRecordStore } from "./records.js";
 import { assertCallerScope, parseSeqKey, seqKey, svcScope } from "./svc-records.js";
@@ -811,29 +810,17 @@ const vfs: CoreService = {
       }
       case "mount": {
         requireWorkspaceCaller(ctx);
-        if (typeof args["prefix"] !== "string" || typeof args["type"] !== "string") {
-          throw new ServiceError("prefix and type are required", 400);
-        }
-        const config =
-          args["config"] && typeof args["config"] === "object"
-            ? (args["config"] as Record<string, unknown>)
-            : {};
-        const mount = await addMount(ctx.workspaceId, ctx.userId, {
-          prefix: args["prefix"],
-          type: args["type"],
-          config,
-          mode: typeof args["mode"] === "string" ? args["mode"] : undefined,
-        });
-        return { mount };
+        throw new ServiceError(
+          "vcs.mount is removed — create a path-keyed profile with profiles.set { path, provider, options }",
+          400,
+        );
       }
       case "unmount": {
         requireWorkspaceCaller(ctx);
-        if (typeof args["prefix"] !== "string" || !args["prefix"]) {
-          throw new ServiceError("prefix is required", 400);
-        }
-        const removed = await removeMount(ctx.workspaceId, args["prefix"]);
-        if (!removed) throw new ServiceError(`No mount at ${args["prefix"]}`, 404);
-        return { removed: args["prefix"] };
+        throw new ServiceError(
+          "vcs.unmount is removed — remove the path-keyed profile with profiles.remove { path }",
+          400,
+        );
       }
       case "restore": {
         requireWorkspaceCaller(ctx);
@@ -1089,6 +1076,7 @@ export const CORE_SERVICES: Record<CoreServiceName, CoreService> = {
   apps: appsService,
   webhooks: webhooksService,
   interfaces: interfacesService,
+  profiles: profilesService,
   sync: syncService,
   sessions: sessionsService,
   notifications: notificationsService,

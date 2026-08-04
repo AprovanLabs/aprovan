@@ -3,7 +3,7 @@
  */
 
 import { getCredentialStore } from "../credentials.js";
-import { listInstances, listInterfaces } from "../interfaces.js";
+import { listInterfaces } from "../interfaces.js";
 import { CORE_SERVICE_NAMES } from "../service-kernel.js";
 
 let utdkProvidersPromise: Promise<Set<string>> | undefined;
@@ -31,6 +31,7 @@ function utdkProviderNames(): Promise<Set<string>> {
 
 /**
  * Build the namespace list installed on `globalThis.tools` for a workflow run.
+ * Named profiles travel in the request body — only bare interface ids appear.
  */
 export async function buildWorkflowNamespaceSet(
   workspaceId: string,
@@ -38,11 +39,6 @@ export async function buildWorkflowNamespaceSet(
 ): Promise<string[]> {
   const namespaces = new Set<string>(CORE_SERVICE_NAMES);
   for (const def of listInterfaces()) namespaces.add(def.id);
-  try {
-    for (const instance of await listInstances(workspaceId)) namespaces.add(instance.instance);
-  } catch {
-    // A malformed bindings file must not take the whole run down.
-  }
   const registryProviders = await utdkProviderNames();
   if (scriptContent) {
     for (const match of scriptContent.matchAll(/tools\.([A-Za-z_$][\w$]*)/gu)) {

@@ -29,17 +29,20 @@ import { isTerminalStatus, POLL_INTERVAL_MS } from "./types";
 import { mergeExecutionRows } from "./utils";
 
 interface InterfacesListing {
-  interfaces: Array<{ id: string }>;
-  instances: Array<{ namespace: string; interface: string; name: string | null }>;
+  interfaces: Array<{
+    id: string;
+    profiles?: Array<{ name: string | null }>;
+  }>;
 }
 
 function llmBindingIds(listing: InterfacesListing): string[] {
-  const fromInstances = listing.instances
-    .filter((instance) => instance.interface === "llm")
-    .map((instance) => instance.namespace);
-  const hasDefault = listing.interfaces.some((def) => def.id === "llm");
-  const ids = hasDefault ? ["llm", ...fromInstances] : fromInstances;
-  return [...new Set(ids.filter(Boolean))];
+  const llm = listing.interfaces.find((def) => def.id === "llm");
+  if (!llm) return [];
+  const named = (llm.profiles ?? [])
+    .map((profile) => profile.name)
+    .filter((name): name is string => typeof name === "string" && name.length > 0)
+    .map((name) => `llm:${name}`);
+  return ["llm", ...named];
 }
 
 export function AgentsPanel({ scope }: NativePanelProps) {

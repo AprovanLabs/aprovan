@@ -142,13 +142,8 @@ const FALLBACK_INTERFACES = new Set(["llm", "sql", "sandbox", "agent", "vcs"]);
  */
 const NATIVE_INTERFACE_IDS = new Set(["agent", "vcs", "llm"]);
 
-function interfaceBaseId(namespace: string): string {
-  const separator = namespace.indexOf(":");
-  return separator === -1 ? namespace : namespace.slice(0, separator);
-}
-
 function isNativeInterface(namespace: string): boolean {
-  return NATIVE_INTERFACE_IDS.has(interfaceBaseId(namespace));
+  return NATIVE_INTERFACE_IDS.has(namespace);
 }
 
 /**
@@ -187,9 +182,9 @@ export function groupNamespaces(
   return { core, interfaces: interfaces.sort(), providers: providers.sort() };
 }
 
-/** `sql` and `sql:analytics` are both the `sql` interface. */
+/** A namespace is always a bare name — no colon-addressed instances. */
 function isFallbackInterface(namespace: string): boolean {
-  return FALLBACK_INTERFACES.has(interfaceBaseId(namespace));
+  return FALLBACK_INTERFACES.has(namespace);
 }
 
 /**
@@ -203,8 +198,7 @@ export function namespaceLabel(
   info: NamespaceInfo | undefined,
 ): { label: string; description: string } {
   if (info) return { label: info.label, description: info.description };
-  const head = namespace.split(":")[0] ?? namespace;
-  return { label: head.charAt(0).toUpperCase() + head.slice(1), description: "" };
+  return { label: namespace.charAt(0).toUpperCase() + namespace.slice(1), description: "" };
 }
 
 /** Compact profile summary for services-menu subtitles when discovery lists them. */

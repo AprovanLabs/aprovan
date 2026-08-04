@@ -1,5 +1,19 @@
 import type { Draft } from "./types";
 
+function parseLlmPin(raw: string): { interface: string; profile?: string } | undefined {
+  const trimmed = raw.trim();
+  if (!trimmed) return undefined;
+  const sep = trimmed.indexOf(":");
+  if (sep !== -1) {
+    const interfaceId = trimmed.slice(0, sep) || "llm";
+    const profile = trimmed.slice(sep + 1);
+    return profile ? { interface: interfaceId, profile } : { interface: interfaceId };
+  }
+  if (trimmed === "llm") return { interface: "llm" };
+  return { interface: "llm", profile: trimmed };
+}
+
+
 /**
  * Normalize an editor draft into the create/update payload for the `agents`
  * namespace. On update, emptied collections clear with `null` (not `undefined`)
@@ -49,8 +63,12 @@ export function buildSavePayload(
   return {
     name: draft.name.trim(),
     title: draft.title.trim() || undefined,
-    llm: draft.llm.trim() || undefined,
-    llmCandidates: candidates.length ? candidates : editing ? null : undefined,
+    llm: parseLlmPin(draft.llm),
+    llmCandidates: candidates.length
+      ? candidates.map((c) => parseLlmPin(c)!).filter(Boolean)
+      : editing
+        ? null
+        : undefined,
     policy,
     provider: draft.provider.trim() || undefined,
     model: draft.model.trim() || undefined,

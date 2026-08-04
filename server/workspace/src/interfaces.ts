@@ -1,41 +1,19 @@
 /**
- * Generic interfaces — virtual tool namespaces a workspace binds to a
- * concrete provider + credential.
- *
  * Many APIs implement a subset of another (OpenAI-compatible LLM servers,
  * S3-compatible object stores). An *interface* names that common surface
  * (`llm`, `objectstore`, …); *compat entries* list which registry providers
  * implement it and how to reach them (executor module + base URL + option
- * defaults); a *workspace binding* (`.services/bindings.json`) picks the
- * implementation. Callers use one stable namespace —
+ * defaults); a *workspace profile* picks the implementation. Callers use one
+ * stable namespace —
  *
- *   await llm.createChatCompletion({ messages });
+ *   await tools.llm.createChatCompletion({ messages });
  *
- * — and swapping OpenAI for Anthropic (or Synthetic) is a binding change,
- * not a code change. Credentials stay keyed by the concrete provider id, so
- * the registry credentials page and the gateway credential store line up.
+ * — and swapping OpenAI for Anthropic (or Synthetic) is a profile change,
+ * not a code change. Credentials stay keyed by the concrete provider id.
  *
- * Zero-config: with no explicit binding, an interface resolves to the first
- * compat provider that has a workspace credential.
- *
- * ## Instances
- *
- * One binding per interface is enough to answer "which LLM does this
- * workspace use", and not enough for anything else: a workspace with a
- * production database and an analytics warehouse needs *both* bound to `sql`
- * at once, and two accounts on one provider need two credentials. So a
- * binding is keyed by an **instance name**, not by the interface id:
- *
- *   sql              → the default instance (what `sql.query` reaches)
- *   sql:analytics    → a second, independently bound implementation
- *   sql:warehouse    → a third
- *
- * Each instance is (interface, provider, credential, options), and each is a
- * namespace of its own — `sql:analytics.query` appears in tool discovery, in
- * the services menu, and as a workflow script import next to `sql.query`. The
- * bare interface id is reserved as the default instance, which is why the
- * pre-instance bindings file (keyed by interface id, with no `interface`
- * field) reads correctly as-is: it was always describing the default.
+ * Named configurations use the unified profile store (`profiles.set` with a
+ * `name`); the profile travels in the request body, never as a colon-
+ * addressed namespace on the wire.
  */
 
 import { createRequire } from "node:module";
@@ -139,36 +117,20 @@ interface BindingsFile {
   bindings?: Record<string, InterfaceBinding>;
 }
 
-/** Instance names: same shape as an agent or workflow name. */
-const INSTANCE_RE = /^[a-z0-9][a-z0-9-]{0,63}$/u;
-
 export interface InterfaceNamespace {
   /** The interface being implemented (`sql`). */
   interfaceId: string;
-  /** The bindings-file key (`sql` for the default, `sql:analytics` named). */
+  /** Always the bare interface id — profiles travel in the request body. */
   instance: string;
-  /** The part after the colon, absent for the default instance. */
-  name?: string;
 }
 
 /**
- * Parse a namespace into its interface and instance, or `undefined` when it
- * names no interface at all.
- *
- * `:` is safe as the separator: no registry provider id contains one (they
- * use dashes and slashes — `synthetic-new`, `fly/sprites`), and a namespace
- * is a single path segment on the wire, so `POST /tools/sql:analytics/query`
- * needs no routing change.
+ * Parse a namespace as a bare interface id, or `undefined` when it names no
+ * interface (or uses the removed colon-addressed form).
  */
 export function parseInterfaceNamespace(namespace: string): InterfaceNamespace | undefined {
-  const separator = namespace.indexOf(":");
-  if (separator === -1) {
-    return isInterface(namespace) ? { interfaceId: namespace, instance: namespace } : undefined;
-  }
-  const interfaceId = namespace.slice(0, separator);
-  const name = namespace.slice(separator + 1);
-  if (!isInterface(interfaceId) || !INSTANCE_RE.test(name)) return undefined;
-  return { interfaceId, instance: namespace, name };
+  if (namespace.includes(":")) return undefined;
+  return isInterface(namespace) ? { interfaceId: namespace, instance: namespace } : undefined;
 }
 
 /** Contract packages whose `compat.json` feeds the workspace interface catalog. */
@@ -311,13 +273,27 @@ function usesLegacyBindingsFile(): boolean {
 }
 
 function splitInstance(instance: string): { interfaceId: string; name: string } {
+  // Legacy colon keys from pre-migration bindings may still appear during
+  // import; after migration every key is a bare interface id + profile name.
   const separator = instance.indexOf(":");
   if (separator === -1) return { interfaceId: instance, name: DEFAULT_PROFILE_NAME };
   return { interfaceId: instance.slice(0, separator), name: instance.slice(separator + 1) };
 }
 
 function toInstanceKey(targetId: string, name: string): string {
-  return name === DEFAULT_PROFILE_NAME ? targetId : `${targetId}:${name}`;
+  // Stored configuration never uses the colon form — named profiles are
+  // addressed as (targetId, name) in the profile store. The map key for the
+  // in-memory bindings view stays the bare interface for the default and
+  // `${targetId}\0${name}` is not needed: listInstances returns structured
+  // records. For resolveInterfaceForWorkspace we look up by profile name.
+  return name === DEFAULT_PROFILE_NAME ? targetId : `${targetId}\u0000${name}`;
+}
+
+function bindingLookupKey(interfaceId: string, profileName?: string): string {
+  if (profileName === undefined || profileName === "" || profileName === DEFAULT_PROFILE_NAME) {
+    return interfaceId;
+  }
+  return `${interfaceId}\u0000${profileName}`;
 }
 
 async function readLegacyBindingsFile(
@@ -433,15 +409,22 @@ export async function readBindings(
  */
 export async function listInstances(
   workspaceId: string,
-): Promise<Array<InterfaceNamespace & { binding: InterfaceBinding }>> {
+): Promise<
+  Array<InterfaceNamespace & { binding: InterfaceBinding; name?: string }>
+> {
   const bindings = await readBindings(workspaceId);
-  const instances: Array<InterfaceNamespace & { binding: InterfaceBinding }> = [];
-  for (const [instance, binding] of Object.entries(bindings)) {
-    const parsed = parseInterfaceNamespace(instance);
-    // A binding whose interface no longer exists (renamed, removed) is
-    // skipped rather than thrown on — the file outlives the catalog.
-    if (!parsed) continue;
-    instances.push({ ...parsed, binding });
+  const instances: Array<InterfaceNamespace & { binding: InterfaceBinding; name?: string }> = [];
+  for (const [key, binding] of Object.entries(bindings)) {
+    const sep = key.indexOf("\u0000");
+    const interfaceId = sep === -1 ? key : key.slice(0, sep);
+    const name = sep === -1 ? undefined : key.slice(sep + 1);
+    if (!isInterface(interfaceId)) continue;
+    instances.push({
+      interfaceId,
+      instance: interfaceId,
+      ...(name !== undefined ? { name } : {}),
+      binding,
+    });
   }
   return instances;
 }
@@ -509,27 +492,32 @@ function splitOptions(
 /**
  * Resolve an interface namespace to its concrete implementation for a
  * workspace: caller override first (e.g. a workflow registration's
- * `bindings`), then the instance's binding, else — for the default instance
- * only — the first compat provider with a credential.
+ * `bindings`), then the named/default profile, else — for the default only —
+ * the first compat provider with a credential.
  *
- * `namespace` is `sql` or `sql:analytics`. A *named* instance has no
- * zero-config fallback by design: `sql` meaning "whatever database is
- * connected" is a convenience, but `sql:analytics` silently pointing at
- * production because nobody bound it would be a data leak wearing a
- * convenience's clothes.
+ * `namespace` is always a bare interface id. Named configurations travel as
+ * `profile` (request body / depth-0 configure), never as a colon path segment.
+ * A named profile has no zero-config fallback.
  */
 export async function resolveInterfaceForWorkspace(
   workspaceId: string,
   namespace: string,
   overrideProvider?: string,
+  profile?: string,
 ): Promise<ResolvedInterface> {
   const parsed = parseInterfaceNamespace(namespace);
   if (!parsed) throw new ServiceError(`Unknown interface: ${namespace}`, 404);
-  const { interfaceId, instance, name } = parsed;
+  const interfaceId = parsed.interfaceId;
+  const name =
+    profile !== undefined && profile !== "" && profile !== DEFAULT_PROFILE_NAME
+      ? profile
+      : undefined;
+  const instance = interfaceId;
   const def = resolveInterface(interfaceId);
   if (!def) throw new ServiceError(`Unknown interface: ${interfaceId}`, 404);
 
-  const binding = (await readBindings(workspaceId))[instance];
+  const bindings = await readBindings(workspaceId);
+  const binding = bindings[bindingLookupKey(interfaceId, name)];
 
   if (overrideProvider) {
     const compat = def.compat.find((entry) => entry.provider === overrideProvider);
@@ -577,8 +565,19 @@ export async function resolveInterfaceForWorkspace(
   }
 
   if (name !== undefined) {
+    const existing = Object.keys(bindings)
+      .filter((key) => key === interfaceId || key.startsWith(`${interfaceId}\u0000`))
+      .map((key) => {
+        const sep = key.indexOf("\u0000");
+        return sep === -1 ? "default" : key.slice(sep + 1);
+      });
+    const available =
+      existing.length > 0
+        ? `Available profiles: ${existing.map((n) => JSON.stringify(n)).join(", ")}`
+        : `No profiles are configured for ${interfaceId}`;
     throw new ServiceError(
-      `No such interface instance: ${instance}. Create it with interfaces.bind { interface: "${interfaceId}", as: "${name}", provider: … }.`,
+      `No ${interfaceId} profile named ${JSON.stringify(name)}. ${available}. ` +
+        `Create it with profiles.set { namespace: "${interfaceId}", name: ${JSON.stringify(name)}, provider: … }.`,
       404,
     );
   }
@@ -596,8 +595,8 @@ export async function resolveInterfaceForWorkspace(
     def.compat.find((entry) => connected.has(entry.provider));
   if (!compat) {
     throw new ServiceError(
-      `Interface ${interfaceId} has no binding and no connected compatible provider. ` +
-        `Connect a credential for one of: ${def.compat.map((c) => c.provider).join(", ")} — or bind one with interfaces.bind.`,
+      `Interface ${interfaceId} has no profile and no connected compatible provider. ` +
+        `Connect a credential for one of: ${def.compat.map((c) => c.provider).join(", ")} — or set one with profiles.set.`,
       400,
     );
   }

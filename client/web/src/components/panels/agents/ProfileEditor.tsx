@@ -153,13 +153,13 @@ export function ProfileEditor({
       <Section
         id="model"
         title="Model"
-        hint="Pick a configured LLM binding, or type a namespace when the list isn't available."
+        hint="Pick a configured LLM profile, or type a profile name when the list isn't available."
         defaultOpen={sectionDefaultOpen(draft, "model")}
         error={sectionErrors.model}
       >
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="space-y-1 sm:col-span-2">
-            <div className={fieldLabel}>LLM binding</div>
+            <div className={fieldLabel}>LLM profile</div>
             {pickerAvailable && !useFreeText ? (
               <div className="flex gap-1.5">
                 <select
@@ -188,7 +188,7 @@ export function ProfileEditor({
                 <Input
                   value={draft.llm}
                   onChange={(e) => set({ llm: e.target.value })}
-                  placeholder="llm or llm:fast"
+                  placeholder="llm or fast (profile name)"
                   className="h-8 font-mono text-xs"
                 />
                 {pickerAvailable && (
@@ -215,7 +215,7 @@ export function ProfileEditor({
             <Input
               value={draft.llmCandidates}
               onChange={(e) => set({ llmCandidates: e.target.value })}
-              placeholder="llm:fast, llm:deep"
+              placeholder="fast, deep (profile names)"
               className="h-8 font-mono text-xs"
             />
           </label>

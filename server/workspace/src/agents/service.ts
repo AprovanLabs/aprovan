@@ -59,19 +59,20 @@ export interface AgentMount {
   mode: "ro" | "rw";
 }
 
+export interface AgentInterfacePin {
+  interface: string;
+  profile?: string;
+}
+
 export interface AgentProfile {
   name: string;
   title?: string;
   /**
-   * The `llm` interface instance this agent's runs resolve through — `llm`
-   * (the workspace default), or a named one like `llm:fast`. This is the
-   * same swappable-implementation mechanism sandboxes use: an agent picks a
-   * *bound, credentialed instance*, not a provider it hopes is connected.
-   *
-   * `provider`/`model` below predate instances and still work — they pin the
-   * implementation directly, ignoring whatever the instance is bound to.
+   * Which llm profile this agent's runs resolve through. Prefer
+   * `{ interface: "llm", profile?: "fast" }`; a legacy colon string
+   * (`"llm:fast"`) is accepted at write time and normalised.
    */
-  llm?: string;
+  llm?: AgentInterfacePin;
   /** LLM provider id (synthetic.new, openai, …) the agent's runs should use. */
   provider?: string;
   model?: string;
@@ -85,12 +86,10 @@ export interface AgentProfile {
    */
   policy?: AgentModelPolicy;
   /**
-   * `llm` instances the policy may choose between (e.g. ["llm:fast",
-   * "llm:deep"]) — each carries its own tier/cost metadata in its binding
-   * options. When present, selection wins over `llm`; when selection comes
-   * up empty (cost cap excluded everything), `llm` is the fallback.
+   * llm profiles the policy may choose between. Prefer
+   * `{ interface, profile? }` pins; legacy colon strings are normalised.
    */
-  llmCandidates?: string[];
+  llmCandidates?: AgentInterfacePin[];
   /**
    * Workspace files a run should see, in the sandbox mount vocabulary and
    * validated against `grants.paths` exactly as `sandboxes.create` mounts
@@ -105,35 +104,66 @@ export interface AgentProfile {
 }
 
 /**
- * Validate an agent's `llm` field: it must name an instance of the `llm`
- * interface. Binding an agent to `sql:analytics` is a configuration error
- * worth catching at write time.
+ * Validate an agent's `llm` field into `{ interface, profile? }`.
+ * Accepts the structured shape or a legacy colon string (`"llm:fast"`).
  */
-function parseAgentLlm(value: unknown): string | undefined {
+function parseAgentLlm(value: unknown): AgentInterfacePin | undefined {
   if (value === undefined || value === null || value === "") return undefined;
-  const namespace = typeof value === "string" ? value : "";
-  const parsed = parseInterfaceNamespace(namespace);
-  if (!parsed || parsed.interfaceId !== "llm") {
+  if (typeof value === "object" && !Array.isArray(value)) {
+    const record = value as Record<string, unknown>;
+    const interfaceId = typeof record["interface"] === "string" ? record["interface"] : "";
+    if (interfaceId !== "llm") {
+      throw new ServiceError(
+        `llm.interface must be "llm", got: ${JSON.stringify(interfaceId)}`,
+        400,
+      );
+    }
+    const profile =
+      typeof record["profile"] === "string" && record["profile"]
+        ? record["profile"]
+        : undefined;
+    return profile ? { interface: "llm", profile } : { interface: "llm" };
+  }
+  if (typeof value !== "string") {
     throw new ServiceError(
-      `llm must name an llm interface instance (e.g. "llm" or "llm:fast"), got: ${namespace}`,
+      `llm must be { interface, profile? } or a legacy instance string`,
       400,
     );
   }
-  return namespace;
+  // Legacy colon form — accept once and normalise.
+  if (value.includes(":")) {
+    const sep = value.indexOf(":");
+    const interfaceId = value.slice(0, sep);
+    const profile = value.slice(sep + 1);
+    if (interfaceId !== "llm" || !profile) {
+      throw new ServiceError(
+        `llm must name an llm profile (e.g. { interface: "llm", profile: "fast" }), got: ${value}`,
+        400,
+      );
+    }
+    return { interface: "llm", profile };
+  }
+  if (value !== "llm") {
+    throw new ServiceError(
+      `llm must name an llm profile (e.g. { interface: "llm", profile: "fast" }), got: ${value}`,
+      400,
+    );
+  }
+  return { interface: "llm" };
 }
 
-function parseAgentLlmCandidates(value: unknown): string[] | undefined {
+function parseAgentLlmCandidates(value: unknown): AgentInterfacePin[] | undefined {
   if (value === undefined || value === null) return undefined;
   if (!Array.isArray(value) || value.length === 0) {
     throw new ServiceError(
-      'llmCandidates must be a non-empty array of llm instance names (["llm:fast", "llm:deep"])',
+      'llmCandidates must be a non-empty array of { interface, profile? } pins',
       400,
     );
   }
   return value.map((entry) => {
     const parsed = parseAgentLlm(entry);
     if (!parsed) {
-      throw new ServiceError(`llmCandidates entries must name llm instances, got: ${String(entry)}`, 400);
+      throw new ServiceError(`llmCandidates entries must name llm profiles, got: ${String(entry)}`, 400);
     }
     return parsed;
   });
@@ -274,25 +304,31 @@ async function renderMountLayer(
 }
 
 /**
- * Pick the `llm` instance a run thinks with. Candidates resolve through
+ * Pick the llm profile a run thinks with. Candidates resolve through
  * `resolveInterfaceForWorkspace` so their binding options (`tier`,
  * `costPerMTokUsd`) feed the pure selector; an unbound candidate is skipped
  * rather than fatal — the profile lists preferences, not requirements.
- * Fallback order: selection → `profile.llm` → the default `llm` instance
+ * Fallback order: selection → `profile.llm` → the default llm profile
  * (by leaving the redirection unset).
  */
 async function selectRunLlm(
   workspaceId: string,
   profile: AgentProfile,
   effort: AgentEffort | undefined,
-): Promise<string | undefined> {
+): Promise<AgentInterfacePin | undefined> {
   if (!profile.llmCandidates?.length) return profile.llm;
   const candidates: LlmCandidateMeta[] = [];
-  for (const instance of profile.llmCandidates) {
+  for (const pin of profile.llmCandidates) {
     try {
-      const resolved = await resolveInterfaceForWorkspace(workspaceId, instance);
+      const resolved = await resolveInterfaceForWorkspace(
+        workspaceId,
+        pin.interface,
+        undefined,
+        pin.profile,
+      );
       candidates.push({
-        instance,
+        instance: pin.profile ? `${pin.interface}:${pin.profile}` : pin.interface,
+        pin,
         tier: parseLlmTier(resolved.options["tier"]),
         ...(typeof resolved.options["costPerMTokUsd"] === "number"
           ? { costPerMTokUsd: resolved.options["costPerMTokUsd"] }
@@ -302,10 +338,13 @@ async function selectRunLlm(
       // Unbound or unresolvable candidate: not eligible, not an error.
     }
   }
-  return (
-    selectLlmInstance(candidates, { ...profile.policy, ...(effort ? { effort } : {}) }) ??
-    profile.llm
-  );
+  const selected = selectLlmInstance(candidates, {
+    ...profile.policy,
+    ...(effort ? { effort } : {}),
+  });
+  if (!selected) return profile.llm;
+  const match = candidates.find((c) => c.instance === selected);
+  return match?.pin ?? profile.llm;
 }
 
 /**

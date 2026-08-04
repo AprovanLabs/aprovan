@@ -12,6 +12,7 @@ export interface ToolCall {
   namespace: string;
   procedure: string;
   args: unknown[];
+  pin?: { profile?: string; options?: Record<string, unknown> };
 }
 
 export type MiddlewareFn = (
@@ -50,14 +51,14 @@ export class PluginRegistry {
   /** Wrap transport with the middleware chain (registration order). */
   wrapTransport(transport: ToolsTransport): ToolsTransport {
     if (this.middleware.length === 0) return transport;
-    return (namespace, procedure, args) => {
-      const call: ToolCall = { namespace, procedure, args };
+    return (namespace, procedure, args, pin) => {
+      const call: ToolCall = { namespace, procedure, args, ...(pin ? { pin } : {}) };
       let index = 0;
       const next = (): Promise<unknown> => {
         if (index < this.middleware.length) {
           return this.middleware[index++]!(call, next);
         }
-        return transport(namespace, procedure, args);
+        return transport(namespace, procedure, args, pin);
       };
       return next();
     };
@@ -93,11 +94,12 @@ export class PluginRegistry {
   wrapProxy(proxy: Proxy): Proxy {
     if (this.middleware.length === 0) return proxy;
     return {
-      call: (namespace, procedure, args, meta) =>
-        this.wrapTransport((ns, proc, a) => proxy.call(ns, proc, a, meta))(
+      call: (namespace, procedure, args, meta, pin) =>
+        this.wrapTransport((ns, proc, a, p) => proxy.call(ns, proc, a, meta, p))(
           namespace,
           procedure,
           args,
+          pin,
         ),
     };
   }

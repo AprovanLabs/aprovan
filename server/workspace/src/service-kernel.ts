@@ -56,16 +56,15 @@ export interface ServiceContext extends RegistryServiceContext {
    */
   interfaceBindings?: Record<string, string>;
   /**
-   * Per-run interface *instance* redirection (interface id → instance
-   * namespace), set from an agent profile's `llm`. An agent bound to
-   * `llm:fast` means its runs' plain `llm.createChatCompletion` calls resolve
-   * through that instance — the agent picks a bound implementation, and the
-   * script it runs stays written against the generic namespace.
+   * Per-run interface profile redirection (interface id → profile pin), set
+   * from an agent profile's `llm`. An agent pinned to `{ interface: "llm",
+   * profile: "fast" }` means its runs' plain `llm.createChatCompletion`
+   * calls resolve through that profile.
    *
    * Distinct from {@link interfaceBindings}, which names a *provider* and so
-   * bypasses instance options and credentials entirely.
+   * bypasses profile options and credentials entirely.
    */
-  interfaceInstances?: Record<string, string>;
+  interfaceInstances?: Record<string, string | { interface: string; profile?: string }>;
   /**
    * Trace correlation. Every cascade — `events.emit` → workflow, workflow →
    * workflow, app call → workflow — carries these forward, so a run record
@@ -144,6 +143,7 @@ export const CORE_SERVICE_NAMES = [
   "apps",
   "webhooks",
   "interfaces",
+  "profiles",
   "sync",
   "sessions",
   "notifications",

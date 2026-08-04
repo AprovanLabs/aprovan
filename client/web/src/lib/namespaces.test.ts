@@ -38,16 +38,15 @@ describe("groupNamespaces", () => {
     expect(grouped.providers).toEqual(["github"]);
   });
 
-  it("separates interfaces and their named instances from providers", () => {
+  it("separates bare interfaces from providers (no colon instances)", () => {
     const grouped = groupNamespaces(
-      ["sql", "sql:analytics", "linear"],
+      ["sql", "linear"],
       catalog([
         ["sql", "interface"],
-        ["sql:analytics", "interface"],
         ["linear", "provider"],
       ]),
     );
-    expect(grouped.interfaces).toEqual(["sql", "sql:analytics"]);
+    expect(grouped.interfaces).toEqual(["sql"]);
     expect(grouped.providers).toEqual(["linear"]);
     expect(grouped.core).toEqual([]);
   });
@@ -66,13 +65,13 @@ describe("groupNamespaces", () => {
     expect(grouped.providers).toEqual(["github"]);
   });
 
-  it("still groups known interfaces and their instances when unreachable", () => {
+  it("still groups known bare interfaces when unreachable", () => {
     const grouped = groupNamespaces(
-      ["sql", "sql:analytics", "llm", "agent", "vcs", "linear"],
+      ["sql", "llm", "agent", "vcs", "linear"],
       null,
     );
     expect(grouped.core).toEqual(["llm", "agent", "vcs"]);
-    expect(grouped.interfaces).toEqual(["sql", "sql:analytics"]);
+    expect(grouped.interfaces).toEqual(["sql"]);
     expect(grouped.providers).toEqual(["linear"]);
   });
 

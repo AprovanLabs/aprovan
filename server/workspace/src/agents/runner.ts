@@ -305,7 +305,15 @@ async function runNativeAgent(
   // with agent Y" from the run record alone.
   const sandboxId =
     typeof args.metadata?.["sandboxId"] === "string" ? args.metadata["sandboxId"] : undefined;
-  const llmInstance = ctx.interfaceInstances?.["llm"] ?? "llm";
+  const llmPin = ctx.interfaceInstances?.["llm"];
+  const llmInstance =
+    typeof llmPin === "object" && llmPin !== null
+      ? (llmPin as { profile?: string }).profile
+        ? `llm:${(llmPin as { profile: string }).profile}`
+        : "llm"
+      : typeof llmPin === "string"
+        ? llmPin
+        : "llm";
 
   const record: StoredAgentRun = {
     id,

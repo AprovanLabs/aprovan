@@ -25,8 +25,8 @@ export interface AgentPolicy {
 export interface AgentProfile {
   name: string;
   title?: string;
-  llm?: string;
-  llmCandidates?: string[];
+  llm?: { interface: string; profile?: string } | string;
+  llmCandidates?: Array<{ interface: string; profile?: string } | string>;
   policy?: AgentPolicy;
   provider?: string;
   model?: string;

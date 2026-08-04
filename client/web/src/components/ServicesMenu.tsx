@@ -4,9 +4,9 @@
  * Four layers, one dialog:
  *  - Native services (VFS, Key value, Agents, Sessions, …) — always
  *    available, no credential.
- *  - Interfaces (llm, sql, sandbox, and any named instance like
- *    `sql:analytics`) — one tool contract, a swappable implementation. Each
- *    row shows which provider it currently resolves to.
+ *  - Interfaces (llm, sql, sandbox, …) — one tool contract, a swappable
+ *    implementation selected by profile. Each row shows which provider the
+ *    default profile currently resolves to.
  *  - Registry providers — connected ones (a credential exists, so their tools
  *    ride the proxy) expand to their tool list and deep-link back to the
  *    registry catalog page; unconnected catalog providers offer a one-click
