@@ -311,7 +311,7 @@ async function handleChat(
   }
 
   // System prompt: explicit `system` wins; otherwise a stored prompt —
-  // PostHog-managed when configured, workspace FS fallback (see promptStore).
+  // Workspace FS copy (see scripts/seed-prompts.ts).
   let system = typeof body.system === "string" ? body.system : undefined;
   if (!system && body.prompt?.id) {
     const stored = await resolveStoredPrompt(workspaceId, body.prompt.id);

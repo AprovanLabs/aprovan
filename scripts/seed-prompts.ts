@@ -22,7 +22,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { getFsStore } from "../apps/workspace/src/fs-store.js";
+import { getFsStore } from "../server/workspace/src/fs-store.js";
 
 const { values: args } = parseArgs({
   options: {

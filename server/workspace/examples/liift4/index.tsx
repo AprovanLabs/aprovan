@@ -128,7 +128,7 @@ const STORE_KEY = "liift4-state";
 
 async function loadState() {
   try {
-    const res = await keyvalue.get({ key: STORE_KEY });
+    const res = await tools.keyvalue.get({ key: STORE_KEY });
     if (res && res.value) return res.value;
   } catch (e) {
     // first run — nothing saved yet
@@ -138,7 +138,7 @@ async function loadState() {
 
 async function saveState(state) {
   try {
-    await keyvalue.set({ key: STORE_KEY, value: state });
+    await tools.keyvalue.set({ key: STORE_KEY, value: state });
   } catch (e) {
     console.error("Could not save your progress:", e);
   }
