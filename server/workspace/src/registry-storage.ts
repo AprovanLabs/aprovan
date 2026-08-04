@@ -24,7 +24,7 @@ async function createDsqlBackedStorage(): Promise<RegistryStorage> {
     async exec(sql) {
       for (const statement of sql.split(/;\s*(?:\n|$)/u)) {
         const trimmed = statement.trim();
-        if (trimmed) await pool.query(trimmed);
+        if (trimmed) await dsql.execDsqlDdl(pool, trimmed);
       }
     },
     async all(sql, params = []) {

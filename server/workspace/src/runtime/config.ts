@@ -218,8 +218,8 @@ export type StoreBackend = "sqlite" | "dynamo" | "dsql";
  * factories:
  *
  *   STORE_BACKEND = "sqlite" | "dynamo" | "dsql"
- *     default: sqlite when WORKSPACE_MODE=local; dynamo when aws (interim);
- *     dsql is set explicitly at cutover.
+ *     default: sqlite when WORKSPACE_MODE=local; dsql when aws.
+ *     dynamo remains for rollback / pre-cutover mirrors only.
  *
  * Lazy module loading is preserved per backend: sqlite loads no AWS SDK and
  * no `pg`; dsql loads `pg` (and the DSQL signer) only. `dsql` still rides S3
@@ -231,7 +231,7 @@ export type StoreBackend = "sqlite" | "dynamo" | "dsql";
  */
 export function storeBackend(): StoreBackend {
   const raw = process.env["STORE_BACKEND"]?.trim().toLowerCase();
-  if (!raw) return isAwsMode() ? "dynamo" : "sqlite";
+  if (!raw) return isAwsMode() ? "dsql" : "sqlite";
   if (raw === "sqlite" || raw === "dynamo" || raw === "dsql") return raw;
   throw new Error(`STORE_BACKEND must be "sqlite", "dynamo", or "dsql" (got "${raw}")`);
 }

@@ -92,9 +92,11 @@ export async function reseedDsql(fromDir: string): Promise<ReseedCounts> {
     return rows.length;
   };
 
-  // --- FS latest metadata (blobs stay where they are in S3) ---------------
+  // --- FS latest + version metadata (blobs stay where they are in S3) -----
   // The mirror's fs_files holds exactly the latest pointers (the snapshot
-  // only mirrors P# rows), so each row becomes one fs_latest row.
+  // only mirrors P# rows). Seed both fs_latest and fs_files with the same
+  // hash so staged sessionRead (hash-pinned) works after cutover — version
+  // history beyond "current tip" is still deliberately dropped.
   const fsRows = mirror
     .prepare(`SELECT workspace_id, path, hash, mime_type, size, updated_at FROM fs_files`)
     .all() as MirrorRow[];
@@ -104,6 +106,13 @@ export async function reseedDsql(fromDir: string): Promise<ReseedCounts> {
        VALUES ($1, $2, $3, $4, $5, $6)
        ON CONFLICT (workspace_id, path)
        DO UPDATE SET hash = $3, mime_type = $4, size = $5, updated_at = $6`,
+      [row["workspace_id"], row["path"], row["hash"], row["mime_type"], row["size"], row["updated_at"]],
+    );
+    await dsqlQuery(
+      `INSERT INTO fs_files (workspace_id, path, hash, mime_type, size, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (workspace_id, path, hash)
+       DO UPDATE SET mime_type = $4, size = $5, updated_at = $6`,
       [row["workspace_id"], row["path"], row["hash"], row["mime_type"], row["size"], row["updated_at"]],
     );
   });
@@ -137,11 +146,12 @@ export async function reseedDsql(fromDir: string): Promise<ReseedCounts> {
     let index = 0;
     return sql.replace(/\?/gu, () => `$${++index}`);
   };
+  const { execDsqlDdl } = await import("../src/db/dsql.js");
   const storage = await createSqlStorage({
     async exec(sql) {
       for (const statement of sql.split(/;\s*(?:\n|$)/u)) {
         const trimmed = statement.trim();
-        if (trimmed) await registryPool.query(trimmed);
+        if (trimmed) await execDsqlDdl(registryPool, trimmed);
       }
     },
     async all(sql, params = []) {

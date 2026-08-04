@@ -22,9 +22,9 @@ export class RegistryApp extends Stack {
 
     // Which backend the workspace stores use. Stays "dynamo" until the
     // runbook'd cutover flips it (`cdk deploy -c storeBackend=dsql`); flipping
-    // back is the rollback (tables are untouched either side of the flip).
+    // Default dsql after cutover; `-c storeBackend=dynamo` is the rollback.
     const storeBackend =
-      (this.node.tryGetContext("storeBackend") as string | undefined) ?? "dynamo";
+      (this.node.tryGetContext("storeBackend") as string | undefined) ?? "dsql";
     if (!["dynamo", "dsql"].includes(storeBackend)) {
       throw new Error(`storeBackend context must be "dynamo" or "dsql" (got "${storeBackend}")`);
     }
