@@ -230,6 +230,24 @@ function isSyntaxError(err: unknown): boolean {
   return (err as { code?: string })?.code === "42601";
 }
 
+/**
+ * Run a DDL statement against DSQL, rewriting plain `CREATE INDEX` to
+ * `CREATE INDEX ASYNC` (required by Aurora DSQL). Vanilla Postgres test rigs
+ * that reject ASYNC fall back to the plain form.
+ */
+export async function execDsqlDdl(pool: DsqlPool, sql: string): Promise<void> {
+  const rewritten = sql.replace(/\bCREATE\s+INDEX\b(?!\s+ASYNC\b)/giu, "CREATE INDEX ASYNC");
+  try {
+    await pool.query(rewritten);
+  } catch (err) {
+    if (/\bINDEX ASYNC\b/iu.test(rewritten) && isSyntaxError(err)) {
+      await pool.query(rewritten.replace(/\bINDEX ASYNC\b/giu, "INDEX"));
+      return;
+    }
+    throw err;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // OCC retry (SQLSTATE 40001) + transaction chunking
 // ---------------------------------------------------------------------------
