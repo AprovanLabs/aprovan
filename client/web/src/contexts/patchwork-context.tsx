@@ -1,5 +1,5 @@
 import { createContext, useContext } from "react";
-import type { Compiler } from "@aprovan/patchwork-compiler";
+import type { Compiler } from "@aprovan/patchwork";
 
 export interface PatchworkContext {
   compiler: Compiler | null;

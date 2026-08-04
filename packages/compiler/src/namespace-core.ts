@@ -5,7 +5,7 @@
  * This is the sole definition of the installed first-party namespace set.
  * Hosts, the type generator, the dependency scanner, and the gateway's
  * capabilities surface all import from here (published as the dependency-free
- * subpath `@aprovan/patchwork-compiler/namespace-core`) so they cannot disagree.
+ * subpath `@aprovan/patchwork/namespace-core`) so they cannot disagree.
  * Nothing on that path may reach esbuild-wasm or DOM code.
  */
 

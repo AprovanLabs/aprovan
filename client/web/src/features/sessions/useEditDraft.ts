@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import type { VirtualProject } from "@aprovan/patchwork-compiler";
+import type { VirtualProject } from "@aprovan/patchwork";
 import {
   createSingleWorkspaceFileProject,
   loadWorkspaceDirectoryProject,

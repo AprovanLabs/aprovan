@@ -57,7 +57,7 @@ importers:
       '@ai-sdk/react':
         specifier: ^3.0.69
         version: 3.0.99(react@19.2.7)(zod@3.25.76)
-      '@aprovan/patchwork-compiler':
+      '@aprovan/patchwork':
         specifier: workspace:*
         version: link:../../packages/compiler
       '@aprovan/patchwork-editor':
@@ -354,7 +354,7 @@ importers:
 
   packages/editor:
     dependencies:
-      '@aprovan/patchwork-compiler':
+      '@aprovan/patchwork':
         specifier: workspace:*
         version: link:../compiler
       '@pierre/trees':
@@ -602,7 +602,7 @@ importers:
 
   packages/ui:
     dependencies:
-      '@aprovan/patchwork-compiler':
+      '@aprovan/patchwork':
         specifier: workspace:*
         version: link:../compiler
       class-variance-authority:
@@ -642,7 +642,7 @@ importers:
       '@aprovan/node':
         specifier: workspace:*
         version: link:../../packages/node
-      '@aprovan/patchwork-compiler':
+      '@aprovan/patchwork':
         specifier: workspace:*
         version: link:../../packages/compiler
       '@aprovan/registry-server':

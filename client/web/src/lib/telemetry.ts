@@ -19,7 +19,7 @@
  * visibility change / pagehide.
  */
 
-import type { WidgetRuntimeEvent } from "@aprovan/patchwork-compiler";
+import type { WidgetRuntimeEvent } from "@aprovan/patchwork";
 import type { TelemetryExportArgs, TelemetryExportResult } from "@utdk/telemetry";
 import { createTelemetry, type TelemetrySdk } from "@utdk/telemetry/sdk";
 import { GATEWAY_BASE } from "./gateway";

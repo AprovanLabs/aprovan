@@ -1,4 +1,4 @@
-import type { VirtualProject, VirtualFile } from '@aprovan/patchwork-compiler';
+import type { VirtualProject, VirtualFile } from '@aprovan/patchwork';
 
 export interface EditHistoryEntry {
   prompt: string;

@@ -66,7 +66,7 @@ import { readRegistration } from "../workflows/store.js";
  * compiles against.
  *
  * The compiler version MUST track this package's own
- * `@aprovan/patchwork-compiler` dependency — `tests/live-apps.test.ts` asserts
+ * `@aprovan/patchwork` dependency — `tests/live-apps.test.ts` asserts
  * it, because drift here is silent and severe. A published app imports its
  * service namespaces as bare specifiers (`import keyvalue from "keyvalue"`),
  * which only resolve to the injected namespace because the compiler's
@@ -495,7 +495,7 @@ try {
   // a stale compiler. esbuild-wasm is external + import-mapped to its real ESM
   // browser build — esm.sh's UMD interop drops its named exports
   // ("build is not a function").
-  const { createCompiler } = await import("https://esm.sh/@aprovan/patchwork-compiler@${APP_SHELL_COMPILER_VERSION}?external=esbuild-wasm");
+  const { createCompiler } = await import("https://esm.sh/@aprovan/patchwork@${APP_SHELL_COMPILER_VERSION}?external=esbuild-wasm");
   const compiler = await createCompiler({
     image: "@aprovan/patchwork-image-shadcn@${APP_SHELL_IMAGE_VERSION}",
     cdnBaseUrl: "https://esm.sh",

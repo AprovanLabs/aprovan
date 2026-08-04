@@ -4,7 +4,7 @@ import {
   WidgetPreview,
   scanToolsAccess,
 } from "@aprovan/patchwork-editor";
-import { createSingleFileProject } from "@aprovan/patchwork-compiler";
+import { createSingleFileProject } from "@aprovan/patchwork";
 import {
   AlertCircle,
   Check,

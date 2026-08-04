@@ -1,5 +1,5 @@
-import { createProjectFromFiles, detectMainFile } from '@aprovan/patchwork-compiler';
-import type { VirtualFile, VirtualProject } from '@aprovan/patchwork-compiler';
+import { createProjectFromFiles, detectMainFile } from '@aprovan/patchwork';
+import type { VirtualFile, VirtualProject } from '@aprovan/patchwork';
 
 export { scanToolsAccess, type ToolsAccessScan } from './scan-tools-access.js';
 

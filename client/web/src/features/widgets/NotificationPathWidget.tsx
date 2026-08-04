@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { WidgetPreview } from "@aprovan/patchwork-editor";
-import type { Compiler } from "@aprovan/patchwork-compiler";
+import type { Compiler } from "@aprovan/patchwork";
 import { readFile } from "@/lib/workspace-vfs";
 import {
   createWidgetPlugins,

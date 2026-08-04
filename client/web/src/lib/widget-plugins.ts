@@ -3,7 +3,7 @@ import {
   type NamespaceNode,
   type OverrideContext,
   type PluginRegistry,
-} from "@aprovan/patchwork-compiler";
+} from "@aprovan/patchwork";
 import { widgetTelemetrySdk, type WidgetTelemetrySdkOptions } from "./telemetry";
 
 const TELEMETRY_OVERRIDE_TYPES = `declare namespace telemetry {

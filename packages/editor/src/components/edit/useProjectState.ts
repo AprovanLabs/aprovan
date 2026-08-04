@@ -1,10 +1,10 @@
-import { createSingleFileProject } from "@aprovan/patchwork-compiler";
+import { createSingleFileProject } from "@aprovan/patchwork";
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import type {
   EditHistoryEntry,
   EditSessionState,
 } from "./types";
-import type { VirtualProject } from "@aprovan/patchwork-compiler";
+import type { VirtualProject } from "@aprovan/patchwork";
 
 export interface UseProjectStateOptions {
   originalCode?: string;

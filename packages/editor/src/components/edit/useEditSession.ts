@@ -7,7 +7,7 @@ import type {
   EditSessionActions,
   CompileFn,
 } from "./types";
-import type { VirtualProject } from "@aprovan/patchwork-compiler";
+import type { VirtualProject } from "@aprovan/patchwork";
 
 // The compile-error retry recursion was unbounded — a prompt the model can
 // never satisfy looped forever. Two fix attempts, then the error surfaces.

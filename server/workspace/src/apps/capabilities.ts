@@ -28,7 +28,7 @@
 import {
   NATIVE_APP_NAMESPACES,
   type NativeAppNamespace,
-} from "@aprovan/patchwork-compiler/namespace-core";
+} from "@aprovan/patchwork/namespace-core";
 import { isInterface } from "../interfaces.js";
 import { isCoreServiceName, ServiceError } from "../service-kernel.js";
 import { DEFAULT_DAILY_CALLS } from "./usage.js";
@@ -38,7 +38,7 @@ export type { AppRequirement };
 export { NATIVE_APP_NAMESPACES, type NativeAppNamespace };
 
 /** The auto-partitioned first-party namespaces an app session may call.
- *  Defined once in `@aprovan/patchwork-compiler/namespace-core`.
+ *  Defined once in `@aprovan/patchwork/namespace-core`.
  *  `notifications` is scoped per (app, user) by construction: an app can
  *  only notify its own current user, and only embed choices whose calls it
  *  could make itself (see notifications/service.ts). `telemetry` is

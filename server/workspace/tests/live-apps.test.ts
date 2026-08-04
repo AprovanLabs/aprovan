@@ -346,7 +346,7 @@ describe("app shell compiler pin", () => {
     const pkg = JSON.parse(
       await readFile(new URL("../package.json", import.meta.url), "utf8"),
     ) as { dependencies: Record<string, string> };
-    const declared = pkg.dependencies["@aprovan/patchwork-compiler"];
+    const declared = pkg.dependencies["@aprovan/patchwork"];
     expect(declared).toBeDefined();
     let expected = declared!.replace(/^[\^~]/, "");
     if (expected === "workspace:*") {
@@ -363,7 +363,7 @@ describe("app shell compiler pin", () => {
     const html = await (await liveAppsRouter.request("/local/pinned")).text();
 
     expect(html).toContain(
-      `https://esm.sh/@aprovan/patchwork-compiler@${APP_SHELL_COMPILER_VERSION}?external=esbuild-wasm`,
+      `https://esm.sh/@aprovan/patchwork@${APP_SHELL_COMPILER_VERSION}?external=esbuild-wasm`,
     );
     expect(html).not.toContain("${APP_SHELL_COMPILER_VERSION}");
   });

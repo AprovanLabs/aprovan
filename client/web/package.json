@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@ai-sdk/react": "^3.0.69",
-    "@aprovan/patchwork-compiler": "workspace:*",
+    "@aprovan/patchwork": "workspace:*",
     "@aprovan/patchwork-editor": "workspace:*",
     "@aprovan/registry-main": "workspace:*",
     "@aprovan/registry-ui": "workspace:*",

@@ -1,11 +1,11 @@
 /**
- * @aprovan/patchwork-compiler
+ * @aprovan/patchwork
  *
  * JSX→ESM compilation, image loading, and DOM mounting for Patchwork widgets.
  *
  * @example
  * ```typescript
- * import { createCompiler } from '@aprovan/patchwork-compiler';
+ * import { createCompiler } from '@aprovan/patchwork';
  *
  * const compiler = await createCompiler({
  *   image: '@aprovan/patchwork-image-shadcn',
@@ -112,7 +112,7 @@ export { vfsPlugin } from "./transforms/vfs.js";
 export type { VFSPluginOptions } from "./transforms/vfs.js";
 export { NATIVE_APP_NAMESPACES } from "./namespace-core.js";
 // Also published on its own, dependency-free:
-//   import { generateNamespaceTypes } from "@aprovan/patchwork-compiler/namespace-types";
+//   import { generateNamespaceTypes } from "@aprovan/patchwork/namespace-types";
 // which is how the gateway generates an app's `__sdk__.d.ts` without loading
 // esbuild-wasm into a Node process.
 export { generateNamespaceTypes } from "./transforms/namespace-types.js";

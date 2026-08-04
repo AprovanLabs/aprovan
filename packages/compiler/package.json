@@ -1,5 +1,5 @@
 {
-  "name": "@aprovan/patchwork-compiler",
+  "name": "@aprovan/patchwork",
   "version": "0.2.0",
   "description": "Patchwork compiler - JSX→ESM compilation, image loading, DOM mounting",
   "type": "module",

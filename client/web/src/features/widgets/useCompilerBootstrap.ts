@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { createCompiler, type Compiler } from "@aprovan/patchwork-compiler";
+import { createCompiler, type Compiler } from "@aprovan/patchwork";
 import type { ServiceInfo } from "@aprovan/patchwork-editor";
 import { ACTIVE_WORKSPACE_KEY } from "@/features/tabs/useTabs";
 import { getAccessTokenSync } from "@/lib/auth";

@@ -21,7 +21,7 @@
  * single allow-list entry, which is what an allow-list *editor* needs.
  */
 
-import { NATIVE_APP_NAMESPACES } from "@aprovan/patchwork-compiler/namespace-core";
+import { NATIVE_APP_NAMESPACES } from "@aprovan/patchwork/namespace-core";
 
 // ---------------------------------------------------------------------------
 // Transport

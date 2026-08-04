@@ -24,7 +24,7 @@ import { getActiveContent, getFiles } from './types';
 import { useEditSession, type UseEditSessionOptions } from './useEditSession';
 import { WorkspaceTree } from './WorkspaceTree';
 import { markdownRoundTrips } from '../markdownRoundTrip';
-import type { VirtualProject } from '@aprovan/patchwork-compiler';
+import type { VirtualProject } from '@aprovan/patchwork';
 
 function toggleDefaultView(current: DefaultView, info: { defaultView: DefaultView; canToggleView: boolean; category: string }): DefaultView {
   if (!info.canToggleView) return current;
