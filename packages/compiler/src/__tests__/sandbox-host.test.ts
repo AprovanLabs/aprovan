@@ -12,7 +12,6 @@ import { ParentBridge } from "../mount/bridge.js";
 import { answerServiceCall, serviceCallArgs } from "../mount/sandbox-host.js";
 import { runScriptInSandbox } from "../mount/sandbox.js";
 import { createCallableNamespaceNode } from "../mount/assemble-tools.js";
-import { createNamespaceProxy } from "@utdk/remote";
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -183,34 +182,30 @@ describe("runScriptInSandbox", () => {
 });
 
 describe("single proxy implementation", () => {
-  it("host-side namespace nodes are constructed by @utdk/remote", () => {
-    const assembleSource = readFileSync(
-      join(packageRoot, "src/mount/assemble-tools.ts"),
-      "utf8",
-    );
-    expect(assembleSource).toContain('from "@utdk/remote"');
-    expect(assembleSource).toContain("createNamespaceProxy");
-
-    // No second host-side Proxy tree builder outside the iframe serialization.
-    const mountDir = join(packageRoot, "src/mount");
-    const hostBuilders = readdirSync(mountDir)
-      .filter((name) => name.endsWith(".ts") && name !== "iframe-proxy-source.ts")
-      .filter((name) => {
-        const source = readFileSync(join(mountDir, name), "utf8");
-        return (
-          /function createNestedProxy|function createNamespaceNode/.test(source) &&
-          !name.includes("sandbox.ts")
-        );
-      });
-    expect(hostBuilders).toEqual([]);
-
-    // Runtime check: createCallableNamespaceNode is a createNamespaceProxy node.
-    const fromRemote = createNamespaceProxy("github", {
-      call: async () => null,
+  it("host-side namespace nodes support lazy client(name) configure", async () => {
+    const calls: Array<{
+      namespace: string;
+      procedure: string;
+      pin?: { profile?: string; options?: Record<string, unknown> };
+    }> = [];
+    const node = createCallableNamespaceNode("github", async (ns, proc, _args, pin) => {
+      calls.push({ namespace: ns, procedure: proc, pin });
+      return null;
     });
-    const fromAssemble = createCallableNamespaceNode("github", async () => null);
-    expect(typeof fromRemote).toBe("function");
-    expect(typeof fromAssemble).toBe("function");
-    expect(typeof fromAssemble({ name: "work" })).toBe("function");
+
+    const work = (node as { client: (c: unknown) => typeof node }).client("work");
+    expect(calls).toEqual([]);
+    await (work as { repos: { get: (a: unknown) => Promise<unknown> } }).repos.get({ owner: "o" });
+    await (work as { repos: { list: (a: unknown) => Promise<unknown> } }).repos.list({});
+
+    expect(calls).toEqual([
+      { namespace: "github", procedure: "repos.get", pin: { profile: "work" } },
+      { namespace: "github", procedure: "repos.list", pin: { profile: "work" } },
+    ]);
+
+    // Depth-0 configure is equivalent.
+    const pinned = node({ name: "fast", options: { effort: "low" } }) as typeof node;
+    await (pinned as { repos: { get: (a: unknown) => Promise<unknown> } }).repos.get({});
+    expect(calls[2]?.pin).toEqual({ profile: "fast", options: { effort: "low" } });
   });
 });

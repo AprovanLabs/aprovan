@@ -61,8 +61,8 @@ async function assertProviderAllowed(
 }
 
 /**
- * Map product interface namespaces (colon syntax, per-run redirects) to the
- * embed API's base namespace + profile pin.
+ * Map product interface namespaces (per-run redirects) to the embed API's
+ * base namespace + profile pin.
  */
 function resolveEmbedTarget(
   ctx: ServiceContext,
@@ -79,26 +79,34 @@ function resolveEmbedTarget(
     return { namespace, profile };
   }
 
-  const { interfaceId, name } = parsed;
+  const { interfaceId } = parsed;
 
   const bindingOverride = ctx.interfaceBindings?.[interfaceId];
   if (bindingOverride) {
     return { namespace: bindingOverride, profile };
   }
 
-  if (name !== undefined) {
-    return { namespace: interfaceId, profile: name };
+  if (profile !== undefined) {
+    return { namespace: interfaceId, profile };
   }
 
   const redirected = ctx.interfaceInstances?.[interfaceId];
-  if (redirected) {
-    const redir = parseInterfaceNamespace(redirected);
-    if (redir) {
-      return {
-        namespace: redir.interfaceId,
-        profile: redir.name ?? profile,
-      };
+  if (redirected && typeof redirected === "object" && redirected !== null) {
+    const pin = redirected as { interface?: string; profile?: string };
+    return {
+      namespace: typeof pin.interface === "string" ? pin.interface : interfaceId,
+      ...(typeof pin.profile === "string" ? { profile: pin.profile } : {}),
+    };
+  }
+  if (typeof redirected === "string") {
+    if (!redirected.includes(":")) {
+      return { namespace: interfaceId, profile: redirected };
     }
+    const sep = redirected.indexOf(":");
+    return {
+      namespace: redirected.slice(0, sep) || interfaceId,
+      profile: redirected.slice(sep + 1) || undefined,
+    };
   }
 
   return { namespace: interfaceId, profile };
@@ -116,21 +124,10 @@ async function dispatchThroughEmbed(
 }
 
 /**
- * `profile` is the script-side `client(name)` pin (docs/interfaces.md;
- * formerly `getClient({ profile })`). It means two things, by namespace
- * kind, and the two
- * vocabularies are deliberately unified rather than a third being invented:
- *
- *   - provider namespaces (`github`): a credential *label* — resolved to
- *     that exact credential, with misses and ambiguity failing loudly
- *     (see resolveCredentialRecord);
- *   - interface namespaces (`llm`): an *instance* name — `getClient({
- *     profile: "fast" })` dispatches through `llm:fast`, because instances
- *     already are the interface world's profiles (their bindings carry the
- *     credential pin AND the option overrides a bare label never could).
- *
- * Both fail at call time with a ServiceError naming what exists; neither can
- * reach the module loader, whose errors name nothing the caller can act on.
+ * `profile` is the depth-0 configure pin (`tools.ns({ name })` / body
+ * `{ profile }`). One vocabulary for providers and interfaces: a named
+ * profile in the unified store. Missing profiles fail at the first
+ * operation with an error naming the profile and listing what exists.
  */
 export async function invokeTool(
   ctx: ServiceContext,
@@ -138,17 +135,27 @@ export async function invokeTool(
   procedure: string,
   args: Record<string, unknown>,
   profile?: string,
+  callSiteOptions?: Record<string, unknown>,
 ): Promise<unknown> {
   // Agent-attributed runs are bounded by their profile's tool grants —
   // checked before any dispatch branch so native, interface, and provider
   // calls all answer to the same list.
   assertToolGranted(ctx.grants, namespace, procedure);
 
+  if (callSiteOptions) {
+    const { assertCallOptions } = await import("../profiles/types.js");
+    try {
+      assertCallOptions(callSiteOptions);
+    } catch (err) {
+      throw new ServiceError(err instanceof Error ? err.message : String(err), 400);
+    }
+  }
+
   const core = getCoreService(namespace);
   if (core) {
     if (profile !== undefined) {
       throw new ServiceError(
-        `${namespace} is a core service — it has no credential profiles to pin with client()`,
+        `${namespace} is a core service — it has no profiles to pin`,
         400,
       );
     }
@@ -157,19 +164,8 @@ export async function invokeTool(
 
   const parsed = parseInterfaceNamespace(namespace);
   if (parsed) {
-    let target = namespace;
-    if (profile !== undefined) {
-      target = `${parsed.interfaceId}:${profile}`;
-      if (!parseInterfaceNamespace(target)) {
-        throw new ServiceError(
-          `"${profile}" is not a valid ${parsed.interfaceId} instance name — ` +
-            `interface profiles are instance names (lowercase letters, digits, hyphens)`,
-          400,
-        );
-      }
-    }
-    await assertProviderAllowed(ctx, target, procedure);
-    return dispatchInterface(ctx, target, procedure, args);
+    await assertProviderAllowed(ctx, namespace, procedure);
+    return dispatchInterface(ctx, namespace, procedure, args, undefined, profile, callSiteOptions);
   }
 
   await assertProviderAllowed(ctx, namespace, procedure);
@@ -179,10 +175,30 @@ export async function invokeTool(
   if (llmAlias && procedure === "createChatCompletion" && !("model" in finalArgs)) {
     finalArgs = { ...finalArgs, model: llmAlias.defaultModel };
   }
+  if (callSiteOptions) {
+    finalArgs = { ...finalArgs, ...callSiteOptions };
+  }
+
+  // Provider profile: resolve credential id from the profile store when set.
+  let credentialId: string | undefined;
+  if (profile !== undefined) {
+    const { resolveNamespaceProfile } = await import("../profiles/resolver.js");
+    const resolved = await resolveNamespaceProfile(
+      ctx.workspaceId,
+      namespace,
+      profile,
+      callSiteOptions,
+    );
+    if (resolved.record?.credential) credentialId = resolved.record.credential;
+    finalArgs = { ...resolved.options, ...args, ...(callSiteOptions ?? {}) };
+    if (llmAlias && procedure === "createChatCompletion" && !("model" in finalArgs)) {
+      finalArgs = { ...finalArgs, model: llmAlias.defaultModel };
+    }
+  }
 
   return dispatchProviderLegacy(ctx, {
     credentialProvider: namespace,
-    ...(profile !== undefined ? { credentialProfile: profile } : {}),
+    ...(credentialId ? { credentialId } : {}),
     module: llmAlias?.module ?? namespace,
     baseUrl: llmAlias?.baseUrl,
     procedure,
@@ -211,27 +227,46 @@ export async function dispatchInterface(
   procedure: string,
   args: Record<string, unknown>,
   overrideProvider?: string,
+  profile?: string,
+  callSiteOptions?: Record<string, unknown>,
 ): Promise<unknown> {
   if (usesEmbedInterfaceDispatch()) {
-    const { namespace: ns, profile } = resolveEmbedTarget(
+    const { namespace: ns, profile: embedProfile } = resolveEmbedTarget(
       ctx,
       namespace,
-      undefined,
+      profile,
       overrideProvider,
     );
-    return dispatchThroughEmbed(ctx, ns, procedure, args, profile ? { profile } : undefined);
+    return dispatchThroughEmbed(
+      ctx,
+      ns,
+      procedure,
+      callSiteOptions ? { ...args, ...callSiteOptions } : args,
+      embedProfile ? { profile: embedProfile } : undefined,
+    );
   }
 
   const parsed = parseInterfaceNamespace(namespace);
   const interfaceId = parsed?.interfaceId ?? namespace;
-  const instance =
-    parsed && parsed.name === undefined
-      ? (ctx.interfaceInstances?.[interfaceId] ?? namespace)
-      : namespace;
+  // Agent profiles may redirect the default interface to a named profile.
+  let effectiveProfile = profile;
+  if (effectiveProfile === undefined && parsed) {
+    const redirected = ctx.interfaceInstances?.[interfaceId];
+    if (redirected && typeof redirected === "object" && redirected !== null) {
+      const pin = redirected as { interface?: string; profile?: string };
+      if (typeof pin.profile === "string") effectiveProfile = pin.profile;
+    } else if (typeof redirected === "string" && !redirected.includes(":")) {
+      effectiveProfile = redirected;
+    } else if (typeof redirected === "string") {
+      const sep = redirected.indexOf(":");
+      if (sep !== -1) effectiveProfile = redirected.slice(sep + 1);
+    }
+  }
   const resolved = await resolveInterfaceForWorkspace(
     ctx.workspaceId,
-    instance,
+    interfaceId,
     overrideProvider ?? ctx.interfaceBindings?.[interfaceId],
+    effectiveProfile,
   );
   if (resolved.compat.unavailable) {
     throw new ServiceError(
@@ -240,8 +275,8 @@ export async function dispatchInterface(
     );
   }
   const withDefaults = resolved.def.defaultsFor.includes(procedure)
-    ? { ...resolved.options, ...args }
-    : args;
+    ? { ...resolved.options, ...args, ...(callSiteOptions ?? {}) }
+    : { ...args, ...(callSiteOptions ?? {}) };
   if (resolved.def.id === "agent" && resolved.compat.provider === "native") {
     const { dispatchNativeAgentOp } = await import("../agents/runner.js");
     return dispatchNativeAgentOp(ctx, procedure, withDefaults);

@@ -1,5 +1,16 @@
 import type { AgentProfile, Draft } from "./types";
 
+export function formatLlmPin(value: AgentProfile["llm"]): string {
+  if (!value) return "llm";
+  if (typeof value === "string") return value;
+  return value.profile ? `${value.interface}:${value.profile}` : value.interface;
+}
+
+export function formatLlmPins(values: AgentProfile["llmCandidates"]): string {
+  return (values ?? []).map((v) => formatLlmPin(v)).join(", ");
+}
+
+
 export const emptyDraft: Draft = {
   name: "",
   title: "",
@@ -20,8 +31,8 @@ export function toDraft(agent: AgentProfile): Draft {
   return {
     name: agent.name,
     title: agent.title ?? "",
-    llm: agent.llm ?? "llm",
-    llmCandidates: (agent.llmCandidates ?? []).join(", "),
+    llm: formatLlmPin(agent.llm),
+    llmCandidates: formatLlmPins(agent.llmCandidates),
     effort: agent.policy?.effort ?? "",
     maxCostUsd:
       agent.policy?.maxCostUsd !== undefined ? String(agent.policy.maxCostUsd) : "",

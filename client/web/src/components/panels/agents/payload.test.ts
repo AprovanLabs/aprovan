@@ -14,7 +14,7 @@ describe("buildSavePayload", () => {
     expect(payload).toEqual({
       name: "reviewer",
       title: undefined,
-      llm: "llm",
+      llm: { interface: "llm" },
       llmCandidates: undefined,
       policy: undefined,
       provider: undefined,
@@ -77,8 +77,11 @@ describe("buildSavePayload", () => {
     expect(payload).toEqual({
       name: "writer",
       title: "Doc writer",
-      llm: "llm:fast",
-      llmCandidates: ["llm:fast", "llm:deep"],
+      llm: { interface: "llm", profile: "fast" },
+      llmCandidates: [
+        { interface: "llm", profile: "fast" },
+        { interface: "llm", profile: "deep" },
+      ],
       policy: { effort: "high", maxCostUsd: 5, deadlineMs: 30000 },
       provider: "anthropic",
       model: "claude-sonnet",

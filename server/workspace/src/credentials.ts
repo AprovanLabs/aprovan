@@ -749,18 +749,11 @@ export function resetCredentialStore(): void {
  *
  * With no `credentialId` this is the historical behaviour — the first
  * credential the workspace holds for the provider. With one, it is that exact
- * credential, and a mismatch is reported rather than silently falling back:
- * an interface instance pointing at a credential that has since been deleted
- * or re-provisioned must fail loudly, not quietly execute against a different
- * account.
+ * credential, and a mismatch is reported rather than silently falling back.
  *
- * A `profile` names a credential by its *label* — the human name the
- * credentials page already shows ("work", "billing account") — which is what
- * a script's `getClient({ profile })` carries (docs/interfaces.md). Labels
- * are the workspace's vocabulary, not stable ids, so a miss or an ambiguity
- * fails with the labels that actually exist rather than falling back to the
- * first credential: routing "personal" to the work account is exactly the
- * mistake the feature exists to prevent.
+ * A `profile` pin is resolved by the unified profile store before this
+ * function is called (credential id on the record). Labels are display names
+ * only — arriving here with a bare profile name is a configuration bug.
  */
 export async function resolveCredentialRecord(
   workspaceId: string,
@@ -770,15 +763,16 @@ export async function resolveCredentialRecord(
 ): Promise<{ id: string; payload: CredentialPayload } | undefined> {
   const store = getCredentialStore();
   if (credentialId && profile !== undefined) {
-    // No dispatch path sets both: interfaces turn a profile into an instance
-    // (whose binding carries the id) before reaching here, and provider
-    // dispatch never pins an id. Both arriving means a caller bug.
     throw new CredentialResolutionError(
       `Cannot resolve ${provider} by credential id and profile at once`,
     );
   }
   if (profile !== undefined) {
-    return resolveRecordByProfile(workspaceId, provider, profile);
+    throw new CredentialResolutionError(
+      `Credential profile ${JSON.stringify(profile)} for ${provider} must be resolved through the profile store ` +
+        `(profiles.set { namespace: ${JSON.stringify(provider)}, name: ${JSON.stringify(profile)}, credential: <id> }) — ` +
+        `credential labels are display names, not identifiers`,
+    );
   }
   if (!credentialId) return store.resolveRecordForProvider(workspaceId, provider);
   const record = await store.resolveRecordById(workspaceId, credentialId);
@@ -790,48 +784,6 @@ export async function resolveCredentialRecord(
   if (record.provider !== provider) {
     throw new CredentialResolutionError(
       `Credential ${credentialId} belongs to ${record.provider}, not ${provider}`,
-    );
-  }
-  return { id: record.id, payload: record.payload };
-}
-
-async function resolveRecordByProfile(
-  workspaceId: string,
-  provider: string,
-  profile: string,
-): Promise<{ id: string; payload: CredentialPayload }> {
-  const store = getCredentialStore();
-  const records = (await store.list(workspaceId)).filter(
-    (record) => record.provider === provider,
-  );
-  const matches = records.filter((record) => record.label === profile);
-  if (matches.length === 0) {
-    const labels = records
-      .map((record) => record.label)
-      .filter((label): label is string => typeof label === "string" && label.length > 0);
-    const available =
-      labels.length > 0
-        ? `Available profiles: ${labels.map((label) => `"${label}"`).join(", ")}`
-        : records.length === 0
-          ? `The workspace holds no ${provider} credentials`
-          : `None of the workspace's ${records.length} ${provider} credential(s) carries a label — set one on the credentials page to use it as a profile`;
-    throw new CredentialResolutionError(
-      `No ${provider} credential is labeled "${profile}". ${available}`,
-    );
-  }
-  if (matches.length > 1) {
-    throw new CredentialResolutionError(
-      `${matches.length} ${provider} credentials are labeled "${profile}" — a profile must name exactly one. ` +
-        `Relabel them on the credentials page so each label is unique.`,
-    );
-  }
-  const match = matches[0]!;
-  const record = await store.resolveRecordById(workspaceId, match.id);
-  if (!record) {
-    // Deleted between the listing and the read; the same loud failure a
-    // stale pinned credentialId gets.
-    throw new CredentialResolutionError(
-      `Credential ${match.id} (profile "${profile}") no longer exists in this workspace`,
     );
   }
   return { id: record.id, payload: record.payload };

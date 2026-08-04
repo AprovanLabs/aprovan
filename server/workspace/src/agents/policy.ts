@@ -29,8 +29,10 @@ const TIER_ORDER: readonly LlmTier[] = ["fast", "balanced", "deep"];
 
 /** One candidate instance, as resolved from its binding options. */
 export interface LlmCandidateMeta {
-  /** The instance namespace (`llm:fast`, `llm:deep`). */
+  /** The instance namespace (`llm:fast`, `llm:deep`) or bare interface id. */
   instance: string;
+  /** Structured pin when candidates come from agent profiles. */
+  pin?: { interface: string; profile?: string };
   /** The binding's `options.tier`; an undeclared candidate counts as balanced. */
   tier?: LlmTier;
   /** The binding's `options.costPerMTokUsd` — declared $/1M tokens. */

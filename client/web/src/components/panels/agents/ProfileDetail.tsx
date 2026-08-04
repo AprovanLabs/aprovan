@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArmedButton, relativeTime } from "../shell";
+import { formatLlmPin, formatLlmPins } from "./draft";
 import type { AgentProfile, ExecutionRow } from "./types";
 import { isTerminalStatus } from "./types";
 import { LiveDot, formatDuration, promptPreview } from "./utils";
@@ -65,14 +66,14 @@ export function ProfileDetail({
         <ConfigRow label="Model">
           {agent.llm ? (
             <Badge variant="secondary" className="px-1.5 py-0 font-mono text-[10px]">
-              {agent.llm}
+              {formatLlmPin(agent.llm)}
             </Badge>
           ) : (
             <span className="text-muted-foreground">Not set</span>
           )}
           {agent.llmCandidates?.length ? (
             <span className="ml-1 text-muted-foreground">
-              candidates: {agent.llmCandidates.join(", ")}
+              candidates: {formatLlmPins(agent.llmCandidates)}
             </span>
           ) : null}
         </ConfigRow>

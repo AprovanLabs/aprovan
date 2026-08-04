@@ -210,15 +210,28 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<Workflow
       };
       const spanStart = performance.now();
       try {
-        // Positional args follow the SDK call convention: a single object
-        // argument is the operation's named args.
-        const argObject =
+        const rawArgs: Record<string, unknown> =
           args.length === 1 && typeof args[0] === "object" && args[0] !== null
-            ? (args[0] as Record<string, unknown>)
+            ? { ...(args[0] as Record<string, unknown>) }
             : args.length === 0
               ? {}
               : { args };
-        const result = await invokeTool(ctx, namespace, path, argObject, profile);
+        const embeddedOptions = rawArgs["__options"];
+        const callSiteOptions =
+          embeddedOptions &&
+          typeof embeddedOptions === "object" &&
+          !Array.isArray(embeddedOptions)
+            ? (embeddedOptions as Record<string, unknown>)
+            : undefined;
+        if (callSiteOptions) delete rawArgs["__options"];
+        const result = await invokeTool(
+          ctx,
+          namespace,
+          path,
+          rawArgs,
+          profile,
+          callSiteOptions,
+        );
         span.ok = true;
         return result;
       } catch (err) {

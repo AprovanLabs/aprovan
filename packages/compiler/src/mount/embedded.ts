@@ -116,8 +116,8 @@ export async function mountEmbedded(
   const pluginContext = { sourcePath: options.sourcePath };
   const tools = assembleTools({
     namespaces: services,
-    transport: (namespace, procedure, args) =>
-      effectiveProxy.call(namespace, procedure, args),
+    transport: (namespace, procedure, args, pin) =>
+      effectiveProxy.call(namespace, procedure, args, undefined, pin),
     plugins: options.plugins,
     pluginContext,
   });

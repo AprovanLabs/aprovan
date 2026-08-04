@@ -248,6 +248,8 @@ export interface Proxy {
     args: unknown[],
     /** Attribution for telemetry: which widget made this call. */
     meta?: WidgetCallMeta,
+    /** Profile / call-site options pinned by depth-0 configure or `.client`. */
+    pin?: { profile?: string; options?: Record<string, unknown> },
   ): Promise<unknown>;
 }
 
@@ -323,6 +325,8 @@ export interface ServiceCallPayload {
   namespace: string;
   procedure: string;
   args: unknown[];
+  profile?: string;
+  options?: Record<string, unknown>;
 }
 
 export interface ServiceResultPayload {

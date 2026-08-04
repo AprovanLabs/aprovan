@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { invokeNamespaceTool } from "@/lib/tools";
 import { PanelEmpty, relativeTime } from "../shell";
+import { formatLlmPin } from "./draft";
 import type {
   AgentProfile,
   AgentRunDetail,
@@ -146,7 +147,7 @@ function AgentRunDetailView({
           <div className="flex flex-wrap gap-1">
             {agentProfile.llm && (
               <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">
-                {agentProfile.llm}
+                {formatLlmPin(agentProfile.llm)}
               </Badge>
             )}
             {agentProfile.model && (

@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { PanelEmpty } from "../shell";
+import { formatLlmPin } from "./draft";
 import type { AgentProfile } from "./types";
 import { promptPreview } from "./utils";
 
@@ -42,7 +43,7 @@ export function ProfileList({
             <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
               {agent.llm ? (
                 <Badge variant="secondary" className="shrink-0 px-1.5 py-0 font-mono text-[10px]">
-                  {agent.llm}
+                  {formatLlmPin(agent.llm)}
                 </Badge>
               ) : (
                 <span className="shrink-0 text-[10px]">No model</span>

@@ -24,6 +24,10 @@ export interface ToolCredential {
 
 export interface ToolCallRequest {
   args: Record<string, unknown>;
+  /** Profile name pinned by depth-0 configure / client pin. Travels out of band. */
+  profile?: string;
+  /** Call-site options (no transport keys). Merged over profile options. */
+  options?: Record<string, unknown>;
   credential?: ToolCredential;
   stream?: boolean;
 }

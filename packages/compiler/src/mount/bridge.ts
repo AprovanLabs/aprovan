@@ -42,6 +42,7 @@ export function createHttpProxy(
       procedure: string,
       args: unknown[],
       meta?: WidgetCallMeta,
+      pin?: { profile?: string; options?: Record<string, unknown> },
     ): Promise<unknown> {
       const url = `${proxyUrl}/${namespace}/${procedure}`;
       const startedAt = Date.now();
@@ -75,7 +76,11 @@ export function createHttpProxy(
         response = await fetchImpl(url, {
           method: "POST",
           headers,
-          body: JSON.stringify({ args: args[0] ?? {} }),
+          body: JSON.stringify({
+            args: args[0] ?? {},
+            ...(pin?.profile !== undefined ? { profile: pin.profile } : {}),
+            ...(pin?.options !== undefined ? { options: pin.options } : {}),
+          }),
         });
       } catch (err) {
         emitCall(false, err instanceof Error ? err.message : String(err));
@@ -221,8 +226,15 @@ export class ParentBridge {
       const payload = message.payload as ServiceCallPayload;
       const win = sourceIframe.contentWindow;
       if (!win) return;
+      const pin =
+        payload.profile !== undefined || payload.options !== undefined
+          ? {
+              ...(payload.profile !== undefined ? { profile: payload.profile } : {}),
+              ...(payload.options !== undefined ? { options: payload.options } : {}),
+            }
+          : undefined;
       await answerServiceCall(win, message.id, payload, (namespace, procedure, args) =>
-        this.proxy.call(namespace, procedure, args, meta),
+        this.proxy.call(namespace, procedure, args, meta, pin),
       );
     }
   }
@@ -279,6 +291,8 @@ export function createIframeProxy(): Proxy {
       namespace: string,
       procedure: string,
       args: unknown[],
+      _meta?: WidgetCallMeta,
+      pin?: { profile?: string; options?: Record<string, unknown> },
     ): Promise<unknown> {
       return new Promise((resolve, reject) => {
         const id = generateMessageId();
@@ -287,7 +301,13 @@ export function createIframeProxy(): Proxy {
         const message: BridgeMessage = {
           type: "service-call",
           id,
-          payload: { namespace, procedure, args } as ServiceCallPayload,
+          payload: {
+            namespace,
+            procedure,
+            args,
+            ...(pin?.profile !== undefined ? { profile: pin.profile } : {}),
+            ...(pin?.options !== undefined ? { options: pin.options } : {}),
+          } as ServiceCallPayload,
         };
 
         window.parent.postMessage(message, "*");
@@ -388,7 +408,7 @@ export function generateIframeBridgeScript(
     }
   });
 
-  function proxyCall(namespace, procedure, args) {
+  function proxyCall(namespace, procedure, args, pin) {
     return new Promise(function(resolve, reject) {
       const id = Date.now() + '-' + Math.random().toString(36).slice(2, 11);
       pendingCalls.set(id, { resolve: resolve, reject: reject });
@@ -396,7 +416,13 @@ export function generateIframeBridgeScript(
       window.parent.postMessage({
         type: 'service-call',
         id: id,
-        payload: { namespace: namespace, procedure: procedure, args: args }
+        payload: {
+          namespace: namespace,
+          procedure: procedure,
+          args: args,
+          profile: pin && pin.profile,
+          options: pin && pin.options
+        }
       }, '*');
 
       setTimeout(function() {

@@ -24,7 +24,6 @@ import { mayInvokeTool } from "../authorize.js";
 import { getCredentialStore, resolveCredentialRecord } from "../credentials.js";
 import {
   isInterface,
-  listInstances,
   listInterfaces,
   parseInterfaceNamespace,
   readBindings,
@@ -324,20 +323,19 @@ async function interfaceIsExecutable(
 }
 
 /**
- * Every interface namespace this workspace can call: each interface's default
- * instance when some compatible provider is connected, plus every named
- * instance the workspace has bound. `sql:analytics` is a namespace in exactly
- * the way `sql` is — same discovery, same dispatch, its own credential.
+ * Every interface namespace this workspace can call. Named profiles travel in
+ * the request body (`client(name)` / `{ profile }`), so discovery lists only
+ * bare interface ids — never colon-addressed instances.
  */
 async function interfaceNamespaces(
-  workspaceId: string,
+  _workspaceId: string,
   connected: Set<string>,
 ): Promise<string[]> {
-  const namespaces = listInterfaces()
+  return listInterfaces()
     .filter((def) => {
       // When an interface id is also a core service (`telemetry`), the bare
-      // namespace stays on the core-service branch — vendor egress is named
-      // instances only (D3). Don't advertise a duplicate interface namespace.
+      // namespace stays on the core-service branch — vendor egress uses
+      // profiles (D3). Don't advertise a duplicate interface namespace.
       if (isCoreServiceName(def.id)) return false;
       // A credentialless implementation is always available, so its interface
       // is always listed — `agent` must appear in a workspace that has
@@ -345,10 +343,6 @@ async function interfaceNamespaces(
       return def.compat.some((entry) => entry.credentialless || connected.has(entry.provider));
     })
     .map((def) => def.id);
-  for (const instance of await listInstances(workspaceId)) {
-    if (!namespaces.includes(instance.instance)) namespaces.push(instance.instance);
-  }
-  return namespaces;
 }
 
 /**
@@ -582,7 +576,7 @@ async function describeNamespaces(workspaceId: string): Promise<NamespaceInfo[]>
     namespaces.push({
       id: namespace,
       kind: "interface",
-      label: parsed.name ? `${def.label} · ${parsed.name}` : def.label,
+      label: def.label,
       description: def.description,
       icon: "plug",
       compat: def.compat
@@ -733,6 +727,39 @@ toolsRouter.post("/:provider/:operation{.*}", rateLimitByUserId, async (c) => {
     }
   }
 
+  // Body is parsed before interface/provider resolution so `profile` and
+  // call-site `options` travel out of band (never in the URL path).
+  const requestId = crypto.randomUUID();
+  const startTime = Date.now();
+
+  let body: ToolCallRequest;
+  try {
+    body = await c.req.json<ToolCallRequest>();
+  } catch {
+    recordDispatch(400, 0, "Expected { args, profile?, options? }");
+    return c.json({ error: "Expected { args, profile?, options? }" }, 400);
+  }
+  if (!body.args || typeof body.args !== "object" || Array.isArray(body.args)) {
+    recordDispatch(400, 0, "args must be an object");
+    return c.json({ error: "args must be an object" }, 400);
+  }
+  if (body.options && typeof body.options === "object" && !Array.isArray(body.options)) {
+    const { assertCallOptions } = await import("../profiles/types.js");
+    try {
+      assertCallOptions(body.options);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      recordDispatch(400, 0, message);
+      return c.json({ error: message }, 400);
+    }
+  }
+  const requestProfile =
+    typeof body.profile === "string" && body.profile ? body.profile : undefined;
+  const callSiteOptions =
+    body.options && typeof body.options === "object" && !Array.isArray(body.options)
+      ? body.options
+      : undefined;
+
   // Generic interfaces (llm, …) resolve to the workspace's bound
   // implementation and dispatch as that concrete provider — credential
   // lookup, alias resolution, permissions, and audit all see the real
@@ -748,9 +775,15 @@ toolsRouter.post("/:provider/:operation{.*}", rateLimitByUserId, async (c) => {
   // same way the workflow twin does in workflows/invoke.ts. No module, no
   // credential, no isolate.
   let nativeAgentInterface = false;
+  const requestNamespace = provider;
   if (provider && operation && parseInterfaceNamespace(provider)) {
     try {
-      const resolved = await resolveInterfaceForWorkspace(workspaceId, provider);
+      const resolved = await resolveInterfaceForWorkspace(
+        workspaceId,
+        provider,
+        undefined,
+        requestProfile,
+      );
       // An entry with no loadable module must not reach the isolate: the
       // loader's own error names a package subpath, not the thing that is
       // actually missing. See InterfaceCompat.unavailable.
@@ -763,8 +796,8 @@ toolsRouter.post("/:provider/:operation{.*}", rateLimitByUserId, async (c) => {
       nativeAgentInterface =
         resolved.def.id === "agent" && resolved.compat.provider === "native";
       interfaceDefaults = resolved.def.defaultsFor.includes(operation)
-        ? resolved.options
-        : undefined;
+        ? { ...resolved.options, ...(callSiteOptions ?? {}) }
+        : callSiteOptions;
       provider = resolved.compat.provider;
       interfaceModule = resolved.compat.module;
       interfaceTimeoutMs = resolved.def.timeoutMs;
@@ -777,15 +810,34 @@ toolsRouter.post("/:provider/:operation{.*}", rateLimitByUserId, async (c) => {
       recordDispatch(status, 0, message);
       return c.json({ error: message }, status as 400);
     }
+  } else if (provider && requestProfile) {
+    // Provider namespace profile → resolve credential id from the profile store.
+    const { getNamespaceProfile, listProfileNames } = await import("../profiles/store.js");
+    const record = await getNamespaceProfile(workspaceId, provider, requestProfile);
+    if (!record) {
+      const existing = await listProfileNames(workspaceId, provider);
+      const available =
+        existing.length > 0
+          ? `Available profiles: ${existing.map((n) => JSON.stringify(n)).join(", ")}`
+          : `No profiles are configured for ${provider}`;
+      const message = `No ${provider} profile named ${JSON.stringify(requestProfile)}. ${available}`;
+      recordDispatch(404, 0, message);
+      return c.json({ error: message }, 404);
+    }
+    if (record.credential) interfaceCredentialId = record.credential;
+    if (record.options || callSiteOptions) {
+      interfaceDefaults = { ...(record.options ?? {}), ...(callSiteOptions ?? {}) };
+    }
+  } else if (callSiteOptions) {
+    interfaceDefaults = callSiteOptions;
   }
 
   if (
     getAuthMode() === "oidc" &&
-    !(await mayInvokeTool(principal, provider!, operation!))
+    !(await mayInvokeTool(principal, requestNamespace!, operation!))
   ) {
-    const requestId = crypto.randomUUID();
-    logMetadata({ requestId, workspaceId, callerId, provider: provider!, operation: operation!, status: 403 });
-    getAuditStore().append({ requestId, workspaceId, callerId, provider: provider!, operation: operation!, status: 403 });
+    logMetadata({ requestId, workspaceId, callerId, provider: requestNamespace!, operation: operation!, status: 403 });
+    getAuditStore().append({ requestId, workspaceId, callerId, provider: requestNamespace!, operation: operation!, status: 403 });
     recordDispatch(403, 0, "Forbidden: caller does not have permission for this operation");
     return c.json({ error: "Forbidden: caller does not have permission for this operation" }, 403);
   }
@@ -793,21 +845,6 @@ toolsRouter.post("/:provider/:operation{.*}", rateLimitByUserId, async (c) => {
   if (!provider || !operation) {
     recordDispatch(400, 0, "Missing provider or operation");
     return c.json({ error: "Missing provider or operation" }, 400);
-  }
-
-  const requestId = crypto.randomUUID();
-  const startTime = Date.now();
-
-  let body: ToolCallRequest;
-  try {
-    body = await c.req.json<ToolCallRequest>();
-  } catch {
-    recordDispatch(400, Date.now() - startTime, "Expected { args, credential? }");
-    return c.json({ error: "Expected { args, credential? }" }, 400);
-  }
-  if (!body.args || typeof body.args !== "object" || Array.isArray(body.args)) {
-    recordDispatch(400, Date.now() - startTime, "args must be an object");
-    return c.json({ error: "args must be an object" }, 400);
   }
   // In-process short-circuit for the native agent runtime — the HTTP twin of
   // the one in workflows/invoke.ts, mirroring the core-service branch above:
