@@ -109,12 +109,17 @@ export async function mountEmbedded(
     document.head.appendChild(style);
   }
 
+  const effectiveProxy = options.plugins?.wrapProxy(proxy) ?? proxy;
+
   // Install the assembled tools root
   const services = widget.manifest.services || [];
+  const pluginContext = { sourcePath: options.sourcePath };
   const tools = assembleTools({
     namespaces: services,
     transport: (namespace, procedure, args) =>
-      proxy.call(namespace, procedure, args),
+      effectiveProxy.call(namespace, procedure, args),
+    plugins: options.plugins,
+    pluginContext,
   });
   installTools(window, tools);
 

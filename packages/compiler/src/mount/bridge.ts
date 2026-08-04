@@ -332,11 +332,22 @@ export function createIframeProxy(): Proxy {
  * 1. Message handling for service results from parent
  * 2. Dynamic proxy objects for each namespace that support arbitrary nested calls
  */
-export function generateIframeBridgeScript(services: string[]): string {
+export function generateIframeBridgeScript(
+  services: string[],
+  options: {
+    staticOverrides?: Record<string, unknown>;
+    telemetryBind?: string;
+  } = {},
+): string {
   const uniqueNamespaces = extractNamespaces(services);
   const toolsAssignments = uniqueNamespaces
     .map((ns) => `tools[${JSON.stringify(ns)}] = createNamespaceNode(${JSON.stringify(ns)});`)
     .join("\n  ");
+  const overrideAssign =
+    options.staticOverrides && Object.keys(options.staticOverrides).length > 0
+      ? `\n  Object.assign(tools, ${JSON.stringify(options.staticOverrides)});`
+      : "";
+  const telemetryBind = options.telemetryBind ?? "";
 
   return `
 (function() {
@@ -440,8 +451,9 @@ export function generateIframeBridgeScript(services: string[]): string {
   }
 
   var tools = {};
-  ${toolsAssignments}
+  ${toolsAssignments}${overrideAssign}
   window.tools = tools;
+  ${telemetryBind}
 })();
 `;
 }

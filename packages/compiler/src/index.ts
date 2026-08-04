@@ -162,6 +162,13 @@ export {
 export type {
   AssembleToolsOptions,
   NamespaceNode,
-  ToolsPlugins,
   ToolsTransport,
+  MiddlewareFn,
+  OverrideContext,
+  OverrideFactory,
+  ToolCall,
 } from "./mount/index.js";
+export {
+  createPluginRegistry,
+  PluginRegistry,
+} from "./plugins/index.js";

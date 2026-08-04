@@ -67,7 +67,10 @@ export interface NamespaceTypesOptions {
    * where the data physically lands, how it is partitioned, anything the
    * caller knows and this generator cannot.
    */
-  notes?: Record<string, string>;
+  /**
+   * Per-namespace declaration overrides from plugin registration (override `types`).
+   */
+  overrideTypes?: Record<string, string>;
 }
 
 /** One workflow an app exports, as the manifest declares it. */
@@ -410,9 +413,18 @@ export function generateNamespaceTypes(
   if (workflows.length > 0 && !namespaces.includes("app")) {
     namespaces.push("app");
   }
+  if (options.overrideTypes) {
+    for (const ns of Object.keys(options.overrideTypes)) {
+      if (!namespaces.includes(ns)) namespaces.push(ns);
+    }
+  }
 
   const native = new Set<string>(NATIVE_APP_NAMESPACES);
   const blocks = namespaces.map((namespace) => {
+    const pluginType = options.overrideTypes?.[namespace];
+    if (pluginType) {
+      return `${blockComment(options.notes?.[namespace])}${pluginType}`;
+    }
     const declaration = native.has(namespace)
       ? NATIVE_DECLARATIONS[namespace]
       : undefined;

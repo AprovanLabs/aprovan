@@ -6,6 +6,7 @@
 
 import { generateImportMap } from "../transforms/cdn.js";
 import { ParentBridge, generateIframeBridgeScript } from "./bridge.js";
+import { TELEMETRY_IFRAME_BIND } from "../plugins/telemetry-iframe-bind.js";
 import { generateIframeMountHelpers } from "./mount-default-export.js";
 import type {
   CompiledWidget,
@@ -73,8 +74,15 @@ function generateIframeContent(
   services: string[],
   baseUrl: string,
   darkMode: boolean,
+  mountOptions: Pick<MountOptions, "plugins" | "sourcePath">,
 ): string {
-  const bridgeScript = generateIframeBridgeScript(services);
+  const pluginContext = { sourcePath: mountOptions.sourcePath };
+  const bridgeScript = generateIframeBridgeScript(services, {
+    staticOverrides: mountOptions.plugins?.staticOverrides(pluginContext),
+    telemetryBind: mountOptions.plugins?.hasTelemetryOverride()
+      ? TELEMETRY_IFRAME_BIND
+      : undefined,
+  });
 
   // Generate import map from image dependencies and manifest packages
   const packages = {
@@ -240,6 +248,7 @@ export async function mountIframe(
 ): Promise<MountedWidget> {
   const { target, sandbox = DEFAULT_SANDBOX, inputs = {} } = options;
   const mountId = generateMountId();
+  const effectiveProxy = options.plugins?.wrapProxy(proxy) ?? proxy;
 
   // Create iframe
   const iframe = document.createElement("iframe");
@@ -251,7 +260,7 @@ export async function mountIframe(
   // Register with bridge before loading content. The meta attributes every
   // service call and console line from this iframe to its widget source; the
   // per-mount traceId groups one instance's activity into one trace.
-  const bridge = getParentBridge(proxy, telemetry);
+  const bridge = getParentBridge(effectiveProxy, telemetry);
   bridge.registerIframe(iframe, {
     widgetId: mountId,
     ...(options.sourcePath ? { path: options.sourcePath } : {}),
@@ -267,7 +276,7 @@ export async function mountIframe(
   const darkMode =
     typeof document !== "undefined" &&
     document.documentElement.classList.contains("dark");
-  const content = generateIframeContent(image, inputs, services, baseUrl, darkMode);
+  const content = generateIframeContent(image, inputs, services, baseUrl, darkMode, options);
   iframe.srcdoc = content;
 
   // Append to target

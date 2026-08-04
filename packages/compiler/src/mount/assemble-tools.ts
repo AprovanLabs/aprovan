@@ -3,6 +3,8 @@
  */
 
 import { extractNamespaces } from "../namespace-core.js";
+import type { PluginRegistry } from "../plugins/registry.js";
+import type { OverrideContext } from "../plugins/registry.js";
 
 export type ToolsTransport = (
   namespace: string,
@@ -10,17 +12,13 @@ export type ToolsTransport = (
   args: unknown[],
 ) => Promise<unknown>;
 
-/** Plugin registry — wired in stream 4. */
-export interface ToolsPlugins {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  [key: string]: any;
-}
-
 export interface AssembleToolsOptions {
   /** Service names or dotted paths; reduced to namespace roots. */
   namespaces: string[];
   transport: ToolsTransport;
-  plugins?: ToolsPlugins;
+  plugins?: PluginRegistry;
+  /** Host context forwarded to override factories. */
+  pluginContext?: OverrideContext;
 }
 
 export type NamespaceNode = Record<string, unknown> & {
@@ -60,16 +58,28 @@ export function createCallableNamespaceNode(
  * Build the `tools` root from a namespace set and transport.
  * The only place namespace proxies are constructed in this package.
  */
-export function assembleTools(options: AssembleToolsOptions): Record<string, NamespaceNode> {
-  const { namespaces, transport } = options;
-  const uniqueNamespaces = extractNamespaces(namespaces);
+export function assembleTools(
+  options: AssembleToolsOptions,
+): Record<string, unknown> {
+  const { namespaces, transport, plugins, pluginContext = {} } = options;
+  const uniqueNamespaces = new Set(extractNamespaces(namespaces));
+  if (plugins) {
+    for (const ns of plugins.providedNamespaces()) uniqueNamespaces.add(ns);
+  }
+
+  const wrappedTransport = plugins?.wrapTransport(transport) ?? transport;
   const tools: Record<string, NamespaceNode> = {};
 
   for (const namespace of uniqueNamespaces) {
-    tools[namespace] = createCallableNamespaceNode(namespace, transport);
+    if (plugins?.providedNamespaces().includes(namespace) && !extractNamespaces(namespaces).includes(namespace)) {
+      continue;
+    }
+    tools[namespace] = createCallableNamespaceNode(namespace, wrappedTransport);
   }
 
-  void options.plugins;
+  if (plugins) {
+    return plugins.applyOverrides(tools, pluginContext);
+  }
 
   return tools;
 }

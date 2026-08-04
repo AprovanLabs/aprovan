@@ -19,9 +19,18 @@ export {
 export type {
   AssembleToolsOptions,
   NamespaceNode,
-  ToolsPlugins,
   ToolsTransport,
 } from "./assemble-tools.js";
+export {
+  createPluginRegistry,
+  PluginRegistry,
+} from "../plugins/index.js";
+export type {
+  MiddlewareFn,
+  OverrideContext,
+  OverrideFactory,
+  ToolCall,
+} from "../plugins/index.js";
 export {
   createHttpProxy,
   extractNamespaces,
