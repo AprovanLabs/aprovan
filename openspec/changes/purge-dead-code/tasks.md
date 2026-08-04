@@ -107,22 +107,24 @@
 
 > Depends-on: - | Touches: core/infra/aws/dist/**, core/infra/cloudflare/tunnel.tf | Verify: cd core/infra/aws && pnpm run build && pnpm run typecheck; cd core/infra/cloudflare && make validate
 
-- [ ] 3.1 `rm -rf core/infra/aws/dist/` (confirmed untracked by git — `git ls-files` returns zero
+- [x] 3.1 `rm -rf core/infra/aws/dist/` (confirmed untracked by git — `git ls-files` returns zero
       results — local working-tree cleanup only, no diff expected)
-- [ ] 3.2 Delete `core/infra/cloudflare/tunnel.tf` (confirmed standalone: defines
+- [x] 3.2 Delete `core/infra/cloudflare/tunnel.tf` (confirmed standalone: defines
       `random_password.tunnel_secret`, `cloudflare_tunnel.tunnel`,
       `cloudflare_tunnel_config.example_config` with placeholder values — `"foobar"`,
       `10.0.0.2/3`; no other `.tf` file in `infra/cloudflare/` references these resource names;
       fully superseded by `workspace-tunnel.tf`, which stays)
-- [ ] 3.3 `cd core/infra/aws && pnpm run build` to confirm `dist/` regenerates clean from source
+- [x] 3.3 `cd core/infra/aws && pnpm run build` to confirm `dist/` regenerates clean from source
       after deletion
 
 ## 4. npm deprecations
 
 > Depends-on: 1, 2 | Touches: (none — npm registry state only, no repo files) | Verify: npm view <package> --json | grep -q '"deprecated"' for each package listed below
 
-- [ ] 4.1 Confirm npm publish auth for the `@aprovan` scope is available to the executing agent;
+- [x] 4.1 Confirm npm publish auth for the `@aprovan` scope is available to the executing agent;
       if not, stop here and leave 4.2–4.5 unchecked rather than skipping silently (PRD constraint)
+      — **BLOCKED 2026-08-04**: `npm whoami` / `npm token list` return E401 (invalid
+      `~/.npmrc` token). Auth not available; 4.2–4.8 left unchecked per PRD.
 - [ ] 4.2 `npm deprecate @aprovan/bobbin "Deleted in purge-dead-code (WS-1); the visual-edit panel is discontinued. See git history for the source."`
 - [ ] 4.3 `npm deprecate @aprovan/patchwork-mcp "Deleted in purge-dead-code (WS-1); MCP-Apps distribution is rebuild-later-if-ever. See git history for the source."`
 - [ ] 4.4 `npm deprecate @aprovan/patchwork "Deleted in purge-dead-code (WS-1); its only consumer (@aprovan/patchwork-mcp) was removed. See git history for the source."`
