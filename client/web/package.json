@@ -14,7 +14,6 @@
     "@aprovan/editor": "workspace:*",
     "@aprovan/registry-main": "workspace:*",
     "@aprovan/registry-ui": "workspace:*",
-    "@aprovan/runtime": "^0.1.0",
     "@aprovan/ui": "workspace:*",
     "@lobehub/icons-static-svg": "^1.93.0",
     "@radix-ui/react-avatar": "^1.1.11",

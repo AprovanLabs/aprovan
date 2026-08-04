@@ -147,6 +147,9 @@ export {
   reloadIframe,
   disposeIframeBridge,
   DEV_SANDBOX,
+  // Script sandbox (playground entry point)
+  runScriptInSandbox,
+  answerServiceCall,
   // Tools assembly
   assembleTools,
   createCallableNamespaceNode,
@@ -167,6 +170,8 @@ export type {
   OverrideContext,
   OverrideFactory,
   ToolCall,
+  RunScriptOptions,
+  SandboxRun,
 } from "./mount/index.js";
 export {
   createPluginRegistry,

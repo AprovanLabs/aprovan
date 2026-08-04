@@ -3,6 +3,8 @@
  */
 
 import { extractNamespaces } from "../namespace-core.js";
+import { IFRAME_NAMESPACE_PROXY_SOURCE } from "./iframe-proxy-source.js";
+import { answerServiceCall } from "./sandbox-host.js";
 import type {
   BridgeMessage,
   ServiceCallPayload,
@@ -217,32 +219,11 @@ export class ParentBridge {
 
     if (message.type === "service-call") {
       const payload = message.payload as ServiceCallPayload;
-      try {
-        const result = await this.proxy.call(
-          payload.namespace,
-          payload.procedure,
-          payload.args,
-          meta,
-        );
-
-        const response: BridgeMessage = {
-          type: "service-result",
-          id: message.id,
-          payload: { result } as ServiceResultPayload,
-        };
-
-        sourceIframe.contentWindow?.postMessage(response, "*");
-      } catch (error) {
-        const response: BridgeMessage = {
-          type: "service-result",
-          id: message.id,
-          payload: {
-            error: error instanceof Error ? error.message : String(error),
-          } as ServiceResultPayload,
-        };
-
-        sourceIframe.contentWindow?.postMessage(response, "*");
-      }
+      const win = sourceIframe.contentWindow;
+      if (!win) return;
+      await answerServiceCall(win, message.id, payload, (namespace, procedure, args) =>
+        this.proxy.call(namespace, procedure, args, meta),
+      );
     }
   }
 
@@ -427,28 +408,9 @@ export function generateIframeBridgeScript(
     });
   }
 
-  // Callable namespace node: depth-0 invocation configures; depth >= 1 dispatches.
-  function createNamespaceNode(namespace) {
-    function createNestedProxy(path) {
-      var fn = function() {
-        var args = Array.prototype.slice.call(arguments);
-        if (!path) {
-          return createNamespaceNode(namespace);
-        }
-        return proxyCall(namespace, path, args);
-      };
-
-      return new Proxy(fn, {
-        get: function(_, nestedName) {
-          if (typeof nestedName === 'symbol') return undefined;
-          var newPath = path ? path + '.' + nestedName : nestedName;
-          return createNestedProxy(newPath);
-        }
-      });
-    }
-
-    return createNestedProxy('');
-  }
+  // Namespace proxy factory — serialization of @utdk/remote's algorithm
+  // (see iframe-proxy-source.ts). Host-side construction uses @utdk/remote.
+  ${IFRAME_NAMESPACE_PROXY_SOURCE}
 
   var tools = {};
   ${toolsAssignments}${overrideAssign}
@@ -457,3 +419,4 @@ export function generateIframeBridgeScript(
 })();
 `;
 }
+

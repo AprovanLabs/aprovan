@@ -11,6 +11,17 @@ export {
   DEV_SANDBOX,
 } from "./iframe.js";
 export {
+  runScriptInSandbox,
+  type RunScriptOptions,
+  type SandboxRun,
+  type RuntimeDependency as ScriptRuntimeDependency,
+} from "./sandbox.js";
+export {
+  answerServiceCall,
+  serviceCallArgs,
+  transportAsProxy,
+} from "./sandbox-host.js";
+export {
   assembleTools,
   createCallableNamespaceNode,
   installTools,

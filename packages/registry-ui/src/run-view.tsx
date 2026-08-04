@@ -6,7 +6,7 @@
  * The component is purely presentational over a neutral {@link RunViewModel};
  * two adapters produce that shape:
  *
- *  - {@link runViewFromRuntimeEvents} — folds a `@aprovan/runtime` event
+ *  - {@link runViewFromRuntimeEvents} — folds a `@utdk/remote` event
  *    stream (`call:start` / `call:retry` / `call:end` / `log` / `script:end`)
  *    into the model. Hosts accumulate events with {@link reduceRunEvent} and
  *    re-run the adapter each render, so streaming runs stay live.
@@ -69,8 +69,8 @@ export interface RunViewModel {
 // ---------------------------------------------------------------------------
 
 /**
- * Structural stand-in for `@aprovan/runtime`'s `RuntimeEvent` union so this
- * shared package needs no runtime dependency; real events are assignable.
+ * Structural stand-in for `@utdk/remote`'s `RuntimeEvent` union so this
+ * shared package needs no remote-client dependency; real events are assignable.
  */
 export type RunViewRuntimeEvent =
   | {
