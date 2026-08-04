@@ -69,4 +69,34 @@ describe("createChecker", () => {
       env.dispose();
     }
   });
+
+  it("allows named imports from unmatched modules (react via wildcard)", async () => {
+    const env = await createTypeEnvironment({
+      rootFiles: [AMBIENT_FALLBACK_PATH, "/lib.d.ts"],
+      files: {
+        [AMBIENT_FALLBACK_PATH]: AMBIENT_FALLBACK,
+        "/lib.d.ts": LIB_STUB,
+      },
+      fsMap: new Map([
+        ["/lib.d.ts", LIB_STUB],
+        [AMBIENT_FALLBACK_PATH, AMBIENT_FALLBACK],
+      ]),
+      compilerOptions: TEST_COMPILER_OPTIONS,
+    });
+    try {
+      const checker = createChecker(env);
+      const project = createSingleFileProject(
+        `import { useState, useEffect } from "react";\nexport const n = useState(0);\n`,
+        "main.tsx",
+        "widget",
+      );
+      const diags = await checker.check(project, project.entry);
+      const starModuleErrors = diags.filter((d) =>
+        /Module '"\*"' has no exported member/u.test(d.message),
+      );
+      expect(starModuleErrors).toEqual([]);
+    } finally {
+      env.dispose();
+    }
+  });
 });
