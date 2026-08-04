@@ -16,8 +16,11 @@
 
 import { agentToolEntries as agentDiscoveryEntries } from "@utdk/agent";
 import { withSpan } from "@utdk/common/telemetry";
+import { eventsToolEntries as eventsDiscoveryEntries } from "@utdk/events";
+import { keyvalueToolEntries as keyvalueDiscoveryEntries } from "@utdk/keyvalue";
 import { llmToolEntries as llmDiscoveryEntries } from "@utdk/llm";
 import { telemetryToolEntries as telemetryDiscoveryEntries } from "@utdk/telemetry";
+import { vfsToolEntries as vfsDiscoveryEntries } from "@utdk/vfs";
 import { Hono } from "hono";
 import { getAuditStore } from "../audit.js";
 import { mayInvokeTool } from "../authorize.js";
@@ -34,7 +37,7 @@ import { isLlmProvider, resolveLlmProvider } from "../llm.js";
 import { getAuthMode, requireAuth } from "../middleware/auth.js";
 import { rateLimitByUserId } from "../middleware/rateLimitMiddleware.js";
 import { OAuthExchangeError, resolveToInjectable } from "../oauthTokens.js";
-import { isCoreServiceName, ServiceError } from "../service-kernel.js";
+import { ServiceError } from "../service-kernel.js";
 import { parseTelemetrySourceHeader, recordTelemetry } from "../telemetry/service.js";
 import {
   catalogToolEntries,
@@ -66,6 +69,9 @@ export interface ToolEntry {
   description?: string;
   inputSchema?: unknown;
   outputSchema?: unknown;
+  /** Result belongs to a bound implementation; any outputSchema is advisory. */
+  passthrough?: boolean;
+  streaming?: boolean;
 }
 
 interface CachedToolList {
@@ -210,7 +216,13 @@ function toLlmToolEntries(
 /** Re-label a contract package's own entries onto an interface namespace. */
 function toContractToolEntries(
   namespace: string,
-  entries: Array<{ name: string; description: string; inputSchema: Record<string, unknown> }>,
+  entries: Array<{
+    name: string;
+    description: string;
+    inputSchema: Record<string, unknown>;
+    outputSchema?: unknown;
+    streaming?: boolean;
+  }>,
 ): ToolEntry[] {
   return entries.map((entry) => ({
     provider: namespace,
@@ -222,6 +234,130 @@ function toContractToolEntries(
       : entry.name.slice(entry.name.indexOf(".") + 1),
     description: entry.description,
     inputSchema: entry.inputSchema,
+    ...(entry.outputSchema !== undefined ? { outputSchema: entry.outputSchema } : {}),
+    ...(entry.streaming !== undefined ? { streaming: entry.streaming } : {}),
+  }));
+}
+
+/** Workspace commit-store ops advertised for the aprovan native vcs binding. */
+function nativeVcsDiscoveryEntries(namespace: string): ToolEntry[] {
+  const ops: Array<{
+    operation: string;
+    description: string;
+    inputSchema: Record<string, unknown>;
+    outputSchema: Record<string, unknown>;
+  }> = [
+    {
+      operation: "commit",
+      description: "Snapshot the current workspace tree as a commit on main.",
+      inputSchema: { type: "object", properties: { message: { type: "string" } } },
+      outputSchema: {
+        type: "object",
+        properties: {
+          commit: { type: "object" },
+          created: { type: "boolean" },
+        },
+        required: ["commit", "created"],
+      },
+    },
+    {
+      operation: "log",
+      description: "Commit history, newest first.",
+      inputSchema: {
+        type: "object",
+        properties: { limit: { type: "number" } },
+      },
+      outputSchema: {
+        type: "object",
+        properties: { commits: { type: "array", items: { type: "object" } } },
+        required: ["commits"],
+      },
+    },
+    {
+      operation: "show",
+      description: "A commit's metadata, file list, and changes vs its parent.",
+      inputSchema: {
+        type: "object",
+        properties: { commit: { type: "string" } },
+        required: ["commit"],
+      },
+      outputSchema: {
+        type: "object",
+        properties: {
+          commit: { type: "object" },
+          files: { type: "array", items: { type: "string" } },
+          changes: { type: "object" },
+        },
+        required: ["commit", "files", "changes"],
+      },
+    },
+    {
+      operation: "diff",
+      description: "Added/modified/removed paths between two commits.",
+      inputSchema: {
+        type: "object",
+        properties: { from: { type: "string" }, to: { type: "string" } },
+        required: ["from", "to"],
+      },
+      outputSchema: {
+        type: "object",
+        properties: {
+          from: { type: "string" },
+          to: { type: "string" },
+          added: { type: "array", items: { type: "string" } },
+          modified: { type: "array", items: { type: "string" } },
+          removed: { type: "array", items: { type: "string" } },
+        },
+        required: ["from", "to", "added", "modified", "removed"],
+      },
+    },
+    {
+      operation: "branches",
+      description: "Named refs with their head commits.",
+      inputSchema: { type: "object", properties: {} },
+      outputSchema: {
+        type: "object",
+        properties: {
+          branches: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: { name: { type: "string" }, commit: { type: "string" } },
+            },
+          },
+        },
+        required: ["branches"],
+      },
+    },
+    {
+      operation: "restore",
+      description: "Non-destructively restore a commit's content.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          commit: { type: "string" },
+          path: { type: "string" },
+          prefix: { type: "string" },
+        },
+        required: ["commit"],
+      },
+      outputSchema: {
+        type: "object",
+        properties: {
+          commit: { type: "string" },
+          restored: { type: "array", items: { type: "string" } },
+        },
+        required: ["commit", "restored"],
+      },
+    },
+  ];
+  return ops.map((op) => ({
+    provider: namespace,
+    name: `${namespace}.${op.operation}`,
+    operation: op.operation,
+    description: op.description,
+    inputSchema: op.inputSchema,
+    outputSchema: op.outputSchema,
   }));
 }
 
@@ -282,9 +418,45 @@ async function interfaceToolEntries(
     );
   }
   if (parsed.interfaceId === "telemetry") {
-    // Vendor egress only — named instances advertise `export`; the bare
-    // namespace is the core service (emit/query/traces/export → activity store).
-    return toContractToolEntries(namespace, telemetryDiscoveryEntries(namespace));
+    // Contract `export` plus product activity ops on the aprovan default.
+    const exportEntries = toContractToolEntries(
+      namespace,
+      telemetryDiscoveryEntries(namespace),
+    );
+    if (namespace.includes(":")) return exportEntries;
+    const { telemetryService } = await import("../telemetry/service.js");
+    const product = telemetryService.tools
+      .filter((t) => t.operation !== "export")
+      .map((t) => ({
+        provider: namespace,
+        name: `${namespace}.${t.operation}`,
+        operation: t.operation,
+        description: t.description,
+        inputSchema: t.inputSchema,
+        ...(t.outputSchema !== undefined ? { outputSchema: t.outputSchema } : {}),
+      }));
+    return [...product, ...exportEntries];
+  }
+  if (parsed.interfaceId === "vfs") {
+    return toContractToolEntries(namespace, vfsDiscoveryEntries(namespace));
+  }
+  if (parsed.interfaceId === "keyvalue") {
+    return toContractToolEntries(namespace, keyvalueDiscoveryEntries(namespace));
+  }
+  if (parsed.interfaceId === "events") {
+    return toContractToolEntries(namespace, eventsDiscoveryEntries(namespace));
+  }
+  if (parsed.interfaceId === "vcs") {
+    // Workspace commit store (aprovan) vs Git-hosting contract (third parties).
+    try {
+      const resolved = await resolveInterfaceForWorkspace(workspaceId, namespace);
+      if (resolved.compat.provider === "aprovan") {
+        return nativeVcsDiscoveryEntries(namespace);
+      }
+    } catch {
+      // Fall through to empty / module borrow.
+    }
+    return nativeVcsDiscoveryEntries(namespace);
   }
   try {
     const resolved = await resolveInterfaceForWorkspace(workspaceId, namespace);
@@ -333,10 +505,8 @@ async function interfaceNamespaces(
 ): Promise<string[]> {
   return listInterfaces()
     .filter((def) => {
-      // When an interface id is also a core service (`telemetry`), the bare
-      // namespace stays on the core-service branch — vendor egress uses
-      // profiles (D3). Don't advertise a duplicate interface namespace.
-      if (isCoreServiceName(def.id)) return false;
+      // No service/interface precedence: interface ids are never also platform
+      // plugins (native-interface-provider / "No shadowed names").
       // A credentialless implementation is always available, so its interface
       // is always listed — `agent` must appear in a workspace that has
       // connected nothing, because the gateway's own runner is already there.
@@ -357,7 +527,7 @@ async function interfaceNamespaces(
  * Real UTDK providers that also appear in a compat list (github, openai, …)
  * still list normally.
  */
-const INTERFACE_ONLY_PROVIDERS = new Set(["machine", "native", "bashkit", "harness"]);
+const INTERFACE_ONLY_PROVIDERS = new Set(["machine", "native", "bashkit", "harness", "aprovan"]);
 
 export function shouldListCredentialAsProvider(provider: string): boolean {
   if (isInterface(provider)) return false;
@@ -537,7 +707,8 @@ toolsRouter.get("/", async (c) => {
 // the server's answer, and it costs no catalog I/O: core services and
 // interfaces are static, providers come from the credential list.
 
-export type NamespaceKind = "core" | "interface" | "provider" | "llm-alias";
+/** `plugin` = Aprovan-only platform namespace (formerly `core`). */
+export type NamespaceKind = "plugin" | "core" | "interface" | "provider" | "llm-alias";
 
 export interface NamespaceInfo {
   id: string;
@@ -558,9 +729,11 @@ async function describeNamespaces(workspaceId: string): Promise<NamespaceInfo[]>
   const connected = new Set(credentials.map((credential) => credential.provider));
   const bindings = await readBindings(workspaceId);
 
+  // Platform plugins are published as first-party (`plugin`; `core` kept as a
+  // synonym in clients that still key on the old wire value).
   const namespaces: NamespaceInfo[] = coreServiceMeta().map((service) => ({
     id: service.id,
-    kind: "core",
+    kind: "plugin",
     label: service.label,
     description: service.blurb,
     icon: service.icon,
@@ -584,7 +757,13 @@ async function describeNamespaces(workspaceId: string): Promise<NamespaceInfo[]>
         // connectable vendor — same INTERFACE_ONLY treatment as agent's
         // in-process runner, but filtered from listings so named instances
         // only offer real backends (datadog, sentry, …).
-        .filter((entry) => !(parsed.interfaceId === "telemetry" && entry.provider === "native"))
+        .filter(
+          (entry) =>
+            !(
+              parsed.interfaceId === "telemetry" &&
+              (entry.provider === "native" || entry.provider === "aprovan")
+            ),
+        )
         .map((entry) => ({
           provider: entry.provider,
           label: entry.label,
@@ -773,8 +952,10 @@ toolsRouter.post("/:provider/:operation{.*}", rateLimitByUserId, async (c) => {
   // The agent interface's `native` entry is this process: dispatch
   // short-circuits in-process below (after authz + body validation), the
   // same way the workflow twin does in workflows/invoke.ts. No module, no
-  // credential, no isolate.
+  // credential, no isolate. The five Aprovan-native contracts (`aprovan`
+  // provider) take the same path for the same reason.
   let nativeAgentInterface = false;
+  let aprovanNativeInterface: string | undefined;
   const requestNamespace = provider;
   if (provider && operation && parseInterfaceNamespace(provider)) {
     try {
@@ -795,6 +976,12 @@ toolsRouter.post("/:provider/:operation{.*}", rateLimitByUserId, async (c) => {
       }
       nativeAgentInterface =
         resolved.def.id === "agent" && resolved.compat.provider === "native";
+      if (resolved.compat.provider === "aprovan") {
+        const { isAprovanNativeBinding } = await import("../native-dispatch.js");
+        if (isAprovanNativeBinding(resolved.def.id, resolved.compat.provider)) {
+          aprovanNativeInterface = resolved.def.id;
+        }
+      }
       interfaceDefaults = resolved.def.defaultsFor.includes(operation)
         ? { ...resolved.options, ...(callSiteOptions ?? {}) }
         : callSiteOptions;
@@ -858,6 +1045,33 @@ toolsRouter.post("/:provider/:operation{.*}", rateLimitByUserId, async (c) => {
       const { dispatchNativeAgentOp } = await import("../agents/runner.js");
       const data = await dispatchNativeAgentOp(
         { workspaceId, userId: callerId },
+        operation,
+        nativeArgs,
+      );
+      const durationMs = Date.now() - startTime;
+      getAuditStore().append({ requestId, workspaceId, callerId, provider, operation, status: 200, durationMs });
+      recordDispatch(200, durationMs);
+      return c.json({ data, meta: { requestId, durationMs } });
+    } catch (err) {
+      const status = err instanceof ServiceError ? err.status : 500;
+      const message = err instanceof Error ? err.message : String(err);
+      getAuditStore().append({ requestId, workspaceId, callerId, provider, operation, status });
+      recordDispatch(status, Date.now() - startTime, message);
+      return c.json({ error: message }, status as 400);
+    }
+  }
+  // In-process short-circuit for the Aprovan native provider (vfs/vcs/
+  // keyvalue/events/telemetry) — credentialless, no isolate.
+  if (aprovanNativeInterface) {
+    try {
+      const nativeArgs = {
+        ...(interfaceDefaults ?? {}),
+        ...(body.args as Record<string, unknown>),
+      };
+      const { dispatchAprovanNativeOp } = await import("../native-dispatch.js");
+      const data = await dispatchAprovanNativeOp(
+        { workspaceId, userId: callerId },
+        aprovanNativeInterface,
         operation,
         nativeArgs,
       );

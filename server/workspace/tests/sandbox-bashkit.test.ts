@@ -4,7 +4,7 @@
  * `sandboxes.test.ts` proves the workspace half (mounts, diff, commit
  * routing) over a fake driver; this file proves the whole column over the
  * real one: `sandboxes.*` → the `sandbox` interface → the isolate's dynamic
- * import of `@aprovan/sandbox-bashkit` → a real bash interpreter in WASM.
+ * import of `@aprovan/native/bashkit` → a real bash interpreter in WASM.
  * Every exec here actually runs; every manifest hash is computed from real
  * file bodies on both sides.
  *
@@ -98,7 +98,7 @@ describe("bashkit through sandboxes.*", () => {
     const resolved = await resolveInterfaceForWorkspace("local", "sandbox");
     expect(resolved.bound).toBe(false);
     expect(resolved.compat.provider).toBe("bashkit");
-    expect(resolved.compat.moduleSpecifier).toBe("@aprovan/sandbox-bashkit");
+    expect(resolved.compat.moduleSpecifier).toBe("@aprovan/native/bashkit");
     expect(resolved.compat.credentialless).toBe(true);
   });
 

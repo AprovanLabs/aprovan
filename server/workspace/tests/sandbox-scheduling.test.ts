@@ -26,8 +26,8 @@ let dataDir: string;
  * without a network dependency.
  */
 const IMAGES: Record<string, unknown> = {
-  "@aprovan/sandbox-image-node": {
-    name: "@aprovan/sandbox-image-node",
+  "@aprovan/native": {
+    name: "@aprovan/native",
     version: "0.1.0",
     sandbox: {
       workdir: "/work",
@@ -123,7 +123,7 @@ const asAgent = (host: Registered, path: string, body: unknown = {}) =>
     body: JSON.stringify(body),
   });
 
-const NODE_IMAGE = "@aprovan/sandbox-image-node";
+const NODE_IMAGE = "@aprovan/native";
 const PYTHON_IMAGE = "@aprovan/sandbox-image-python";
 
 beforeEach(async () => {

@@ -224,8 +224,10 @@ describe("lazy migration fallback", () => {
     );
     await manage("keyvalue/set", { key: "merge-brand-new", value: 2 });
 
-    const listed = await data<{ keys: string[] }>(await manage("keyvalue/list", { prefix: "merge-" }));
-    expect(listed.keys.sort()).toEqual(["merge-brand-new", "merge-fresh"]);
+    const listed = await data<{ keys: Array<{ key: string }> }>(
+      await manage("keyvalue/list", { prefix: "merge-" }),
+    );
+    expect(listed.keys.map((k) => k.key).sort()).toEqual(["merge-brand-new", "merge-fresh"]);
   });
 });
 

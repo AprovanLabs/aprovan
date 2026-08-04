@@ -33,7 +33,6 @@ import {
   type ProviderTool,
 } from "@utdk/mcp-core";
 import { mayInvokeTool } from "../authorize.js";
-import { getCoreService } from "../service-kernel.js";
 import { FS_TOOLS, FS_TOOL_NAMES, handleFsTool } from "./fs-tools.js";
 import { getAuditStore } from "../audit.js";
 import { listAll, getFsStore } from "../fs-store.js";
@@ -261,7 +260,7 @@ export async function handleTelemetryTool(
   args: Record<string, unknown>,
 ) {
   try {
-    const service = getCoreService("telemetry");
+    const { telemetryService: service } = await import("../telemetry/service.js");
     if (!service) throw new Error("telemetry service unavailable");
     const procedure = toolName === "telemetry_traces" ? "traces" : "query";
     const data = await service.call(

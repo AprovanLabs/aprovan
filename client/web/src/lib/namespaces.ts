@@ -33,7 +33,7 @@ import {
 import { GATEWAY_BASE } from "./gateway";
 import { gatewayFetch } from "./gateway-fetch";
 
-export type NamespaceKind = "core" | "interface" | "provider" | "llm-alias";
+export type NamespaceKind = "plugin" | "core" | "interface" | "provider" | "llm-alias";
 
 export interface NamespaceCompat {
   provider: string;
@@ -173,7 +173,8 @@ export function groupNamespaces(
         : degraded && isFallbackInterface(namespace)
           ? "interface"
           : undefined);
-    if (kind === "core") core.push(namespace);
+    // `plugin` is the stream-6 wire value; `core` kept for older gateways.
+    if (kind === "core" || kind === "plugin") core.push(namespace);
     else if (kind === "interface") {
       if (isNativeInterface(namespace)) core.push(namespace);
       else interfaces.push(namespace);

@@ -1,177 +1,13 @@
 /**
- * The compat-catalog extraction is a behavior-preserving swap: the
- * `InterfaceDef[]` built from the contract packages' `compat.json` documents
- * (via @utdk/common/compat) must deep-equal the literals that lived in
- * `listInterfaces()` before the extraction, with `llm` still composed live
- * from the chat-provider registry.
+ * Compat catalog loaded from contract packages' `compat.json` documents.
+ * Stream 4 adds credentialless `aprovan` defaults for the five native
+ * contracts and retargets sandbox moduleSpecifiers at `@aprovan/native`.
  */
 import { describe, expect, it } from "vitest";
 import { listInterfaces } from "../src/interfaces.js";
 import { listLlmProviders } from "../src/llm.js";
 
-/** The pre-extraction `listInterfaces()` literals, verbatim. */
-const preExtractionLiterals = () => [
-  {
-    id: "llm",
-    label: "LLM",
-    description:
-      "OpenAI-compatible chat completions. Bind to any connected LLM provider; scripts call llm.createChatCompletion / llm.listModels.",
-    timeoutMs: 120_000,
-    defaultsFor: ["createChatCompletion"],
-    compat: listLlmProviders().map((provider) => ({
-      provider: provider.id,
-      label: provider.label,
-      module: provider.module,
-      baseUrl: provider.baseUrl,
-      defaults: { model: provider.defaultModel },
-    })),
-  },
-  {
-    id: "sql",
-    label: "SQL",
-    description:
-      "Uniform SQL queries over relational backends; scripts call sql.query({ sql, params }). " +
-      "Each backend is a handwritten UTDK provider module built on @utdk/sql. " +
-      "Secrets live in the provider credential (Snowflake/Databricks token, Postgres connection string); " +
-      "connection config (account, host, warehouse_id, database) rides the binding options.",
-    timeoutMs: 60_000,
-    defaultsFor: ["query"],
-    compat: [
-      { provider: "postgres", label: "PostgreSQL", module: "postgres" },
-      { provider: "snowflake", label: "Snowflake", module: "snowflake" },
-      { provider: "databricks", label: "Databricks", module: "databricks" },
-    ],
-  },
-  {
-    id: "sandbox",
-    label: "Sandbox",
-    description:
-      "Execution environments with a filesystem and a shell: create/exec/read/write/list against any connected sandbox host. " +
-      "Each backend is a handwritten UTDK provider module built on @utdk/sandbox. " +
-      "Secrets live in the provider credential (API token, or a local host's client token); " +
-      "the API root, default image and region ride the binding options. " +
-      "Workspace-facing mounting, sync and commit live in the `sandboxes` core service — see docs/sandboxes.md.",
-    timeoutMs: 300_000,
-    defaultsFor: ["create"],
-    compat: [
-      {
-        provider: "bashkit",
-        label: "Bashkit (WASM)",
-        module: "bashkit",
-        moduleSpecifier: "@aprovan/sandbox-bashkit",
-        credentialless: true,
-      },
-      {
-        provider: "machine",
-        label: "Registered machine",
-        module: "machine",
-        moduleSpecifier: "@aprovan/sandbox-host",
-      },
-      { provider: "fly/sprites", label: "fly.io Sprites", module: "fly/sprites" },
-      {
-        provider: "cloudflare/sandbox",
-        label: "Cloudflare Sandbox",
-        module: "cloudflare/sandbox",
-      },
-    ],
-  },
-  {
-    id: "vcs",
-    label: "Git hosting",
-    description:
-      "Git hosting for code review: repos.get, pullRequests.get/list/diff/comment/review, branches.get, files.get " +
-      "against whichever host a workspace's code lives on. " +
-      "Each backend is a handwritten UTDK provider module built on @utdk/vcs. " +
-      "Credentials stay keyed by the concrete provider (github), so a connected GitHub account just works.",
-    timeoutMs: 60_000,
-    defaultsFor: [],
-    compat: [
-      {
-        provider: "github",
-        label: "GitHub",
-        module: "github/vcs",
-      },
-      {
-        provider: "bitbucket",
-        label: "Bitbucket",
-        module: "bitbucket/vcs",
-        unavailable:
-          "The Bitbucket adapter module is not built yet. The contract is @utdk/vcs; " +
-          "the mapping to Bitbucket's REST API does not exist.",
-      },
-    ],
-  },
-  {
-    id: "agent",
-    label: "Agent runtime",
-    description:
-      "The agent loop itself: run/get/cancel against whichever runtime executes an agent's turns. " +
-      "Each backend is a handwritten UTDK provider module built on @utdk/agent. " +
-      "The default is the gateway's own in-process runner, which needs no credential; vendor runtimes " +
-      "(OpenAI Assistants, a relayed harness) are bound like any other implementation. " +
-      "Profiles, instruction layers, grants, mounts and entrypoints live in the `agents` core service " +
-      "— see docs/agent-interface.md.",
-    timeoutMs: 900_000,
-    defaultsFor: ["run"],
-    compat: [
-      {
-        provider: "native",
-        label: "Aprovan runner (in-process)",
-        module: "native",
-        credentialless: true,
-      },
-      {
-        provider: "openai",
-        label: "OpenAI Assistants",
-        module: "openai/assistants",
-        unavailable:
-          "The OpenAI Assistants adapter module is not built yet. The vendor surface exists " +
-          "(utdk/openai generates createThreadAndRun/getRun/cancelRun); the run/get/cancel mapping does not.",
-      },
-      {
-        provider: "harness",
-        label: "Relayed harness",
-        module: "harness",
-        moduleSpecifier: "@aprovan/agent-host",
-        unavailable: "@aprovan/agent-host is not built yet.",
-      },
-    ],
-  },
-  {
-    id: "telemetry",
-    label: "Telemetry",
-    description:
-      "Export logs, metrics, and traces in the OTLP/HTTP JSON encoding. The default is the workspace's own activity store (query/traces stay native); vendor backends are bound as named instances (telemetry:datadog).",
-    timeoutMs: 30_000,
-    defaultsFor: [],
-    compat: [
-      {
-        provider: "native",
-        label: "Workspace activity store",
-        module: "native",
-        credentialless: true,
-      },
-      {
-        provider: "datadog",
-        label: "Datadog (OTLP intake)",
-        module: "datadog/telemetry",
-      },
-      {
-        provider: "sentry",
-        label: "Sentry",
-        module: "sentry/telemetry",
-        unavailable:
-          "Sentry's OTLP ingestion is trace-focused and DSN-keyed; a logs/metrics mapping does not exist yet.",
-      },
-    ],
-  },
-];
-
-describe("compat catalog extraction (behavior-preserving swap)", () => {
-  it("produces InterfaceDef[] deep-equal to the pre-extraction literals", () => {
-    expect(listInterfaces()).toEqual(preExtractionLiterals());
-  });
-
+describe("compat catalog", () => {
   it("keeps llm composed live from the chat-provider registry", () => {
     const llm = listInterfaces().find((def) => def.id === "llm");
     expect(llm?.compat.map((entry) => entry.provider)).toEqual(
@@ -181,5 +17,41 @@ describe("compat catalog extraction (behavior-preserving swap)", () => {
 
   it("declares no webhooks interface anywhere (spec: webhooks never an interface)", () => {
     expect(listInterfaces().some((def) => def.id === "webhooks")).toBe(false);
+  });
+
+  it("registers credentialless aprovan for vfs/vcs/keyvalue/events/telemetry", () => {
+    for (const id of ["vfs", "vcs", "keyvalue", "events", "telemetry"] as const) {
+      const def = listInterfaces().find((entry) => entry.id === id);
+      expect(def, id).toBeDefined();
+      expect(def!.compat[0]).toMatchObject({
+        provider: "aprovan",
+        credentialless: true,
+        moduleSpecifier: "@aprovan/native",
+      });
+    }
+  });
+
+  it("points sandbox drivers at @aprovan/native subpaths", () => {
+    const sandbox = listInterfaces().find((def) => def.id === "sandbox");
+    expect(sandbox?.compat.find((e) => e.provider === "bashkit")).toMatchObject({
+      moduleSpecifier: "@aprovan/native/bashkit",
+      credentialless: true,
+    });
+    expect(sandbox?.compat.find((e) => e.provider === "machine")).toMatchObject({
+      moduleSpecifier: "@aprovan/native/host",
+    });
+  });
+
+  it("keeps third-party adapters alongside aprovan defaults", () => {
+    const vfs = listInterfaces().find((def) => def.id === "vfs");
+    expect(vfs?.compat.some((e) => e.provider === "s3")).toBe(true);
+    const keyvalue = listInterfaces().find((def) => def.id === "keyvalue");
+    expect(keyvalue?.compat.some((e) => e.provider === "dynamodb")).toBe(true);
+    const events = listInterfaces().find((def) => def.id === "events");
+    expect(events?.compat.some((e) => e.provider === "sqs")).toBe(true);
+    const vcs = listInterfaces().find((def) => def.id === "vcs");
+    expect(vcs?.compat.some((e) => e.provider === "github")).toBe(true);
+    const telemetry = listInterfaces().find((def) => def.id === "telemetry");
+    expect(telemetry?.compat.some((e) => e.provider === "datadog")).toBe(true);
   });
 });

@@ -36,7 +36,7 @@ let dataDir: string;
 // A stand-in image registry (sandbox-scheduling.test.ts pattern).
 // -----------------------------------------------------------------------------
 
-const NODE_IMAGE = "@aprovan/sandbox-image-node";
+const NODE_IMAGE = "@aprovan/native";
 
 const IMAGES: Record<string, unknown> = {
   [NODE_IMAGE]: {

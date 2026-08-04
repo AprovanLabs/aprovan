@@ -128,7 +128,8 @@ const NATIVE_SPECS: Record<NativeAppNamespace, NativeSpec> = {
   vfs: {
     description:
       "The app's own folder as a filesystem. Relative paths resolve under the app root; `~/<path>` reaches another declared prefix or a workspace share.",
-    procedures: ["list", "read", "write", "delete"],
+    // Contract surface (vfs-vcs-split): driver ops only — no separate allow-list.
+    procedures: ["list", "read", "write", "delete", "stat"],
     fsPath: "<root>/",
     partitionNote:
       "Reads and writes are confined to the app's declared prefixes, and each user's file partition " +

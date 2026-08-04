@@ -1,7 +1,7 @@
 /**
  * The driver client for bashkit sandboxes.
  *
- * Like `@aprovan/sandbox-host`, this is a first-party implementation of the
+ * Like `@aprovan/native/host`, this is a first-party implementation of the
  * public `@utdk/sandbox` contract and deliberately not in the `utdk/*`
  * catalogue — UTDK is the vendor namespace, and an interpreter the gateway
  * runs itself has no vendor. Unlike the machine host there is no wire at all:

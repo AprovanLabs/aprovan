@@ -23,6 +23,7 @@ import {
   syncSession,
   updateSession,
   type ChatSessionRecord,
+  type SessionChangeSummary,
   type SessionMode,
   type SessionStatus,
 } from "./chat-sessions.js";
@@ -38,10 +39,20 @@ function sessionMode(value: unknown): SessionMode | undefined {
   throw new ServiceError('mode must be "auto" or "staged"', 400);
 }
 
+/**
+ * Session plus its staged-change summary (and optional base timestamp).
+ * Eleven session operations' result shapes hang off this helper.
+ */
+export type SessionWithChanges = ChatSessionRecord & {
+  changes: SessionChangeSummary;
+  /** ISO timestamp of the base commit, when the commit is still readable. */
+  baseAt?: string;
+};
+
 async function withChanges(
   workspaceId: string,
   session: ChatSessionRecord,
-): Promise<Record<string, unknown>> {
+): Promise<SessionWithChanges> {
   const [changes, base] = await Promise.all([
     changeSummary(workspaceId, session),
     readCommit(workspaceId, session.base),

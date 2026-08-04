@@ -609,19 +609,62 @@ export const appsService: CoreService = {
       },
     },
     {
-      name: "apps.data",
-      operation: "data",
+      name: "apps.dataUsers",
+      operation: "dataUsers",
       description:
-        "Owner-side administration of an app's user data, since per-user partitions are read-enforced (foreign access answers 404): with just 'app', lists the app's users; add 'user' to list that user's keys; add 'key' to read one record, or 'path' to read one file from the user's file partition under .apps/<appId>/data/<user>. Gated on the app's admin role; every call is audited.",
+        "List users with data partitions for an app. Admin-only; audited.",
       inputSchema: {
         type: "object",
         properties: {
           app: { type: "string", description: "App alias or ULID" },
           name: { type: "string" },
-          user: { type: "string", description: "App-user sub — list their keys, or read one with `key`" },
-          key: { type: "string", description: "One record key to read (requires `user`; mutually exclusive with `path`)" },
-          path: { type: "string", description: "One file to read from the user's file partition (requires `user`; mutually exclusive with `key`)" },
         },
+      },
+    },
+    {
+      name: "apps.dataKeys",
+      operation: "dataKeys",
+      description:
+        "List record keys in one app user's partition. Admin-only; audited.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          app: { type: "string" },
+          name: { type: "string" },
+          user: { type: "string", description: "App-user sub" },
+        },
+        required: ["user"],
+      },
+    },
+    {
+      name: "apps.dataGet",
+      operation: "dataGet",
+      description: "Read one record from an app user's partition. Admin-only; audited.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          app: { type: "string" },
+          name: { type: "string" },
+          user: { type: "string" },
+          key: { type: "string" },
+        },
+        required: ["user", "key"],
+      },
+    },
+    {
+      name: "apps.dataRead",
+      operation: "dataRead",
+      description:
+        "Read one file from an app user's file partition under .apps/<appId>/data/<user>. Admin-only; audited.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          app: { type: "string" },
+          name: { type: "string" },
+          user: { type: "string" },
+          path: { type: "string" },
+        },
+        required: ["user", "path"],
       },
     },
     {
@@ -1067,7 +1110,11 @@ export const appsService: CoreService = {
           })),
         };
       }
-      case "data": {
+      case "data":
+      case "dataUsers":
+      case "dataKeys":
+      case "dataGet":
+      case "dataRead": {
         const manifest = await requireApp(ctx.workspaceId, args);
 
         const admins = manifest.roles?.admins ?? [];
@@ -1081,11 +1128,31 @@ export const appsService: CoreService = {
         const user = typeof args["user"] === "string" ? args["user"] : undefined;
         const key = typeof args["key"] === "string" ? args["key"] : undefined;
         const filePath = typeof args["path"] === "string" ? args["path"] : undefined;
-        if (key !== undefined && user === undefined) {
-          throw new ServiceError("`key` requires `user`", 400);
+        // Legacy `apps.data` overload still accepted; prefer the split ops.
+        const mode =
+          procedure === "dataUsers"
+            ? "users"
+            : procedure === "dataKeys"
+              ? "keys"
+              : procedure === "dataGet"
+                ? "get"
+                : procedure === "dataRead"
+                  ? "read"
+                  : filePath !== undefined
+                    ? "read"
+                    : key !== undefined
+                      ? "get"
+                      : user !== undefined
+                        ? "keys"
+                        : "users";
+        if ((mode === "keys" || mode === "get" || mode === "read") && user === undefined) {
+          throw new ServiceError("`user` is required", 400);
         }
-        if (filePath !== undefined && user === undefined) {
-          throw new ServiceError("`path` requires `user`", 400);
+        if (mode === "get" && key === undefined) {
+          throw new ServiceError("`key` is required", 400);
+        }
+        if (mode === "read" && filePath === undefined) {
+          throw new ServiceError("`path` is required", 400);
         }
         if (filePath !== undefined && key !== undefined) {
           throw new ServiceError("`path` and `key` are mutually exclusive", 400);
@@ -1098,7 +1165,7 @@ export const appsService: CoreService = {
         const scopePrefix = `app#${manifest.appId}#u#`;
 
         let result: Record<string, unknown>;
-        if (user !== undefined && filePath !== undefined) {
+        if (mode === "read" && user !== undefined && filePath !== undefined) {
           const partition = appDataDir(manifest.appId, user);
           const resolved = workspacePath(`${partition}/${filePath}`, "path");
           if (!resolved.startsWith(`${partition}/`)) {
@@ -1113,7 +1180,7 @@ export const appsService: CoreService = {
             content: file?.content ?? null,
             ...(file ? { hash: file.hash, mimeType: file.mimeType, size: file.size } : {}),
           };
-        } else if (user !== undefined && key !== undefined) {
+        } else if (mode === "get" && user !== undefined && key !== undefined) {
           const entry = await records.get(tenant, `${scopePrefix}${user}`, key);
           result = {
             appId: manifest.appId,
@@ -1124,7 +1191,7 @@ export const appsService: CoreService = {
             updatedAt: entry?.updatedAt,
             updatedBy: entry?.updatedBy,
           };
-        } else if (user !== undefined) {
+        } else if (mode === "keys" && user !== undefined) {
           result = {
             appId: manifest.appId,
             app: manifest.name,

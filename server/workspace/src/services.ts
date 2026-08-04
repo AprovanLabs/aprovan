@@ -31,29 +31,19 @@ import {
 import { getFsStore, isServicePath, listAll, normalizeFsPath } from "./fs-store.js";
 import { interfacesService } from "./interfaces-service.js";
 import { profilesService } from "./profiles-service.js";
-import {
-  commitTree,
-  diffSnapshots,
-  listRefs,
-  logCommits,
-  readSnapshot,
-  resolveCommitish,
-  restoreCommit,
-} from "./vcs/store.js";
-import {
-  assertNotMounted,
-  mountEntries,
-  mountRead,
-  readMounts,
-} from "./vcs/mounts.js";
+import { readSnapshot, resolveCommitish } from "./vcs/store.js";
+import { assertNotMounted, mountEntries, mountRead } from "./vcs/mounts.js";
 import { getRecordStore } from "./records.js";
 import { assertCallerScope, parseSeqKey, seqKey, svcScope } from "./svc-records.js";
 import { sandboxesService } from "./sandboxes/service.js";
 import {
-  installCoreServices,
+  installPlatformPlugins,
+  type PlatformPluginName,
+} from "./platform-plugins.js";
+import { sealPlatformPluginOutputSchemas } from "./platform-output-schemas.js";
+import {
   ServiceError,
   type CoreService,
-  type CoreServiceName,
   type ServiceContext,
 } from "./service-kernel.js";
 import { syncService } from "./sync.js";
@@ -376,13 +366,13 @@ async function resolveVfsPath(
 }
 
 /**
- * VCS verbs (and commit-pinned reads) are member-only: an app session's view
- * of the filesystem is its own partition, and history/refs are a workspace
- * concern (see docs/vcs-and-sessions.md).
+ * Commit-pinned reads/lists and staged-session overlays are member-only: an
+ * app session's view of the filesystem is its own partition. Version-control
+ * verbs themselves live on the `vcs` namespace (see vfs-vcs-split).
  */
 function requireWorkspaceCaller(ctx: ServiceContext): void {
   if (ctx.appScope) {
-    throw new ServiceError("VCS operations are workspace-only", 403);
+    throw new ServiceError("Commit-pinned and session overlays are workspace-only", 403);
   }
 }
 
@@ -412,7 +402,7 @@ async function stagedSession(
 const vfs: CoreService = {
   meta: {
     label: "VFS",
-    blurb: "Workspace files, commits and mounts",
+    blurb: "Workspace files",
     icon: "folder-tree",
   },
   tools: [
@@ -478,98 +468,15 @@ const vfs: CoreService = {
       },
     },
     {
-      name: "vfs.commit",
-      operation: "commit",
-      description:
-        "Snapshot the current workspace tree as a commit on main (cheap — records content hashes, copies nothing). No-op when nothing changed.",
-      inputSchema: {
-        type: "object",
-        properties: { message: { type: "string" } },
-      },
-    },
-    {
-      name: "vfs.log",
-      operation: "log",
-      description: "Commit history, newest first (ref defaults to main).",
-      inputSchema: {
-        type: "object",
-        properties: { ref: { type: "string" }, limit: { type: "number" } },
-      },
-    },
-    {
-      name: "vfs.show",
-      operation: "show",
-      description:
-        "A commit's metadata, file manifest, and change list vs its parent. Accepts a commit id (or unambiguous prefix) or a ref name.",
-      inputSchema: {
-        type: "object",
-        properties: { commit: { type: "string" } },
-        required: ["commit"],
-      },
-    },
-    {
-      name: "vfs.diff",
-      operation: "diff",
-      description:
-        "Added/modified/removed paths (with content hashes) between two commits or refs. Read either side of a file with vfs.read {path, hash}.",
-      inputSchema: {
-        type: "object",
-        properties: { from: { type: "string" }, to: { type: "string" } },
-        required: ["from", "to"],
-      },
-    },
-    {
-      name: "vfs.branches",
-      operation: "branches",
-      description: "Named refs (main plus any session branches) with their head commits.",
-      inputSchema: { type: "object", properties: {} },
-    },
-    {
-      name: "vfs.mounts",
-      operation: "mounts",
-      description:
-        "List VFS mounts — path prefixes backed by an external store (git repo at a ref, or an S3 bucket). Read-only in v1.",
-      inputSchema: { type: "object", properties: {} },
-    },
-    {
-      name: "vfs.mount",
-      operation: "mount",
-      description:
-        'Mount an external store at a path prefix. type "git": config {repo: "owner/name", ref?, path?} (uses the workspace github credential). type "s3": config {bucket, prefix?, region?} (gateway-role access). Mounted prefixes are read-only and excluded from commits.',
+      name: "vfs.stat",
+      operation: "stat",
+      description: "Return metadata for a workspace file or directory without reading its content.",
       inputSchema: {
         type: "object",
         properties: {
-          prefix: { type: "string" },
-          type: { type: "string", enum: ["git", "s3", "crdt"] },
-          config: { type: "object" },
-          mode: { type: "string", enum: ["read", "readwrite"] },
-        },
-        required: ["prefix", "type", "config"],
-      },
-    },
-    {
-      name: "vfs.unmount",
-      operation: "unmount",
-      description: "Remove a mount by its prefix (the external store is untouched).",
-      inputSchema: {
-        type: "object",
-        properties: { prefix: { type: "string" } },
-        required: ["prefix"],
-      },
-    },
-    {
-      name: "vfs.restore",
-      operation: "restore",
-      description:
-        "Non-destructively restore a commit's content (optionally one path or a prefix): old content is re-written as the new latest, nothing is erased.",
-      inputSchema: {
-        type: "object",
-        properties: {
-          commit: { type: "string" },
           path: { type: "string" },
-          prefix: { type: "string" },
         },
-        required: ["commit"],
+        required: ["path"],
       },
     },
   ],
@@ -740,101 +647,19 @@ const vfs: CoreService = {
         if (!removed) throw new ServiceError(`Not found: ${path}`, 404);
         return { deleted: path };
       }
-      case "commit": {
-        requireWorkspaceCaller(ctx);
-        const message =
-          typeof args["message"] === "string" && args["message"] ? args["message"] : "Commit";
-        const { commit, created } = await commitTree(ctx.workspaceId, {
-          message,
-          author: ctx.userId,
-        });
-        return { commit, created };
-      }
-      case "log": {
-        requireWorkspaceCaller(ctx);
-        const head = await resolveCommitish(
-          ctx.workspaceId,
-          typeof args["ref"] === "string" && args["ref"] ? args["ref"] : "main",
-        ).catch(() => undefined);
-        if (!head) return { commits: [] };
-        const limit = Math.min(Number(args["limit"]) || 50, 200);
-        return { commits: await logCommits(ctx.workspaceId, head.id, limit) };
-      }
-      case "show": {
-        requireWorkspaceCaller(ctx);
-        if (typeof args["commit"] !== "string" || !args["commit"]) {
-          throw new ServiceError("commit is required", 400);
-        }
-        const commit = await resolveCommitish(ctx.workspaceId, args["commit"]);
-        const snapshot = await readSnapshot(ctx.workspaceId, commit.snapshot);
-        if (!snapshot) throw new ServiceError(`Snapshot missing for commit ${commit.id}`, 404);
-        const parent = commit.parents[0]
-          ? await resolveCommitish(ctx.workspaceId, commit.parents[0]).catch(() => undefined)
-          : undefined;
-        const parentSnapshot = parent
-          ? await readSnapshot(ctx.workspaceId, parent.snapshot)
-          : undefined;
+      case "stat": {
+        const path = await resolveVfsPath(ctx, args["path"], false);
+        assertPathGranted(ctx.grants, path, false);
+        if (!ctx.appScope) await assertPartitionAccess(ctx.workspaceId, ctx.userId, path);
+        const file = await store.read(ctx.workspaceId, path);
+        if (!file) throw new ServiceError(`Not found: ${path}`, 404);
         return {
-          commit,
-          entries: snapshot.entries,
-          // Mount lineage (specs/mount-lineage): the snapshot's deterministic
-          // tokens ride along so history consumers can pair them with the
-          // commit's `provenance`. Absent for pre-lineage commits — no error.
-          ...(snapshot.mounts ? { mounts: snapshot.mounts } : {}),
-          changes: diffSnapshots(parentSnapshot, snapshot),
+          path: file.path,
+          kind: "file" as const,
+          size: file.size,
+          etag: file.hash,
+          modifiedAt: file.updatedAt,
         };
-      }
-      case "diff": {
-        requireWorkspaceCaller(ctx);
-        if (typeof args["from"] !== "string" || typeof args["to"] !== "string") {
-          throw new ServiceError("from and to are required", 400);
-        }
-        const from = await resolveCommitish(ctx.workspaceId, args["from"]);
-        const to = await resolveCommitish(ctx.workspaceId, args["to"]);
-        const [fromSnapshot, toSnapshot] = await Promise.all([
-          readSnapshot(ctx.workspaceId, from.snapshot),
-          readSnapshot(ctx.workspaceId, to.snapshot),
-        ]);
-        if (!fromSnapshot || !toSnapshot) {
-          throw new ServiceError("Snapshot missing for a diff side", 404);
-        }
-        return { from: from.id, to: to.id, ...diffSnapshots(fromSnapshot, toSnapshot) };
-      }
-      case "branches": {
-        requireWorkspaceCaller(ctx);
-        return { refs: await listRefs(ctx.workspaceId) };
-      }
-      case "mounts": {
-        requireWorkspaceCaller(ctx);
-        return { mounts: await readMounts(ctx.workspaceId) };
-      }
-      case "mount": {
-        requireWorkspaceCaller(ctx);
-        throw new ServiceError(
-          "vcs.mount is removed — create a path-keyed profile with profiles.set { path, provider, options }",
-          400,
-        );
-      }
-      case "unmount": {
-        requireWorkspaceCaller(ctx);
-        throw new ServiceError(
-          "vcs.unmount is removed — remove the path-keyed profile with profiles.remove { path }",
-          400,
-        );
-      }
-      case "restore": {
-        requireWorkspaceCaller(ctx);
-        if (typeof args["commit"] !== "string" || !args["commit"]) {
-          throw new ServiceError("commit is required", 400);
-        }
-        const commit = await resolveCommitish(ctx.workspaceId, args["commit"]);
-        const filter = {
-          path: typeof args["path"] === "string" ? normalizeFsPath(args["path"]) ?? undefined : undefined,
-          prefix:
-            typeof args["prefix"] === "string" ? normalizeFsPath(args["prefix"]) ?? undefined : undefined,
-        };
-        const result = await restoreCommit(ctx.workspaceId, commit, filter);
-        return { commit: commit.id, ...result };
       }
       default:
         throw new ServiceError(`Unknown vfs procedure: ${procedure}`, 404);
@@ -909,6 +734,11 @@ interface CatalogDetailField {
   schema: unknown;
 }
 
+interface CatalogOperationOutput {
+  description: string | null;
+  schema: Record<string, unknown> | null;
+}
+
 interface CatalogDetailOperation {
   sdkPath: string;
   httpMethod: string;
@@ -916,6 +746,10 @@ interface CatalogDetailOperation {
   description: string | null;
   parameters?: CatalogDetailField[];
   requestBodyFields?: CatalogDetailField[];
+  /** Per-status success/error bodies from utdk-output-schemas. */
+  outputs?: Record<string, CatalogOperationOutput>;
+  /** True when upstream OpenAPI omitted `responses`. */
+  responseUnknown?: boolean;
 }
 
 function schemaFromCatalogOp(op: CatalogDetailOperation): Record<string, unknown> {
@@ -938,6 +772,29 @@ function schemaFromCatalogOp(op: CatalogDetailOperation): Record<string, unknown
     properties,
     ...(required.length > 0 ? { required } : {}),
   };
+}
+
+/**
+ * Success-path output schema from catalog `outputs`: lowest 2xx status with a
+ * schema. Omit when `responseUnknown` or no 2xx schema (MCP-aligned).
+ */
+export function outputSchemaFromCatalogOp(
+  op: Pick<CatalogDetailOperation, "outputs" | "responseUnknown">,
+): unknown | undefined {
+  if (op.responseUnknown) return undefined;
+  const outputs = op.outputs;
+  if (!outputs || typeof outputs !== "object") return undefined;
+  const successStatuses = Object.keys(outputs)
+    .filter((code) => {
+      const n = Number(code);
+      return Number.isInteger(n) && n >= 200 && n < 300;
+    })
+    .sort((a, b) => Number(a) - Number(b));
+  for (const status of successStatuses) {
+    const schema = outputs[status]?.schema;
+    if (schema && typeof schema === "object") return schema;
+  }
+  return undefined;
 }
 
 const providerDetailCache = new Map<
@@ -966,7 +823,7 @@ export async function catalogToolEntries(provider: string): Promise<ToolEntry[]>
       operation: op.sdkPath,
       description: op.summary ?? op.description ?? undefined,
       inputSchema: schemaFromCatalogOp(op),
-      outputSchema: undefined,
+      outputSchema: outputSchemaFromCatalogOp(op),
     }));
   providerDetailCache.set(provider, {
     entries,
@@ -1063,14 +920,14 @@ const registry: CoreService = {
 // ---------------------------------------------------------------------------
 
 /**
- * Keyed by {@link CORE_SERVICE_NAMES}, so a namespace named there without a
- * service wired here (or wired here without being named there) fails the
- * build instead of surfacing as a missing namespace at runtime.
+ * Platform plugins (Aprovan-only namespaces). Interface drivers — keyvalue,
+ * events, vfs, telemetry — resolve through the interface → native path and
+ * are not registered here (no shadowed names).
+ *
+ * Keyed by {@link PLATFORM_PLUGIN_NAMES}: a name listed there without a
+ * plugin (or wired without being listed) fails the build.
  */
-export const CORE_SERVICES: Record<CoreServiceName, CoreService> = {
-  keyvalue,
-  events,
-  vfs,
+const PLATFORM_PLUGINS_RAW: Record<PlatformPluginName, CoreService> = {
   registry,
   workflows: workflowsService,
   apps: appsService,
@@ -1080,15 +937,25 @@ export const CORE_SERVICES: Record<CoreServiceName, CoreService> = {
   sync: syncService,
   sessions: sessionsService,
   notifications: notificationsService,
-  telemetry: telemetryService,
   agents: agentsService,
   sandboxes: sandboxesService,
 };
 
-// Hand the registry to the kernel, so upstream modules (the workflow runner,
-// sync) can dispatch to a sibling namespace without importing this file.
-installCoreServices(CORE_SERVICES);
+export const PLATFORM_PLUGINS = sealPlatformPluginOutputSchemas(PLATFORM_PLUGINS_RAW);
 
-// Lookup and discovery are the kernel's; re-exported here so `services.js`
-// stays the import site every route already uses.
+/** @deprecated Use {@link PLATFORM_PLUGINS}. */
+export const CORE_SERVICES = PLATFORM_PLUGINS;
+
+installPlatformPlugins(PLATFORM_PLUGINS);
+
+// Product helpers still used by native-dispatch / tests during the transition.
+export { keyvalue as keyvalueProductService, events as eventsProductService, vfs as vfsProductService };
+export { telemetryService };
+
 export { coreServiceMeta, coreToolEntries, getCoreService } from "./service-kernel.js";
+export {
+  platformPluginMeta,
+  platformToolEntries,
+  getPlatformPlugin,
+  PLATFORM_PLUGIN_NAMES,
+} from "./platform-plugins.js";

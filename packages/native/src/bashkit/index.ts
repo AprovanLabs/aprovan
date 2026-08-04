@@ -1,5 +1,5 @@
 /**
- * `@aprovan/sandbox-bashkit` — Aprovan sandboxes on a WASM bash interpreter.
+ * `@aprovan/native/bashkit` — Aprovan sandboxes on a WASM bash interpreter.
  *
  * First-party, deliberately *not* in the `utdk/*` catalogue: UTDK is the
  * vendor namespace, and an interpreter the gateway runs in its own process

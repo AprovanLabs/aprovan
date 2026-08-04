@@ -12,14 +12,15 @@ import {
   type RegistryServer,
 } from "@aprovan/registry-server";
 import { dispatchNativeAgentOp } from "./agents/runner.js";
+import { dispatchAprovanNativeOp } from "./native-dispatch.js";
 import { getExecutor } from "./isolate.js";
 import { getAuthMode } from "./middleware/auth.js";
 import { getRegistryStorage } from "./registry-storage.js";
 import {
-  CORE_SERVICE_NAMES,
-  getCoreService,
-  type CoreService,
-} from "./service-kernel.js";
+  PLATFORM_PLUGIN_NAMES,
+  getPlatformPlugin,
+  type PlatformPlugin,
+} from "./platform-plugins.js";
 import { ensureTenantForWorkspace, tenantIdForWorkspace } from "./tenant-registry.js";
 import type { ServiceContext } from "./service-kernel.js";
 
@@ -54,9 +55,9 @@ export function getRegistryServer(): Promise<RegistryServer> {
 async function bootRegistryServer(): Promise<RegistryServer> {
   // Product core services must be registered before dispatch routes through the package.
   await import("./services.js");
-  const nativeServices: Record<string, CoreService> = {};
-  for (const name of CORE_SERVICE_NAMES) {
-    const svc = getCoreService(name);
+  const nativeServices: Record<string, PlatformPlugin> = {};
+  for (const name of PLATFORM_PLUGIN_NAMES) {
+    const svc = getPlatformPlugin(name);
     if (svc) nativeServices[name] = svc;
   }
 
@@ -92,6 +93,16 @@ async function bootRegistryServer(): Promise<RegistryServer> {
     compatDispatch: {
       agent: async (ctx, operation, args) =>
         dispatchNativeAgentOp(ctx, operation, args as Record<string, unknown>),
+      vfs: async (ctx, operation, args) =>
+        dispatchAprovanNativeOp(ctx, "vfs", operation, args as Record<string, unknown>),
+      vcs: async (ctx, operation, args) =>
+        dispatchAprovanNativeOp(ctx, "vcs", operation, args as Record<string, unknown>),
+      keyvalue: async (ctx, operation, args) =>
+        dispatchAprovanNativeOp(ctx, "keyvalue", operation, args as Record<string, unknown>),
+      events: async (ctx, operation, args) =>
+        dispatchAprovanNativeOp(ctx, "events", operation, args as Record<string, unknown>),
+      telemetry: async (ctx, operation, args) =>
+        dispatchAprovanNativeOp(ctx, "telemetry", operation, args as Record<string, unknown>),
     },
     telemetry: {
       otlpEndpoint: process.env["OTEL_EXPORTER_OTLP_ENDPOINT"],

@@ -72,6 +72,7 @@ import {
   tokenDigest,
   type SandboxHostRecord,
   type SandboxMount,
+  type SandboxMountKind,
   type SandboxRecord,
 } from "./store.js";
 import type { CapabilityGrants } from "../grants.js";
@@ -83,7 +84,7 @@ const INTERFACE = "sandbox";
  * all would leave a machine unable to take any scheduled run, which is never
  * what someone registering a machine meant.
  */
-const DEFAULT_IMAGE = "@aprovan/sandbox-image-node";
+const DEFAULT_IMAGE = "@aprovan/native";
 
 /**
  * Resolved image descriptors, keyed by `<provider>:<spec>`. Descriptors are
@@ -131,7 +132,7 @@ function timeoutOf(args: Record<string, unknown>): number | undefined {
  * API and it lives in this process, so routing an HTTP request from the
  * gateway back to the gateway would add a network round trip per file — and
  * materializing a mount is one write per file. The published
- * `@aprovan/sandbox-host` client exists for callers that genuinely are
+ * `@aprovan/native/host` client exists for callers that genuinely are
  * elsewhere (another deployment, a script), and takes the HTTP path.
  */
 function driverFor(ctx: ServiceContext, target: { provider: string; hostId?: string }): SandboxCall {
@@ -332,11 +333,31 @@ async function materializeAnyMount(
   return materializeMount(ctx, record, mount, call);
 }
 
-/** Public shape of a sandbox: the record plus per-mount change counts. */
-function summarize(record: SandboxRecord): Record<string, unknown> {
+/** Public mount summary: record fields plus a materialized file count. */
+export interface SandboxMountSummary {
+  path: string;
+  source: string | null;
+  kind: SandboxMountKind;
+  mode: "ro" | "rw";
+  track: boolean;
+  files: number;
+  syncedAt: string;
+}
+
+/**
+ * Public shape of a sandbox: the record with mounts narrowed to a summary
+ * (file counts instead of the full `base` map). Explicit fields — no open
+ * record spread — so downstream output schemas can read the real shape.
+ */
+export type SandboxSummary = Omit<SandboxRecord, "mounts"> & {
+  mounts: SandboxMountSummary[];
+};
+
+function summarize(record: SandboxRecord): SandboxSummary {
+  const { mounts, ...rest } = record;
   return {
-    ...record,
-    mounts: record.mounts.map((mount) => ({
+    ...rest,
+    mounts: mounts.map((mount) => ({
       path: mount.path,
       source: mount.source,
       kind: mount.kind ?? "vfs",
@@ -379,7 +400,7 @@ export const sandboxesService: CoreService = {
       inputSchema: {
         type: "object",
         properties: {
-          image: { type: "string", description: "Image package spec, e.g. @aprovan/sandbox-image-node" },
+          image: { type: "string", description: "Image package spec, e.g. @aprovan/native" },
           name: { type: "string" },
           mounts: {
             type: "array",

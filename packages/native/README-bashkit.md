@@ -1,4 +1,4 @@
-# @aprovan/sandbox-bashkit
+# @aprovan/native/bashkit
 
 Aprovan sandboxes on a WASM bash interpreter. A first-party implementation of
 the `@utdk/sandbox` driver contract, backed by
@@ -8,7 +8,7 @@ calling process** — no container, no host registration, no credential.
 
 ## Where it sits among the providers
 
-| | machine (`@aprovan/sandbox-host`) | fly / cloudflare | **bashkit** |
+| | machine (`@aprovan/native/host`) | fly / cloudflare | **bashkit** |
 | --- | --- | --- | --- |
 | Toolchain | whatever the machine has | container image | bash + text tools (`grep`, `sed`, `awk`, `find`, `jq`, …) |
 | Isolation | a directory boundary | hardware | total — the "filesystem" is a data structure this instance owns |
@@ -56,7 +56,7 @@ browser test runner, so validation is a standalone page rather than a new
 framework:
 
 ```bash
-pnpm --filter @aprovan/sandbox-bashkit build
+pnpm --filter @aprovan/native/bashkit build
 cd packages/sandbox-bashkit
 npx serve ..    # any static server that follows symlinks works
 # open http://localhost:3000/sandbox-bashkit/demo/
@@ -72,7 +72,7 @@ common static server).
 ## Tests
 
 ```bash
-pnpm --filter @aprovan/sandbox-bashkit test
+pnpm --filter @aprovan/native/bashkit test
 ```
 
 Runs the driver against the real interpreter — no mocks; the interpreter is

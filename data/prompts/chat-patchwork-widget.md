@@ -51,7 +51,7 @@ Native namespaces (always available):
   `await tools.events.list({ channel: 'form.submitted', limit: 50 })` → `{ channel, events: [{ id, ts, userId, payload }] }`
 - `tools.vfs` — the workspace filesystem (content-hash versioned).
   `await tools.vfs.list({ prefix: 'widgets' })` → `{ entries }`; `await tools.vfs.read({ path })` / `tools.vfs.write({ path, content })` / `tools.vfs.delete({ path })`.
-  Versioning: `await tools.vfs.commit({ message })` snapshots the workspace; `tools.vfs.log({})` / `tools.vfs.diff({ from, to })` / `tools.vfs.restore({ commit, path })` read and restore history; `tools.vfs.read({ path, commit })` pins a read.
+  Versioning: `await tools.vcs.commit({ message })` snapshots the workspace; `tools.vcs.log({})` / `tools.vcs.diff({ from, to })` / `tools.vcs.restore({ commit, path })` read and restore history; `tools.vfs.read({ path, commit })` pins a read. `tools.vfs` is driver ops only (list/read/write/delete/stat).
 - `tools.registry` — discover available SDKs at runtime.
   `await tools.registry.search({ q: 'create issue' })` → `{ operations: [{ providerPath, sdkPath, summary }] }`; `await tools.registry.providers({ q })` → `{ providers }`.
 - `tools.telemetry` — the workspace's debugging evidence: every service call, widget console line, and workflow failure (3-day retention). **When a widget or workflow you built misbehaves, read this before guessing.**

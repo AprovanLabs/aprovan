@@ -19,7 +19,7 @@
 import { homedir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
 import { createInterface } from "node:readline";
-import { runAgent } from "@aprovan/sandbox-host";
+import { runAgent } from "@aprovan/native/host";
 import {
   authHeaders,
   gatewayUrl,
@@ -48,7 +48,7 @@ Options:
   --root <dir>      Directory sandboxes are created under (default: ~/aprovan/work).
                     This is the containment boundary — nothing outside it is reachable.
   --image <spec>    Sandbox image this machine offers to run (repeatable).
-                    Default: @aprovan/sandbox-image-node. A scheduled run is
+                    Default: @aprovan/native. A scheduled run is
                     only offered to machines registered for its image.
   --host <id>       Which registered host to act as (default: the only one)
 

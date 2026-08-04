@@ -1,0 +1,147 @@
+{
+  "name": "@aprovan/native",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Aprovan-supplied native implementations: workspace contract backends (vfs, vcs, keyvalue, events, telemetry) and sandbox execution (bashkit, machine host, Node image)",
+  "keywords": [
+    "aprovan",
+    "native",
+    "sandbox",
+    "vfs",
+    "utdk"
+  ],
+  "license": "MIT",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./bashkit": {
+      "types": "./dist/bashkit/index.d.ts",
+      "import": "./dist/bashkit/index.js",
+      "default": "./dist/bashkit/index.js"
+    },
+    "./host": {
+      "types": "./dist/host/index.d.ts",
+      "import": "./dist/host/index.js",
+      "default": "./dist/host/index.js"
+    },
+    "./vfs": {
+      "types": "./dist/vfs.d.ts",
+      "import": "./dist/vfs.js",
+      "default": "./dist/vfs.js"
+    },
+    "./vcs": {
+      "types": "./dist/vcs.d.ts",
+      "import": "./dist/vcs.js",
+      "default": "./dist/vcs.js"
+    },
+    "./keyvalue": {
+      "types": "./dist/keyvalue.d.ts",
+      "import": "./dist/keyvalue.js",
+      "default": "./dist/keyvalue.js"
+    },
+    "./events": {
+      "types": "./dist/events.d.ts",
+      "import": "./dist/events.js",
+      "default": "./dist/events.js"
+    },
+    "./telemetry": {
+      "types": "./dist/telemetry.d.ts",
+      "import": "./dist/telemetry.js",
+      "default": "./dist/telemetry.js"
+    }
+  },
+  "files": [
+    "dist",
+    "PROMPT.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check-types": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "clean": "rm -rf dist",
+    "test": "vitest run"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "sandbox": {
+    "platform": "linux/amd64",
+    "workdir": "/work",
+    "base": {
+      "fly/sprites": "managed",
+      "cloudflare/sandbox": "docker.io/cloudflare/sandbox:0.12.4",
+      "machine": {
+        "require": [
+          "node",
+          "npm",
+          "git"
+        ]
+      }
+    },
+    "tools": [
+      {
+        "name": "node",
+        "version": ">=22",
+        "check": "node --version",
+        "description": "Node.js runtime"
+      },
+      {
+        "name": "npm",
+        "version": ">=10",
+        "check": "npm --version",
+        "description": "Package installs"
+      },
+      {
+        "name": "npx",
+        "check": "npx --version",
+        "description": "One-off package execution"
+      },
+      {
+        "name": "git",
+        "check": "git --version",
+        "description": "Version control"
+      },
+      {
+        "name": "corepack",
+        "check": "corepack --version",
+        "description": "Enables pnpm/yarn: `corepack enable`"
+      }
+    ],
+    "namespaces": [
+      "vfs",
+      "keyvalue",
+      "telemetry"
+    ],
+    "env": {
+      "CI": "1",
+      "NPM_CONFIG_FUND": "false",
+      "NPM_CONFIG_AUDIT": "false"
+    },
+    "resources": {
+      "cpus": 2,
+      "memoryMb": 2048
+    },
+    "prompt": "./PROMPT.md"
+  },
+  "dependencies": {
+    "@everruns/bashkit-wasm": "^0.14.4",
+    "@utdk/events": "^0.2.0",
+    "@utdk/keyvalue": "^0.2.0",
+    "@utdk/sandbox": "^0.2.0",
+    "@utdk/telemetry": "^0.3.0",
+    "@utdk/vfs": "^0.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "typescript": "^5.7.3",
+    "vitest": "2.1.5"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

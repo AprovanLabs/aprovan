@@ -4,7 +4,7 @@
 
 import { getCredentialStore } from "../credentials.js";
 import { listInterfaces } from "../interfaces.js";
-import { CORE_SERVICE_NAMES } from "../service-kernel.js";
+import { PLATFORM_PLUGIN_NAMES } from "../platform-plugins.js";
 
 let utdkProvidersPromise: Promise<Set<string>> | undefined;
 
@@ -37,7 +37,15 @@ export async function buildWorkflowNamespaceSet(
   workspaceId: string,
   scriptContent?: string,
 ): Promise<string[]> {
-  const namespaces = new Set<string>(CORE_SERVICE_NAMES);
+  const namespaces = new Set<string>([
+    ...PLATFORM_PLUGIN_NAMES,
+    // Interface drivers are always available via the aprovan native default.
+    "vfs",
+    "vcs",
+    "keyvalue",
+    "events",
+    "telemetry",
+  ]);
   for (const def of listInterfaces()) namespaces.add(def.id);
   const registryProviders = await utdkProviderNames();
   if (scriptContent) {

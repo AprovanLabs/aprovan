@@ -281,6 +281,14 @@ export async function dispatchInterface(
     const { dispatchNativeAgentOp } = await import("../agents/runner.js");
     return dispatchNativeAgentOp(ctx, procedure, withDefaults);
   }
+  if (resolved.compat.provider === "aprovan") {
+    const { dispatchAprovanNativeOp, isAprovanNativeBinding } = await import(
+      "../native-dispatch.js"
+    );
+    if (isAprovanNativeBinding(resolved.def.id, resolved.compat.provider)) {
+      return dispatchAprovanNativeOp(ctx, resolved.def.id, procedure, withDefaults);
+    }
+  }
   return dispatchProviderLegacy(ctx, {
     credentialProvider: resolved.compat.provider,
     ...(resolved.credentialId ? { credentialId: resolved.credentialId } : {}),
