@@ -15,7 +15,7 @@ import {
   PanelErrorWithRetry,
   PanelLoading,
   PanelShell,
-  useToolData,
+  usePanelData,
   useScopeFilter,
   type NativePanelProps,
 } from "./shell";
@@ -51,7 +51,7 @@ export function KeyValuePanel({ scope: explicitScope }: NativePanelProps) {
     return () => window.clearTimeout(timer);
   }, [prefix]);
 
-  const { data: keys, error, loading, refresh } = useToolData(
+  const { data: keys, error, loading, refresh } = usePanelData(
     async () => listKeys(await kv("list", committedPrefix ? { prefix: committedPrefix } : {})),
     committedPrefix,
   );
