@@ -14,15 +14,18 @@ t=0   utdk-output-schemas ──────────────────
 - Keep third-party **interface** compat adapters; reconsider only for non-interface natives.
 - All other OQs: accept recommendations (recorded in each change).
 
-## Wave 0 — IN FLIGHT (local worktree agents; cloud blocked on multi-root)
-| Brief | Change | Streams | Model | Agent | Status |
-|-------|--------|---------|-------|-------|--------|
-| tools-global/00-full | tools-global | 1–8 | opus | [tools-global](7ae3c853-ce3a-47fd-a158-81d0beab8b62) | running |
-| utdk-output-schemas/01 | output slot | 1 | sonnet | [slot](cf898327-85e4-4f52-b06c-e52bd1879d2e) | running |
-| utdk-output-schemas/02 | envelope ADR | 2 | composer | [adr](42a3b88d-ce67-42fa-8d59-fd85d7ce2987) | running |
-| utdk-output-schemas/03 | response extraction | 3 | opus | [extract](f05bfe45-7dc9-4f56-aa44-1bfa89a185bc) | running |
+## Wave 0 status (2026-08-03 night)
+| Stream | Status | PR |
+|--------|--------|-----|
+| utdk-output-schemas 1 slot | **merged** | registry#109 |
+| utdk-output-schemas 2 ADR | **merged** | registry#108 |
+| utdk-output-schemas 3 extraction | **merged** | registry#110 |
+| utdk-output-schemas 4 regen | running [regen](5fe38db3-d0f9-4aca-88b9-9879760a1483) | — |
+| utdk-output-schemas 5 catalog | running [catalog](4eacb16c-bf9d-45f8-ac3d-c2005eeef69a) | — |
+| utdk-output-schemas 6 MCP | running [mcp](13359f82-3185-4037-aa39-3476b2b0bf42) | — |
+| utdk-output-schemas 7 digitalocean | blocked on 4 | — |
+| tools-global 1–8 | in progress (orchestrator) | — |
 
-Wave-1/2 briefs pre-written under each change `briefs/00-full.md` (gated).
 
 ### Wave 0b (after 03 merges)
 | Brief | Streams | Notes |
