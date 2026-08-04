@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef } from "react";
 import { DefaultChatTransport } from "ai";
-import { buildEditMessages, type EditTransport, type ServiceInfo } from "@aprovan/patchwork-editor";
+import { buildEditMessages, type EditTransport, type ServiceInfo } from "@aprovan/editor";
 import { IMAGE_SPEC } from "@/features/widgets/useCompilerBootstrap";
 import { resilientChatFetch } from "@/lib/chat-transport";
 import { GATEWAY_BASE } from "@/lib/gateway";

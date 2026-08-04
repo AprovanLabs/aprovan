@@ -1,7 +1,7 @@
 import { useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { AppsPanel } from "@aprovan/registry-ui/apps-panel";
 import type { AppsSelection } from "@aprovan/registry-ui/apps-panel";
-import { CodePreview, getFileType } from "@aprovan/patchwork-editor";
+import { CodePreview, getFileType } from "@aprovan/editor";
 import { AlertCircle, Loader2 } from "lucide-react";
 import { PanelTabs } from "@/components/panels/shell";
 import { useCompiler, useServices, useSharedEditSession } from "@/contexts";

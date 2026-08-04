@@ -1,4 +1,4 @@
-import { MarkdownEditor } from "@aprovan/patchwork-editor";
+import { MarkdownEditor } from "@aprovan/editor";
 import { useEffect, useMemo, useState } from "react";
 import { fileLabel, formatMentionToken } from "./chat-file-context";
 

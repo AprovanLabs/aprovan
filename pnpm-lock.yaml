@@ -60,7 +60,7 @@ importers:
       '@aprovan/patchwork':
         specifier: workspace:*
         version: link:../../packages/compiler
-      '@aprovan/patchwork-editor':
+      '@aprovan/editor':
         specifier: workspace:*
         version: link:../../packages/editor
       '@aprovan/registry-main':

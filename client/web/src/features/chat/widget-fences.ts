@@ -1,4 +1,4 @@
-import { extractCodeBlocks, getFileType, type CodePart } from "@aprovan/patchwork-editor";
+import { extractCodeBlocks, getFileType, type CodePart } from "@aprovan/editor";
 import { isWorkflowScript } from "@aprovan/registry-ui/renderers";
 
 const WIDGET_FENCE_LANGUAGES = new Set([

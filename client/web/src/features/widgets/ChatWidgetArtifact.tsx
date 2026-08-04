@@ -3,7 +3,7 @@ import {
   ViewModeToggle,
   WidgetPreview,
   scanToolsAccess,
-} from "@aprovan/patchwork-editor";
+} from "@aprovan/editor";
 import { createSingleFileProject } from "@aprovan/patchwork";
 import {
   AlertCircle,

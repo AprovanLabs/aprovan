@@ -1,5 +1,5 @@
 import { useContext, useMemo } from "react";
-import { extractCodeBlocks } from "@aprovan/patchwork-editor";
+import { extractCodeBlocks } from "@aprovan/editor";
 import { AlertCircle, Brain, ChevronDown, Loader2, Wrench } from "lucide-react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";

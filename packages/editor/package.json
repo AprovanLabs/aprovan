@@ -1,5 +1,5 @@
 {
-  "name": "@aprovan/patchwork-editor",
+  "name": "@aprovan/editor",
   "version": "0.1.2",
   "description": "Components for facilitating widget generation and editing",
   "type": "module",

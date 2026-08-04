@@ -65,17 +65,13 @@ import { readRegistration } from "../workflows/store.js";
  * The compiler the app page loads from esm.sh, and the widget image it
  * compiles against.
  *
- * The compiler version MUST track this package's own
- * `@aprovan/patchwork` dependency — `tests/live-apps.test.ts` asserts
- * it, because drift here is silent and severe. A published app imports its
- * service namespaces as bare specifiers (`import keyvalue from "keyvalue"`),
- * which only resolve to the injected namespace because the compiler's
- * namespace-import plugin claims them *before* the CDN transform. A compiler
- * old enough to predate that plugin sends every one of them to esm.sh instead,
- * where `keyvalue` 404s (breaking the page outright) and `vfs`, `events` and
- * `agents` are real, unrelated npm packages that resolve 200 — so the app
- * loads and then misbehaves. The pin is exact rather than a range because
- * esm.sh caches the unversioned "latest" redirect for hours.
+ * The compiler version MUST track this package's own `@aprovan/patchwork`
+ * dependency — `tests/live-apps.test.ts` asserts it, because drift here is
+ * silent and severe. Widgets reach server namespaces only through the global
+ * `tools` root assembled by this compiler; there are no bare namespace import
+ * specifiers to claim. The exact pin remains for reproducible esm.sh caching
+ * (unversioned "latest" redirects are cached for hours), not because npm
+ * package name collisions could hijack `vfs`/`events`/`agents` anymore.
  */
 export const APP_SHELL_COMPILER_VERSION = "0.2.0";
 const APP_SHELL_IMAGE_VERSION = "0.1.4";

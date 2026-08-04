@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createCompiler, type Compiler } from "@aprovan/patchwork";
-import type { ServiceInfo } from "@aprovan/patchwork-editor";
+import type { ServiceInfo } from "@aprovan/editor";
 import { ACTIVE_WORKSPACE_KEY } from "@/features/tabs/useTabs";
 import { getAccessTokenSync } from "@/lib/auth";
 import { GATEWAY_BASE } from "@/lib/gateway";

@@ -1,4 +1,4 @@
-import { MobileDrawer, WorkspaceTree } from "@aprovan/patchwork-editor";
+import { MobileDrawer, WorkspaceTree } from "@aprovan/editor";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { usePresenceTitleMap } from "@/features/presence";
