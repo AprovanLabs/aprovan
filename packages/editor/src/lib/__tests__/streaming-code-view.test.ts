@@ -5,12 +5,12 @@ describe("streaming code view (unterminated fence)", () => {
   it("extracts an unclosed fence as a progressive code part", () => {
     const partial = "Here is a widget:\n\n```tsx\nexport default () => <div>Hi";
     const parts = extractCodeBlocks(partial, { includeUnclosed: true });
-    const code = parts.find((p) => p.type === "code" || p.type === "tsx");
+    const code = parts.find((p) => p.type !== "text");
     expect(code).toBeDefined();
     if (!code || code.type === "text") throw new Error("expected code part");
-    expect(code.unclosed).toBe(true);
+    expect("unclosed" in code && code.unclosed).toBe(true);
     expect(code.content).toContain("export default");
-    expect(code.language).toMatch(/tsx|jsx|typescript/i);
+    expect("language" in code && code.language).toMatch(/tsx|jsx|typescript/i);
   });
 
   it("grows the unclosed content as more tokens arrive", () => {

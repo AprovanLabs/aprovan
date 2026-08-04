@@ -1,24 +1,22 @@
 /**
  * Client-side write-policy seam: plain paths write through; app source and
  * writable mounts stage; non-writable mounts are read-only. Consumed by
- * FileEditorPane (stream 4) — unused until then.
+ * FileEditorPane — resolves direct / staged / read-only write handling.
  */
 
 import { ACTIVE_WORKSPACE_KEY } from "@/features/tabs/useTabs";
 import { invokeAppsTool, invokeNamespaceTool } from "@/lib/tools";
 import { subscribeToWorkspaceChanges } from "@/lib/workspace-vfs";
+import type { StagedPrefixSets } from "./write-policy-resolve";
+
+export {
+  normalizePolicyPath,
+  resolveWritePolicy,
+  type StagedPrefixSets,
+  type WritePolicy,
+} from "./write-policy-resolve";
 
 const invokeVfsTool = invokeNamespaceTool("vfs");
-
-export type WritePolicy = "direct" | "staged" | "readonly";
-
-export interface StagedPrefixSets {
-  /** Declared source prefixes of installed apps (appPathAllowed's set). */
-  appPrefixes: string[];
-  /** VCS mount prefixes with writability (all read-only in v1). */
-  mounts: Array<{ prefix: string; writable: boolean }>;
-  loadedAt: number;
-}
 
 const EMPTY_SETS: StagedPrefixSets = {
   appPrefixes: [],
@@ -36,17 +34,6 @@ function currentWorkspaceId(): string {
   } catch {
     return "";
   }
-}
-
-export function normalizePolicyPath(path: string): string {
-  return path.replace(/^\/+|\/+$/g, "").replace(/\/+/g, "/");
-}
-
-function underPrefix(path: string, prefix: string): boolean {
-  const p = normalizePolicyPath(path);
-  const pref = normalizePolicyPath(prefix);
-  if (!pref) return false;
-  return p === pref || p.startsWith(`${pref}/`);
 }
 
 function ensureRefreshSubscription(): void {
@@ -128,48 +115,6 @@ export async function loadStagedPrefixes(force?: boolean): Promise<StagedPrefixS
 /** Drop the cache so the next load refetches (e.g. after a 403 write). */
 export function invalidateStagedPrefixes(): void {
   cache = null;
-}
-
-/**
- * Pure; normalizes the path; longest-prefix match.
- * Non-writable mount ⇒ `"readonly"`. Writable mount ⇒ `"staged"`.
- * App source prefix ⇒ `"staged"`. Otherwise `"direct"`.
- */
-export function resolveWritePolicy(path: string, sets: StagedPrefixSets): WritePolicy {
-  const p = normalizePolicyPath(path);
-
-  let bestMount: { prefix: string; writable: boolean } | null = null;
-  for (const mount of sets.mounts) {
-    if (!underPrefix(p, mount.prefix)) continue;
-    if (
-      !bestMount ||
-      normalizePolicyPath(mount.prefix).length > normalizePolicyPath(bestMount.prefix).length
-    ) {
-      bestMount = mount;
-    }
-  }
-
-  let bestApp: string | null = null;
-  for (const prefix of sets.appPrefixes) {
-    if (!underPrefix(p, prefix)) continue;
-    if (!bestApp || normalizePolicyPath(prefix).length > normalizePolicyPath(bestApp).length) {
-      bestApp = prefix;
-    }
-  }
-
-  const mountLen = bestMount ? normalizePolicyPath(bestMount.prefix).length : -1;
-  const appLen = bestApp ? normalizePolicyPath(bestApp).length : -1;
-
-  if (mountLen >= appLen && bestMount) {
-    return bestMount.writable ? "staged" : "readonly";
-  }
-  if (bestApp) return "staged";
-
-  // Cold cache (loadedAt === 0): do not invent staged routes — consumers
-  // should block saves until loadStagedPrefixes completes rather than
-  // write-through to a staged target.
-  if (sets.loadedAt === 0) return "direct";
-  return "direct";
 }
 
 /** Snapshot of the current cache, or EMPTY_SETS when cold. */

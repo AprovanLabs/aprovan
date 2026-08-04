@@ -4,8 +4,24 @@ export {
   type EditMessage,
 } from "./lib/edit-prompt";
 export { CodePreview, type WidgetVfs } from "./components/CodePreview";
+export {
+  UnifiedCodeEditor,
+  initialUnifiedView,
+  type UnifiedCodeEditorProps,
+} from "./components/UnifiedCodeEditor";
+export {
+  SaveAffordance,
+  SaveStatusButton,
+  SaveConfirmDialog,
+  type SaveAffordanceState,
+  type SaveStatus,
+  type DirectSaveState,
+  type DraftAffordanceState,
+  type SaveConfirmDialogProps,
+} from "./components/SaveAffordance";
+export { staleFileAction, type StaleFileAction } from "./components/staleFile";
 export { ViewModeToggle, type ViewModeToggleProps } from "./components/ViewModeToggle";
-export { WidgetPreview } from "./components/WidgetPreview";
+export { WidgetPreview, type WidgetPreviewProps } from "./components/WidgetPreview";
 export { MobileDrawer, type MobileDrawerProps } from "./components/MobileDrawer";
 export { MarkdownEditor } from "./components/MarkdownEditor";
 export { MarkdownPreview } from "./components/MarkdownPreview";
@@ -16,7 +32,6 @@ export {
   EditModal,
   EditHistory,
   WorkspaceTree,
-  SaveConfirmDialog,
   CodeBlockView,
   CodeEditor,
   MediaPreview,
@@ -36,7 +51,6 @@ export {
   type EditApiOptions,
   type EditTransport,
   type WorkspaceTreeProps,
-  type SaveConfirmDialogProps,
   type CodeBlockViewProps,
   type CodeEditorProps,
   type MediaPreviewProps,

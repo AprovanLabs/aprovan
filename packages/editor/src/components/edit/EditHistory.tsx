@@ -1,7 +1,6 @@
 import { Loader2 } from 'lucide-react';
 import { useRef, useEffect } from 'react';
-import Markdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import { MarkdownPreview } from '../MarkdownPreview';
 import type { EditHistoryEntry } from './types';
 
 interface EditHistoryProps {
@@ -46,7 +45,7 @@ export function EditHistory({
           <div className="flex justify-end">
             <div className="bg-primary text-primary-foreground rounded-lg px-4 py-2 max-w-[85%]">
               <div className="prose prose-sm prose-invert max-w-none prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-ol:my-1 prose-li:my-0">
-                <Markdown remarkPlugins={[remarkGfm]}>{entry.prompt}</Markdown>
+                <MarkdownPreview value={entry.prompt} />
               </div>
             </div>
           </div>
@@ -54,7 +53,7 @@ export function EditHistory({
           <div className="flex justify-start">
             <div className="bg-primary/10 rounded-lg px-4 py-2 max-w-[85%]">
               <div className="prose prose-sm dark:prose-invert max-w-none prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-ol:my-1 prose-li:my-0">
-                <Markdown remarkPlugins={[remarkGfm]}>{entry.summary}</Markdown>
+                <MarkdownPreview value={entry.summary} />
               </div>
             </div>
           </div>
@@ -66,7 +65,7 @@ export function EditHistory({
           <div className="flex justify-end">
             <div className="bg-primary text-primary-foreground rounded-lg px-4 py-2 max-w-[85%]">
               <div className="prose prose-sm prose-invert max-w-none prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-ol:my-1 prose-li:my-0">
-                <Markdown remarkPlugins={[remarkGfm]}>{pendingPrompt}</Markdown>
+                <MarkdownPreview value={pendingPrompt} />
               </div>
             </div>
           </div>

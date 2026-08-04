@@ -29,6 +29,7 @@ const COMMON_LANGUAGES: BundledLanguage[] = [
   "python",
   "bash",
   "sql",
+  "diff",
 ];
 
 export function getHighlighter(): Promise<Highlighter> {
@@ -64,6 +65,8 @@ export function normalizeLanguage(lang: string | null | undefined): BundledLangu
     sql: "sql",
     typescript: "typescript",
     javascript: "javascript",
+    diff: "diff",
+    patch: "diff",
   };
   return mapping[normalized] || "typescript";
 }
