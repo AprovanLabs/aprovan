@@ -16,6 +16,7 @@ import type {
   CompilerOptions,
   CompileOptions,
   CompiledWidget,
+  Diagnostic,
   LoadedImage,
   Manifest,
   MountedWidget,
@@ -24,6 +25,29 @@ import type {
   WidgetTelemetryHook,
 } from "./types.js";
 import type { VirtualProject } from "./vfs/types.js";
+
+/** Format typecheck diagnostics into the message body of a thrown Error. */
+export function formatTypeDiagnostics(diagnostics: Diagnostic[]): string {
+  return diagnostics
+    .map((d) => `${d.file}:${d.line}:${d.column}: ${d.message}`)
+    .join("\n");
+}
+
+/**
+ * Run the injected checker when both `typescript` and `checker` are set.
+ * Error-severity findings abort the compile; warnings are ignored for now.
+ */
+export async function runTypecheck(
+  project: VirtualProject,
+  options: Pick<CompileOptions, "typescript" | "checker">,
+): Promise<void> {
+  if (!options.typescript || !options.checker) return;
+  const diagnostics = await options.checker.check(project, project.entry);
+  const errors = diagnostics.filter((d) => d.severity === "error");
+  if (errors.length > 0) {
+    throw new Error(formatTypeDiagnostics(errors));
+  }
+}
 
 // Track esbuild initialization
 let esbuildInitialized = false;
@@ -231,11 +255,16 @@ class PatchworkCompiler implements Compiler {
   private async buildWidget(
     source: string | VirtualProject,
     manifest: Manifest,
-    _options: CompileOptions = {},
+    options: CompileOptions = {},
   ): Promise<CompiledWidget> {
     // Normalize input to VirtualProject (entry defined by project, defaults to main.tsx)
     const project =
       typeof source === "string" ? createSingleFileProject(source) : source;
+
+    // Typecheck before bundling when a checker is injected and the flag is on.
+    // Failures throw into compile()'s catch, which emits the existing
+    // `Compile failed:` telemetry shape.
+    await runTypecheck(project, options);
 
     // Infer loader from entry file extension
     const entryExt = project.entry.split(".").pop();

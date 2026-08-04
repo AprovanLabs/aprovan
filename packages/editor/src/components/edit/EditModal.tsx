@@ -12,14 +12,14 @@ import { useState, useCallback, useMemo, useRef, useEffect, type ReactNode } fro
 import { MarkdownEditor } from '../MarkdownEditor';
 import { MarkdownPreview } from '../MarkdownPreview';
 import { MobileDrawer } from '../MobileDrawer';
-import { SaveStatusButton, type SaveStatus } from '../SaveStatusButton';
+import { SaveStatusButton, type SaveStatus } from '../SaveAffordance';
 import { ViewModeToggle } from '../ViewModeToggle';
 import { CodeBlockView } from './CodeBlockView';
 import { EditHistory } from './EditHistory';
 import { LogsPanel, type EditorLogsSource } from './LogsPanel';
 import { getFileType, isMarkdownFile, getMimeType, type DefaultView } from './fileTypes';
 import { MediaPreview } from './MediaPreview';
-import { SaveConfirmDialog } from './SaveConfirmDialog';
+import { SaveConfirmDialog } from '../SaveAffordance';
 import { getActiveContent, getFiles } from './types';
 import { useEditSession, type UseEditSessionOptions } from './useEditSession';
 import { WorkspaceTree } from './WorkspaceTree';

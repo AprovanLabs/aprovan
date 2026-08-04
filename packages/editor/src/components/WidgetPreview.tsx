@@ -1,6 +1,12 @@
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { Compiler, Manifest, MountedWidget, PluginRegistry } from '@aprovan/patchwork';
+import type {
+  Checker,
+  Compiler,
+  Manifest,
+  MountedWidget,
+  PluginRegistry,
+} from '@aprovan/patchwork';
 
 export interface WidgetPreviewProps {
   code: string;
@@ -18,6 +24,8 @@ export interface WidgetPreviewProps {
   onError?: (error: string) => void;
   /** Host plugins (telemetry override, notification payload, …). */
   plugins?: PluginRegistry;
+  /** Injected typechecker — runs on the compile that precedes preview. */
+  checker?: Checker;
 }
 
 function createManifest(services?: string[]): Manifest {
@@ -38,6 +46,7 @@ export function WidgetPreview({
   sourcePath,
   onError,
   plugins: pluginsProp,
+  checker,
 }: WidgetPreviewProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -63,13 +72,22 @@ export function WidgetPreview({
       setError(null);
 
       try {
+        const started = performance.now();
         const widget = await compiler.compile(code, createManifest(services), {
           typescript: true,
           // Attribution for the compiler's own error telemetry: a failed
           // compile is recorded against this file, so it reaches the Logs
           // panel and the problem digest that "fix it" prompts carry.
           ...(sourcePath ? { sourcePath } : {}),
+          ...(checker ? { checker } : {}),
         });
+        if (checker) {
+          // Latency signal for compile-before-preview typecheck (Stream 8.4).
+          console.debug(
+            `[editor] compile+typecheck ${Math.round(performance.now() - started)}ms`,
+            sourcePath ?? '(anonymous)',
+          );
+        }
 
         if (cancelled || !containerRef.current) return;
 
@@ -119,7 +137,7 @@ export function WidgetPreview({
         mountedRef.current = null;
       }
     };
-  }, [code, compiler, enabled, services, sourcePath, plugins]);
+  }, [code, compiler, enabled, services, sourcePath, plugins, checker]);
 
   return (
     <>

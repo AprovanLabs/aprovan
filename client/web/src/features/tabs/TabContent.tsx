@@ -1,30 +1,22 @@
 import { useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { AppsPanel } from "@aprovan/registry-ui/apps-panel";
 import type { AppsSelection } from "@aprovan/registry-ui/apps-panel";
-import { CodePreview, getFileType } from "@aprovan/editor";
+import { getFileType, type UnifiedCodeEditorProps } from "@aprovan/editor";
 import { AlertCircle, Loader2 } from "lucide-react";
 import { PanelTabs } from "@/components/panels/shell";
 import { useCompiler, useServices, useSharedEditSession } from "@/contexts";
 import { FileEditorPane } from "@/features/editing/FileEditorPane";
+import { useCompileChecker } from "@/features/editing/useCompileChecker";
 import { NATIVE_SURFACES, parseNativeTabPath } from "@/lib/native-surfaces";
-import { editorLogsSource } from "@/lib/telemetry";
 import { invokeAppsTool, invokeWorkflowsTool } from "@/lib/tools";
-import {
-  createSingleWorkspaceFileProject,
-  workspaceWidgetVfs,
-} from "@/lib/workspace-vfs";
+import { createSingleWorkspaceFileProject } from "@/lib/workspace-vfs";
 import { appsTabPath, parseAppsTabPath, type OpenTab } from "./tab-routing";
 import { isNativeTabPath, UnknownNativeSurface } from "./UnknownNativeSurface";
 
-function isEditableTabPath(path: string): boolean {
-  const category = getFileType(path).category;
-  return category === "text" || category === "compilable";
-}
-
 /**
  * Active tab content: dispatches the active tab's pseudo-path to a native
- * surface panel, the shared `AppsPanel`, an in-tab `FileEditorPane` for
- * editable files, or a read-mostly `CodePreview` for media/binary.
+ * surface panel, the shared `AppsPanel`, or UnifiedCodeEditor via
+ * FileEditorPane (editable and read-only paths share one composition).
  */
 export function TabContent({
   openTabs,
@@ -50,12 +42,13 @@ export function TabContent({
   closeTab: (path: string) => void;
   createWorkflowInChat: (appName?: string) => void;
   publishFlowInChat: (workflowName: string) => void;
-  customPreview: React.ComponentProps<typeof CodePreview>["customPreview"];
+  customPreview: UnifiedCodeEditorProps["customPreview"];
   loadScript: (path: string) => Promise<string | null>;
 }) {
   const compiler = useCompiler();
   const namespaces = useServices();
   const openSharedEditSession = useSharedEditSession();
+  const checker = useCompileChecker(namespaces);
 
   // App panes carry contextual native tabs (Details + appTab surfaces); the
   // active sub-tab resets when the pane shows a different app.
@@ -92,6 +85,9 @@ export function TabContent({
       return next;
     });
   };
+
+  const category = getFileType(activeTabPath).category;
+  const canOpenEditor = category === "compilable";
 
   return (
     <div
@@ -146,10 +142,9 @@ export function TabContent({
           />
         </div>
       )}
-      {/* Only real workspace files reach the preview:
+      {/* Only real workspace files reach the editor:
           a native tab renders its Panel above and must
-          not also mount CodePreview (whose edit toolbar
-          makes no sense on a native surface). */}
+          not also mount the file composition. */}
       {!appsSelection && !nativeSurface && !unknownNative && (
         <>
           {tab.loading ? (
@@ -162,18 +157,20 @@ export function TabContent({
               <AlertCircle className="h-4 w-4 shrink-0" />
               <span>{tab.error}</span>
             </div>
-          ) : isEditableTabPath(activeTabPath) ? (
+          ) : (
             <FileEditorPane
               path={activeTabPath}
               code={tab.code}
               stale={tab.stale}
               compiler={compiler}
               services={namespaces}
+              customPreview={customPreview}
+              checker={checker}
               onReload={() => reloadStaleTab(activeTabPath)}
               onKeepLocal={keepLocal}
               onOpenFile={openWorkspacePreview}
               onOpenEditor={
-                openSharedEditSession
+                canOpenEditor && openSharedEditSession
                   ? () => {
                       const entryFile =
                         activeTabPath.split("/").filter(Boolean).pop() ?? "index.tsx";
@@ -193,34 +190,6 @@ export function TabContent({
                   : undefined
               }
             />
-          ) : (
-            <>
-              {tab.stale && (
-                <div className="shrink-0 px-3 py-1.5 text-xs bg-orange-50 dark:bg-orange-950/40 border-b border-orange-200 dark:border-orange-800 flex items-center gap-2 text-orange-700 dark:text-orange-400">
-                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                  <span>This file was modified externally.</span>
-                  <button
-                    onClick={() => reloadStaleTab(activeTabPath)}
-                    className="ml-auto underline hover:no-underline"
-                  >
-                    Reload
-                  </button>
-                  <button onClick={keepLocal} className="underline hover:no-underline">
-                    Keep local
-                  </button>
-                </div>
-              )}
-              <CodePreview
-                fill
-                code={tab.code}
-                compiler={compiler}
-                services={namespaces}
-                filePath={activeTabPath}
-                vfs={workspaceWidgetVfs}
-                customPreview={customPreview}
-                logsSource={editorLogsSource}
-              />
-            </>
           )}
         </>
       )}

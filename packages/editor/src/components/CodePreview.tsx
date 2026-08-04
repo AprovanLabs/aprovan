@@ -1,13 +1,12 @@
 import { createSingleFileProject } from '@aprovan/patchwork';
-import { Code, Pencil, RotateCcw, MessageSquare } from 'lucide-react';
+import { MessageSquare, RotateCcw } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { withTimeout } from '../lib/utils';
-import { EditModal, type CompileFn, type EditorLogsSource, CodeBlockView, MediaPreview, getFileType } from './edit';
-import { MarkdownPreview } from './MarkdownPreview';
-import { SaveStatusButton, type SaveStatus } from './SaveStatusButton';
-import { ViewModeToggle } from './ViewModeToggle';
+import { EditModal, type CompileFn, type EditorLogsSource, getFileType } from './edit';
+import { type SaveStatus } from './SaveAffordance';
+import { UnifiedCodeEditor } from './UnifiedCodeEditor';
 import { WidgetPreview } from './WidgetPreview';
-import type { Compiler, Manifest , VirtualProject } from '@aprovan/patchwork';
+import type { Checker, Compiler, Manifest, VirtualProject } from '@aprovan/patchwork';
 
 /**
  * Storage adapter widgets save to / reload from. `CodePreview` talks to the
@@ -75,6 +74,8 @@ interface CodePreviewProps {
    * attribution of the preview mount.
    */
   logsSource?: (path?: string) => EditorLogsSource | undefined;
+  /** Optional typechecker injected into compile-before-preview. */
+  checker?: Checker;
 }
 
 // The post-edit compile check has no timeout of its own (esbuild resolving
@@ -133,6 +134,10 @@ function createManifest(services?: string[]): Manifest {
   };
 }
 
+/**
+ * VFS-backed widget host over UnifiedCodeEditor.
+ * Keeps storage adapter, customPreview, and logsSource seams.
+ */
 export function CodePreview({
   code: originalCode,
   compiler,
@@ -147,9 +152,9 @@ export function CodePreview({
   fill = false,
   className,
   logsSource,
+  checker,
 }: CodePreviewProps) {
   const [isEditing, setIsEditing] = useState(false);
-  const [showPreview, setShowPreview] = useState(true);
   const [currentCode, setCurrentCode] = useState(originalCode);
   const [editCount, setEditCount] = useState(0);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
@@ -179,21 +184,17 @@ export function CodePreview({
   // forced everything to main.tsx.
   const defaultEntryFile = language ? entryFileForLanguage(language) : entrypoint;
 
-  // Determine project ID based on the VFS adapter and available path
   const getProjectId = useCallback(async () => {
     if (effectiveFilePath && (await vfs.usePaths())) {
-      // Use the directory containing the file as project ID
       const parts = effectiveFilePath.split('/');
       if (parts.length > 1) {
         return parts.slice(0, -1).join('/');
       }
-      // Single file, use filename without extension as ID
       return effectiveFilePath.replace(/\.[^.]+$/, '');
     }
     return fallbackId;
   }, [effectiveFilePath, fallbackId, vfs]);
 
-  // Get the entry filename
   const getEntryFile = useCallback(() => {
     if (effectiveFilePath) {
       const parts = effectiveFilePath.split('/');
@@ -236,6 +237,8 @@ export function CodePreview({
     };
   }, [getProjectId, getEntryFile]);
 
+  // VFS stale: clean → silent reload; dirty → mark unsaved (no banner — host
+  // composition uses UnifiedCodeEditor stale banner when stale+onReload set).
   useEffect(() => {
     if (!vfsPath) return;
     const unsubscribe = vfs.subscribe(async (record) => {
@@ -263,7 +266,6 @@ export function CodePreview({
     return () => unsubscribe();
   }, [vfsPath, vfs]);
 
-  // Save to an explicit target path (from the prompt) or the derived one.
   const saveTo = useCallback(
     async (targetPath: string | null) => {
       setSaveStatus('saving');
@@ -289,8 +291,6 @@ export function CodePreview({
     [currentCode, getProjectId, getEntryFile, vfs],
   );
 
-  // Manual save: an unnamed widget first asks where to land, prefilled with
-  // the generated default; later saves reuse the chosen path.
   const handleSave = useCallback(() => {
     if (!effectiveFilePath) {
       setPathDraft(`${fallbackId}/${defaultEntryFile}`);
@@ -311,8 +311,6 @@ export function CodePreview({
   const previewPath = filePath ?? defaultEntryFile;
   const fileType = useMemo(() => getFileType(previewPath), [previewPath]);
   const canRenderWidget = fileType.category === 'compilable';
-  // The fence language (when supplied) is the truth for highlighting; the
-  // extension-derived one covers path-only hosts like the workspace tabs.
   const displayLanguage = language ?? fileType.language;
 
   const compile: CompileFn = useCallback(
@@ -320,7 +318,6 @@ export function CodePreview({
       if (!canRenderWidget) return { success: true };
       if (!compiler) return { success: true };
 
-      // Capture console.error outputs during compilation
       const errors: string[] = [];
       const originalError = console.error;
       console.error = (...args) => {
@@ -333,6 +330,7 @@ export function CodePreview({
           compiler.compile(code, createManifest(services), {
             typescript: true,
             ...(effectiveFilePath ? { sourcePath: effectiveFilePath } : {}),
+            ...(checker ? { checker } : {}),
           }),
           COMPILE_TIMEOUT_MS,
           `Compilation timed out after ${COMPILE_TIMEOUT_MS / 1000}s`,
@@ -349,7 +347,7 @@ export function CodePreview({
         console.error = originalError;
       }
     },
-    [canRenderWidget, compiler, services, effectiveFilePath]
+    [canRenderWidget, compiler, services, effectiveFilePath, checker]
   );
 
   const handleRevert = () => {
@@ -358,49 +356,7 @@ export function CodePreview({
   };
 
   const hasChanges = currentCode !== originalCode;
-
-  const previewBody = useMemo(() => {
-    const custom = customPreview?.({ code: currentCode, filePath });
-    if (custom) return custom;
-
-    if (canRenderWidget) {
-      return (
-        <WidgetPreview
-          code={currentCode}
-          compiler={compiler}
-          services={services}
-          enabled={showPreview && !isEditing}
-          sourcePath={effectiveFilePath}
-          onError={onWidgetError}
-        />
-      );
-    }
-
-    if (fileType.category === 'media') {
-      return (
-        <MediaPreview
-          content={currentCode}
-          mimeType={fileType.mimeType}
-          fileName={previewPath}
-        />
-      );
-    }
-
-    if (fileType.language === 'markdown') {
-      return (
-        <div className="p-4 prose prose-sm dark:prose-invert max-w-none">
-          <MarkdownPreview value={currentCode} />
-        </div>
-      );
-    }
-
-    return (
-      <CodeBlockView
-        content={currentCode}
-        language={displayLanguage}
-      />
-    );
-  }, [canRenderWidget, compiler, currentCode, customPreview, displayLanguage, effectiveFilePath, filePath, fileType, isEditing, onWidgetError, previewPath, services, showPreview]);
+  const dirty = currentCode !== lastSavedCode;
 
   const handleOpenEditor = useCallback(async () => {
     if (!onOpenEditSession) {
@@ -420,109 +376,86 @@ export function CodePreview({
     });
   }, [onOpenEditSession, getProjectId, getEntryFile, currentCode, filePath]);
 
-  // In fill mode the surrounding pane already draws the frame and owns the
-  // height; inline in a message the host wraps the preview in a bounded
-  // container — no viewport floors/caps here.
-  const bodyClass = fill
-    ? 'flex flex-col flex-1 min-h-0 overflow-y-auto bg-card'
-    : `flex flex-col overflow-y-auto bg-card${className ? ` ${className}` : ''}`;
-
   return (
     <>
-      <div
-        className={
-          fill
-            ? 'flex flex-col h-full min-h-0 min-w-0'
-            : 'border rounded-lg overflow-hidden min-w-0'
-        }
-      >
-        <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 border-b shrink-0">
-          <Code className="h-4 w-4 text-muted-foreground" />
-          {editCount > 0 && (
+      <UnifiedCodeEditor
+        path={previewPath}
+        code={originalCode}
+        content={currentCode}
+        dirty={dirty}
+        editable={false}
+        compiler={compiler}
+        services={services}
+        language={displayLanguage ?? undefined}
+        fill={fill}
+        className={className}
+        customPreview={customPreview}
+        previewEnabled={!isEditing}
+        onWidgetError={onWidgetError}
+        onOpenEditor={() => void handleOpenEditor()}
+        checker={checker}
+        saveState={{
+          kind: 'button',
+          status: saveStatus,
+          onClick: handleSave,
+          disabled: saveStatus === 'saving',
+          tone: 'muted',
+          target: vfsPath ?? undefined,
+        }}
+        headerLeading={
+          editCount > 0 ? (
             <span className="text-xs text-muted-foreground flex items-center gap-1">
               <MessageSquare className="h-3 w-3" />
               {editCount} edit{editCount !== 1 ? 's' : ''}
             </span>
-          )}
-          <div className="ml-auto flex gap-1">
-            {hasChanges && (
+          ) : null
+        }
+        headerExtra={
+          hasChanges ? (
+            <button
+              type="button"
+              onClick={handleRevert}
+              className="px-2 py-1 text-xs rounded flex items-center gap-1 hover:bg-muted text-muted-foreground"
+              title="Revert to original"
+            >
+              <RotateCcw className="h-3 w-3" />
+            </button>
+          ) : null
+        }
+        belowHeader={
+          pathPromptOpen ? (
+            <div className="flex items-center gap-2 px-3 py-2 border-b bg-muted/30">
+              <span className="text-xs text-muted-foreground shrink-0">Save to</span>
+              <input
+                value={pathDraft}
+                onChange={(e) => setPathDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') confirmSavePath();
+                  if (e.key === 'Escape') setPathPromptOpen(false);
+                }}
+                autoFocus
+                spellCheck={false}
+                className="flex-1 min-w-0 rounded border bg-background px-2 py-1 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-ring"
+              />
               <button
-                onClick={handleRevert}
-                className="px-2 py-1 text-xs rounded flex items-center gap-1 hover:bg-muted text-muted-foreground"
-                title="Revert to original"
+                type="button"
+                onClick={confirmSavePath}
+                disabled={!pathDraft.trim()}
+                className="px-2 py-1 text-xs rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
               >
-                <RotateCcw className="h-3 w-3" />
+                Save
               </button>
-            )}
-            <button
-              onClick={() => void handleOpenEditor()}
-              className="px-2 py-1 text-xs rounded flex items-center gap-1 hover:bg-muted"
-              title="Edit component"
-            >
-              <Pencil className="h-3 w-3" />
-            </button>
-            <SaveStatusButton
-              status={saveStatus}
-              onClick={handleSave}
-              disabled={saveStatus === 'saving'}
-              tone="muted"
-              target={vfsPath ?? undefined}
-            />
-            <ViewModeToggle
-              active={showPreview}
-              label={showPreview ? 'Preview' : 'Code'}
-              onClick={() => setShowPreview(!showPreview)}
-            />
-          </div>
-        </div>
-
-        {pathPromptOpen && (
-          <div className="flex items-center gap-2 px-3 py-2 border-b bg-muted/30">
-            <span className="text-xs text-muted-foreground shrink-0">Save to</span>
-            <input
-              value={pathDraft}
-              onChange={(e) => setPathDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') confirmSavePath();
-                if (e.key === 'Escape') setPathPromptOpen(false);
-              }}
-              autoFocus
-              spellCheck={false}
-              className="flex-1 min-w-0 rounded border bg-background px-2 py-1 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-ring"
-            />
-            <button
-              onClick={confirmSavePath}
-              disabled={!pathDraft.trim()}
-              className="px-2 py-1 text-xs rounded bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-            >
-              Save
-            </button>
-            <button
-              onClick={() => setPathPromptOpen(false)}
-              className="px-2 py-1 text-xs rounded hover:bg-muted text-muted-foreground"
-            >
-              Cancel
-            </button>
-          </div>
-        )}
-
-        {showPreview ? (
-          <div className={bodyClass}>{previewBody}</div>
-        ) : (
-          <div
-            className={
-              fill
-                ? 'flex-1 min-h-0 overflow-auto bg-muted/30'
-                : `bg-muted/30 overflow-auto${className ? ` ${className}` : ''}`
-            }
-          >
-            <CodeBlockView
-              content={currentCode}
-              language={displayLanguage}
-            />
-          </div>
-        )}
-      </div>
+              <button
+                type="button"
+                onClick={() => setPathPromptOpen(false)}
+                className="px-2 py-1 text-xs rounded hover:bg-muted text-muted-foreground"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : null
+        }
+      />
 
       <EditModal
         isOpen={isEditing}
@@ -531,7 +464,6 @@ export function CodePreview({
           setEditCount((prev) => prev + edits);
           setIsEditing(false);
 
-          // Auto-save to VFS when edits complete
           if (edits > 0) {
             setSaveStatus('saving');
             (async () => {
@@ -557,6 +489,7 @@ export function CodePreview({
             compiler={compiler}
             services={services}
             sourcePath={effectiveFilePath}
+            checker={checker}
           />
         )}
       />

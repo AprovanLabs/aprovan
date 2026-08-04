@@ -217,6 +217,47 @@ describe("generateNamespaceTypes", () => {
     expect(dts).toContain("type ProfileClient = (name: string) => Promise<GithubNamespace>;");
   });
 
+  it("emits the service root as a global declaration", () => {
+    const dts = generateNamespaceTypes(["vfs", "github.repos.list"]);
+    expect(dts).toContain("declare const tools: {");
+    expect(dts).toContain('vfs: import("vfs").default;');
+    expect(dts).toContain('github: import("github").default;');
+  });
+
+  it("uses a single PascalCase derivation for structural type names", () => {
+    const dts = generateNamespaceTypes(["openRouter.chat"]);
+    // openRouter → open + Router → OpenRouter
+    expect(dts).toContain("export interface OpenRouterNamespace");
+  });
+
+  it("incorporates plugin-carried declarations as a second input", () => {
+    const plugin = `declare module "notify" {
+  export interface Notify { ping(): Promise<void>; }
+  const notify: Notify;
+  export default notify;
+  export { notify };
+}`;
+    const dts = generateNamespaceTypes(["vfs"], [], {
+      pluginDeclarations: { notify: plugin },
+    });
+    expect(dts).toContain(plugin);
+    expect(dts).toContain('notify: import("notify").default;');
+    expect(dts).toContain('vfs: import("vfs").default;');
+  });
+
+  it("merges overrideTypes with pluginDeclarations", () => {
+    const dts = generateNamespaceTypes([], [], {
+      overrideTypes: {
+        a: `declare module "a" { const a: { x: 1 }; export default a; }`,
+      },
+      pluginDeclarations: {
+        b: `declare module "b" { const b: { y: 2 }; export default b; }`,
+      },
+    });
+    expect(dts).toContain('declare module "a"');
+    expect(dts).toContain('declare module "b"');
+  });
+
   it("types a workflow from its JSON Schemas", () => {
     const dts = generateNamespaceTypes(["app"], [
       {

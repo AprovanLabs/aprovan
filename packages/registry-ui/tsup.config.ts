@@ -16,7 +16,7 @@ export default defineConfig({
   format: ["esm"],
   dts: true,
   clean: true,
-  external: ["react"],
+  external: ["react", "@aprovan/editor", "@aprovan/editor/ts"],
   // CSS imports become their text: tailor.tsx bundles the React Flow base
   // stylesheet (and its own tailor.css) to self-inject at runtime, so the
   // graph stays usable on hosts that never imported the stylesheets. The

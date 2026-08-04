@@ -1,8 +1,6 @@
 import { useContext, useMemo } from "react";
-import { extractCodeBlocks } from "@aprovan/editor";
+import { extractCodeBlocks, HighlightedCode, MarkdownPreview } from "@aprovan/editor";
 import { AlertCircle, Brain, ChevronDown, Loader2, Wrench } from "lucide-react";
-import Markdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import type { UIMessage } from "ai";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -242,7 +240,7 @@ export function TextPartWithSession({
   if (isUser) {
     return (
       <div className="prose prose-sm prose-invert prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-ol:my-1 prose-li:my-0 prose-pre:my-2 prose-code:before:content-none prose-code:after:content-none">
-        <Markdown remarkPlugins={[remarkGfm]}>{text}</Markdown>
+        <MarkdownPreview value={text} />
       </div>
     );
   }
@@ -252,11 +250,23 @@ export function TextPartWithSession({
   return (
     <div className="prose prose-sm dark:prose-invert prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-ol:my-1 prose-li:my-0 prose-pre:my-2 prose-code:before:content-none prose-code:after:content-none">
       {parts.map((part, index) => {
+        // Unapplied (or streaming) patch/diff hunks — keep visibly as a
+        // highlighted fence; successful patches are rewritten upstream.
         if (part.type === "code" && (part.language === "patch" || part.language === "diff")) {
+          const path = part.attributes?.path;
           return (
-            <Markdown key={index} remarkPlugins={[remarkGfm]}>
-              {`\`\`\`diff\n${part.content}\`\`\``}
-            </Markdown>
+            <div
+              key={index}
+              className="not-prose my-2 border rounded-lg overflow-hidden min-w-0"
+            >
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-muted/50 border-b text-xs text-muted-foreground">
+                <span>{part.language}</span>
+                {path && <span className="font-mono">{path}</span>}
+              </div>
+              <div className="bg-muted/30 overflow-auto max-h-[60vh] p-3">
+                <HighlightedCode code={part.content} language="diff" />
+              </div>
+            </div>
           );
         }
 
@@ -324,11 +334,7 @@ export function TextPartWithSession({
           );
         }
 
-        return (
-          <Markdown key={index} remarkPlugins={[remarkGfm]}>
-            {part.content}
-          </Markdown>
-        );
+        return <MarkdownPreview key={index} value={part.content} />;
       })}
     </div>
   );
