@@ -2,10 +2,10 @@
 
 > Depends-on: - | Touches: packages/compiler/src/namespace-core.ts, server/workspace/src/apps/capabilities.ts, packages/ui/src/apps-store/wire.ts, packages/registry-ui/src/apps/**, packages/registry-ui/src/apps-panel.tsx | Verify: `pnpm --filter @aprovan/patchwork-compiler test && pnpm check-types`
 
-- [ ] 1.1 Make `packages/compiler/src/namespace-core.ts` the sole definition of the installed namespace set; export it from the dependency-free subpath so Node consumers can reach it without esbuild-wasm.
-- [ ] 1.2 Delete the duplicate list in `server/workspace/src/apps/capabilities.ts:40` and import from 1.1.
-- [ ] 1.3 Delete the third, divergent list in `packages/ui/src/apps-store/wire.ts:798` (3 names vs 6) and import from 1.1; update its consumers in `packages/registry-ui`.
-- [ ] 1.4 Add a test asserting no other module declares a hardcoded first-party namespace list (satisfies `widget-dependency-scan` / "Single definition of the namespace set").
+- [x] 1.1 Make `packages/compiler/src/namespace-core.ts` the sole definition of the installed namespace set; export it from the dependency-free subpath so Node consumers can reach it without esbuild-wasm.
+- [x] 1.2 Delete the duplicate list in `server/workspace/src/apps/capabilities.ts:40` and import from 1.1.
+- [x] 1.3 Delete the third, divergent list in `packages/ui/src/apps-store/wire.ts:798` (3 names vs 6) and import from 1.1; update its consumers in `packages/registry-ui`.
+- [x] 1.4 Add a test asserting no other module declares a hardcoded first-party namespace list (satisfies `widget-dependency-scan` / "Single definition of the namespace set").
 
 ## 2. `tools` assembly and callable nodes
 
