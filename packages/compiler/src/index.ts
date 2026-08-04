@@ -117,12 +117,21 @@ export { NATIVE_APP_NAMESPACES } from "./namespace-core.js";
 //   import { generateNamespaceTypes } from "@aprovan/patchwork/namespace-types";
 // which is how the gateway generates an app's `__sdk__.d.ts` without loading
 // esbuild-wasm into a Node process.
-export { generateNamespaceTypes } from "./transforms/namespace-types.js";
+export { generateNamespaceTypes, toPascalCase } from "./transforms/namespace-types.js";
+export {
+  emitProviderModuleIndex,
+  providerModuleName,
+  resolveOnDemandProviderMounts,
+} from "./transforms/provider-types-bundle.js";
 export type {
   JsonSchema,
   WorkflowTypeSpec,
   NamespaceTypesOptions,
 } from "./transforms/namespace-types.js";
+export type {
+  OnDemandProviderMountOptions,
+  ProviderTypesBundle,
+} from "./transforms/provider-types-bundle.js";
 
 // VFS
 export {
