@@ -6,8 +6,8 @@ Complete enough for review PRs (do not merge). Companion registry PR ships
 `"path"` + interfaces docs rewrite.
 
 ## PRs
-- Aprovan: (filled after open)
-- Registry: (filled after open)
+- Aprovan: https://github.com/AprovanLabs/aprovan/pull/85
+- Registry: https://github.com/AprovanLabs/registry/pull/120
 
 ## What landed
 
