@@ -18,6 +18,7 @@ export {
   WorkspaceTree,
   SaveConfirmDialog,
   CodeBlockView,
+  CodeEditor,
   MediaPreview,
   useEditSession,
   useProjectState,
@@ -37,6 +38,7 @@ export {
   type WorkspaceTreeProps,
   type SaveConfirmDialogProps,
   type CodeBlockViewProps,
+  type CodeEditorProps,
   type MediaPreviewProps,
   type FileCategory,
   type FileTypeInfo,
@@ -92,3 +94,11 @@ export {
 export { resolvePatchesInText } from "./lib/patch";
 
 export { cn, withTimeout } from "./lib/utils";
+
+export {
+  getHighlighter,
+  normalizeLanguage,
+  highlightToHtml,
+  HighlightedCode,
+  type HighlightedCodeProps,
+} from "./lib/highlighter";

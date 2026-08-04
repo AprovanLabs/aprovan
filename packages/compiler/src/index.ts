@@ -53,6 +53,8 @@ export type {
   Platform,
   Manifest,
   InputSpec,
+  Checker,
+  Diagnostic,
   CompileOptions,
   CompiledWidget,
   MountMode,

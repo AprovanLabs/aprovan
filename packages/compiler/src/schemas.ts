@@ -108,16 +108,18 @@ export const ManifestSchema = z.object({
 
 export type Manifest = z.infer<typeof ManifestSchema>;
 
-// Compile options schema
+// Compile options schema. `checker` is a function interface — validated as
+// custom rather than JSON-shaped, matching CompileOptions in types.ts.
 export const CompileOptionsSchema = z
   .object({
     typescript: z.boolean().optional(),
     sourcePath: z.string().optional(),
+    checker: z.custom<(project: unknown, entry: string) => Promise<unknown[]>>((v) => {
+      return typeof v === "object" && v !== null && typeof (v as { check?: unknown }).check === "function";
+    }).optional(),
   })
   .strict()
   .optional();
-
-export type CompileOptions = z.infer<typeof CompileOptionsSchema>;
 
 // Mount mode schema
 export const MountModeSchema = z.enum(['embedded', 'iframe']);

@@ -27,9 +27,36 @@ export interface InputSpec {
   description?: string;
 }
 
+/**
+ * A single typecheck finding. Formatted into the runtime's existing
+ * `Compile failed:` error-telemetry path so the logs panel, problem digest,
+ * and self-heal loop pick it up unchanged.
+ */
+export interface Diagnostic {
+  file: string;
+  line: number;
+  column: number;
+  message: string;
+  severity: "error" | "warning";
+}
+
+/**
+ * Injected typechecker. The widget runtime never depends on a typechecker —
+ * hosts that want diagnostics supply one (typically backed by the editor's
+ * per-project type environment).
+ */
+export interface Checker {
+  check(project: VirtualProject, entry: string): Promise<Diagnostic[]>;
+}
+
 // Compiler options. Entry point and loader are inferred from
 // VirtualProject.entry.
 export interface CompileOptions {
+  /**
+   * When true and a `checker` is supplied, run typechecking before the
+   * esbuild pass. Without a checker the flag is a no-op (call sites already
+   * pass it today; Stream 8 wires the implementation).
+   */
   typescript?: boolean;
   /**
    * Workspace path of the source being compiled, for telemetry attribution —
@@ -38,6 +65,8 @@ export interface CompileOptions {
    * but cannot be filtered to the file that caused it.
    */
   sourcePath?: string;
+  /** Optional injected typechecker. See {@link Checker}. */
+  checker?: Checker;
 }
 
 // Compiled widget output
