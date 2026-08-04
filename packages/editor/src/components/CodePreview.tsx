@@ -1,4 +1,4 @@
-import { createSingleFileProject } from '@aprovan/patchwork-compiler';
+import { createSingleFileProject } from '@aprovan/patchwork';
 import { Code, Pencil, RotateCcw, MessageSquare } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { withTimeout } from '../lib/utils';
@@ -7,7 +7,7 @@ import { MarkdownPreview } from './MarkdownPreview';
 import { SaveStatusButton, type SaveStatus } from './SaveStatusButton';
 import { ViewModeToggle } from './ViewModeToggle';
 import { WidgetPreview } from './WidgetPreview';
-import type { Compiler, Manifest , VirtualProject } from '@aprovan/patchwork-compiler';
+import type { Compiler, Manifest , VirtualProject } from '@aprovan/patchwork';
 
 /**
  * Storage adapter widgets save to / reload from. `CodePreview` talks to the

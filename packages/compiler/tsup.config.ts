@@ -6,6 +6,7 @@ export default defineConfig({
   // path must never pull esbuild-wasm or DOM code in with it.
   entry: {
     index: "src/index.ts",
+    "namespace-core": "src/namespace-core.ts",
     "namespace-types": "src/transforms/namespace-types.ts",
   },
   format: ["esm", "cjs"],

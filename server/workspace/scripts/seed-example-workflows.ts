@@ -53,10 +53,10 @@ const GITHUB_STATUS_SCRIPT = `// Daily AprovanLabs status update.
 // Cron: once a day. GitHub (UTDK) -> synthetic.new summary -> VFS doc.
 const org = "AprovanLabs";
 
-const repos = await github.repos.listForOrg({ org, sort: "pushed", per_page: 5 });
+const repos = await tools.github.repos.listForOrg({ org, sort: "pushed", per_page: 5 });
 const activity = [];
 for (const repo of repos) {
-  const commits = await github.repos.listCommits({ owner: org, repo: repo.name, per_page: 5 });
+  const commits = await tools.github.repos.listCommits({ owner: org, repo: repo.name, per_page: 5 });
   activity.push({
     repo: repo.name,
     pushed_at: repo.pushed_at,
@@ -71,8 +71,7 @@ for (const repo of repos) {
 }
 console.log("collected activity for", activity.length, "repos");
 
-// synthetic.new turns the raw activity into a structured Markdown doc.
-const completion = await synthetic_new.createChatCompletion({
+const completion = await tools["synthetic.new"].createChatCompletion({
   messages: [
     {
       role: "system",
@@ -87,7 +86,7 @@ const completion = await synthetic_new.createChatCompletion({
 });
 const doc = completion.choices[0].message.content;
 
-await vfs.write({ path: "status/AprovanLabs.md", content: doc, mimeType: "text/markdown" });
+await tools.vfs.write({ path: "status/AprovanLabs.md", content: doc, mimeType: "text/markdown" });
 console.log("wrote status/AprovanLabs.md (" + doc.length + " chars)");
 return { repos: activity.length, bytes: doc.length };
 `;

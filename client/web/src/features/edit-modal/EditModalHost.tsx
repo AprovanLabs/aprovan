@@ -4,8 +4,8 @@ import {
   WidgetPreview,
   withTimeout,
   type EditTransport,
-} from "@aprovan/patchwork-editor";
-import type { Compiler } from "@aprovan/patchwork-compiler";
+} from "@aprovan/editor";
+import type { Compiler } from "@aprovan/patchwork";
 import { ProviderModelControls } from "@/components/ProviderPicker";
 import { createPreviewManifest } from "@/features/widgets/createPreviewManifest";
 import { COMPILE_TIMEOUT_MS } from "@/features/widgets/useCompilerBootstrap";

@@ -36,6 +36,8 @@ export interface ProviderCatalogInfo {
 
 export interface DependencyPanelProps {
   dependencies: ScriptDependency[];
+  /** True when dynamic `tools[expr]` access makes the list incomplete. */
+  unresolved?: boolean;
   /** Lookup by provider id; missing entries render as "unregistered". */
   catalog?: Record<string, ProviderCatalogInfo>;
   /** Base URL for provider deep links (e.g. `/registry`). */
@@ -62,20 +64,28 @@ function ProviderIcon({ info, provider }: { info?: ProviderCatalogInfo; provider
 
 export function DependencyPanel({
   dependencies,
+  unresolved = false,
   catalog,
   registryBaseUrl = "",
   className,
 }: DependencyPanelProps): React.ReactElement {
-  if (dependencies.length === 0) {
+  if (dependencies.length === 0 && !unresolved) {
     return (
       <p className={`text-xs text-muted-foreground ${className ?? ""}`}>
-        No providers imported yet — add an import to declare a dependency.
+        No tools.* accesses yet — call a namespace on the global tools root.
       </p>
     );
   }
 
   return (
-    <ul className={`flex flex-col divide-y rounded-lg border ${className ?? ""}`}>
+    <div className={`flex flex-col gap-2 ${className ?? ""}`}>
+      {unresolved && (
+        <p className="text-xs text-amber-700 dark:text-amber-400">
+          Dependency list may be incomplete — dynamic tools[…] access detected.
+        </p>
+      )}
+      {dependencies.length === 0 ? null : (
+    <ul className="flex flex-col divide-y rounded-lg border">
       {dependencies.map((dependency) => {
         const info = catalog?.[dependency.provider];
         const namespace = dependency.path
@@ -137,5 +147,7 @@ export function DependencyPanel({
         );
       })}
     </ul>
+      )}
+    </div>
   );
 }

@@ -1,4 +1,4 @@
-import { CodeBlockView, MarkdownPreview } from "@aprovan/patchwork-editor";
+import { CodeBlockView, MarkdownPreview } from "@aprovan/editor";
 import { resolveRenderer } from "@aprovan/registry-ui/renderers";
 import { Loader2 } from "lucide-react";
 import { WorkspaceFilePreview } from "@/components/WorkspaceFilePreview";

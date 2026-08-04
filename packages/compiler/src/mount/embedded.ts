@@ -5,11 +5,10 @@
  */
 
 import {
-  generateNamespaceGlobals,
-  injectNamespaceGlobals,
-  removeNamespaceGlobals,
-  extractNamespaces,
-} from "./bridge.js";
+  assembleTools,
+  installTools,
+  removeTools,
+} from "./assemble-tools.js";
 import {
   mountDefaultExport,
   pickCreateElement,
@@ -110,11 +109,19 @@ export async function mountEmbedded(
     document.head.appendChild(style);
   }
 
-  // Generate and inject service namespace globals
+  const effectiveProxy = options.plugins?.wrapProxy(proxy) ?? proxy;
+
+  // Install the assembled tools root
   const services = widget.manifest.services || [];
-  const namespaceNames = extractNamespaces(services);
-  const namespaces = generateNamespaceGlobals(services, proxy);
-  injectNamespaceGlobals(window, namespaces);
+  const pluginContext = { sourcePath: options.sourcePath };
+  const tools = assembleTools({
+    namespaces: services,
+    transport: (namespace, procedure, args) =>
+      effectiveProxy.call(namespace, procedure, args),
+    plugins: options.plugins,
+    pluginContext,
+  });
+  installTools(window, tools);
 
   // Get framework config from image
   const frameworkConfig = image?.config?.framework || {};
@@ -182,8 +189,8 @@ export async function mountEmbedded(
       moduleCleanup();
     }
 
-    // Remove namespace globals
-    removeNamespaceGlobals(window, namespaceNames);
+    // Remove tools root
+    removeTools(window);
 
     // Remove style
     const style = document.getElementById(`${mountId}-style`);

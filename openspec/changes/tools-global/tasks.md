@@ -2,32 +2,32 @@
 
 > Depends-on: - | Touches: packages/compiler/src/namespace-core.ts, server/workspace/src/apps/capabilities.ts, packages/ui/src/apps-store/wire.ts, packages/registry-ui/src/apps/**, packages/registry-ui/src/apps-panel.tsx | Verify: `pnpm --filter @aprovan/patchwork-compiler test && pnpm check-types`
 
-- [ ] 1.1 Make `packages/compiler/src/namespace-core.ts` the sole definition of the installed namespace set; export it from the dependency-free subpath so Node consumers can reach it without esbuild-wasm.
-- [ ] 1.2 Delete the duplicate list in `server/workspace/src/apps/capabilities.ts:40` and import from 1.1.
-- [ ] 1.3 Delete the third, divergent list in `packages/ui/src/apps-store/wire.ts:798` (3 names vs 6) and import from 1.1; update its consumers in `packages/registry-ui`.
-- [ ] 1.4 Add a test asserting no other module declares a hardcoded first-party namespace list (satisfies `widget-dependency-scan` / "Single definition of the namespace set").
+- [x] 1.1 Make `packages/compiler/src/namespace-core.ts` the sole definition of the installed namespace set; export it from the dependency-free subpath so Node consumers can reach it without esbuild-wasm.
+- [x] 1.2 Delete the duplicate list in `server/workspace/src/apps/capabilities.ts:40` and import from 1.1.
+- [x] 1.3 Delete the third, divergent list in `packages/ui/src/apps-store/wire.ts:798` (3 names vs 6) and import from 1.1; update its consumers in `packages/registry-ui`.
+- [x] 1.4 Add a test asserting no other module declares a hardcoded first-party namespace list (satisfies `widget-dependency-scan` / "Single definition of the namespace set").
 
 ## 2. `tools` assembly and callable nodes
 
 > Depends-on: 1 | Touches: packages/compiler/src/mount/**, packages/compiler/src/transforms/namespaces.ts, packages/compiler/src/index.ts, packages/compiler/src/__tests__/namespaces.test.ts | Verify: `pnpm --filter @aprovan/patchwork-compiler test`
 
-- [ ] 2.1 Add `assembleTools({ namespaces, plugins, transport })` as the single constructor of namespace proxies; make it the only place a proxy is built in this package.
-- [ ] 2.2 Make each namespace node callable at depth 0 (configure → return node) and dispatching at depth ≥ 1, per tech-plan D2. Depth-0 invocation currently throws; replace that behavior.
-- [ ] 2.3 Change `generateIframeBridgeScript` to install a single `globalThis.tools` instead of one global per namespace.
-- [ ] 2.4 Change `mountEmbedded` to install and tear down `tools` only; delete `injectNamespaceGlobals` / `removeNamespaceGlobals` per-namespace paths.
-- [ ] 2.5 Delete `namespaceImportPlugin`, `generateNamespaceModule`, and `NAMESPACE_MODULE_NAMESPACE`; remove their registration from the esbuild plugin list.
-- [ ] 2.6 Rewrite `__tests__/namespaces.test.ts` against `tools` (8 existing fixtures assert bare-specifier compilation and must be replaced, not adapted).
-- [ ] 2.7 Add tests for the three `tools-namespace-root` scenarios that are compiler-observable: root-anchored dispatch, bare global absent, bare specifier not intercepted.
+- [x] 2.1 Add `assembleTools({ namespaces, plugins, transport })` as the single constructor of namespace proxies; make it the only place a proxy is built in this package.
+- [x] 2.2 Make each namespace node callable at depth 0 (configure → return node) and dispatching at depth ≥ 1, per tech-plan D2. Depth-0 invocation currently throws; replace that behavior.
+- [x] 2.3 Change `generateIframeBridgeScript` to install a single `globalThis.tools` instead of one global per namespace.
+- [x] 2.4 Change `mountEmbedded` to install and tear down `tools` only; delete `injectNamespaceGlobals` / `removeNamespaceGlobals` per-namespace paths.
+- [x] 2.5 Delete `namespaceImportPlugin`, `generateNamespaceModule`, and `NAMESPACE_MODULE_NAMESPACE`; remove their registration from the esbuild plugin list.
+- [x] 2.6 Rewrite `__tests__/namespaces.test.ts` against `tools` (8 existing fixtures assert bare-specifier compilation and must be replaced, not adapted).
+- [x] 2.7 Add tests for the three `tools-namespace-root` scenarios that are compiler-observable: root-anchored dispatch, bare global absent, bare specifier not intercepted.
 
 ## 3. Workflow sandbox installs `tools`
 
 > Depends-on: 1 | Touches: server/workspace/src/workflows/runner.ts, server/workspace/src/workflows/sandbox.ts, server/workspace/src/sync.ts, server/workspace/tests/{workflows,sandbox,agents,agent-run,webhooks,telemetry,apps,app-domain}.test.ts | Verify: `pnpm --filter @aprovan/workspace test`
 
-- [ ] 3.1 Replace the per-namespace `globalThis[ns]` installation in the QuickJS prelude with a single `tools` root built from the same namespace set (tech-plan open question resolved: prelude, not `__boot`).
-- [ ] 3.2 Delete `RESERVED_SCRIPT_GLOBALS` — with one root there is nothing left to reserve.
-- [ ] 3.3 Delete `transformWorkflowModule`'s import-rewrite regex in the registry-server sandbox; workflow scripts reach services through `tools` only. Keep the `export default` → `__workflowMain` rewrite.
-- [ ] 3.4 Remove the second namespace-set construction in `sync.ts:203-210`; use the shared assembly.
-- [ ] 3.5 Update the inline script fixtures in the eight named test files to `tools.` form.
+- [x] 3.1 Replace the per-namespace `globalThis[ns]` installation in the QuickJS prelude with a single `tools` root built from the same namespace set (tech-plan open question resolved: prelude, not `__boot`).
+- [x] 3.2 Delete `RESERVED_SCRIPT_GLOBALS` — with one root there is nothing left to reserve.
+- [x] 3.3 Delete `transformWorkflowModule`'s import-rewrite regex in the registry-server sandbox; workflow scripts reach services through `tools` only. Keep the `export default` → `__workflowMain` rewrite.
+- [x] 3.4 Remove the second namespace-set construction in `sync.ts:203-210`; use the shared assembly.
+- [x] 3.5 Update the inline script fixtures in the eight named test files to `tools.` form.
 
 ## 4. Plugin registry
 

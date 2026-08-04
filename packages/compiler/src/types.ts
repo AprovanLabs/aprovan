@@ -1,4 +1,5 @@
 import type { VirtualProject } from "./vfs/types.js";
+import type { PluginRegistry } from "./plugins/registry.js";
 
 /**
  * Core types for the Patchwork compiler
@@ -65,6 +66,8 @@ export interface MountOptions {
   inputs?: Record<string, unknown>;
   /** Workspace path of the widget's source, for telemetry attribution. */
   sourcePath?: string;
+  /** Host plugins registered before sandbox creation. */
+  plugins?: PluginRegistry;
 }
 
 // Mounted widget handle

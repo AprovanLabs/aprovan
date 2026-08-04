@@ -24,7 +24,7 @@
 
 import { ChevronRight, ExternalLink, Loader2, Plus, Server, Wrench } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { ServiceInfo } from "@aprovan/patchwork-editor";
+import type { ServiceInfo } from "@aprovan/editor";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,

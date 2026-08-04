@@ -121,9 +121,8 @@ describe("workflows as namespace procedures", () => {
   beforeEach(async () => {
     await putFile(
       "workflows/echo-app.js",
-      `import keyvalue from "keyvalue";
-       export default async (input) => {
-         await keyvalue.set({ key: "last", value: input });
+      `export default async (input) => {
+         await tools.keyvalue.set({ key: "last", value: input });
          return { echoed: input && input.n };
        }`,
     );
@@ -279,7 +278,7 @@ describe("generated SDK", () => {
     expect(types).toContain("weeks: number");
     expect(types).toContain("headline?: string");
     // Ambient `declare module` blocks — the same file the compiler generates
-    // for the editor, so `import keyvalue from "keyvalue"` resolves everywhere.
+    // for the editor, so `tools.keyvalue` resolves everywhere.
     expect(types).toContain('declare module "keyvalue"');
     expect(types).toContain("export { keyvalue };");
     // Namespaces the allow-list withholds are not declared at all.

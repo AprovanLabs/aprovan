@@ -1,5 +1,5 @@
 import { createContext, useContext } from "react";
-import type { VirtualProject } from "@aprovan/patchwork-compiler";
+import type { VirtualProject } from "@aprovan/patchwork";
 
 export const SharedEditSessionCtx = createContext<
   | ((session: {

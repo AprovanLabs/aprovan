@@ -10,14 +10,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-// Native namespaces are importable typed modules — same contract as UTDK
-// provider SDKs (the compiler resolves these to the injected namespaces).
-import keyvalue from "keyvalue";
-// This app's own exported workflows answer on the `app` namespace, one method
-// per export (`tasks-agent-runner` → `app.tasksAgentRunner`). There is no
-// `workflows` namespace — and because `workflows` *is* a real npm package,
-// importing it resolves 200 from the CDN and fails only at the call site.
-import app from "app";
+// Native namespaces and this app's exports are on the global tools root.
 
 type Status = "todo" | "in_progress" | "in_review" | "done" | "canceled";
 
@@ -130,10 +123,10 @@ export default function Tasks() {
   const [prompt, setPrompt] = useState("");
 
   const load = useCallback(async () => {
-    const { keys } = await keyvalue.list({ prefix: "task:" });
+    const { keys } = await tools.keyvalue.list({ prefix: "task:" });
     const loaded: Task[] = [];
     for (const key of keys) {
-      const { value } = await keyvalue.get({ key });
+      const { value } = await tools.keyvalue.get({ key });
       if (value && typeof value === "object") loaded.push(value as Task);
     }
     loaded.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
@@ -147,7 +140,7 @@ export default function Tasks() {
   }, [load]);
 
   const saveTask = useCallback(async (task: Task) => {
-    await keyvalue.set({ key: `task:${task.id}`, value: task });
+    await tools.keyvalue.set({ key: `task:${task.id}`, value: task });
     setTasks((prev) => prev.map((t) => (t.id === task.id ? task : t)));
   }, []);
 
@@ -172,7 +165,7 @@ export default function Tasks() {
       createdAt: now,
       updatedAt: now,
     };
-    await keyvalue.set({ key: `task:${task.id}`, value: task });
+    await tools.keyvalue.set({ key: `task:${task.id}`, value: task });
     setTitle("");
     setDescription("");
     setPrompt("");
@@ -202,7 +195,7 @@ export default function Tasks() {
     setBusy(true);
     setNotice(null);
     try {
-      await app.tasksAgentRunner();
+      await tools.app.tasksAgentRunner();
       setNotice("Agents kicked off — todo tasks with an agent assignee are being worked in isolated drafts.");
       await load();
     } catch (err) {

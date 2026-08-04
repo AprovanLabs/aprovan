@@ -2,9 +2,9 @@ import {
   CodeBlockView,
   ViewModeToggle,
   WidgetPreview,
-  parseUsesAttribute,
-} from "@aprovan/patchwork-editor";
-import { createSingleFileProject } from "@aprovan/patchwork-compiler";
+  scanToolsAccess,
+} from "@aprovan/editor";
+import { createSingleFileProject } from "@aprovan/patchwork";
 import {
   AlertCircle,
   Check,
@@ -29,7 +29,6 @@ export function ChatWidgetArtifact({
   content,
   language,
   path,
-  uses,
   titleHint,
   isStreaming = false,
   onWidgetError,
@@ -37,7 +36,6 @@ export function ChatWidgetArtifact({
   content: string;
   language?: string;
   path?: string;
-  uses?: string;
   titleHint?: string;
   isStreaming?: boolean;
   onWidgetError?: (error: string) => void;
@@ -47,9 +45,9 @@ export function ChatWidgetArtifact({
   const openEditSession = useSharedEditSession();
   const { onOpenFile } = usePanelHostActions();
 
-  const declared = useMemo(() => parseUsesAttribute(uses), [uses]);
+  const scanned = useMemo(() => scanToolsAccess(content), [content]);
   const previewServices =
-    declared.length > 0 ? declared.map((d) => d.namespace) : services;
+    scanned.namespaces.length > 0 ? scanned.namespaces : services;
 
   const suggestedPath = useMemo(
     () =>

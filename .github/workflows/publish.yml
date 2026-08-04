@@ -34,8 +34,8 @@ jobs:
             --filter @aprovan/sandbox-image-node \
             --filter @aprovan/sandbox-host \
             --filter @aprovan/cli \
-            --filter @aprovan/patchwork-compiler \
-            --filter @aprovan/patchwork-editor \
+            --filter @aprovan/patchwork \
+            --filter @aprovan/editor \
             build
       - run: |
           failed=""
@@ -47,8 +47,8 @@ jobs:
             @aprovan/sandbox-image-node \
             @aprovan/sandbox-host \
             @aprovan/cli \
-            @aprovan/patchwork-compiler \
-            @aprovan/patchwork-editor; do
+            @aprovan/patchwork \
+            @aprovan/editor; do
             dir=$(pnpm --filter "$pkg" exec pwd 2>/dev/null | tail -1) || continue
             version=$(node -p "require('$dir/package.json').version")
             if npm view "$pkg@$version" version >/dev/null 2>&1; then

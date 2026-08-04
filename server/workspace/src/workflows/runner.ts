@@ -19,13 +19,12 @@
  */
 
 import { readAgentProfile } from "../agents/service.js";
-import { getCredentialStore } from "../credentials.js";
 import { getFsStore } from "../fs-store.js";
-import { listInstances, listInterfaces } from "../interfaces.js";
-import { CORE_SERVICE_NAMES, ServiceError, type ServiceContext } from "../service-kernel.js";
+import { ServiceError, type ServiceContext } from "../service-kernel.js";
 import type { TelemetryExportResult } from "@utdk/telemetry";
 import { recordTelemetry, type TelemetryEventInput } from "../telemetry/service.js";
 import { invokeTool } from "./invoke.js";
+import { buildWorkflowNamespaceSet } from "./namespace-set.js";
 import { runScriptInSandbox } from "./sandbox.js";
 import {
   createWorkflowTelemetryFacade,
@@ -44,55 +43,9 @@ import {
 
 export const MAX_EVENT_DEPTH = 2;
 
-/**
- * Identifiers the sandbox already gives a meaning, which a namespace global
- * must never take over.
- *
- * `agent` is the live one: it has meant "the profile this run is attributed
- * to" since agent attribution shipped, and the `agent` *interface* (the raw
- * runtime driver) would otherwise shadow it with a proxy the moment the
- * catalog gained that id — `agent.name` silently becoming a namespace path
- * instead of the profile's name.
- *
- * Losing the global costs a script nothing it should have been using. The raw
- * driver is not the surface here, for the same reason `sandboxes.exec` is the
- * surface and `sandbox.exec` is not: spawning a sub-agent means `agents.*`,
- * where the profile, the grants and the run record live. A script that really
- * wants the bare driver can still reach a named instance (`agent:deep`),
- * which cannot collide.
- */
-const RESERVED_SCRIPT_GLOBALS = new Set(["agent", "input", "console"]);
 // Generous enough for a couple of LLM calls (chat-provider dispatch allows
 // 120s per call); the sync spin-loop guard below stays tight.
 const SCRIPT_TIMEOUT_MS = 180_000;
-
-/**
- * Top-level provider names from the utdk registry (github, stripe, …),
- * loaded once. Used to expose script-referenced public providers as
- * namespaces even when no credential is stored.
- */
-let utdkProvidersPromise: Promise<Set<string>> | undefined;
-
-function utdkProviderNames(): Promise<Set<string>> {
-  utdkProvidersPromise ??= (async () => {
-    try {
-      const { createRequire } = await import("node:module");
-      const require = createRequire(import.meta.url);
-      const registry = require("@utdk/clients/registry.json") as {
-        providers?: Record<string, unknown>;
-      };
-      const names = new Set<string>();
-      for (const name of Object.keys(registry.providers ?? {})) {
-        const root = name.split("/")[0] ?? "";
-        if (/^[A-Za-z_$][\w$]*$/u.test(root)) names.add(root);
-      }
-      return names;
-    } catch {
-      return new Set<string>();
-    }
-  })();
-  return utdkProvidersPromise;
-}
 
 function stringify(value: unknown): string {
   if (typeof value === "string") return value;
@@ -277,35 +230,7 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<Workflow
       }
     };
 
-  // Namespace globals: every core service, every generic interface (llm, …
-  // — resolved to the workspace's bound implementation at call time), plus
-  // every credentialed provider (LLM aliases included — they dispatch
-  // through the alias resolution), plus any registry provider the script
-  // references — public APIs (github, …) work without a credential, so a
-  // missing credential must not strip the namespace.
-  const namespaces = new Set<string>(CORE_SERVICE_NAMES);
-  for (const def of listInterfaces()) namespaces.add(def.id);
-  // Named interface instances (`sql:analytics`) are namespaces in their own
-  // right, so a script reaches a second database the same way it reaches the
-  // first — `import analytics from "sql:analytics"`.
-  try {
-    for (const instance of await listInstances(workspaceId)) namespaces.add(instance.instance);
-  } catch {
-    // A malformed bindings file must not take the whole run down; the
-    // default instances above still resolve.
-  }
-  const registryProviders = await utdkProviderNames();
-  for (const match of scriptFile.content.matchAll(/([A-Za-z_$][\w$]*)\s*\./gu)) {
-    const identifier = match[1]!;
-    if (registryProviders.has(identifier)) namespaces.add(identifier);
-  }
-  try {
-    const credentials = await getCredentialStore().list(workspaceId);
-    for (const credential of credentials) namespaces.add(credential.provider);
-  } catch {
-    // Credential listing is best-effort; core namespaces still work.
-  }
-  for (const reserved of RESERVED_SCRIPT_GLOBALS) namespaces.delete(reserved);
+  const namespaces = await buildWorkflowNamespaceSet(workspaceId, scriptFile.content);
 
   try {
     run.result =
@@ -315,7 +240,7 @@ export async function runWorkflow(options: RunWorkflowOptions): Promise<Workflow
         source: `${TELEMETRY_SDK_GUEST_BIND}\n${scriptFile.content}`,
         filename: registration.scriptPath,
         input: input ?? null,
-        namespaces: [...namespaces],
+        namespaces,
         dispatch: (namespace, path, args, profile) => dispatchFor(namespace)(path, args, profile),
         log: pushLog,
         timeoutMs: SCRIPT_TIMEOUT_MS,

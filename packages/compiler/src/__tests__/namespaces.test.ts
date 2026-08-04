@@ -1,33 +1,26 @@
 /**
- * Namespace imports and their generated types.
- *
- * The builds here run the real esbuild-wasm with the real plugin list, and the
- * output is executed in a `vm` context that stands in for the widget's window.
- * That is the only way to check the property that matters: the imported
- * namespace and the injected global are the *same* proxy, in both mount paths.
+ * `tools` assembly, mount installation, and generated namespace types.
  */
 
 import { runInNewContext } from "node:vm";
 import * as esbuild from "esbuild-wasm";
 import { describe, it, expect } from "vitest";
 import {
-  generateNamespaceGlobals,
-  generateIframeBridgeScript,
-} from "../mount/bridge.js";
+  assembleTools,
+  installTools,
+} from "../mount/assemble-tools.js";
+import { generateIframeBridgeScript } from "../mount/bridge.js";
 import { cdnTransformPlugin } from "../transforms/cdn.js";
 import { generateNamespaceTypes } from "../transforms/namespace-types.js";
-import { namespaceImportPlugin } from "../transforms/namespaces.js";
 import type { Proxy as ServiceProxy } from "../types.js";
 
 interface BuildOptions {
-  services?: string[];
-  /** IIFE builds are runnable in a `vm` context; ESM builds are inspectable. */
   format?: "esm" | "iife";
 }
 
 async function build(
   source: string,
-  { services = [], format = "esm" }: BuildOptions = {},
+  { format = "esm" }: BuildOptions = {},
 ): Promise<string> {
   const result = await esbuild.build({
     stdin: { contents: source, loader: "tsx", sourcefile: "main.tsx" },
@@ -37,12 +30,12 @@ async function build(
     target: "es2022",
     platform: "browser",
     ...(format === "iife" ? { globalName: "Widget" } : {}),
-    plugins: [namespaceImportPlugin({ services }), cdnTransformPlugin({})],
+    plugins: [cdnTransformPlugin({})],
   });
   return result.outputFiles?.[0]?.text ?? "";
 }
 
-/** A recording proxy plus the namespace globals a mount would install. */
+/** A recording proxy plus transport for assembleTools. */
 function recordingProxy(): {
   proxy: ServiceProxy;
   calls: Array<[string, string, unknown[]]>;
@@ -59,18 +52,68 @@ function recordingProxy(): {
   };
 }
 
-describe("namespaceImportPlugin", () => {
-  it("resolves an injected namespace to the installed global and calls it", async () => {
+function installToolsInSandbox(
+  sandbox: Record<string, unknown>,
+  services: string[],
+  proxy: ServiceProxy,
+): void {
+  const tools = assembleTools({
+    namespaces: services,
+    transport: (namespace, procedure, args) =>
+      proxy.call(namespace, procedure, args),
+  });
+  installTools(sandbox as typeof globalThis, tools);
+}
+
+describe("assembleTools", () => {
+  it("dispatches root-anchored calls through transport", async () => {
+    const { proxy, calls } = recordingProxy();
+    const tools = assembleTools({
+      namespaces: ["vfs"],
+      transport: (namespace, procedure, args) =>
+        proxy.call(namespace, procedure, args),
+    });
+
+    await tools.vfs.read({ path: "notes.md" });
+
+    expect(calls).toEqual([["vfs", "read", [{ path: "notes.md" }]]]);
+  });
+
+  it("returns a configured node without dispatching at depth 0", () => {
+    const { proxy, calls } = recordingProxy();
+    const tools = assembleTools({
+      namespaces: ["github"],
+      transport: (namespace, procedure, args) =>
+        proxy.call(namespace, procedure, args),
+    });
+
+    const configured = tools.github({ name: "work" });
+    expect(configured).toBeDefined();
+    expect(calls).toEqual([]);
+  });
+
+  it("dispatches from a configured node at depth >= 1", async () => {
+    const { proxy, calls } = recordingProxy();
+    const tools = assembleTools({
+      namespaces: ["github"],
+      transport: (namespace, procedure, args) =>
+        proxy.call(namespace, procedure, args),
+    });
+
+    await tools.github({ name: "work" }).repos.get({ owner: "x" });
+
+    expect(calls).toEqual([["github", "repos.get", [{ owner: "x" }]]]);
+  });
+
+  it("runs widget code against the installed tools root (embedded path)", async () => {
     const code = await build(
-      `import vfs from "vfs";
-       export const read = () => vfs.read({ path: "notes.md" });`,
-      { services: ["vfs"], format: "iife" },
+      `export const read = () => tools.vfs.read({ path: "notes.md" });`,
+      { format: "iife" },
     );
 
     const { proxy, calls } = recordingProxy();
-    const sandbox: Record<string, unknown> = {
-      ...generateNamespaceGlobals(["vfs"], proxy),
-    };
+    const sandbox: Record<string, unknown> = {};
+    installToolsInSandbox(sandbox, ["vfs"], proxy);
     runInNewContext(code, sandbox);
 
     const widget = sandbox["Widget"] as { read: () => Promise<unknown> };
@@ -79,95 +122,12 @@ describe("namespaceImportPlugin", () => {
     expect(calls).toEqual([["vfs", "read", [{ path: "notes.md" }]]]);
   });
 
-  it("supports the named export alongside the default", async () => {
+  it("uses the same tools root the iframe bridge installs (iframe path)", async () => {
     const code = await build(
-      `import { keyvalue } from "keyvalue";
-       export const set = () => keyvalue.set({ key: "k", value: 1 });`,
-      { services: ["keyvalue"], format: "iife" },
+      `export const read = () => tools.vfs.read({ path: "a" });`,
+      { format: "iife" },
     );
 
-    const { proxy, calls } = recordingProxy();
-    const sandbox: Record<string, unknown> = {
-      ...generateNamespaceGlobals(["keyvalue"], proxy),
-    };
-    runInNewContext(code, sandbox);
-    await (sandbox["Widget"] as { set: () => Promise<unknown> }).set();
-
-    expect(calls).toEqual([["keyvalue", "set", [{ key: "k", value: 1 }]]]);
-  });
-
-  it("does not hit the CDN for a namespace specifier", async () => {
-    const code = await build(`import vfs from "vfs"; export default vfs;`, {
-      services: ["vfs"],
-    });
-    expect(code).not.toContain("esm.sh");
-  });
-
-  it("still sends a non-namespace bare import to the CDN", async () => {
-    const code = await build(
-      `import vfs from "vfs";
-       import { clsx } from "clsx";
-       export default () => clsx(vfs);`,
-      { services: ["vfs"] },
-    );
-    expect(code).toContain('from "https://esm.sh/clsx"');
-  });
-
-  it("does not shadow a real package when the namespace is not injected", async () => {
-    const code = await build(`import vfs from "vfs"; export default vfs;`, {
-      services: ["keyvalue"],
-    });
-    expect(code).toContain('from "https://esm.sh/vfs"');
-  });
-
-  it("leaves deep imports to the CDN", async () => {
-    const code = await build(
-      `import repos from "github/repos"; export default repos;`,
-      { services: ["github"] },
-    );
-    expect(code).toContain("https://esm.sh/github/repos");
-  });
-
-  it("gives the import and the global the same identity (embedded path)", async () => {
-    const code = await build(
-      `import vfsModule from "vfs";
-       export const same = vfsModule === (globalThis as any).vfs;
-       export const viaImport = () => vfsModule.read({ path: "a" });
-       export const viaGlobal = () => (globalThis as any).vfs.read({ path: "a" });`,
-      { services: ["vfs"], format: "iife" },
-    );
-
-    const { proxy, calls } = recordingProxy();
-    const sandbox: Record<string, unknown> = {
-      ...generateNamespaceGlobals(["vfs"], proxy),
-    };
-    runInNewContext(code, sandbox);
-
-    const widget = sandbox["Widget"] as {
-      same: boolean;
-      viaImport: () => Promise<unknown>;
-      viaGlobal: () => Promise<unknown>;
-    };
-    expect(widget.same).toBe(true);
-
-    await widget.viaImport();
-    await widget.viaGlobal();
-    expect(calls).toEqual([
-      ["vfs", "read", [{ path: "a" }]],
-      ["vfs", "read", [{ path: "a" }]],
-    ]);
-  });
-
-  it("uses the same proxy the iframe bridge installs (iframe path)", async () => {
-    const code = await build(
-      `import vfsModule from "vfs";
-       export const same = vfsModule === (globalThis as any).vfs;
-       export const viaImport = () => vfsModule.read({ path: "a" });`,
-      { services: ["vfs"], format: "iife" },
-    );
-
-    // Stand in for the sandboxed iframe: window === globalThis, and the parent
-    // is a postMessage sink we can inspect.
     const posted: Array<Record<string, unknown>> = [];
     const context: Record<string, unknown> = { setTimeout: () => 0, posted };
     runInNewContext(
@@ -179,13 +139,8 @@ describe("namespaceImportPlugin", () => {
       context,
     );
 
-    const widget = context["Widget"] as {
-      same: boolean;
-      viaImport: () => Promise<unknown>;
-    };
-    expect(widget.same).toBe(true);
-
-    void widget.viaImport();
+    const widget = context["Widget"] as { read: () => Promise<unknown> };
+    void widget.read();
     const call = posted.at(-1) as { type: string; payload: unknown };
     expect(call.type).toBe("service-call");
     expect(call.payload).toEqual({
@@ -194,18 +149,35 @@ describe("namespaceImportPlugin", () => {
       args: [{ path: "a" }],
     });
   });
+});
 
-  it("fails with a namespace-shaped message when no global was installed", async () => {
+describe("tools-namespace-root", () => {
+  it("fails with ReferenceError when a bare global is referenced", async () => {
     const code = await build(
-      `import vfs from "vfs";
-       export const read = () => vfs.read({ path: "a" });`,
-      { services: ["vfs"], format: "iife" },
+      `export const read = () => vfs.read({ path: "a" });`,
+      { format: "iife" },
     );
 
+    const { proxy } = recordingProxy();
     const sandbox: Record<string, unknown> = {};
+    installToolsInSandbox(sandbox, ["vfs"], proxy);
     runInNewContext(code, sandbox);
+
     const widget = sandbox["Widget"] as { read: () => Promise<unknown> };
-    expect(() => widget.read()).toThrow(/"vfs" is not available/);
+    expect(() => widget.read()).toThrow(/vfs is not defined/);
+  });
+
+  it("does not intercept a bare vfs import — it resolves via the CDN", async () => {
+    const code = await build(`import vfs from "vfs"; export default vfs;`);
+    expect(code).toContain('from "https://esm.sh/vfs"');
+  });
+
+  it("still sends other bare imports to the CDN", async () => {
+    const code = await build(
+      `import { clsx } from "clsx";
+       export default () => clsx("a");`,
+    );
+    expect(code).toContain('from "https://esm.sh/clsx"');
   });
 });
 

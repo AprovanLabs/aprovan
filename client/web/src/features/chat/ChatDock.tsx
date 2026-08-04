@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { resolvePatchesInText } from "@aprovan/patchwork-editor";
+import { resolvePatchesInText } from "@aprovan/editor";
 import {
   AlertCircle,
   Check,

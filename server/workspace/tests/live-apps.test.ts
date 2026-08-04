@@ -338,15 +338,14 @@ describe("daily call limits", () => {
 
 describe("app shell compiler pin", () => {
   it("loads the same compiler major.minor.patch this package depends on", async () => {
-    // Drift here is the failure mode described on APP_SHELL_COMPILER_VERSION:
-    // an older compiler has no namespace-import plugin, so `import keyvalue
-    // from "keyvalue"` goes to esm.sh (404, page dead) and `import vfs from
-    // "vfs"` silently loads an unrelated npm package. The dependency range is
-    // the source of truth; the shell string follows it.
+    // Drift between APP_SHELL_COMPILER_VERSION and the workspace dependency
+    // means published app shells load a different compiler than dev — silent
+    // and hard to bisect. The dependency range is the source of truth; the
+    // shell string follows it.
     const pkg = JSON.parse(
       await readFile(new URL("../package.json", import.meta.url), "utf8"),
     ) as { dependencies: Record<string, string> };
-    const declared = pkg.dependencies["@aprovan/patchwork-compiler"];
+    const declared = pkg.dependencies["@aprovan/patchwork"];
     expect(declared).toBeDefined();
     let expected = declared!.replace(/^[\^~]/, "");
     if (expected === "workspace:*") {
@@ -363,7 +362,7 @@ describe("app shell compiler pin", () => {
     const html = await (await liveAppsRouter.request("/local/pinned")).text();
 
     expect(html).toContain(
-      `https://esm.sh/@aprovan/patchwork-compiler@${APP_SHELL_COMPILER_VERSION}?external=esbuild-wasm`,
+      `https://esm.sh/@aprovan/patchwork@${APP_SHELL_COMPILER_VERSION}?external=esbuild-wasm`,
     );
     expect(html).not.toContain("${APP_SHELL_COMPILER_VERSION}");
   });

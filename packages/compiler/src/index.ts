@@ -1,11 +1,11 @@
 /**
- * @aprovan/patchwork-compiler
+ * @aprovan/patchwork
  *
  * JSX→ESM compilation, image loading, and DOM mounting for Patchwork widgets.
  *
  * @example
  * ```typescript
- * import { createCompiler } from '@aprovan/patchwork-compiler';
+ * import { createCompiler } from '@aprovan/patchwork';
  *
  * const compiler = await createCompiler({
  *   image: '@aprovan/patchwork-image-shadcn',
@@ -110,16 +110,9 @@ export { DEFAULT_CDN_BASE } from "./cdn-config.js";
 export type { CdnTransformOptions } from "./transforms/cdn.js";
 export { vfsPlugin } from "./transforms/vfs.js";
 export type { VFSPluginOptions } from "./transforms/vfs.js";
-// Namespace imports (`import vfs from "vfs"`) + their generated ambient types
-export {
-  namespaceImportPlugin,
-  generateNamespaceModule,
-  NAMESPACE_MODULE_NAMESPACE,
-  NATIVE_APP_NAMESPACES,
-} from "./transforms/namespaces.js";
-export type { NamespaceImportOptions } from "./transforms/namespaces.js";
+export { NATIVE_APP_NAMESPACES } from "./namespace-core.js";
 // Also published on its own, dependency-free:
-//   import { generateNamespaceTypes } from "@aprovan/patchwork-compiler/namespace-types";
+//   import { generateNamespaceTypes } from "@aprovan/patchwork/namespace-types";
 // which is how the gateway generates an app's `__sdk__.d.ts` without loading
 // esbuild-wasm into a Node process.
 export { generateNamespaceTypes } from "./transforms/namespace-types.js";
@@ -154,14 +147,28 @@ export {
   reloadIframe,
   disposeIframeBridge,
   DEV_SANDBOX,
+  // Tools assembly
+  assembleTools,
+  createCallableNamespaceNode,
+  installTools,
+  removeTools,
   // Bridge
   createHttpProxy,
-  createFieldAccessProxy,
-  generateNamespaceGlobals,
-  injectNamespaceGlobals,
-  removeNamespaceGlobals,
   extractNamespaces,
   ParentBridge,
   createIframeProxy,
   generateIframeBridgeScript,
 } from "./mount/index.js";
+export type {
+  AssembleToolsOptions,
+  NamespaceNode,
+  ToolsTransport,
+  MiddlewareFn,
+  OverrideContext,
+  OverrideFactory,
+  ToolCall,
+} from "./mount/index.js";
+export {
+  createPluginRegistry,
+  PluginRegistry,
+} from "./plugins/index.js";

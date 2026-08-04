@@ -1,6 +1,6 @@
 import { AlertCircle, Loader2 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
-import type { Compiler, Manifest, MountedWidget } from '@aprovan/patchwork-compiler';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { Compiler, Manifest, MountedWidget, PluginRegistry } from '@aprovan/patchwork';
 
 export interface WidgetPreviewProps {
   code: string;
@@ -16,6 +16,8 @@ export interface WidgetPreviewProps {
    * sitting in the preview body.
    */
   onError?: (error: string) => void;
+  /** Host plugins (telemetry override, notification payload, …). */
+  plugins?: PluginRegistry;
 }
 
 function createManifest(services?: string[]): Manifest {
@@ -35,6 +37,7 @@ export function WidgetPreview({
   enabled = true,
   sourcePath,
   onError,
+  plugins: pluginsProp,
 }: WidgetPreviewProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,6 +47,8 @@ export function WidgetPreview({
   // compile-and-mount effect on every parent render.
   const onErrorRef = useRef(onError);
   onErrorRef.current = onError;
+
+  const plugins = useMemo(() => pluginsProp, [pluginsProp]);
 
   useEffect(() => {
     if (!enabled || !compiler || !containerRef.current) return;
@@ -78,6 +83,7 @@ export function WidgetPreview({
           mode: 'iframe',
           sandbox: ['allow-scripts', 'allow-same-origin'],
           ...(sourcePath ? { sourcePath } : {}),
+          ...(plugins ? { plugins } : {}),
         });
 
         if (cancelled) {
@@ -113,7 +119,7 @@ export function WidgetPreview({
         mountedRef.current = null;
       }
     };
-  }, [code, compiler, enabled, services, sourcePath]);
+  }, [code, compiler, enabled, services, sourcePath, plugins]);
 
   return (
     <>

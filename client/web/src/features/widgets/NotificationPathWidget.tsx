@@ -1,20 +1,17 @@
-import { useEffect, useState } from "react";
-import { WidgetPreview } from "@aprovan/patchwork-editor";
-import type { Compiler } from "@aprovan/patchwork-compiler";
+import { useEffect, useMemo, useState } from "react";
+import { WidgetPreview } from "@aprovan/editor";
+import type { Compiler } from "@aprovan/patchwork";
 import { readFile } from "@/lib/workspace-vfs";
+import {
+  createWidgetPlugins,
+  registerNotificationOverride,
+} from "@/lib/widget-plugins";
 
 /**
  * A workspace-path notification widget: the file compiles through the
- * ordinary patchwork pipeline (sandboxed iframe). The notification's payload
- * is delivered through the same import convention as every namespace —
- * `import notification from "notification"` — bound here by rewriting that
- * import to a const before compile (prepending is legal because ESM imports
- * hoist). This is what lets a workflow ship its own notification UI as a
- * plain widget file.
+ * ordinary patchwork pipeline (sandboxed iframe). The notification payload
+ * is delivered as a plugin-provided `tools.notification` namespace.
  */
-const NOTIFICATION_IMPORT_RE =
-  /^[ \t]*import\s+([A-Za-z_$][\w$]*)\s+from\s+["']notification["'][ \t]*;?[ \t]*$/m;
-
 export function NotificationPathWidget({
   path,
   data,
@@ -40,14 +37,23 @@ export function NotificationPathWidget({
       active = false;
     };
   }, [path]);
+
+  const plugins = useMemo(() => {
+    const registry = createWidgetPlugins({ path, sourcePath: path });
+    registerNotificationOverride(registry, data);
+    return registry;
+  }, [data, path]);
+
   if (!code || !compiler) return null;
-  const bound = code.replace(
-    NOTIFICATION_IMPORT_RE,
-    (_whole, binding: string) => `const ${binding} = ${JSON.stringify(data ?? null)};`,
-  );
   return (
     <div className="mt-2 overflow-hidden rounded-md border">
-      <WidgetPreview code={bound} compiler={compiler} services={services} sourcePath={path} />
+      <WidgetPreview
+        code={code}
+        compiler={compiler}
+        services={services}
+        sourcePath={path}
+        plugins={plugins}
+      />
     </div>
   );
 }

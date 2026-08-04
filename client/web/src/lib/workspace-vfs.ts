@@ -17,8 +17,8 @@ import {
   type VirtualFile,
   type VirtualProject,
   type WatchCallback,
-} from "@aprovan/patchwork-compiler";
-import type { WidgetVfs } from "@aprovan/patchwork-editor";
+} from "@aprovan/patchwork";
+import type { WidgetVfs } from "@aprovan/editor";
 import { GATEWAY_BASE } from "./gateway";
 import { gatewayFetch } from "./gateway-fetch";
 

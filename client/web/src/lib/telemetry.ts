@@ -19,7 +19,7 @@
  * visibility change / pagehide.
  */
 
-import type { WidgetRuntimeEvent } from "@aprovan/patchwork-compiler";
+import type { WidgetRuntimeEvent } from "@aprovan/patchwork";
 import type { TelemetryExportArgs, TelemetryExportResult } from "@utdk/telemetry";
 import { createTelemetry, type TelemetrySdk } from "@utdk/telemetry/sdk";
 import { GATEWAY_BASE } from "./gateway";
@@ -218,6 +218,22 @@ export async function flushWidgetTelemetrySdks(): Promise<void> {
     sdk.flush().catch(() => undefined),
   );
   await Promise.all(pending);
+}
+
+/**
+ * Direct `telemetry.export` via the tool bridge (widget attribution).
+ * Used by the telemetry plugin override when no gateway delegate is present.
+ */
+export function exportWidgetTelemetry(
+  options: WidgetTelemetrySdkOptions,
+  args: TelemetryExportArgs,
+): Promise<TelemetryExportResult> {
+  widgetTelemetrySdk(options);
+  return exportViaBridge(args, {
+    type: "widget",
+    path: options.path,
+    ...(options.sessionId ? { sessionId: options.sessionId } : {}),
+  });
 }
 
 async function exportViaBridge(

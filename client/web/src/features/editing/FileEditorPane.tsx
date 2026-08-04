@@ -7,8 +7,8 @@ import {
   getFileType,
   markdownRoundTrips,
   type DefaultView,
-} from "@aprovan/patchwork-editor";
-import type { Compiler } from "@aprovan/patchwork-compiler";
+} from "@aprovan/editor";
+import type { Compiler } from "@aprovan/patchwork";
 import { AlertCircle, FileCode, Pencil } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { SaveStateChip, type ChipState } from "./SaveStateChip";

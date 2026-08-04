@@ -245,13 +245,12 @@ describe("telemetry (auto-instrumentation)", () => {
   it("flushes SDK log/counter/withSpan helpers with runId attribution (no hand-built OTLP)", async () => {
     await putFile(
       "workflows/sdk-helpers.js",
-      `import telemetry from "telemetry";
-       export default async function run() {
-         telemetry.log("info", "sdk-hello");
-         telemetry.counter("sdk.clicks", 3);
-         await telemetry.withSpan("sdk-work", async (span) => {
+      `export default async function run() {
+         tools.telemetry.log("info", "sdk-hello");
+         tools.telemetry.counter("sdk.clicks", 3);
+         await tools.telemetry.withSpan("sdk-work", async (span) => {
            span.setAttribute("step", "one");
-           telemetry.log("info", "inside-span");
+           tools.telemetry.log("info", "inside-span");
            return 42;
          });
          return "ok";
@@ -287,10 +286,9 @@ describe("telemetry (auto-instrumentation)", () => {
   it("flushes SDK helpers on failed runs", async () => {
     await putFile(
       "workflows/sdk-fail.js",
-      `import telemetry from "telemetry";
-       export default async function run() {
-         telemetry.log("warn", "before-boom");
-         telemetry.counter("sdk.fail.count");
+      `export default async function run() {
+         tools.telemetry.log("warn", "before-boom");
+         tools.telemetry.counter("sdk.fail.count");
          throw new Error("sdk-boom");
        }`,
     );

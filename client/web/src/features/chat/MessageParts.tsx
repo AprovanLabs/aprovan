@@ -1,5 +1,5 @@
 import { useContext, useMemo } from "react";
-import { extractCodeBlocks } from "@aprovan/patchwork-editor";
+import { extractCodeBlocks } from "@aprovan/editor";
 import { AlertCircle, Brain, ChevronDown, Loader2, Wrench } from "lucide-react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -50,7 +50,6 @@ export function ReasoningPart({ text, isStreaming }: { text: string; isStreaming
             content={block.content}
             language={block.language}
             path={path}
-            uses={block.attributes?.uses}
             titleHint={block.attributes?.title}
             isStreaming={Boolean(block.unclosed)}
           />
@@ -273,7 +272,6 @@ export function TextPartWithSession({
                 content={part.content}
                 language={language}
                 path={path}
-                uses={part.attributes?.uses}
                 titleHint={part.attributes?.title}
                 isStreaming
                 onWidgetError={
@@ -316,7 +314,6 @@ export function TextPartWithSession({
               content={part.content}
               language={language}
               path={path}
-              uses={part.attributes?.uses}
               titleHint={part.attributes?.title}
               onWidgetError={
                 reportWidgetError && messageId

@@ -1,5 +1,5 @@
 {
-  "name": "@aprovan/patchwork-compiler",
+  "name": "@aprovan/patchwork",
   "version": "0.2.0",
   "description": "Patchwork compiler - JSX→ESM compilation, image loading, DOM mounting",
   "type": "module",
@@ -16,6 +16,11 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
+    },
+    "./namespace-core": {
+      "types": "./dist/namespace-core.d.ts",
+      "import": "./dist/namespace-core.js",
+      "require": "./dist/namespace-core.cjs"
     },
     "./namespace-types": {
       "types": "./dist/namespace-types.d.ts",

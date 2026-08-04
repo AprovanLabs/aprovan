@@ -1,5 +1,7 @@
-import { createProjectFromFiles, detectMainFile } from '@aprovan/patchwork-compiler';
-import type { VirtualFile, VirtualProject } from '@aprovan/patchwork-compiler';
+import { createProjectFromFiles, detectMainFile } from '@aprovan/patchwork';
+import type { VirtualFile, VirtualProject } from '@aprovan/patchwork';
+
+export { scanToolsAccess, type ToolsAccessScan } from './scan-tools-access.js';
 
 // Matches fenced code blocks with optional attributes: ```language attr="value"\n...content...```
 // Captures: [1] = language (optional), [2] = attributes (optional), [3] = content
@@ -137,32 +139,6 @@ export function extractCodeBlocks(
   }
 
   return parts;
-}
-
-/**
- * A widget dependency declared in a fence `uses` attribute.
- * Specs are `namespace[@version]` — the version slot also accepts a
- * provenance pin (e.g. `github@sha256:…`) for reproducible loads.
- */
-export interface WidgetDependency {
-  namespace: string;
-  version?: string;
-}
-
-/**
- * Parse a fence `uses` attribute: space- or comma-separated dependency specs,
- * e.g. `uses="keyvalue events github@^1"`.
- */
-export function parseUsesAttribute(uses?: string): WidgetDependency[] {
-  if (!uses) return [];
-  return uses
-    .split(/[\s,]+/)
-    .filter(Boolean)
-    .map((spec) => {
-      const at = spec.indexOf('@', 1); // skip leading @ of scoped names
-      if (at === -1) return { namespace: spec };
-      return { namespace: spec.slice(0, at), version: spec.slice(at + 1) };
-    });
 }
 
 /**

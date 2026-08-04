@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AppsSelection } from "@aprovan/registry-ui/apps-panel";
-import { getFileType } from "@aprovan/patchwork-editor";
+import { getFileType } from "@aprovan/editor";
 import { stashCredentialsPrefill } from "@/lib/credentials";
 import { nativeTabPath, parseNativeTabPath } from "@/lib/native-surfaces";
 import { loadWorkspaceFileProject } from "@/lib/workspace-vfs";
@@ -11,6 +11,7 @@ import {
   type OpenTab,
 } from "./tab-routing";
 
+// Deliberately kept as patchwork:* — renaming would orphan existing user data.
 export const TABS_KEY_PREFIX = "patchwork:open-tabs";
 export const ACTIVE_WORKSPACE_KEY = "patchwork:active-workspace";
 
