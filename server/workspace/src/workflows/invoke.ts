@@ -26,8 +26,8 @@ import { ensureTenantForWorkspace } from "../tenant-registry.js";
 import { listUserGroupIds } from "../userGroups.js";
 import type { ServiceContext } from "../service-kernel.js";
 
-/** Interface dispatch routes through the embed on dsql (unified credential/profile store). */
-function usesEmbedInterfaceDispatch(): boolean {
+/** Interface dispatch routes through the embed on dsql (unified credential/profile store). Dynamo/sqlite keep the legacy path until cutover. */
+export function usesEmbedInterfaceDispatch(): boolean {
   return storeBackend() === "dsql";
 }
 

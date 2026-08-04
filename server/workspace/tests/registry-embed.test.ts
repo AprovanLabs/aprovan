@@ -66,17 +66,45 @@ describe("registry embed", () => {
     ).rejects.toThrow();
   });
 
-  it("invokeTool routes contract calls through embed on dsql backend", async () => {
+  it("preserves product ServiceContext (appScope) across embed compatDispatch", async () => {
+    const { registryDispatch } = await import("../src/registry-embed.js");
+    // Stash a product context with appScope; agent.get should still resolve
+    // workspaceId from the ALS-restored context (tenant 1:1).
+    const scoped: ServiceContext = {
+      workspaceId: "ws-scope",
+      userId: "user:app",
+      appScope: {
+        id: "app-1",
+        name: "demo",
+        paths: ["/apps/demo"],
+        userId: "user:app",
+        role: "user",
+      },
+    };
+    await expect(
+      registryDispatch(scoped, "agent", "get", { id: "missing" }),
+    ).rejects.toThrow(/Unknown agent run/);
+  });
+
+  it("invokeTool routes contract calls through embed only on dsql backend", async () => {
+    delete process.env["STORE_BACKEND"];
+    const { usesEmbedInterfaceDispatch } = await import("../src/workflows/invoke.js");
+    expect(usesEmbedInterfaceDispatch()).toBe(false);
+
+    process.env["STORE_BACKEND"] = "dynamo";
+    expect(usesEmbedInterfaceDispatch()).toBe(false);
+
     process.env["STORE_BACKEND"] = "dsql";
     process.env["DSQL_ENDPOINT"] = process.env["WORKSPACE_TEST_DSQL_URL"] ?? "postgres://invalid";
+    expect(usesEmbedInterfaceDispatch()).toBe(true);
     if (!process.env["WORKSPACE_TEST_DSQL_URL"]) {
-      // Without a DSQL endpoint, assert the routing gate only.
-      const { dispatchInterface } = await import("../src/workflows/invoke.js");
       const source = await import("node:fs/promises").then((fs) =>
         fs.readFile(new URL("../src/workflows/invoke.ts", import.meta.url), "utf8"),
       );
       expect(source).toContain("usesEmbedInterfaceDispatch");
       expect(source).toContain("dispatchThroughEmbed");
+      delete process.env["STORE_BACKEND"];
+      delete process.env["DSQL_ENDPOINT"];
       return;
     }
     const { invokeTool } = await import("../src/workflows/invoke.js");

@@ -96,7 +96,12 @@ jobs:
     name: Roll the service
     runs-on: ubuntu-latest
     needs: publish
-    if: vars.AWS_DEPLOY_ROLE_ARN != '' && (github.event_name == 'push' || inputs.deploy)
+    # Owner cutover (stream 9): only roll when deploy is explicitly requested
+    # and the role ARN is set. Default push builds publish the image but do
+    # not mutate ECS — avoids red main when OIDC trust is not yet wired.
+    if: >
+      vars.AWS_DEPLOY_ROLE_ARN != '' &&
+      (github.event_name == 'workflow_dispatch' && inputs.deploy)
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

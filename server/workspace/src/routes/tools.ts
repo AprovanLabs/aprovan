@@ -1033,9 +1033,58 @@ toolsRouter.post("/:provider/:operation{.*}", rateLimitByUserId, async (c) => {
     recordDispatch(400, 0, "Missing provider or operation");
     return c.json({ error: "Missing provider or operation" }, 400);
   }
+
+  // Contract-addressed calls: route through the embedded registry server on
+  // STORE_BACKEND=dsql (same path as workflows/invoke). Dynamo/sqlite keep
+  // the legacy short-circuits below until cutover.
+  if (requestNamespace && parseInterfaceNamespace(requestNamespace)) {
+    const { usesEmbedInterfaceDispatch, dispatchInterface } = await import(
+      "../workflows/invoke.js"
+    );
+    if (usesEmbedInterfaceDispatch()) {
+      try {
+        const data = await dispatchInterface(
+          { workspaceId, userId: callerId },
+          requestNamespace,
+          operation,
+          body.args,
+          undefined,
+          requestProfile,
+          callSiteOptions,
+        );
+        const durationMs = Date.now() - startTime;
+        getAuditStore().append({
+          requestId,
+          workspaceId,
+          callerId,
+          provider: requestNamespace,
+          operation,
+          status: 200,
+          durationMs,
+        });
+        recordDispatch(200, durationMs);
+        return c.json({ data, meta: { requestId, durationMs } });
+      } catch (err) {
+        const status = err instanceof ServiceError ? err.status : 500;
+        const message = err instanceof Error ? err.message : String(err);
+        getAuditStore().append({
+          requestId,
+          workspaceId,
+          callerId,
+          provider: requestNamespace,
+          operation,
+          status,
+        });
+        recordDispatch(status, Date.now() - startTime, message);
+        return c.json({ error: message }, status as 400);
+      }
+    }
+  }
+
   // In-process short-circuit for the native agent runtime — the HTTP twin of
   // the one in workflows/invoke.ts, mirroring the core-service branch above:
   // no credential resolution (the runner is credentialless) and no isolate.
+  // Retained for STORE_BACKEND!=dsql (embed path above covers dsql).
   if (nativeAgentInterface) {
     try {
       const nativeArgs = {

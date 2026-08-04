@@ -4,12 +4,14 @@
  * contract-addressed tool execution instead of loopback HTTP.
  */
 
+import { AsyncLocalStorage } from "node:async_hooks";
 import {
   createRegistryServer,
   defaultCatalog,
   ProviderExecutor,
   type CallContext,
   type RegistryServer,
+  type ServiceContext as RegistryServiceContext,
 } from "@aprovan/registry-server";
 import { dispatchNativeAgentOp } from "./agents/runner.js";
 import { dispatchAprovanNativeOp } from "./native-dispatch.js";
@@ -25,6 +27,13 @@ import { ensureTenantForWorkspace, tenantIdForWorkspace } from "./tenant-registr
 import type { ServiceContext } from "./service-kernel.js";
 
 let _server: Promise<RegistryServer> | undefined;
+
+/**
+ * Product ServiceContext carried across `server.dispatch` → compatDispatch.
+ * Registry CallContext only has tenant/principal; appScope, grants, and
+ * interface redirects live here for the duration of one in-process call.
+ */
+const productDispatchContext = new AsyncLocalStorage<ServiceContext>();
 
 /** Route embed execution through the workspace executor (shared test seams). */
 class WorkspaceBackedExecutor extends ProviderExecutor {
@@ -92,17 +101,46 @@ async function bootRegistryServer(): Promise<RegistryServer> {
     },
     compatDispatch: {
       agent: async (ctx, operation, args) =>
-        dispatchNativeAgentOp(ctx, operation, args as Record<string, unknown>),
+        dispatchNativeAgentOp(
+          restoreProductContext(ctx),
+          operation,
+          args as Record<string, unknown>,
+        ),
       vfs: async (ctx, operation, args) =>
-        dispatchAprovanNativeOp(ctx, "vfs", operation, args as Record<string, unknown>),
+        dispatchAprovanNativeOp(
+          restoreProductContext(ctx),
+          "vfs",
+          operation,
+          args as Record<string, unknown>,
+        ),
       vcs: async (ctx, operation, args) =>
-        dispatchAprovanNativeOp(ctx, "vcs", operation, args as Record<string, unknown>),
+        dispatchAprovanNativeOp(
+          restoreProductContext(ctx),
+          "vcs",
+          operation,
+          args as Record<string, unknown>,
+        ),
       keyvalue: async (ctx, operation, args) =>
-        dispatchAprovanNativeOp(ctx, "keyvalue", operation, args as Record<string, unknown>),
+        dispatchAprovanNativeOp(
+          restoreProductContext(ctx),
+          "keyvalue",
+          operation,
+          args as Record<string, unknown>,
+        ),
       events: async (ctx, operation, args) =>
-        dispatchAprovanNativeOp(ctx, "events", operation, args as Record<string, unknown>),
+        dispatchAprovanNativeOp(
+          restoreProductContext(ctx),
+          "events",
+          operation,
+          args as Record<string, unknown>,
+        ),
       telemetry: async (ctx, operation, args) =>
-        dispatchAprovanNativeOp(ctx, "telemetry", operation, args as Record<string, unknown>),
+        dispatchAprovanNativeOp(
+          restoreProductContext(ctx),
+          "telemetry",
+          operation,
+          args as Record<string, unknown>,
+        ),
     },
     telemetry: {
       otlpEndpoint: process.env["OTEL_EXPORTER_OTLP_ENDPOINT"],
@@ -123,19 +161,40 @@ export async function resetRegistryServer(): Promise<void> {
 
 /** Build a registry CallContext from a product ServiceContext. */
 export function callContextFromService(ctx: ServiceContext): CallContext {
+  const source: CallContext["source"] = ctx.appScope
+    ? { type: "app", app: ctx.appScope.name }
+    : { type: "tool" };
   return {
     tenantId: tenantIdForWorkspace(ctx.workspaceId),
     principal: ctx.userId,
     role: "admin",
     groupIds: [],
-    source: { type: "tool" },
+    source,
+    ...(ctx.traceId ? { traceId: ctx.traceId } : {}),
+    ...(ctx.appScope
+      ? { actor: { kind: "app" as const, id: ctx.appScope.id } }
+      : {}),
   };
 }
 
-function serviceContextFromCall(ctx: CallContext): ServiceContext {
+/**
+ * Prefer the product context stashed for this dispatch; fall back to the
+ * registry-server kernel shape (workspaceId ← tenantId, 1:1).
+ */
+function restoreProductContext(ctx: RegistryServiceContext): ServiceContext {
+  const stashed = productDispatchContext.getStore();
+  if (stashed && stashed.workspaceId === ctx.workspaceId) {
+    return {
+      ...stashed,
+      ...(ctx.traceId && !stashed.traceId ? { traceId: ctx.traceId } : {}),
+    };
+  }
   return {
-    workspaceId: ctx.tenantId,
-    userId: ctx.principal,
+    workspaceId: ctx.workspaceId,
+    userId: ctx.userId,
+    ...(ctx.workflowDepth !== undefined ? { workflowDepth: ctx.workflowDepth } : {}),
+    ...(ctx.traceId ? { traceId: ctx.traceId } : {}),
+    ...(ctx.parentRunId ? { parentRunId: ctx.parentRunId } : {}),
   };
 }
 
@@ -148,15 +207,17 @@ export async function registryDispatch(
   opts?: { profile?: string },
 ): Promise<unknown> {
   const server = await getRegistryServer();
-  const result = await server.dispatch(
-    callContextFromService(ctx),
-    namespace,
-    operation,
-    args,
-    opts,
-  );
-  if (result.kind === "stream") {
-    return new Response(result.stream).text();
-  }
-  return result.data;
+  return productDispatchContext.run(ctx, async () => {
+    const result = await server.dispatch(
+      callContextFromService(ctx),
+      namespace,
+      operation,
+      args,
+      opts,
+    );
+    if (result.kind === "stream") {
+      return new Response(result.stream).text();
+    }
+    return result.data;
+  });
 }
