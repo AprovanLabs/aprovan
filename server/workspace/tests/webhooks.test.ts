@@ -35,9 +35,8 @@ async function seedWorkflow(name: string): Promise<void> {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      content: `import keyvalue from "keyvalue";
-export default async function run(input) {
-  await keyvalue.set({ key: "${name}-last", value: input });
+      content: `export default async function run(input) {
+  await tools.keyvalue.set({ key: "${name}-last", value: input });
   return { seen: true };
 }`,
     }),

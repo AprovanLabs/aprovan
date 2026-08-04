@@ -20,10 +20,8 @@
  * `{ data }` wrappers.
  */
 
-import { getCredentialStore } from "./credentials.js";
 import { getFsStore } from "./fs-store.js";
 import {
-  CORE_SERVICE_NAMES,
   getCoreService,
   ServiceError,
   type CoreService,
@@ -38,6 +36,7 @@ import {
 } from "./svc-records.js";
 import { invokeTool } from "./workflows/invoke.js";
 import { runScriptInSandbox } from "./workflows/sandbox.js";
+import { buildWorkflowNamespaceSet } from "./workflows/namespace-set.js";
 
 const SYNC_SCOPE = svcScope("sync");
 const SCRIPT_TIMEOUT_MS = 120_000;
@@ -200,20 +199,13 @@ async function runTransform(
   const file = await getFsStore().read(ctx.workspaceId, scriptPath);
   if (!file) throw new ServiceError(`Transform script not found: ${scriptPath}`, 404);
 
-  const namespaces = new Set<string>(CORE_SERVICE_NAMES);
-  try {
-    for (const credential of await getCredentialStore().list(ctx.workspaceId)) {
-      namespaces.add(credential.provider);
-    }
-  } catch {
-    // Core namespaces still work.
-  }
+  const namespaces = await buildWorkflowNamespaceSet(ctx.workspaceId, file.content);
 
   const result = await runScriptInSandbox({
     source: file.content,
     filename: scriptPath,
     input: { records },
-    namespaces: [...namespaces],
+    namespaces,
     dispatch: (namespace, path, callArgs) => {
       const argObject =
         callArgs.length === 1 && typeof callArgs[0] === "object" && callArgs[0] !== null

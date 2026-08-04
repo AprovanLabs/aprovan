@@ -63,10 +63,9 @@ describe("workflows service", () => {
   it("registers, lists, runs, and traces a workflow", async () => {
     await writeScript(
       "workflows/echo.js",
-      `import keyvalue from "keyvalue";
-       export default async function run(input) {
+      `export default async function run(input) {
          console.log("starting", input.n);
-         await keyvalue.set({ key: "wf-last-input", value: input });
+         await tools.keyvalue.set({ key: "wf-last-input", value: input });
          return { doubled: input.n * 2 };
        }`,
     );
@@ -161,8 +160,8 @@ describe("workflows service", () => {
     await writeScript(
       "workflows/reactor.js",
       `export default async function run(input) {
-         await keyvalue.set({ key: "reactor-count", value: (input.payload?.count ?? 0) + 1 });
-         await events.emit({ channel: "wf.chain", payload: { count: (input.payload?.count ?? 0) + 1 } });
+         await tools.keyvalue.set({ key: "reactor-count", value: (input.payload?.count ?? 0) + 1 });
+         await tools.events.emit({ channel: "wf.chain", payload: { count: (input.payload?.count ?? 0) + 1 } });
          return "ok";
        }`,
     );

@@ -133,21 +133,17 @@ describe("agent-attributed workflow runs", () => {
     await putFile("apps/sample.txt", "readable");
     await putFile(
       "workflows/agent-probe.js",
-      `import keyvalue from "keyvalue";
-import vfs from "vfs";
-import events from "events";
-
-export default async function run() {
+      `export default async function run() {
   const out = { agent: agent?.name ?? null, denied: [] };
-  await keyvalue.set({ key: "probe", value: 1 });          // granted
-  await vfs.write({ path: "agentdocs/note.md", content: "hi" }); // rw prefix
-  const file = await vfs.read({ path: "apps/sample.txt" }); // ro prefix
+  await tools.keyvalue.set({ key: "probe", value: 1 });          // granted
+  await tools.vfs.write({ path: "agentdocs/note.md", content: "hi" }); // rw prefix
+  const file = await tools.vfs.read({ path: "apps/sample.txt" }); // ro prefix
   out.readBack = file.content;
-  try { await vfs.write({ path: "apps/sample.txt", content: "clobber" }); }
+  try { await tools.vfs.write({ path: "apps/sample.txt", content: "clobber" }); }
   catch (err) { out.denied.push("vfs.write:apps"); }
-  try { await vfs.read({ path: "workflows/agent-probe.js" }); }
+  try { await tools.vfs.read({ path: "workflows/agent-probe.js" }); }
   catch (err) { out.denied.push("vfs.read:workflows"); }
-  try { await events.emit({ channel: "probe", payload: {} }); }
+  try { await tools.events.emit({ channel: "probe", payload: {} }); }
   catch (err) { out.denied.push("events.emit"); }
   return out;
 }

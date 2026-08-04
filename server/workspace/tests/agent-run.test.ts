@@ -321,19 +321,19 @@ export default async function run(input) {
   const owner = payload.repository?.owner?.login ?? "acme";
   const repo = payload.repository?.name ?? "app";
   const number = payload.pull_request?.number ?? payload.prNumber;
-  const diff = await vcs.pullRequests.diff({ owner, repo, number });
-  const review = await agents.run({
+  const diff = await tools.vcs.pullRequests.diff({ owner, repo, number });
+  const review = await tools.agents.run({
     agent: "code-reviewer",
     input: { diff, owner, repo, number },
   });
   const body = typeof review.output === "string" ? JSON.parse(review.output) : {};
   if (body.blocking) {
-    await vcs.pullRequests.review({
+    await tools.vcs.pullRequests.review({
       owner, repo, number, event: "request_changes", body: "Blocking findings",
     });
   }
   for (const suggestion of body.suggestions ?? []) {
-    await vcs.pullRequests.comment({ owner, repo, number, body: suggestion });
+    await tools.vcs.pullRequests.comment({ owner, repo, number, body: suggestion });
   }
   return { status: review.status, blocking: !!body.blocking, comments: (body.suggestions ?? []).length };
 }

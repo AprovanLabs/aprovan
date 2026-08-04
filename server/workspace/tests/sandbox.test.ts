@@ -26,8 +26,8 @@ describe("wasm script sandbox", () => {
     const { logs, calls, options } = harness({
       source: `
         console.log("starting", input.n, { nested: true });
-        const a = await keyvalue.set({ key: "k", value: input.n });
-        const b = await github.repos.get({ owner: "o", repo: "r" });
+        const a = await tools.keyvalue.set({ key: "k", value: input.n });
+        const b = await tools.github.repos.get({ owner: "o", repo: "r" });
         return { doubled: input.n * 2, a, b };
       `,
       input: { n: 21 },
@@ -46,8 +46,8 @@ describe("wasm script sandbox", () => {
   it("supports promise chaining and Promise.all over namespace calls", async () => {
     const { options } = harness({
       source: `
-        const viaThen = await keyvalue.get({ key: "a" }).then((r) => r.echoed.path);
-        const [x, y] = await Promise.all([github.a(), github.b()]);
+        const viaThen = await tools.keyvalue.get({ key: "a" }).then((r) => r.echoed.path);
+        const [x, y] = await Promise.all([tools.github.a(), tools.github.b()]);
         return { viaThen, paths: [x.echoed.path, y.echoed.path] };
       `,
     });
@@ -60,7 +60,7 @@ describe("wasm script sandbox", () => {
     const { options } = harness({
       namespaces: ["synthetic.new"],
       source: `
-        const r = await synthetic_new.createChatCompletion({ model: "m" });
+        const r = await tools.synthetic_new.createChatCompletion({ model: "m" });
         return r.echoed.namespace;
       `,
     });
@@ -70,18 +70,18 @@ describe("wasm script sandbox", () => {
   it("propagates tool errors as catchable guest exceptions", async () => {
     const { options } = harness({
       dispatch: async () => {
-        throw new Error("Forbidden: no grant for github.repos.get");
+        throw new Error("Forbidden: no grant for tools.github.repos.get");
       },
       source: `
         try {
-          await github.repos.get({});
+          await tools.github.repos.get({});
         } catch (err) {
           return "caught: " + err.message;
         }
       `,
     });
     expect(await runScriptInSandbox(options)).toBe(
-      "caught: Forbidden: no grant for github.repos.get",
+      "caught: Forbidden: no grant for tools.github.repos.get",
     );
   });
 
@@ -90,7 +90,7 @@ describe("wasm script sandbox", () => {
       dispatch: async () => {
         throw new Error("upstream 502");
       },
-      source: `await github.repos.get({});`,
+      source: `await tools.github.repos.get({});`,
     });
     await expect(runScriptInSandbox(options)).rejects.toThrow("upstream 502");
   });
@@ -166,7 +166,7 @@ describe("wasm script sandbox", () => {
   it("times out scripts stuck awaiting a slow tool", async () => {
     const { options } = harness({
       dispatch: () => new Promise((resolve) => setTimeout(() => resolve("late"), 2_000)),
-      source: `await keyvalue.get({});`,
+      source: `await tools.keyvalue.get({});`,
       timeoutMs: 300,
     });
     const start = Date.now();
@@ -181,7 +181,7 @@ describe("wasm script sandbox", () => {
           await new Promise((resolve) => setTimeout(resolve, 50));
           return label;
         },
-        source: `return await keyvalue.get({});`,
+        source: `return await tools.keyvalue.get({});`,
       }).options;
     const results = await Promise.all([
       runScriptInSandbox(mk("one")),

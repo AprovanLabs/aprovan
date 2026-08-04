@@ -54,7 +54,7 @@ export interface CreateWorkflowTelemetryOptions {
  */
 export const TELEMETRY_SDK_GUEST_BIND = String.raw`
 (() => {
-  const raw = globalThis.telemetry;
+  const raw = globalThis.tools && globalThis.tools.telemetry;
   if (!raw) return;
   // The namespace Proxy's get trap returns nested proxies for ANY string
   // key — never read a sentinel via property access. Own-property check
@@ -102,7 +102,7 @@ export const TELEMETRY_SDK_GUEST_BIND = String.raw`
     },
     __aprovanSdkBound: true,
   };
-  globalThis.telemetry = new Proxy(facade, {
+  if (globalThis.tools) globalThis.tools.telemetry = new Proxy(facade, {
     get: function (t, prop) {
       if (typeof prop === "symbol") return undefined;
       if (prop in t) return t[prop];

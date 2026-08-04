@@ -23,11 +23,11 @@
 
 > Depends-on: 1 | Touches: server/workspace/src/workflows/runner.ts, server/workspace/src/workflows/sandbox.ts, server/workspace/src/sync.ts, server/workspace/tests/{workflows,sandbox,agents,agent-run,webhooks,telemetry,apps,app-domain}.test.ts | Verify: `pnpm --filter @aprovan/workspace test`
 
-- [ ] 3.1 Replace the per-namespace `globalThis[ns]` installation in the QuickJS prelude with a single `tools` root built from the same namespace set (tech-plan open question resolved: prelude, not `__boot`).
-- [ ] 3.2 Delete `RESERVED_SCRIPT_GLOBALS` — with one root there is nothing left to reserve.
-- [ ] 3.3 Delete `transformWorkflowModule`'s import-rewrite regex in the registry-server sandbox; workflow scripts reach services through `tools` only. Keep the `export default` → `__workflowMain` rewrite.
-- [ ] 3.4 Remove the second namespace-set construction in `sync.ts:203-210`; use the shared assembly.
-- [ ] 3.5 Update the inline script fixtures in the eight named test files to `tools.` form.
+- [x] 3.1 Replace the per-namespace `globalThis[ns]` installation in the QuickJS prelude with a single `tools` root built from the same namespace set (tech-plan open question resolved: prelude, not `__boot`).
+- [x] 3.2 Delete `RESERVED_SCRIPT_GLOBALS` — with one root there is nothing left to reserve.
+- [x] 3.3 Delete `transformWorkflowModule`'s import-rewrite regex in the registry-server sandbox; workflow scripts reach services through `tools` only. Keep the `export default` → `__workflowMain` rewrite.
+- [x] 3.4 Remove the second namespace-set construction in `sync.ts:203-210`; use the shared assembly.
+- [x] 3.5 Update the inline script fixtures in the eight named test files to `tools.` form.
 
 ## 4. Plugin registry
 
