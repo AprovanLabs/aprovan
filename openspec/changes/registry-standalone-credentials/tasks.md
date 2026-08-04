@@ -9,18 +9,18 @@ Repos: registry = `/Users/jacob/Documents/Code/AprovanLabs/registry`, aprovan =
 
 > Depends-on: - | Touches: registry:packages/registry-server/** | Verify: cd /Users/jacob/Documents/Code/AprovanLabs/registry && pnpm --filter @aprovan/registry-server typecheck && pnpm --filter @aprovan/registry-server test
 
-- [ ] 1.1 Add `browserClientId?: string` to the OIDC member of the `auth` config union in
+- [x] 1.1 Add `browserClientId?: string` to the OIDC member of the `auth` config union in
   `packages/registry-server/src/config/types.ts` and thread it through server construction
   (advertising only — token verification untouched; spec: Browser OIDC client
   configuration).
-- [ ] 1.2 Add public `GET /auth/config` to `src/http/router.ts`: exempt it (with
+- [x] 1.2 Add public `GET /auth/config` to `src/http/router.ts`: exempt it (with
   `/healthz`) from the auth middleware; respond
   `{ mode, oidc?: { issuer, audience, browserClientId? } }`; assert no secret material in
   the response (spec: Public auth configuration endpoint).
-- [ ] 1.3 Add authenticated `GET /whoami` returning
+- [x] 1.3 Add authenticated `GET /whoami` returning
   `{ principal, tenantId, role, groupIds, mode }` from the resolved `CallContext`
   (spec: Authenticated identity endpoint).
-- [ ] 1.4 Vitest coverage: `/auth/config` shape per mode (none / api-key / oidc with and
+- [x] 1.4 Vitest coverage: `/auth/config` shape per mode (none / api-key / oidc with and
   without `browserClientId`); `/whoami` happy path per adapter mode and 401 on bad
   credential; both endpoints present on the embedded router as well as standalone.
 
@@ -28,10 +28,10 @@ Repos: registry = `/Users/jacob/Documents/Code/AprovanLabs/registry`, aprovan =
 
 > Depends-on: - | Touches: aprovan:packages/registry-main/** | Verify: cd /Users/jacob/Documents/Code/AprovanLabs/aprovan && pnpm --filter @aprovan/registry-main typecheck && pnpm --filter @aprovan/registry-main build
 
-- [ ] 2.1 Extend `GatewayClientOptions` with `authHeader?` (default `"Authorization"`) and
+- [x] 2.1 Extend `GatewayClientOptions` with `authHeader?` (default `"Authorization"`) and
   `scopeHeader?` (default `"X-Aprovan-Workspace"`); use them in the private `fetch`
   (tech-plan D4). Defaults preserve current behavior byte-for-byte.
-- [ ] 2.2 Doc-comment the CloudFront OAC rationale on `authHeader` (mirroring
+- [x] 2.2 Doc-comment the CloudFront OAC rationale on `authHeader` (mirroring
   `@aprovan/ui/gateway`'s `DEFAULT_AUTH_HEADER` note).
 
 ## 3. registry-ui admin capabilities and standalone sections
