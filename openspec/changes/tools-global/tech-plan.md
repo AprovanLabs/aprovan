@@ -134,5 +134,7 @@ Rollback is a revert; there is no data migration to undo. Workspace content is n
 
 ## Open Questions
 
-- **Should `assembleTools()` live in the compiler or in the runtime package that `utdk-remote-package` creates?** Recommendation: define it in the compiler now and move it in `utdk-remote-package`, so this change does not block on that one.
-- **Does the workflow sandbox install `tools` via the QuickJS prelude, or does the host pass it in the `__boot` blob?** Recommendation: the prelude, matching how namespace proxies are installed today, so the two runtimes stay structurally similar.
+> Settled 2026-08-03 — accept recommendations.
+
+- **Should `assembleTools()` live in the compiler or in the runtime package that `utdk-remote-package` creates?** Define it in the compiler now; `utdk-remote-package` may move it later.
+- **Does the workflow sandbox install `tools` via the QuickJS prelude, or does the host pass it in the `__boot` blob?** Prelude.

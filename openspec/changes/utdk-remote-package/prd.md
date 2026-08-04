@@ -42,5 +42,7 @@ None.
 
 ## Open Questions
 
-- **Should `@utdk/remote` re-export the pagination helpers (`allPages`, `paginate`), or should they reach callers through a namespace?** Recommendation: re-export them as plain functions for now — they are cross-cutting utilities with no namespace of their own, and routing them through `tools` would require inventing one.
-- **Does the registry playground migrate to `@utdk/remote` in this change or a follow-up?** Recommendation: in this change. Leaving it on a retired package is the state this change exists to eliminate.
+> Settled 2026-08-03 — accept recommendations.
+
+- **Should `@utdk/remote` re-export the pagination helpers (`allPages`, `paginate`), or should they reach callers through a namespace?** Re-export as plain functions.
+- **Does the registry playground migrate to `@utdk/remote` in this change or a follow-up?** In this change.

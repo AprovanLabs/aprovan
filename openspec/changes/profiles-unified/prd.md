@@ -46,5 +46,7 @@ None.
 
 ## Open Questions
 
-- **Does a failed profile lookup fail at the first operation, or should the configuring call round-trip to validate?** Recommendation: fail at the first operation. Lazy resolution is the point; a validating round-trip reintroduces the `await` this change removes. The error must name the profile and list what exists.
-- **Should path-keyed profiles use longest-prefix matching, or exact-prefix only?** Recommendation: longest-prefix, so a mount inside a mount resolves to the inner one — matching how a filesystem behaves and how users will expect nesting to work.
+> Settled 2026-08-03 — accept recommendations.
+
+- **Does a failed profile lookup fail at the first operation, or should the configuring call round-trip to validate?** Fail at first operation; error names the profile and lists what exists.
+- **Should path-keyed profiles use longest-prefix matching, or exact-prefix only?** Longest-prefix.

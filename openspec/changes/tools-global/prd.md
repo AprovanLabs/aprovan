@@ -51,5 +51,7 @@ None — `openspec/specs/` is empty.
 
 ## Open Questions
 
-- **Should the deprecation of bare globals emit a runtime warning for one release rather than failing outright?** Recommendation: no. The user has explicitly rejected back-compat, and a warning path is a second code path to maintain for content that is being reseeded anyway.
-- **Does the PostHog-managed prompt need to be reconciled before or after the repo rewrite?** Recommendation: before — otherwise the rewrite is invisible in production, since `resolveStoredPrompt` prefers PostHog unconditionally.
+> Settled 2026-08-03.
+
+- **Should the deprecation of bare globals emit a runtime warning for one release rather than failing outright?** **No.** Hard cutover; content is reseeded.
+- **Does the PostHog-managed prompt need to be reconciled before or after the repo rewrite?** **Rip out PostHog-managed prompts in favor of repo-managed early** (before/with the rewrite). `resolveStoredPrompt` becomes workspace-FS-only; do not keep a divergence CI check. PostHog `chat-patchwork-widget` must stop being the production source.

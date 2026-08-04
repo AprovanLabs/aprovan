@@ -123,5 +123,7 @@ Steps 1-4 are additive and independently revertable. Step 5 onward is breaking a
 
 ## Open Questions
 
-- **Does the Aprovan provider register under one provider id across all five contracts, or one per contract?** Recommendation: one id. It is one implementation with one trust story, and per-contract ids would imply they can be bound independently, which they cannot.
-- **Should the plugin registry enforce that a platform namespace declares an output schema for every operation?** Recommendation: yes, as the replacement for the build-time check being deleted in step 6 — otherwise the wave trades one consistency guarantee for none.
+> Settled 2026-08-03 — accept recommendations.
+
+- **Does the Aprovan provider register under one provider id across all five contracts, or one per contract?** One id.
+- **Should the plugin registry enforce that a platform namespace declares an output schema for every operation?** Yes.

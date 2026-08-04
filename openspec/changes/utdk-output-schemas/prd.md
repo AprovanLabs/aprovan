@@ -47,5 +47,7 @@ None.
 
 ## Open Questions
 
-- **Emit a `tools` export into generated provider packages, or serve output schemas from the catalog endpoint?** Recommendation: the catalog endpoint. The per-operation `outputs` map is already built in `lib/registry.ts` and thrown away; serving it is a four-file change against a large-diff regeneration of 38 packages, and it covers the same ground.
-- **Should `unknown` returns be distinguishable from "not yet extracted"?** Recommendation: yes — mark operations whose upstream spec omits a response, so coverage is measurable and a future overlay can target them.
+> Settled 2026-08-03 — accept recommendations.
+
+- **Emit a `tools` export into generated provider packages, or serve output schemas from the catalog endpoint?** Catalog endpoint.
+- **Should `unknown` returns be distinguishable from "not yet extracted"?** Yes — mark ops whose upstream spec omits a response.

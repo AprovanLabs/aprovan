@@ -125,5 +125,7 @@ The logs source keeps its current structural shape exactly; the host satisfies i
 
 ## Open Questions
 
-- **Does the read-only composition survive, or is it re-derived from the editable one?** Recommendation: re-derive. The editable path carries write policies and stale-file handling the read-only one lacks, and re-deriving downward is safer than merging upward.
-- **Should the typecheck run on every keystroke or only on the compile that precedes a preview?** Recommendation: on compile only, initially. The model — the primary consumer of diagnostics — sees them at compile time regardless, and per-keystroke checking is a latency question best answered with a measurement rather than a guess.
+> Settled 2026-08-03 — accept recommendations.
+
+- **Does the read-only composition survive, or is it re-derived from the editable one?** Re-derive from editable.
+- **Should the typecheck run on every keystroke or only on the compile that precedes a preview?** Compile-only initially; record latency.

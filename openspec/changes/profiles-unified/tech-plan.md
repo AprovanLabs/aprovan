@@ -118,5 +118,7 @@ Rollback before step 4 is a config flip; after step 4 it is a revert plus a rest
 
 ## Open Questions
 
-- **Should `profiles` be its own namespace, or hang off `interfaces`?** Recommendation: its own. `interfaces.list` is genuine interface discovery and survives untouched; binding is now a profile operation and applies to providers too, so naming it `interfaces.bind` would misdescribe it.
-- **Do path-keyed profiles support a `name`, or is a path always singly-bound?** Recommendation: singly-bound. A path prefix resolving to two implementations has no coherent meaning for a read.
+> Settled 2026-08-03 — accept recommendations.
+
+- **Should `profiles` be its own namespace, or hang off `interfaces`?** Own namespace.
+- **Do path-keyed profiles support a `name`, or is a path always singly-bound?** Singly-bound.

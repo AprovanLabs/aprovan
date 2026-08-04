@@ -46,10 +46,16 @@ None.
 - **Hard**: the file contract is a *driver* contract by design; sessions, overlays, mounts, and version history are explicitly excluded from it. Anything the workspace adds on top belongs to a different namespace.
 - **Hard**: platform handlers are typed as returning `unknown` at the dispatch boundary, so output schemas cannot be derived automatically without restructuring every service. They must be hand-written.
 - **Assumption (confirmed)**: no backwards compatibility is required for the changed shapes.
-- **Assumption (unconfirmed)**: the four contract implementations that already exist for these interfaces — for object storage, a key-value store, a queue, and an observability vendor — are still wanted as user-selectable alternatives. If not, those interfaces could collapse to plugins instead.
+- **Assumption (confirmed)**: the four contract implementations that already exist for these interfaces — for object storage, a key-value store, a queue, and an observability vendor — remain wanted as user-selectable alternatives via the registry-managed interface + compat adapter pattern (may extend to other interface-meeting providers, e.g. LLM).
 - **Assumption (unconfirmed)**: no consumer depends on the current ambiguity in the key-value read result, where a missing key and a stored empty value are indistinguishable.
 
 ## Open Questions
 
-- **Do the driver-passthrough operations declare their contract's shape advisorily, or stay unmarked?** Recommendation: declare it and mark it advisory. A documented expectation that a third-party driver may violate is more useful than nothing, provided the claim is labelled rather than implied.
-- **Does the operation whose result shape depends on which argument was supplied get split into separate operations?** Recommendation: yes. A four-way alternative is nearly useless to a model and to a type generator, and the schema work is what surfaces that the operation was overloaded.
+> Settled 2026-08-03.
+
+- **Do the driver-passthrough operations declare their contract's shape advisorily, or stay unmarked?** Declare and mark advisory.
+- **Does the operation whose result shape depends on which argument was supplied get split into separate operations?** Yes — split.
+
+### Settled assumptions
+
+- **Third-party implementations of the shadowed interfaces (object storage, key-value, queue, observability):** **Keep** the registry-managed interface + compat adapter pattern. It may be extended for other providers meeting an interface (e.g. standardized LLM adapters). If an implementation only exists to meet a non-interface native module, reconsider collapsing to a plugin — but the four existing interface-backed third parties stay.

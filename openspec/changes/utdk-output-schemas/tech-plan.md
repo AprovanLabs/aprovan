@@ -103,5 +103,7 @@ Each step is independently revertable; none changes runtime behavior of a provid
 
 ## Open Questions
 
-- **Should the two divergent unwrap implementations converge in this change or in `tools-global`?** Recommendation: document the divergence here in the ADR, converge the code in `tools-global`, which already owns the widget bridge.
-- **Does the catalog need per-status-code output, or only the selected 2xx schema?** Recommendation: serve the full map. It is already built, and error shapes become useful the moment error modelling is attempted.
+> Settled 2026-08-03 — accept recommendations.
+
+- **Should the two divergent unwrap implementations converge in this change or in `tools-global`?** Document divergence in the ADR here; converge code in `tools-global`.
+- **Does the catalog need per-status-code output, or only the selected 2xx schema?** Serve the full map.

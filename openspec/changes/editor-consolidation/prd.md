@@ -47,5 +47,7 @@ None.
 
 ## Open Questions
 
-- **Does the consolidated editor keep the rich-text markdown dependency, or standardise on the lighter renderer?** Recommendation: keep it. The frontmatter split, the editable language field on fenced blocks, and the fidelity probe all depend on it, and the lighter renderer cannot express any of the three.
-- **Which of the two near-copy compositions survives?** Recommendation: the one behind the editable path, since it carries the write policies and stale-file handling the other lacks; the read-only path is the smaller of the two to re-derive.
+> Settled 2026-08-03 — accept recommendations.
+
+- **Does the consolidated editor keep the rich-text markdown dependency, or standardise on the lighter renderer?** Keep rich-text markdown dependency.
+- **Which of the two near-copy compositions survives?** Editable path; re-derive read-only.

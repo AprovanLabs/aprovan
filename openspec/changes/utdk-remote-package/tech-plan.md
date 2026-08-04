@@ -107,5 +107,7 @@ Rollback: unpublishing is not required — leaving `@aprovan/runtime@0.1.0` on t
 
 ## Open Questions
 
-- **Should `@utdk/remote` be published at `0.1.0` or `1.0.0`?** Recommendation: `0.1.0`. The surface is about to be exercised by three consumers for the first time; a major version implies a stability commitment not yet earned.
-- **Does `imports.ts` still belong here once `tools-global` replaces specifier parsing with `tools.`-access scanning?** Recommendation: keep it in this change and let `tools-global` retarget it in place; splitting the move from the retarget makes both diffs readable.
+> Settled 2026-08-03 — accept recommendations.
+
+- **Should `@utdk/remote` be published at `0.1.0` or `1.0.0`?** `0.1.0`.
+- **Does `imports.ts` still belong here once `tools-global` replaces specifier parsing with `tools.`-access scanning?** Keep the move here; `tools-global` retargets in place.

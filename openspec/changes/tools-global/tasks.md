@@ -58,7 +58,7 @@
 - [ ] 6.1 Fix `scripts/seed-prompts.ts:25` — it imports `../apps/workspace/src/fs-store.js`, a path that has not existed since the `apps/` → `server/` rename.
 - [ ] 6.2 Rewrite `data/prompts/chat-patchwork-widget.md` to teach `tools` only: remove the `uses=` fence example, the bare-globals API catalogue, and the bare-import examples.
 - [ ] 6.3 Delete the duplicate prompt in the registry repo and reconcile the two known divergences (`workflows.trace({ runId })` vs `{ run: runId }` — determine which is correct against `workflows/service.ts`).
-- [ ] 6.4 Add a CI check that fails when the PostHog-managed prompt diverges from the repository copy.
+- [ ] 6.4 Rip out PostHog-managed prompt resolution: `resolveStoredPrompt` reads workspace FS only; remove PostHog fetch/cache from `promptStore.ts`. Archive or stub the PostHog `chat-patchwork-widget` prompt so it cannot silently override the repo.
 - [ ] 6.5 Rewrite the seeded example content to `tools.` form: `examples/tasks/**` (6 files), `examples/liift4/index.tsx`, and the `GITHUB_STATUS_SCRIPT` in `seed-example-workflows.ts`.
 - [ ] 6.6 Reseed the example app, example workflows, tasks app, and prompts.
 
