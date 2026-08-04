@@ -34,7 +34,7 @@ export function createCallableNamespaceNode(
   transport: ToolsTransport,
 ): NamespaceNode {
   return createNamespaceProxy(namespace, {
-    call(provider, operation, args) {
+    call(provider: string, operation: string, args: unknown) {
       return transport(provider, operation, [args]);
     },
   });

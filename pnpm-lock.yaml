@@ -305,8 +305,8 @@ importers:
   packages/compiler:
     dependencies:
       '@utdk/remote':
-        specifier: github:AprovanLabs/registry#main&path:packages/remote
-        version: https://codeload.github.com/AprovanLabs/registry/tar.gz/705d40080076c296ac8c6ce5317950393cf7bc34#path:packages/remote
+        specifier: ^0.1.1
+        version: 0.1.1
       esbuild-wasm:
         specifier: ^0.27.2
         version: 0.27.3
@@ -4655,9 +4655,8 @@ packages:
     resolution: {integrity: sha512-mv41aZxedt2cNlvVSyJ3fE/Oo8RysqLmhFKsJaYP3V75PIh0bdGF0okY1AvqbCNUsBU0wvT+ch43SQ1ais10Og==}
     engines: {node: '>=20.0.0'}
 
-  '@utdk/remote@https://codeload.github.com/AprovanLabs/registry/tar.gz/705d40080076c296ac8c6ce5317950393cf7bc34#path:packages/remote':
-    resolution: {path: packages/remote, tarball: https://codeload.github.com/AprovanLabs/registry/tar.gz/705d40080076c296ac8c6ce5317950393cf7bc34}
-    version: 0.1.1
+  '@utdk/remote@0.1.1':
+    resolution: {integrity: sha512-KGTIFoGENtVQL+PVu7s3AqEb0U4Ad1/cX9rrszsONcouGIYidmi+VadjfjSTPTW+ZiNcIY+QPJyZBpP6SCyTBA==}
     engines: {node: '>=20.0.0'}
 
   '@utdk/sandbox@0.2.0':
@@ -13245,7 +13244,7 @@ snapshots:
       - debug
       - supports-color
 
-  '@utdk/remote@https://codeload.github.com/AprovanLabs/registry/tar.gz/705d40080076c296ac8c6ce5317950393cf7bc34#path:packages/remote': {}
+  '@utdk/remote@0.1.1': {}
 
   '@utdk/sandbox@0.2.0': {}
 
