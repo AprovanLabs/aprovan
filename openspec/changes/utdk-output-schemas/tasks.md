@@ -38,11 +38,11 @@
 
 > Depends-on: 3 | Touches: registry/apps/registry/src/lib/openapi.ts, registry/apps/registry/src/lib/registry.ts, registry/apps/registry/src/pages/catalog/p/[...path].json.ts, registry/apps/registry/src/components/{ProviderExplorer,SdkExplorer}.tsx | Verify: `cd /Users/jacob/Documents/Code/AprovanLabs/registry && pnpm --filter @aprovan/registry-web build`
 
-- [ ] 5.1 Add `outputs` and `responseUnknown` to `OperationInfo`.
-- [ ] 5.2 Serve the per-status `outputs` map already built at `lib/registry.ts:694-709` and currently read by nothing.
-- [ ] 5.3 Mark operations whose upstream spec declares no response, so coverage is measurable rather than inferred.
-- [ ] 5.4 Render a "Returns" section in the catalog explorer components.
-- [ ] 5.5 Measure the served payload size before and after; trim or paginate if it regresses materially.
+- [x] 5.1 Add `outputs` and `responseUnknown` to `OperationInfo`.
+- [x] 5.2 Serve the per-status `outputs` map already built at `lib/registry.ts:694-709` and currently read by nothing.
+- [x] 5.3 Mark operations whose upstream spec declares no response, so coverage is measurable rather than inferred.
+- [x] 5.4 Render a "Returns" section in the catalog explorer components.
+- [x] 5.5 Measure the served payload size before and after; trim or paginate if it regresses materially.
 
 ## 6. MCP output schemas
 
