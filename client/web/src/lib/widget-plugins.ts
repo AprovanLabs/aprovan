@@ -4,7 +4,12 @@ import {
   type OverrideContext,
   type PluginRegistry,
 } from "@aprovan/patchwork";
-import { widgetTelemetrySdk, type WidgetTelemetrySdkOptions } from "./telemetry";
+import type { TelemetryExportArgs, TelemetryExportResult } from "@utdk/telemetry";
+import {
+  exportWidgetTelemetry,
+  widgetTelemetrySdk,
+  type WidgetTelemetrySdkOptions,
+} from "./telemetry";
 
 const TELEMETRY_OVERRIDE_TYPES = `declare namespace telemetry {
   log(level: "debug" | "info" | "warn" | "error", message: string, attrs?: Record<string, string | number | boolean>): void;
@@ -14,6 +19,15 @@ const TELEMETRY_OVERRIDE_TYPES = `declare namespace telemetry {
   export(args: import("@utdk/telemetry").TelemetryExportArgs): Promise<import("@utdk/telemetry").TelemetryExportResult>;
   withSpan<T>(name: string, fn: (span: { setAttribute(k: string, v: string | number | boolean): void }) => Promise<T>): Promise<T>;
 }`;
+
+function callNode(
+  node: NamespaceNode | undefined,
+  key: string,
+  ...args: unknown[]
+): unknown {
+  const fn = node?.[key];
+  return typeof fn === "function" ? (fn as (...a: unknown[]) => unknown)(...args) : undefined;
+}
 
 /** Register a telemetry override that delegates export to the underlying node. */
 export function registerTelemetryOverride(
@@ -32,11 +46,16 @@ export function registerTelemetryOverride(
         sdk.gauge(name, value, attrs),
       histogram: (name: string, value: number, attrs?: Record<string, string>) =>
         sdk.histogram(name, value, attrs),
-      export: (args: Parameters<typeof sdk.export>[0]) =>
-        node ? (node.export(args) as ReturnType<typeof sdk.export>) : sdk.export(args),
-      emit: (...args: unknown[]) => node?.emit?.(...args),
-      query: (...args: unknown[]) => node?.query?.(...args),
-      traces: (...args: unknown[]) => node?.traces?.(...args),
+      export: (args: TelemetryExportArgs): Promise<TelemetryExportResult> => {
+        const viaNode = callNode(node, "export", args);
+        if (viaNode !== undefined) {
+          return viaNode as Promise<TelemetryExportResult>;
+        }
+        return exportWidgetTelemetry(options, args);
+      },
+      emit: (...args: unknown[]) => callNode(node, "emit", ...args),
+      query: (...args: unknown[]) => callNode(node, "query", ...args),
+      traces: (...args: unknown[]) => callNode(node, "traces", ...args),
       flush: () => sdk.flush(),
       withSpan: <T>(name: string, fn: (span: { setAttribute(k: string, v: string | number | boolean): void }) => Promise<T>) =>
         sdk.withSpan(name, fn),

@@ -220,6 +220,22 @@ export async function flushWidgetTelemetrySdks(): Promise<void> {
   await Promise.all(pending);
 }
 
+/**
+ * Direct `telemetry.export` via the tool bridge (widget attribution).
+ * Used by the telemetry plugin override when no gateway delegate is present.
+ */
+export function exportWidgetTelemetry(
+  options: WidgetTelemetrySdkOptions,
+  args: TelemetryExportArgs,
+): Promise<TelemetryExportResult> {
+  widgetTelemetrySdk(options);
+  return exportViaBridge(args, {
+    type: "widget",
+    path: options.path,
+    ...(options.sessionId ? { sessionId: options.sessionId } : {}),
+  });
+}
+
 async function exportViaBridge(
   args: TelemetryExportArgs,
   source: { type: "widget"; path: string; sessionId?: string },
