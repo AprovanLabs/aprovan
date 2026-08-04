@@ -1,7 +1,9 @@
 /**
- * `tools` assembly — the single constructor of namespace proxies.
+ * `tools` assembly — the single host-side constructor of namespace proxies.
+ * Nodes come from `@utdk/remote`; this module only adapts the transport shape.
  */
 
+import { createNamespaceProxy, type NamespaceProxy } from "@utdk/remote";
 import { extractNamespaces } from "../namespace-core.js";
 import type { PluginRegistry } from "../plugins/registry.js";
 import type { OverrideContext } from "../plugins/registry.js";
@@ -21,37 +23,21 @@ export interface AssembleToolsOptions {
   pluginContext?: OverrideContext;
 }
 
-export type NamespaceNode = Record<string, unknown> & {
-  (config?: unknown): NamespaceNode;
-};
+export type NamespaceNode = NamespaceProxy;
 
 /**
- * Callable namespace node. Depth-0 invocation configures and returns a new
- * node without dispatching; depth ≥ 1 invocation dispatches through transport.
+ * Callable namespace node via `@utdk/remote`. Depth-0 configures; depth ≥ 1
+ * dispatches through transport.
  */
 export function createCallableNamespaceNode(
   namespace: string,
   transport: ToolsTransport,
 ): NamespaceNode {
-  function createNestedProxy(path: string): NamespaceNode {
-    const fn = ((...args: unknown[]) => {
-      if (!path) {
-        void args[0];
-        return createCallableNamespaceNode(namespace, transport);
-      }
-      return transport(namespace, path, args);
-    }) as NamespaceNode;
-
-    return new Proxy(fn, {
-      get(_target, key: string | symbol) {
-        if (typeof key === "symbol") return undefined;
-        const newPath = path ? `${path}.${String(key)}` : String(key);
-        return createNestedProxy(newPath);
-      },
-    });
-  }
-
-  return createNestedProxy("");
+  return createNamespaceProxy(namespace, {
+    call(provider, operation, args) {
+      return transport(provider, operation, [args]);
+    },
+  });
 }
 
 /**
@@ -71,7 +57,10 @@ export function assembleTools(
   const tools: Record<string, NamespaceNode> = {};
 
   for (const namespace of uniqueNamespaces) {
-    if (plugins?.providedNamespaces().includes(namespace) && !extractNamespaces(namespaces).includes(namespace)) {
+    if (
+      plugins?.providedNamespaces().includes(namespace) &&
+      !extractNamespaces(namespaces).includes(namespace)
+    ) {
       continue;
     }
     tools[namespace] = createCallableNamespaceNode(namespace, wrappedTransport);

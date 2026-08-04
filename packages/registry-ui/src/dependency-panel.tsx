@@ -8,7 +8,7 @@
 
 import * as React from "react";
 
-/** A parsed script import (from `@aprovan/runtime`'s dependency parser). */
+/** A parsed script import (from `@utdk/remote`'s dependency parser). */
 export interface ScriptDependency {
   /** Local binding name in the script (`github` in `import github from …`). */
   identifier: string;

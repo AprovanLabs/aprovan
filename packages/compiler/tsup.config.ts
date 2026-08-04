@@ -16,6 +16,6 @@ export default defineConfig({
   splitting: false,
   sourcemap: true,
   shims: true,
-  external: ["react", "react-dom", "ink"],
+  external: ["react", "react-dom", "ink", "@utdk/remote"],
   skipNodeModulesBundle: true,
 });
