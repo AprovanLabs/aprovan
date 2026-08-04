@@ -20,9 +20,9 @@ export class RegistryApp extends Stack {
     const { environmentName, names, sharedEnv, workspaceImage } = props;
     const isProd = environmentName === "prd";
 
-    // Which backend the workspace stores use. Stays "dynamo" until the
-    // runbook'd cutover flips it (`cdk deploy -c storeBackend=dsql`); flipping
-    // Default dsql after cutover; `-c storeBackend=dynamo` is the rollback.
+    // Which backend the workspace stores use. Production is dsql after the
+    // cutover; `-c storeBackend=dynamo` is rejected by the container
+    // (`STORE_BACKEND=dynamo` throws). Default dsql.
     const storeBackend =
       (this.node.tryGetContext("storeBackend") as string | undefined) ?? "dsql";
     if (!["dynamo", "dsql"].includes(storeBackend)) {
@@ -219,11 +219,10 @@ export class RegistryApp extends Stack {
     }
 
     // -----------------------------------------------------------------------
-    // Aurora DSQL — the relational target every store migrates to (WS-5
+    // Aurora DSQL — the relational store backend for production (WS-5
     // tech-plan D4: one single-region cluster per environment). aws-cdk-lib
     // 2.180 ships no aws-dsql module yet, so this is the L1 resource by type.
-    // Serverless, pay-per-DPU, permanent free tier — safe to keep dark while
-    // STORE_BACKEND stays "dynamo".
+    // Serverless, pay-per-DPU, permanent free tier.
     // -----------------------------------------------------------------------
     const dsqlCluster = new CfnResource(this, "DsqlCluster", {
       type: "AWS::DSQL::Cluster",

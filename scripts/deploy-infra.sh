@@ -57,7 +57,13 @@ log "Workspace image: $PINNED"
 CDK_FLAGS=(--require-approval "${CDK_REQUIRE_APPROVAL:-never}")
 [[ -n "${AWS_PROFILE:-}" ]] && CDK_FLAGS+=(--profile "$AWS_PROFILE")
 
-log "Deploying workspace infra (env=$ENVIRONMENT account=$CDK_DEFAULT_ACCOUNT region=$CDK_DEFAULT_REGION)"
+# Store backend + optional Dynamo table retirement (post-cutover cleanup).
+CDK_FLAGS+=(-c "storeBackend=${STORE_BACKEND:-dsql}")
+if [[ "${DYNAMO_RETIRED:-}" == "true" ]]; then
+  CDK_FLAGS+=(-c "dynamoRetired=true")
+fi
+
+log "Deploying workspace infra (env=$ENVIRONMENT account=$CDK_DEFAULT_ACCOUNT region=$CDK_DEFAULT_REGION storeBackend=${STORE_BACKEND:-dsql}${DYNAMO_RETIRED:+ dynamoRetired=$DYNAMO_RETIRED})"
 (
   cd "$REPO_ROOT"
   # Workspace CDK deps must be built before infra/workspace tsc can resolve them.

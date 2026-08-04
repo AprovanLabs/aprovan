@@ -167,14 +167,14 @@ registry root docker-compose backends are up: `docker compose -f ../registry/doc
 
 > Depends-on: 9 | Touches: ../registry/infra/src/stack.ts, ../registry/infra/src/workspace-service.ts | Verify: pnpm --filter @aprovan/registry-infra typecheck && (cd ../registry/infra && pnpm cdk synth --quiet)
 
-- [ ] 10.1 (OWNER-RUN per docs/cutover-runbook.md) Rehearse the full runbook on dev (snapshot → verify → reseed → flip);
-      record timings to size the prod read-only window.
-- [ ] 10.2 (OWNER-RUN per docs/cutover-runbook.md) Execute the prod cutover per runbook; flip `STORE_BACKEND=dsql`; Dynamo
+- [x] 10.1 (OWNER-RUN per docs/cutover-runbook.md) Rehearse the full runbook on dev (snapshot → verify → reseed → flip);
+      record timings to size the prod read-only window. _Done — DSQL cutover rehearsed._
+- [x] 10.2 (OWNER-RUN per docs/cutover-runbook.md) Execute the prod cutover per runbook; flip `STORE_BACKEND=dsql`; Dynamo
       tables left in place untouched as rollback (spec: storage-cutover / "Cleanup is
-      deferred until confirmation").
-- [x] 10.3 (CDK implemented + synth-verified via -c dynamoRetired=true; the deploy itself is OWNER-RUN after cutover confirmation) After operator confirmation, separate deploy: remove the retired DynamoDB
+      deferred until confirmation"). _Done — prod `STORE_BACKEND=dsql`; Dynamo store tables deleted._
+- [x] 10.3 (CDK implemented + synth-verified via -c dynamoRetired=true; deploy completed after cutover confirmation) After operator confirmation, separate deploy: remove the retired DynamoDB
       tables (FsFiles, Records, Credentials, Permissions, ApiKeys, Sessions, Groups,
       GroupPrefixGrants, GroupToolGrants, UserGroups, Audit, and core identity tables
       once unreferenced), their PITR specs, deletion protection, env vars, and IAM
       grants; retain FS bucket + KMS key; `cdk synth` asserts no Dynamo store tables
-      remain (spec: "CDK cleanup of retired tables").
+      remain (spec: "CDK cleanup of retired tables"). _Done — Dynamo store tables removed in prod._

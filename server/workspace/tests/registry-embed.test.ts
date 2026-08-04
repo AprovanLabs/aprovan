@@ -91,9 +91,6 @@ describe("registry embed", () => {
     const { usesEmbedInterfaceDispatch } = await import("../src/workflows/invoke.js");
     expect(usesEmbedInterfaceDispatch()).toBe(false);
 
-    process.env["STORE_BACKEND"] = "dynamo";
-    expect(usesEmbedInterfaceDispatch()).toBe(false);
-
     process.env["STORE_BACKEND"] = "dsql";
     process.env["DSQL_ENDPOINT"] = process.env["WORKSPACE_TEST_DSQL_URL"] ?? "postgres://invalid";
     expect(usesEmbedInterfaceDispatch()).toBe(true);

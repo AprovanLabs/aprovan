@@ -1,15 +1,16 @@
 /**
- * Credential storage — three backends behind `ICredentialStore`, selected by
+ * Credential storage — backends behind `ICredentialStore`, selected by
  * `storeBackend()` (runtime/config.ts):
  *
- * - `dynamo` — the legacy single-table backend (retired at cutover). DynamoDB
- *   SSE plus the credential cipher handle at-rest encryption.
  * - `sqlite` — local mode.
- * - `dsql` — the WS-3 reconciliation: the credential store of record is
- *   `@aprovan/registry-server`'s storage (its `credentials` table with
- *   `created_by`, over its SqlClient seam). The workspace does NOT grow a
- *   second DSQL credential schema; `CredentialStoreRegistry` adapts the
- *   package storage to this interface over the shared db/dsql.ts pool.
+ * - `dsql` — the credential store of record is `@aprovan/registry-server`'s
+ *   storage (its `credentials` table with `created_by`, over its SqlClient
+ *   seam). The workspace does NOT grow a second DSQL credential schema;
+ *   `CredentialStoreRegistry` adapts the package storage to this interface
+ *   over the shared db/dsql.ts pool.
+ *
+ * `CredentialStoreDynamodb` remains for snapshot/cutover tooling and
+ * dynamodb-local contract tests only — it is not wired into the factory.
  *
  * Credentials carry a `createdBy` user dimension (tech-plan D5) — the frozen
  * seam WS-3's Profiles reference.
@@ -729,8 +730,6 @@ export function getCredentialStore(): ICredentialStore {
     switch (storeBackend()) {
       case "dsql":
         return new CredentialStoreRegistry();
-      case "dynamo":
-        return new CredentialStoreDynamodb();
       case "sqlite":
         return new CredentialStoreSqlite();
     }

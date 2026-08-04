@@ -19,16 +19,8 @@ import {
 } from "@aws-sdk/client-dynamodb";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { resetDynamoDocClient } from "../src/db/client.js";
-import { resetIdentityStore } from "../src/identity/store.js";
-import {
-  addUserToGroup,
-  createGroup,
-  deleteGroup,
-  getGroup,
-  listGroups,
-  removeUserFromGroup,
-  updateGroup,
-} from "../src/groups.js";
+import { createIdentityStoreDynamo } from "../src/identity/dynamo.js";
+import type { IIdentityStore } from "../src/identity/types.js";
 
 // ---------------------------------------------------------------------------
 // Endpoint probe + table provisioning
@@ -155,17 +147,16 @@ function uniqueWs(): string {
 // ---------------------------------------------------------------------------
 
 describe.skipIf(!ddbReady)("Groups DynamoDB", () => {
+  let store: IIdentityStore;
+
   beforeAll(() => {
-    process.env["STORE_BACKEND"] = "dynamo";
-    resetIdentityStore();
     process.env["GROUPS_TABLE"] = GROUPS_TABLE;
     process.env["USER_GROUPS_TABLE"] = USER_GROUPS_TABLE;
     resetDynamoDocClient();
+    store = createIdentityStoreDynamo();
   });
 
   afterAll(() => {
-    delete process.env["STORE_BACKEND"];
-    resetIdentityStore();
     resetDynamoDocClient();
   });
 
@@ -175,7 +166,7 @@ describe.skipIf(!ddbReady)("Groups DynamoDB", () => {
 
   it("creates a group and retrieves it by id", async () => {
     const ws = uniqueWs();
-    const group = await createGroup(ws, "team-a", "Team A");
+    const group = await store.groups.create(ws, "team-a", "Team A");
 
     expect(group.groupId).toMatch(/^[0-9a-f]{24}$/);
     expect(group.workspaceId).toBe(ws);
@@ -183,41 +174,44 @@ describe.skipIf(!ddbReady)("Groups DynamoDB", () => {
     expect(group.description).toBe("Team A");
     expect(typeof group.createdAt).toBe("string");
 
-    const fetched = await getGroup(ws, group.groupId);
+    const fetched = await store.groups.get(ws, group.groupId);
     expect(fetched).toBeDefined();
     expect(fetched!.name).toBe("team-a");
   });
 
   it("creates a group without description", async () => {
     const ws = uniqueWs();
-    const group = await createGroup(ws, "no-desc");
+    const group = await store.groups.create(ws, "no-desc");
     expect(group.description).toBeUndefined();
 
-    const fetched = await getGroup(ws, group.groupId);
+    const fetched = await store.groups.get(ws, group.groupId);
     expect(fetched!.description).toBeUndefined();
   });
 
   it("lists groups scoped to workspace", async () => {
     const wsA = uniqueWs();
     const wsB = uniqueWs();
-    await createGroup(wsA, "g1");
-    await createGroup(wsA, "g2");
-    await createGroup(wsB, "g3");
+    await store.groups.create(wsA, "g1");
+    await store.groups.create(wsA, "g2");
+    await store.groups.create(wsB, "g3");
 
-    const listA = await listGroups(wsA);
+    const listA = await store.groups.list(wsA);
     expect(listA).toHaveLength(2);
     expect(listA.map((g) => g.name).sort()).toEqual(["g1", "g2"]);
 
-    const listB = await listGroups(wsB);
+    const listB = await store.groups.list(wsB);
     expect(listB).toHaveLength(1);
     expect(listB[0]!.name).toBe("g3");
   });
 
   it("updates group name and description", async () => {
     const ws = uniqueWs();
-    const group = await createGroup(ws, "old-name", "old desc");
+    const group = await store.groups.create(ws, "old-name", "old desc");
 
-    const updated = await updateGroup(ws, group.groupId, { name: "new-name", description: "new desc" });
+    const updated = await store.groups.update(ws, group.groupId, {
+      name: "new-name",
+      description: "new desc",
+    });
     expect(updated).toBeDefined();
     expect(updated!.name).toBe("new-name");
     expect(updated!.description).toBe("new desc");
@@ -226,17 +220,17 @@ describe.skipIf(!ddbReady)("Groups DynamoDB", () => {
 
   it("updateGroup returns undefined for a non-existent group", async () => {
     const ws = uniqueWs();
-    const result = await updateGroup(ws, "nonexistent-id", { name: "x" });
+    const result = await store.groups.update(ws, "nonexistent-id", { name: "x" });
     expect(result).toBeUndefined();
   });
 
   it("deletes a group and returns false on second delete", async () => {
     const ws = uniqueWs();
-    const group = await createGroup(ws, "to-delete");
+    const group = await store.groups.create(ws, "to-delete");
 
-    expect(await deleteGroup(ws, group.groupId)).toBe(true);
-    expect(await getGroup(ws, group.groupId)).toBeUndefined();
-    expect(await deleteGroup(ws, group.groupId)).toBe(false);
+    expect(await store.groups.remove(ws, group.groupId)).toBe(true);
+    expect(await store.groups.get(ws, group.groupId)).toBeUndefined();
+    expect(await store.groups.remove(ws, group.groupId)).toBe(false);
   });
 
   // -------------------------------------------------------------------------
@@ -245,22 +239,22 @@ describe.skipIf(!ddbReady)("Groups DynamoDB", () => {
 
   it("adds and removes a user from a group", async () => {
     const ws = uniqueWs();
-    const group = await createGroup(ws, "ug-test");
+    const group = await store.groups.create(ws, "ug-test");
 
-    await addUserToGroup(ws, group.groupId, "user-sub-1");
-    await addUserToGroup(ws, group.groupId, "user-sub-2");
+    await store.groups.members.add(ws, group.groupId, "user-sub-1");
+    await store.groups.members.add(ws, group.groupId, "user-sub-2");
 
-    expect(await removeUserFromGroup(ws, group.groupId, "user-sub-1")).toBe(true);
-    expect(await removeUserFromGroup(ws, group.groupId, "user-sub-1")).toBe(false);
-    expect(await removeUserFromGroup(ws, group.groupId, "user-sub-2")).toBe(true);
+    expect(await store.groups.members.remove(ws, group.groupId, "user-sub-1")).toBe(true);
+    expect(await store.groups.members.remove(ws, group.groupId, "user-sub-1")).toBe(false);
+    expect(await store.groups.members.remove(ws, group.groupId, "user-sub-2")).toBe(true);
   });
 
   it("addUserToGroup is idempotent", async () => {
     const ws = uniqueWs();
-    const group = await createGroup(ws, "idem-test");
+    const group = await store.groups.create(ws, "idem-test");
 
-    await addUserToGroup(ws, group.groupId, "user-a");
-    await addUserToGroup(ws, group.groupId, "user-a");
-    expect(await removeUserFromGroup(ws, group.groupId, "user-a")).toBe(true);
+    await store.groups.members.add(ws, group.groupId, "user-a");
+    await store.groups.members.add(ws, group.groupId, "user-a");
+    expect(await store.groups.members.remove(ws, group.groupId, "user-a")).toBe(true);
   });
 });

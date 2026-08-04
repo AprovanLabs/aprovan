@@ -1,8 +1,8 @@
 /**
- * Audit log for gateway tool calls — DynamoDB backend (30-day TTL).
+ * Audit log for gateway tool calls — sqlite / dsql backends (Dynamo retired).
  *
- * Per APR-323, the legacy in-memory ring-buffer backend has been removed.
- * `AuditStoreDynamodb` is now the sole implementation.
+ * `AuditStoreDynamodb` remains for dynamodb-local contract tests only and is
+ * not wired into the factory.
  */
 
 import { mkdirSync } from "node:fs";
@@ -395,8 +395,6 @@ export function getAuditStore(): IAuditStore {
     switch (storeBackend()) {
       case "dsql":
         return new AuditStoreDsql();
-      case "dynamo":
-        return new AuditStoreDynamodb();
       case "sqlite":
         return new AuditStoreSqlite();
     }

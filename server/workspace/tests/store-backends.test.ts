@@ -35,14 +35,14 @@ describe("STORE_BACKEND switch", () => {
     resetWorkspaceConfig();
   });
 
-  it("defaults to sqlite in local mode and honors explicit values", () => {
+  it("defaults to sqlite in local mode, honors dsql, and rejects retired dynamo", () => {
     delete process.env["STORE_BACKEND"];
     resetWorkspaceConfig();
     expect(storeBackend()).toBe("sqlite");
     process.env["STORE_BACKEND"] = "dsql";
     expect(storeBackend()).toBe("dsql");
     process.env["STORE_BACKEND"] = "dynamo";
-    expect(storeBackend()).toBe("dynamo");
+    expect(() => storeBackend()).toThrowError(/Dynamo store backend retired/);
   });
 
   it("rejects unknown backends loudly", () => {
