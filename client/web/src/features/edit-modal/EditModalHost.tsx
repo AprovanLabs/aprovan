@@ -21,6 +21,7 @@ import {
   resolveWritePolicy,
   type WritePolicy,
 } from "@/features/editing/write-policy";
+import { useCompileChecker } from "@/features/editing/useCompileChecker";
 
 function fileLabel(path: string): string {
   const parts = path.replace(/\/+$/, "").split("/");
@@ -86,6 +87,7 @@ function EditModalHostInner({
     resolveWritePolicy(targetPath, getCachedStagedPrefixes()),
   );
   const draftRef = useRef<ChatSessionInfo | null>(null);
+  const checker = useCompileChecker(namespaces);
 
   useEffect(() => {
     let cancelled = false;
@@ -150,6 +152,8 @@ function EditModalHostInner({
           await withTimeout(
             compiler.compile(code, createPreviewManifest(namespaces), {
               typescript: true,
+              ...(checker ? { checker } : {}),
+              ...(targetPath ? { sourcePath: targetPath } : {}),
             }),
             COMPILE_TIMEOUT_MS,
             `Compilation timed out after ${COMPILE_TIMEOUT_MS / 1000}s`,
@@ -168,6 +172,7 @@ function EditModalHostInner({
           compiler={compiler}
           services={namespaces}
           sourcePath={editSession.workspacePath ?? editSession.initialActiveFile}
+          checker={checker}
         />
       )}
       previewLoading={!compiler}
