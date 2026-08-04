@@ -602,6 +602,9 @@ importers:
 
   packages/ui:
     dependencies:
+      '@aprovan/patchwork-compiler':
+        specifier: workspace:*
+        version: link:../compiler
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -633,132 +636,6 @@ importers:
       typescript:
         specifier: ^5.8.3
         version: 5.9.3
-
-  packages/utdk/dist/airtable: {}
-
-  packages/utdk/dist/anthropic: {}
-
-  packages/utdk/dist/asana: {}
-
-  packages/utdk/dist/cloudflare: {}
-
-  packages/utdk/dist/cloudflare/sandbox: {}
-
-  packages/utdk/dist/common:
-    devDependencies:
-      '@opentelemetry/api':
-        specifier: ^1.9.0
-        version: 1.9.0
-      '@types/node':
-        specifier: ^25.5.0
-        version: 25.9.5
-      vitest:
-        specifier: 2.1.5
-        version: 2.1.5(@types/node@25.9.5)(lightningcss@1.32.0)(terser@5.49.0)
-
-  packages/utdk/dist/databricks: {}
-
-  packages/utdk/dist/datadog: {}
-
-  packages/utdk/dist/digitalocean: {}
-
-  packages/utdk/dist/discord: {}
-
-  packages/utdk/dist/elevenlabs: {}
-
-  packages/utdk/dist/figma: {}
-
-  packages/utdk/dist/fly: {}
-
-  packages/utdk/dist/fly/sprites: {}
-
-  packages/utdk/dist/front: {}
-
-  packages/utdk/dist/gemini: {}
-
-  packages/utdk/dist/github: {}
-
-  packages/utdk/dist/google: {}
-
-  packages/utdk/dist/google-cloud-run: {}
-
-  packages/utdk/dist/google/books: {}
-
-  packages/utdk/dist/google/calendar: {}
-
-  packages/utdk/dist/google/docs: {}
-
-  packages/utdk/dist/google/drive: {}
-
-  packages/utdk/dist/google/forms: {}
-
-  packages/utdk/dist/google/gmail: {}
-
-  packages/utdk/dist/google/people: {}
-
-  packages/utdk/dist/google/sheets: {}
-
-  packages/utdk/dist/google/slides: {}
-
-  packages/utdk/dist/google/tasks: {}
-
-  packages/utdk/dist/google/youtube: {}
-
-  packages/utdk/dist/hubspot: {}
-
-  packages/utdk/dist/intercom: {}
-
-  packages/utdk/dist/itglue: {}
-
-  packages/utdk/dist/jira: {}
-
-  packages/utdk/dist/launchdarkly: {}
-
-  packages/utdk/dist/linear: {}
-
-  packages/utdk/dist/mercury: {}
-
-  packages/utdk/dist/notion: {}
-
-  packages/utdk/dist/openai: {}
-
-  packages/utdk/dist/openrouteservice: {}
-
-  packages/utdk/dist/petstore: {}
-
-  packages/utdk/dist/pipedrive: {}
-
-  packages/utdk/dist/plaid: {}
-
-  packages/utdk/dist/postgres: {}
-
-  packages/utdk/dist/posthog: {}
-
-  packages/utdk/dist/postman-explore: {}
-
-  packages/utdk/dist/producthunt: {}
-
-  packages/utdk/dist/salesforce: {}
-
-  packages/utdk/dist/sendgrid: {}
-
-  packages/utdk/dist/sentry: {}
-
-  packages/utdk/dist/slack: {}
-
-  packages/utdk/dist/snowflake: {}
-
-  packages/utdk/dist/spotify: {}
-
-  packages/utdk/dist/stripe: {}
-
-  packages/utdk/dist/stytch: {}
-
-  packages/utdk/dist/telegram: {}
-
-  packages/utdk/dist/twilio: {}
-
-  packages/utdk/dist/zendesk: {}
 
   server/workspace:
     dependencies:

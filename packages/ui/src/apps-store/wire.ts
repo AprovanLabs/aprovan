@@ -21,6 +21,8 @@
  * single allow-list entry, which is what an allow-list *editor* needs.
  */
 
+import { NATIVE_APP_NAMESPACES } from "@aprovan/patchwork-compiler/namespace-core";
+
 // ---------------------------------------------------------------------------
 // Transport
 // ---------------------------------------------------------------------------
@@ -794,8 +796,7 @@ export function normalizeChannels(raw: unknown): AppChannel[] {
 // Capabilities — "three ways data is reached"
 // ---------------------------------------------------------------------------
 
-/** The allow-listed first-party namespaces, auto-partitioned per app user. */
-export const NATIVE_APP_NAMESPACES = ["vfs", "keyvalue", "events"] as const;
+export { NATIVE_APP_NAMESPACES };
 
 const NATIVE_LABELS: Record<string, { label: string; detail: string }> = {
   vfs: {
@@ -809,6 +810,18 @@ const NATIVE_LABELS: Record<string, { label: string; detail: string }> = {
   events: {
     label: "Events",
     detail: "Emit and subscribe to workspace event channels; cascades stop at depth 2.",
+  },
+  notifications: {
+    label: "Notifications",
+    detail: "Notify the current app user with title, body, and optional one-click choices.",
+  },
+  telemetry: {
+    label: "Telemetry",
+    detail: "Emit and query debugging spans and logs stamped to this app.",
+  },
+  agents: {
+    label: "Agents",
+    detail: "Read named agent profiles and their runs — management stays member-only.",
   },
 };
 
@@ -889,7 +902,7 @@ export interface ToolEntryInfo {
  * the gateway enforces at publish and at call time, mirrored client-side so
  * an editor can explain a rejection before a round-trip:
  *
- *  1. **native** namespaces (`vfs`, `keyvalue`, `events`) — wildcards allowed;
+ *  1. **native** namespaces (`vfs`, `keyvalue`, `events`, …) — wildcards allowed;
  *  2. the app's own namespace (`<app>.*`, the literal `app.*`, or `workflow.*`
  *     as a synonym), or an exported workflow named directly;
  *  3. **provider** procedures — allowed since 2026-07-24, but each entry is an

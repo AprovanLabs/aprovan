@@ -12,5 +12,5 @@ export default defineConfig({
   dts: true,
   clean: true,
   sourcemap: true,
-  external: ["react", "react-dom"],
+  external: ["react", "react-dom", "@aprovan/patchwork-compiler", "@aprovan/patchwork-compiler/namespace-core"],
 });

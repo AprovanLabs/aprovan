@@ -25,21 +25,24 @@
  * else — a provider *wildcard* in particular — with a message pointing at (3).
  */
 
+import {
+  NATIVE_APP_NAMESPACES,
+  type NativeAppNamespace,
+} from "@aprovan/patchwork-compiler/namespace-core";
 import { isInterface } from "../interfaces.js";
 import { isCoreServiceName, ServiceError } from "../service-kernel.js";
 import { DEFAULT_DAILY_CALLS } from "./usage.js";
 import type { AppManifest, AppRequirement } from "./store.js";
 
 export type { AppRequirement };
+export { NATIVE_APP_NAMESPACES, type NativeAppNamespace };
 
 /** The auto-partitioned first-party namespaces an app session may call.
+ *  Defined once in `@aprovan/patchwork-compiler/namespace-core`.
  *  `notifications` is scoped per (app, user) by construction: an app can
  *  only notify its own current user, and only embed choices whose calls it
  *  could make itself (see notifications/service.ts). `telemetry` is
  *  stamped/filtered by app the same way (telemetry/service.ts). */
-export const NATIVE_APP_NAMESPACES = ["vfs", "keyvalue", "events", "notifications", "telemetry", "agents"] as const;
-
-export type NativeAppNamespace = (typeof NATIVE_APP_NAMESPACES)[number];
 
 /**
  * Namespace an app's exported workflows answer on. `app` is canonical (an app

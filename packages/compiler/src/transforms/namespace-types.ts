@@ -34,6 +34,9 @@
 
 import { extractNamespaces, NATIVE_APP_NAMESPACES } from "../namespace-core.js";
 
+export { extractNamespaces, NATIVE_APP_NAMESPACES };
+export type { NativeAppNamespace } from "../namespace-core.js";
+
 /** The slice of JSON Schema this generator understands. */
 export interface JsonSchema {
   type?: string | string[];

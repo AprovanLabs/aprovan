@@ -17,6 +17,11 @@
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
+    "./namespace-core": {
+      "types": "./dist/namespace-core.d.ts",
+      "import": "./dist/namespace-core.js",
+      "require": "./dist/namespace-core.cjs"
+    },
     "./namespace-types": {
       "types": "./dist/namespace-types.d.ts",
       "import": "./dist/namespace-types.js",
