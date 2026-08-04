@@ -168,8 +168,40 @@ AWS_PROFILE=aprovan scripts/deploy.sh   # aws-core + web stacks
 
 ### Owner stream 9 blockers remaining
 
-1. **Workspace image runtime** — fix `@utdk/common` (and peers) in production image layout; green `workspace-image.yml` + publish tag before ECS pin
+1. ~~**Workspace image runtime**~~ — ✅ image publishes and runs (`ghcr.io/aprovanlabs/workspace:723009123143` health/config OK). ECS auto-roll on push disabled until OIDC trust fixed for stream-9.
 2. **DSQL flip** — `STORE_BACKEND=dsql` activates full interface embed path; until then production stays on dynamo legacy dispatch
-3. **4.5 remainder** — native-service embed needs `CallContext` → product `ServiceContext` field passthrough (`appScope`, grants) before routing vfs/apps/records natives through embed
-4. **CDK synth / deploy-infra** — owner-run per runbook; do not flip SSM until image green
+3. ~~**4.5 CallContext passthrough**~~ — ✅ product `ServiceContext` preserved via AsyncLocalStorage across embed → compatDispatch. Remaining: owner DSQL flip retires dynamo/sqlite legacy interface path + provider label pins.
+4. **CDK synth / deploy-infra** — owner-run per runbook; pin ECS to aprovan-built tag
 5. **PR #81** — merge only after cutover soak
+6. **Core dissolve (10.2–10.5)** — blocked on cutover soak + owner eviction of `core/{agents,evals,skills,prompts}`
+
+---
+
+## Remainders closeout (2026-08-04)
+
+**Branch:** `fix/product-plane-move-remainders`  
+**Worktree:** `.worktrees/aprovan-product-plane`
+
+### Tasks this session
+
+| Task | Status | Notes |
+|------|--------|-------|
+| 2.4 | Deferred | Pre-inline configs gone; `pnpm lint` known-broken (AGENTS.md) |
+| 4.5 | Partial↑ | ALS product-context passthrough; HTTP tools twin routes through embed on dsql; still gated on DSQL flip for full cutover |
+| 7.3 | ✅ | Smoke against published `723009123143`; CI deploy step gated to workflow_dispatch |
+| 9.x / 10.2–10.5 | Blocked | Owner-run / cutover prerequisites |
+
+### Code changes
+
+- `registry-embed.ts`: AsyncLocalStorage carries product `ServiceContext` (appScope, grants, redirects) into `compatDispatch`
+- `workflows/invoke.ts`: export `usesEmbedInterfaceDispatch` (still dsql-only — sqlite embed rejects product `vfs`/`keyvalue` namespaces not in registry catalog)
+- `routes/tools.ts`: dsql interface calls go through `dispatchInterface` / embed
+- `workspace-image.yml`: ECS roll only on `workflow_dispatch` + deploy input (stops red main from OIDC)
+
+### Blocked (do not execute from this change alone)
+
+1. Stream 9 owner cutover (CDK diff, ECS image pin, soak, rollback drill)
+2. Full 4.5 — requires `STORE_BACKEND=dsql` production flip (+ catalog/bindings parity if sqlite embed is ever desired)
+3. Core 10.2–10.5 — personal-repo eviction, npm deprecate, terraform zero-diff, GitHub archive
+4. Registry PR #81 merge — after soak only
+5. 2.4 formal lint rule-identical diff — not recoverable without restoring deleted config packages; lint load broken on main

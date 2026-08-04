@@ -41,7 +41,7 @@ the core tasks in 6 can proceed against their own repos once their deps clear)._
       preserved"): copy the effective contents of core's
       `packages/{eslint-config,prettier-config,tsconfig,vitest-config}` into aprovan root
       files; remove `@aprovan/*-config` deps from every aprovan `package.json`.
-- [ ] 2.4 Confirm lint/typecheck output is rule-identical before vs after inlining (run both
+- [ ] 2.4 (deferred — pre-inline config packages gone; root `pnpm lint` also known-broken per AGENTS.md `ERR_MODULE_NOT_FOUND` for typescript-eslint) Confirm lint/typecheck output is rule-identical before vs after inlining (run both
       configurations on the same tree; diff the reported rule set / diagnostics).
 
 ## 3. Library package moves into aprovan
@@ -77,7 +77,7 @@ the core tasks in 6 can proceed against their own repos once their deps clear)._
 - [x] 4.4 Implement the workspaceId→tenant 1:1 adapter (create on workspace creation, lazy
       backfill on first execution-plane use) — spec: product-composition "Workspaces map to
       registry tenants one-to-one".
-- [ ] 4.5 (partial — interface dispatch routes through embed on `STORE_BACKEND=dsql`; dynamo interim + provider label pins keep legacy path) Register native implementations for product-backed contracts via the embedding
+- [ ] 4.5 (partial — natives registered via `nativeServices` + `compatDispatch`; product `ServiceContext` now preserved across embed via ALS; HTTP tools + invoke route through embed on `STORE_BACKEND=dsql`; dynamo/sqlite interim + provider label pins keep legacy path until owner DSQL flip) Register native implementations for product-backed contracts via the embedding
       API's `registerImplementation`; remove any bespoke product-side dispatch path for
       contract-addressed calls — spec: product-composition "Native implementations register
       against @utdk contracts" (both scenarios).
@@ -133,9 +133,12 @@ the core tasks in 6 can proceed against their own repos once their deps clear)._
       `sandbox-image-node` → `sandbox-host` → `cli` → `patchwork-compiler` →
       `patchwork-editor` (tech-plan D5; spec: deployment "Publish is ordered and
       idempotent").
-- [ ] 7.3 (partial — `scripts/image.sh build` ✅; container start fails at runtime: missing `@utdk/common` in image) Local verification of the image: `bash scripts/image.sh build` then
+- [x] 7.3 Local verification of the image: `bash scripts/image.sh build` then
       `bash scripts/image.sh run` and curl the health/config endpoint of the container
       (spec: deployment "Workspace image builds from aprovan").
+      Verified 2026-08-04 against published `ghcr.io/aprovanlabs/workspace:723009123143`
+      (`/health` + `/api/gateway/config` OK). CI image build/publish green; ECS roll gated
+      to workflow_dispatch until OIDC trust for stream-9 cutover.
 
 ## 8. Registry repo: catalog split & standalone remainder
 
