@@ -159,21 +159,34 @@ one in wins, coordinate via rebase).
 - [x] 8.2 `docker/registry.Dockerfile` (multi-stage, node:22-slim, VOLUME /data,
       HEALTHCHECK) + `smoke-standalone.sh` (boot → create credential → create profile →
       grant → dispatch → MCP list_tools) + CI image publish job (tech-plan D11).
-- [ ] 8.3 Rewire `apps/workspace` to consume the package: replace
+- [x] 8.3 Rewire `apps/workspace` to consume the package: replace
       `isolate.ts`/`toolCache.ts` executor use, `credentials.ts`/`credentialCipher.ts`/
       `oauthTokens.ts`, `interfaces.ts` resolution, `workflows/sandbox.ts`, and
       `mcp/server.ts` with package imports; product services import kernel types from
       the package; register natives + tenant resolver (workspaceId 1:1) via the embed
       API.
-- [ ] 8.4 Delete replaced mechanisms in `apps/workspace`: bindings.json read/write,
+      _Done on main via WS-4 (`product-plane-move`) + follow-ons: product host is
+      `aprovan/server/workspace`, which embeds `@aprovan/registry-server` through
+      `registry-embed.ts` (`createRegistryServer`, workspace→tenant 1:1, natives +
+      agent `compatDispatch`); cipher/oauth/sandbox/isolate/kernel re-export or
+      adapt the package. Registry `apps/workspace` source is gone (moved)._
+- [x] 8.4 Delete replaced mechanisms in `apps/workspace`: bindings.json read/write,
       `interfaces.bind/unbind`, `listInstances`, label-profile resolution, colon
       instance-namespace parsing; grep BOTH repos (registry + aprovan) for `bindings.json`,
       `interfaces.bind`, `getClient({`, and `:` instance syntax; add `profiles.*` tool
       surface for chat parity (profiles spec "Replaced mechanisms are deleted").
+      _Done on main via `profiles-unified` (#85): `interfaces.bind`/`unbind` removed;
+      `profiles.set`/`list`/`remove` is the config surface; colon namespaces rejected;
+      credential label is display-only; `getClient({` gone from the sandbox prelude.
+      Residual: profile-store adapters still named `readBindings`/`listInstances`, a
+      one-time bindings.json→profiles tombstone import, and an interim Dynamo
+      bindings.json path (`STORE_BACKEND=dynamo`) — owned by DSQL cutover, not WS-3._
 - [x] 8.5 Embed-vs-HTTP equivalence test (registry-server spec "Standalone and embedded
       share one pipeline") and dispatch-overhead benchmark asserting the PRD's p95 <20ms
       target in sqlite mode.
 - [x] 8.6 When WS-2 lands: swap the catalog shim for the WS-2 compat data + shared
       credential types; delete the shim.
-- [ ] 8.7 Publish `@aprovan/registry-server@0.x` to npm via the repo release flow;
+- [x] 8.7 Publish `@aprovan/registry-server@0.x` to npm via the repo release flow;
       confirm the aprovan repo can install it (WS-4 handoff).
+      _Published through `@aprovan/registry-server@0.2.2` (registry `publish.yml` on
+      main). Aprovan depends on `^0.2.2`; clean-room `npm install` + import succeeds._
