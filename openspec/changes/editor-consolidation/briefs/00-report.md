@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-04  
 **Aprovan PR:** https://github.com/AprovanLabs/aprovan/pull/84  
-**Registry PR:** (see below after open)
+**Registry PR:** https://github.com/AprovanLabs/registry/pull/122
 
 ## Stream checklist
 
