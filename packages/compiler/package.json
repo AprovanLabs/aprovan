@@ -36,7 +36,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@utdk/remote": "^0.1.1",
+    "@utdk/remote": "github:AprovanLabs/registry#main&path:packages/remote",
     "esbuild-wasm": "^0.27.2",
     "zod": "^3.23.0"
   },
