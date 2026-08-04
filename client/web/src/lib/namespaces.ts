@@ -33,7 +33,7 @@ import {
 import { GATEWAY_BASE } from "./gateway";
 import { gatewayFetch } from "./gateway-fetch";
 
-export type NamespaceKind = "core" | "interface" | "provider" | "llm-alias";
+export type NamespaceKind = "plugin" | "core" | "interface" | "provider" | "llm-alias";
 
 export interface NamespaceCompat {
   provider: string;

@@ -38,6 +38,19 @@ describe("groupNamespaces", () => {
     expect(grouped.providers).toEqual(["github"]);
   });
 
+  it("treats stream-6 plugin kind as Native (alongside legacy core)", () => {
+    const grouped = groupNamespaces(
+      ["sessions", "workflows", "github"],
+      catalog([
+        ["sessions", "plugin"],
+        ["workflows", "plugin"],
+        ["github", "provider"],
+      ]),
+    );
+    expect(grouped.core).toEqual(["sessions", "workflows"]);
+    expect(grouped.providers).toEqual(["github"]);
+  });
+
   it("separates bare interfaces from providers (no colon instances)", () => {
     const grouped = groupNamespaces(
       ["sql", "linear"],
