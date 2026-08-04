@@ -48,10 +48,10 @@
 
 > Depends-on: 3 | Touches: registry/packages/mcp-core/src/loader.ts, registry/packages/mcp-core/src/meta-tools.ts, registry/packages/mcp-core/**/*.test.ts | Verify: `cd /Users/jacob/Documents/Code/AprovanLabs/registry && pnpm --filter @utdk/mcp-core test`
 
-- [ ] 6.1 Set `ProviderTool.outputSchema` from `tool.outputs` in the loader — the value is already on the object the loader reads.
-- [ ] 6.2 Pass it through meta-tools normalisation alongside `inputSchema`.
-- [ ] 6.3 Omit the field entirely when no schema is known; do not emit a permissive placeholder.
-- [ ] 6.4 Add tests for both MCP scenarios in `provider-output-schemas`.
+- [x] 6.1 Set `ProviderTool.outputSchema` from `tool.outputs` in the loader — the value is already on the object the loader reads.
+- [x] 6.2 Pass it through meta-tools normalisation alongside `inputSchema`.
+- [x] 6.3 Omit the field entirely when no schema is known; do not emit a permissive placeholder.
+- [x] 6.4 Add tests for both MCP scenarios in `provider-output-schemas`.
 
 ## 7. Re-bundle digitalocean
 
