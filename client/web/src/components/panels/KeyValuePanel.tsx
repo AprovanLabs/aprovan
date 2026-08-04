@@ -1,10 +1,10 @@
 /**
  * KeyValuePanel — the workspace key-value browser ("Data").
  *
- * Lists keys from the gateway's `keyvalue` core service, lets members inspect
- * and edit any record as raw JSON, and create/delete records. App-partitioned
- * data (`app#<name>#u#<user>`) is intentionally invisible here: the gateway
- * scopes the `list` call to workspace keys automatically.
+ * Lists keys from the gateway's `keyvalue` interface (Aprovan native default),
+ * lets members inspect and edit any record as raw JSON, and create/delete
+ * records. App-partitioned data (`app#<name>#u#<user>`) is intentionally
+ * invisible here: the gateway scopes the `list` call to workspace keys.
  */
 
 import { Database, Plus } from "lucide-react";
@@ -30,6 +30,15 @@ const textareaClass =
   "w-full min-h-[220px] flex-1 rounded-md border bg-background p-2 font-mono text-xs " +
   "placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
+/** Normalize contract list rows (`{ key }`) and legacy string arrays. */
+function listKeys(result: unknown): string[] {
+  const keys = (result as { keys?: unknown })?.keys;
+  if (!Array.isArray(keys)) return [];
+  return keys
+    .map((row) => (typeof row === "string" ? row : (row as { key?: unknown })?.key))
+    .filter((key): key is string => typeof key === "string" && key.length > 0);
+}
+
 export function KeyValuePanel({ scope: explicitScope }: NativePanelProps) {
   const { scope, scopeFilter } = useScopeFilter(explicitScope);
   const kv = useMemo(() => invokeNamespaceTool("keyvalue"), []);
@@ -42,14 +51,11 @@ export function KeyValuePanel({ scope: explicitScope }: NativePanelProps) {
     return () => window.clearTimeout(timer);
   }, [prefix]);
 
-  const { data, error, loading, refresh } = usePanelData(
-    async () =>
-      (await kv("list", committedPrefix ? { prefix: committedPrefix } : {})) as {
-        keys: string[];
-      },
-    committedPrefix
+  const { data: keys, error, loading, refresh } = usePanelData(
+    async () => listKeys(await kv("list", committedPrefix ? { prefix: committedPrefix } : {})),
+    committedPrefix,
   );
-  const keys = data?.keys ?? [];
+  const keyList = keys ?? [];
 
   const [detail, setDetail] = useState<Detail | null>(null);
   const [newKey, setNewKey] = useState("");
@@ -63,7 +69,7 @@ export function KeyValuePanel({ scope: explicitScope }: NativePanelProps) {
     () => () => {
       window.clearTimeout(flashTimer.current);
     },
-    []
+    [],
   );
 
   const selectedKey = detail?.kind === "view" ? detail.key : null;
@@ -183,14 +189,14 @@ export function KeyValuePanel({ scope: explicitScope }: NativePanelProps) {
               className="h-8 max-w-xs font-mono text-xs"
             />
             <span className="text-xs tabular-nums text-muted-foreground">
-              {keys.length} {keys.length === 1 ? "key" : "keys"}
+              {keyList.length} {keyList.length === 1 ? "key" : "keys"}
             </span>
             <Button size="sm" variant="outline" className="ml-auto h-8" onClick={openCreate}>
               <Plus className="mr-1 h-3.5 w-3.5" />
               New record
             </Button>
           </div>
-          {loading && !data ? (
+          {loading && !keys ? (
             <PanelLoading label="Loading records…" />
           ) : error ? (
             <PanelErrorWithRetry
@@ -198,7 +204,7 @@ export function KeyValuePanel({ scope: explicitScope }: NativePanelProps) {
               onRetry={refresh}
               retrying={loading}
             />
-          ) : keys.length === 0 && !committedPrefix && !detail ? (
+          ) : keyList.length === 0 && !committedPrefix && !detail ? (
             <PanelEmpty>
               Records that widgets and workflows save appear here. Create one with New
               record.
@@ -206,12 +212,12 @@ export function KeyValuePanel({ scope: explicitScope }: NativePanelProps) {
           ) : (
             <div className="flex min-h-0 flex-1 flex-col md:flex-row">
               <div className="max-h-56 shrink-0 overflow-y-auto border-b md:max-h-none md:w-64 md:border-b-0 md:border-r">
-                {keys.length === 0 ? (
+                {keyList.length === 0 ? (
                   <div className="p-3 text-xs text-muted-foreground">
                     No keys match this prefix.
                   </div>
                 ) : (
-                  keys.map((key) => (
+                  keyList.map((key) => (
                     <button
                       key={key}
                       onClick={() => setDetail({ kind: "view", key })}
