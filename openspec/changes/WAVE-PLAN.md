@@ -46,16 +46,17 @@ editor-consolidation (#84/#122, `@aprovan/editor@0.2.0`). Prod chat redeployed.
 - Corepack: `COREPACK_INTEGRITY_KEYS=0 COREPACK_ENABLE_DOWNLOAD_PROMPT=0` for pnpm.
 - Cross-repo: registry publish before aprovan pin (`tools-addressing` §4.1 → §4.3).
 
-## Wave 0 — in progress (no unmet deps; paths disjoint after Settled)
+## Wave 0 — in progress
 | Item | Status | Link |
 |------|--------|------|
-| tools-addressing §1 naming authority | **dispatched** | branch `iw8/tools-addressing-01-naming` |
+| tools-addressing §1 naming authority | **merged** | [#127](https://github.com/AprovanLabs/registry/pull/127) → `main` |
 | grant-enforcement §1 gate step 5 | **merged** | [#125](https://github.com/AprovanLabs/registry/pull/125) → `main` |
-| grant-enforcement §3 provision default | **dispatched** | worktree `registry-iw8-ge03` (rebase onto §1) |
+| grant-enforcement §3 provision default | **dispatched** | worktree `registry-iw8-ge03` |
 | graphql-schema-surface §1 ingest SDL | **dispatched** | worktree `registry-graphql-schema-ingest` |
-| platform-oauth-apps §3 pool limiter | **dispatched** | branch `iw8/platform-oauth-03-pool` (report present) |
+| platform-oauth-apps §3 pool limiter | **merged** | [#126](https://github.com/AprovanLabs/registry/pull/126) → `main` |
 
 Hard-order gate cleared for `registry-server-extraction` §9.4 (still wait for GE §3 per task 9.2).
+TA §1 unlocks Wave-1: TA §2, TA §3, TA §4a.
 
 ## Wave 1 — blocked on Wave 0 merges
 | Item | Status | Blocked by |

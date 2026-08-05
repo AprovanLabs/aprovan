@@ -46,17 +46,17 @@ secret, and a self-host boot is clean.
 
 > Depends-on: - | Touches: registry `packages/registry-server/src/dispatch/limits.ts`, `packages/registry-server/src/dispatch/__tests__/limits.test.ts` | Verify: `pnpm --filter @aprovan/registry-server test -- limits`
 
-- [ ] 3.1 Extend the limiter key with an optional `pool` dimension. Calls resolving to a
+- [x] 3.1 Extend the limiter key with an optional `pool` dimension. Calls resolving to a
       tenant-supplied app carry no pool and are limited per-tenant exactly as today.
-- [ ] 3.2 Implement the ceiling arithmetically: per-tenant quota = provider published
+- [x] 3.2 Implement the ceiling arithmetically: per-tenant quota = provider published
       limit ÷ current tenant count, recomputed on tenant-count change rather than per
       call.
-- [ ] 3.3 Emit a metric when a pool-scoped limit is hit, distinguishable from a
+- [x] 3.3 Emit a metric when a pool-scoped limit is hit, distinguishable from a
       tenant-scoped hit — this is the signal that leased buckets are needed.
-- [ ] 3.4 Document in the module docstring that the limiter is in-process and that the
+- [x] 3.4 Document in the module docstring that the limiter is in-process and that the
       pool ceiling is therefore only correct under the arithmetic scheme. The next reader
       must not assume it is distributed.
-- [ ] 3.5 Tests: two tenants on one platform app contend; a tenant on its own app does
+- [x] 3.5 Tests: two tenants on one platform app contend; a tenant on its own app does
       not; pool exhaustion returns `RateLimitExceededError` naming the pool.
 
 **Done when** one tenant cannot exhaust a shared upstream quota, and the reason the
