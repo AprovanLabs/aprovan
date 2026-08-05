@@ -7,16 +7,16 @@ Stream 3 depends on 1. Stream 5 depends on 2 and 4.
 
 > Depends-on: - | Touches: registry `packages/bundler/src/naming.ts`, `packages/bundler/src/naming.test.ts`, `packages/bundler/src/provider.ts` | Verify: `pnpm --filter @aprovan/utdk-bundler test`
 
-- [ ] 1.1 Add `globalAlias` to `ResolvedProviderName`, derived in
+- [x] 1.1 Add `globalAlias` to `ResolvedProviderName`, derived in
       `resolveProviderNameFromHostname`: segments joined camelCase, internal dashes
       removed (`google/drive` → `googleDrive`, `adyen/checkoutservice` →
       `adyenCheckoutservice`, `ably-io/platform` → `ablyIoPlatform`).
-- [ ] 1.2 Add `assertUniqueGlobalAliases(names)`; call it from `loadRegistryProviders`
+- [x] 1.2 Add `assertUniqueGlobalAliases(names)`; call it from `loadRegistryProviders`
       beside the existing `assertValidProviderName` pass. Comparison is
       case-insensitive.
-- [ ] 1.3 Assert every derived alias is a valid JS identifier — `/^[A-Za-z_$][\w$]*$/`.
+- [x] 1.3 Assert every derived alias is a valid JS identifier — `/^[A-Za-z_$][\w$]*$/`.
       A provider name that cannot produce one is a load error naming the provider.
-- [ ] 1.4 Tests: single-segment names alias to themselves unchanged; three-segment names;
+- [x] 1.4 Tests: single-segment names alias to themselves unchanged; three-segment names;
       names with leading digits (`api-` prefix path); a deliberate collision fails load
       with both offending provider names in the message.
 
