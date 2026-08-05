@@ -49,11 +49,13 @@ editor-consolidation (#84/#122, `@aprovan/editor@0.2.0`). Prod chat redeployed.
 ## Wave 0 — in progress (no unmet deps; paths disjoint after Settled)
 | Item | Status | Link |
 |------|--------|------|
-| tools-addressing §1 naming authority | **dispatched** | brief `tools-addressing/briefs/01-naming-authority.md` |
-| grant-enforcement §1 gate step 5 | **dispatched** | brief `grant-enforcement/briefs/01-gate-zero-config.md` |
-| grant-enforcement §3 provision default | **dispatched** | brief `grant-enforcement/briefs/03-provision-default.md` |
-| graphql-schema-surface §1 ingest SDL | **dispatched** | brief `graphql-schema-surface/briefs/01-ingest-sdl.md` |
-| platform-oauth-apps §3 pool limiter | **dispatched** | brief `platform-oauth-apps/briefs/03-pool-limiter.md` |
+| tools-addressing §1 naming authority | **dispatched** | branch `iw8/tools-addressing-01-naming` |
+| grant-enforcement §1 gate step 5 | **merged** | [#125](https://github.com/AprovanLabs/registry/pull/125) → `main` |
+| grant-enforcement §3 provision default | **dispatched** | worktree `registry-iw8-ge03` (rebase onto §1) |
+| graphql-schema-surface §1 ingest SDL | **dispatched** | worktree `registry-graphql-schema-ingest` |
+| platform-oauth-apps §3 pool limiter | **dispatched** | branch `iw8/platform-oauth-03-pool` (report present) |
+
+Hard-order gate cleared for `registry-server-extraction` §9.4 (still wait for GE §3 per task 9.2).
 
 ## Wave 1 — blocked on Wave 0 merges
 | Item | Status | Blocked by |

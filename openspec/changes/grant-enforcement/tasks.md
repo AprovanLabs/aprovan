@@ -8,17 +8,17 @@ Stream 5 depends on 1 and 4. **Stream 1 gates section 9 of `registry-server-extr
 
 > Depends-on: - | Touches: registry `packages/registry-server/src/profiles/resolve.ts`, `packages/registry-server/src/profiles/__tests__/resolve.test.ts` | Verify: `pnpm --filter @aprovan/registry-server test -- profiles`
 
-- [ ] 1.1 Enter step 5 only when `deps.authMode === "none"`. Under `oidc` / `api-key`, a
+- [x] 1.1 Enter step 5 only when `deps.authMode === "none"`. Under `oidc` / `api-key`, a
       missing `default` row is a 403 that names the namespace and says a workspace admin
       must grant a profile.
-- [ ] 1.2 Leave steps 1–4 and 6 untouched. Step 6 (named miss → 404 listing what exists)
+- [x] 1.2 Leave steps 1–4 and 6 untouched. Step 6 (named miss → 404 listing what exists)
       is correct and must keep its message.
-- [ ] 1.3 Update the module docstring: step 5 is no longer "the zero-config path", it is
+- [x] 1.3 Update the module docstring: step 5 is no longer "the zero-config path", it is
       "the ungoverned-mode path".
-- [ ] 1.4 Tests: governed tenant + connected credential + no row → 403, not a credential;
+- [x] 1.4 Tests: governed tenant + connected credential + no row → 403, not a credential;
       `authMode: "none"` + same state → resolves as before; admin under governed mode
       still passes via the existing `ctx.role === "admin"` branch.
-- [ ] 1.5 Test the MCP consequence directly: `permittedTools` now hides a namespace that
+- [x] 1.5 Test the MCP consequence directly: `permittedTools` now hides a namespace that
       has a credential but no granted profile. This is the visibility change section 9
       of `registry-server-extraction` must snapshot.
 
