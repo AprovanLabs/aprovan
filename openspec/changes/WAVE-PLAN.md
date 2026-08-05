@@ -104,8 +104,19 @@ TA §1 unlocks Wave-1: TA §2, TA §3, TA §4a.
 |------|--------|------|
 | platform-oauth-apps §4 default quota | **merged** | [#147](https://github.com/AprovanLabs/registry/pull/147) |
 | platform-oauth-apps §5.1 GitHub proving | **merged** | [#148](https://github.com/AprovanLabs/registry/pull/148) — `github` platformApp; registry-server **0.2.5**; 5.3 remaining providers incremental |
-| platform-oauth-apps §5 onboard runbook | **merged (partial)** | [#142](https://github.com/AprovanLabs/registry/pull/142) — 5.2/5.4 done; 5.1/5.3 wait §4 merge (OQ resolved in decisions.md) |
+| platform-oauth-apps §5 onboard runbook | **merged** | [#142](https://github.com/AprovanLabs/registry/pull/142) |
+| platform-oauth-apps §5.3 Slack flag | **merged** | [#149](https://github.com/AprovanLabs/registry/pull/149) — further providers remain incremental |
 
 ## Later
 grant-enforcement §4–§5; tools-addressing §5–§6; graphql §3–§5; platform-oauth §4–§5;
 registry-server-extraction §9 (after GE §1).
+
+## IW-8 closeout
+
+All five in-scope changes have landed on `main`. Residual (not blocking):
+
+- **POA 5.3** — more `platformApp` flags one provider at a time (Slack done; Google deferred).
+- **GQL 5.4** — disk lint for versioned SDL; blocked on versioned ingest.
+- **Hosted ops** — load `PLATFORM_OAUTH_{GITHUB,SLACK}_CLIENT_*` and deploy `@aprovan/registry-server@0.2.5`.
+
+Product host pin: `@aprovan/registry-server@^0.2.5`.
