@@ -155,3 +155,5 @@ hardcopy.yaml
 
 # Local dual-worktree link to registry contracts (stream 4 verify)
 packages/contracts
+
+.DS_Store
