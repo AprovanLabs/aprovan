@@ -27,3 +27,45 @@ editor-consolidation (#84/#122, `@aprovan/editor@0.2.0`). Prod chat redeployed.
   unify `@utdk/vcs` Git-hosting vs workspace commit ops; full example reseed pass.
 
 **IW-7 workstreams complete.**
+
+---
+
+# Wave plan — improve-wave IW-8
+
+## Settled
+- **Hard order:** `grant-enforcement` §1 before `registry-server-extraction` §9.4
+  (`permittedTools` visibility).
+- **Conflict matrix override:** `grant-enforcement` §3 and `platform-oauth-apps` §1 both
+  touch `registry packages/registry-server/src/credentials/service.ts` — serialize
+  **GE §3 → POA §1** (matrix omitted this; do not run in parallel).
+- `tools-scan.ts`: `tools-addressing` §4 before `grant-enforcement` §2.
+- `imports.ts`: TA §3 → GE §2 → TA §6.
+- `mcp/**`: GE §5 before GQL §3.
+- `profiles/resolve.ts`: GE §1 before GQL §5.
+- `data/registry.json`: additive separate commits + rebase (GQL §5, POA §2/§5).
+- Corepack: `COREPACK_INTEGRITY_KEYS=0 COREPACK_ENABLE_DOWNLOAD_PROMPT=0` for pnpm.
+- Cross-repo: registry publish before aprovan pin (`tools-addressing` §4.1 → §4.3).
+
+## Wave 0 — in progress (no unmet deps; paths disjoint after Settled)
+| Item | Status | Link |
+|------|--------|------|
+| tools-addressing §1 naming authority | **dispatched** | brief `tools-addressing/briefs/01-naming-authority.md` |
+| grant-enforcement §1 gate step 5 | **dispatched** | brief `grant-enforcement/briefs/01-gate-zero-config.md` |
+| grant-enforcement §3 provision default | **dispatched** | brief `grant-enforcement/briefs/03-provision-default.md` |
+| graphql-schema-surface §1 ingest SDL | **dispatched** | brief `graphql-schema-surface/briefs/01-ingest-sdl.md` |
+| platform-oauth-apps §3 pool limiter | **dispatched** | brief `platform-oauth-apps/briefs/03-pool-limiter.md` |
+
+## Wave 1 — blocked on Wave 0 merges
+| Item | Status | Blocked by |
+|------|--------|------------|
+| tools-addressing §2 catalog alias | pending | TA §1 |
+| tools-addressing §3 tools. bind | pending | TA §1 |
+| tools-addressing §4 scanner (registry half) | pending | — (after W0; before GE §2) |
+| platform-oauth-apps §1 resolution | pending | GE §3 |
+| platform-oauth-apps §2 flag/secrets | pending | — (after W0; serialize registry.json) |
+| grant-enforcement §2 bracket error | pending | TA §4 |
+| graphql-schema-surface §2 type index | pending | GQL §1 |
+
+## Later
+grant-enforcement §4–§5; tools-addressing §5–§6; graphql §3–§5; platform-oauth §4–§5;
+registry-server-extraction §9 (after GE §1).
