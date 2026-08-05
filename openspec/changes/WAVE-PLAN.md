@@ -52,7 +52,7 @@ editor-consolidation (#84/#122, `@aprovan/editor@0.2.0`). Prod chat redeployed.
 | tools-addressing §1 naming authority | **merged** | [#127](https://github.com/AprovanLabs/registry/pull/127) → `main` |
 | grant-enforcement §1 gate step 5 | **merged** | [#125](https://github.com/AprovanLabs/registry/pull/125) → `main` |
 | grant-enforcement §3 provision default | **dispatched** | worktree `registry-iw8-ge03` |
-| graphql-schema-surface §1 ingest SDL | **dispatched** | worktree `registry-graphql-schema-ingest` |
+| graphql-schema-surface §1 ingest SDL | **merged** | [#132](https://github.com/AprovanLabs/registry/pull/132) Linear schema shipped |
 | platform-oauth-apps §3 pool limiter | **merged** | [#126](https://github.com/AprovanLabs/registry/pull/126) → `main` |
 
 Hard-order gate cleared for `registry-server-extraction` §9.4 (still wait for GE §3 per task 9.2).
@@ -75,7 +75,10 @@ TA §1 unlocks Wave-1: TA §2, TA §3, TA §4a.
 | Item | Status | Link |
 |------|--------|------|
 | grant-enforcement §2 bracket error | **merged** | [#133](https://github.com/AprovanLabs/registry/pull/133) `@utdk/remote@0.1.5` + aprovan [#104](https://github.com/AprovanLabs/aprovan/pull/104) chip removed |
-| tools-addressing §5 lazy types | **dispatched** | worktree `aprovan-iw8-ta05` |
+| tools-addressing §5 lazy types | **merged** | [#103](https://github.com/AprovanLabs/aprovan/pull/103) |
+
+## Settled (mid-wave addendum)
+- tools-addressing §1–§6 **complete** on main.
 
 ## Later
 grant-enforcement §4–§5; tools-addressing §5–§6; graphql §3–§5; platform-oauth §4–§5;

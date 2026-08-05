@@ -7,14 +7,14 @@ and 4 depend on 2 and touch disjoint paths, so they run in parallel once 2 lands
 
 > Depends-on: - | Touches: registry `packages/bundler/src/phases/**`, `packages/bundler/src/openapi.ts`, `packages/utdk/<provider>/schema.graphql` | Verify: `pnpm --filter @aprovan/utdk-bundler test`
 
-- [ ] 1.1 Add an SDL fetch/ingest step: a provider entry may declare a schema source
+- [x] 1.1 Add an SDL fetch/ingest step: a provider entry may declare a schema source
       (URL or repo path) fetched alongside its OpenAPI spec, with the same
       `provenance.json` treatment — hash, `fetchedAt`, `generation`.
-- [ ] 1.2 Write `schema.graphql` into the provider package. Validate it parses as SDL at
+- [x] 1.2 Write `schema.graphql` into the provider package. Validate it parses as SDL at
       bundle time; a malformed schema fails the build rather than shipping.
-- [ ] 1.3 Seed with Linear, whose passthrough operation already exists and whose schema
+- [x] 1.3 Seed with Linear, whose passthrough operation already exists and whose schema
       is public and stable.
-- [ ] 1.4 Assert a provider declaring a schema source also declares a GraphQL operation,
+- [x] 1.4 Assert a provider declaring a schema source also declares a GraphQL operation,
       and vice versa — a schema with no way to execute it is a packaging bug.
 
 **Done when** `packages/utdk/linear/schema.graphql` ships with provenance, and a
