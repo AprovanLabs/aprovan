@@ -210,7 +210,7 @@ them, per `tech-plan.md`'s Rollout section.
       client/web/src/features/**/*.ts client/web/src/features/**/*.tsx
       client/web/src/contexts/*.tsx`). Satisfies `specs/chat-app-structure` Requirement
       "Extracted feature modules stay small".
-- [ ] 11.5 Run the full manual smoke pass against every flow in `ux.md`'s Flows and Screens
+- [ ] 11.5 **OWNER-BLOCKED** Run the full manual smoke pass against every flow in `ux.md`'s Flows and Screens
       & States sections (send message + widget render, self-heal trigger, tab open across
       all three namespaces, full session lifecycle, edit modal open/save/discard,
       notifications bell widget render). This is the acceptance gate for "zero user-visible
