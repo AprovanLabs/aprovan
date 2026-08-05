@@ -74,7 +74,7 @@ TA §1 unlocks Wave-1: TA §2, TA §3, TA §4a.
 ## Wave 1b — unlocked by TA §4
 | Item | Status | Link |
 |------|--------|------|
-| grant-enforcement §2 bracket error | **dispatched** | worktree `registry-iw8-ge02` |
+| grant-enforcement §2 bracket error | **merged** | [#133](https://github.com/AprovanLabs/registry/pull/133) `@utdk/remote@0.1.5` + aprovan [#104](https://github.com/AprovanLabs/aprovan/pull/104) chip removed |
 | tools-addressing §5 lazy types | **dispatched** | worktree `aprovan-iw8-ta05` |
 
 ## Later
