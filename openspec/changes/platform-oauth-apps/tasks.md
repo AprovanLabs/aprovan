@@ -66,12 +66,12 @@ current scheme is sufficient is written down next to the code.
 
 > Depends-on: 1, 3 | Touches: registry `packages/registry-server/src/config/types.ts`, `packages/registry-server/src/config/env.ts` | Verify: `pnpm --filter @aprovan/registry-server test -- config`
 
-- [ ] 4.1 Resolve the PRD's open question: pick the default per-tenant rps and 24h budget
+- [x] 4.1 Resolve the PRD's open question: pick the default per-tenant rps and 24h budget
       against a platform app, and record the reasoning in this change. It must be decided
       **before** the first platform app ships.
-- [ ] 4.2 Make platform-app defaults distinct from BYO defaults — a tenant on its own app
+- [x] 4.2 Make platform-app defaults distinct from BYO defaults — a tenant on its own app
       should not inherit a ceiling that exists to protect a shared pool.
-- [ ] 4.3 Test that a tenant switching from platform to BYO picks up the wider limit
+- [x] 4.3 Test that a tenant switching from platform to BYO picks up the wider limit
       without an admin action.
 
 **Done when** the shipped defaults are deliberate and documented rather than inherited.
