@@ -64,13 +64,13 @@ a failed write leaves no half-state.
 
 > Depends-on: 1 | Touches: registry `packages/registry-server/src/config/types.ts`, `packages/registry-server/src/dispatch/**` | Verify: `pnpm --filter @aprovan/registry-server test -- dispatch`
 
-- [ ] 4.1 Add `narrowedTo?: string[]` to `CallContext`, holding canonical provider names.
-- [ ] 4.2 Validate at construction that it is a subset of the principal's grant; a
+- [x] 4.1 Add `narrowedTo?: string[]` to `CallContext`, holding canonical provider names.
+- [x] 4.2 Validate at construction that it is a subset of the principal's grant; a
       superset is a 400 naming the offending entries, never a silent intersection.
-- [ ] 4.3 Enforce in the same predicate as the grant check, so there is still one gate.
-- [ ] 4.4 Record the narrowing in the audit span, distinct from the principal's full
+- [x] 4.3 Enforce in the same predicate as the grant check, so there is still one gate.
+- [x] 4.4 Record the narrowing in the audit span, distinct from the principal's full
       grant (PRD open question — assumed yes).
-- [ ] 4.5 Tests: narrowed run cannot reach a granted-but-excluded namespace; a superset
+- [x] 4.5 Tests: narrowed run cannot reach a granted-but-excluded namespace; a superset
       request is rejected rather than clamped.
 
 **Done when** a caller can voluntarily reduce blast radius and cannot increase it.

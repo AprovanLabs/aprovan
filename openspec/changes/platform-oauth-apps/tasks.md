@@ -8,16 +8,16 @@ time.
 
 > Depends-on: - | Touches: registry `packages/registry-server/src/credentials/service.ts`, `packages/registry-server/src/credentials/oauth.ts`, `packages/registry-server/src/credentials/__tests__/**` | Verify: `pnpm --filter @aprovan/registry-server test -- credentials`
 
-- [ ] 1.1 Resolve OAuth client credentials as: tenant-supplied `clientId`/`clientSecret`
+- [x] 1.1 Resolve OAuth client credentials as: tenant-supplied `clientId`/`clientSecret`
       if present, else the platform app for that provider, else a 400 that tells the user
       to supply their own app and names the provider.
-- [ ] 1.2 Return `origin: "tenant" | "platform"` from resolution; it is audited and it
+- [x] 1.2 Return `origin: "tenant" | "platform"` from resolution; it is audited and it
       drives the pool-limit key in stream 3.
-- [ ] 1.3 Apply on both OAuth paths — `oauth2_authcode` exchange and `oauth2_client`
+- [x] 1.3 Apply on both OAuth paths — `oauth2_authcode` exchange and `oauth2_client`
       grant — since they resolve client credentials at different times.
-- [ ] 1.4 Never return a platform secret from any tenant-facing credential read. Add a
+- [x] 1.4 Never return a platform secret from any tenant-facing credential read. Add a
       test that asserts the redaction directly rather than trusting the shape.
-- [ ] 1.5 Tests: tenant override wins over an available platform app; no platform app and
+- [x] 1.5 Tests: tenant override wins over an available platform app; no platform app and
       no override produces the actionable 400; `origin` is correct in all three cases.
 
 **Done when** a tenant can connect a platform-app provider with no client secret, and can

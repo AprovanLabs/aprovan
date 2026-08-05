@@ -84,8 +84,13 @@ TA §1 unlocks Wave-1: TA §2, TA §3, TA §4a.
 | Item | Status | Link |
 |------|--------|------|
 | platform-oauth-apps §1 resolution | **dispatched** | worktree `registry-iw8-poa01` |
-| grant-enforcement §4 run-scoped narrowing | **dispatched** | worktree `registry-iw8-ge04` |
+| grant-enforcement §4 run-scoped narrowing | **merged** | [#135](https://github.com/AprovanLabs/registry/pull/135) |
 | registry-server-extraction §9 MCP closeout | **dispatched** | worktree `aprovan-iw8-rse09` |
+
+## Wave 3b — unlocked by GE §4
+| Item | Status | Link |
+|------|--------|------|
+| grant-enforcement §5 MCP sandbox tool | **dispatched** | worktree `registry-iw8-ge05` |
 
 ## Later
 grant-enforcement §4–§5; tools-addressing §5–§6; graphql §3–§5; platform-oauth §4–§5;
