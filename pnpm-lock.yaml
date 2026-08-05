@@ -396,6 +396,9 @@ importers:
       '@typescript/vfs':
         specifier: ^1.6.4
         version: 1.6.4(typescript@5.9.3)
+      '@utdk/remote':
+        specifier: 0.1.4
+        version: 0.1.4
       '@valtown/codemirror-ts':
         specifier: ^2.3.1
         version: 2.3.1(@codemirror/autocomplete@6.20.3)(@codemirror/lint@6.9.7)(@codemirror/state@6.7.1)(@codemirror/view@6.43.6)
@@ -885,10 +888,16 @@ packages:
   '@aws-sdk/core@3.977.4':
     resolution: {integrity: sha512-CEkcQlMOQJCvul60U7wdAOACjtdgFWDsfJI+6wUOGdhGNV2lGbuJpi/R50QLpFG3Tp+sQxa/RmzC3X7KHbhuTA==}
     engines: {node: '>=20.0.0'}
+    deprecated: |-
+      Deprecated due to Document number parsing bug in JSON, see
+        https://github.com/aws/aws-sdk-js-v3/issues/8246. Newer version available.
 
   '@aws-sdk/core@3.977.5':
     resolution: {integrity: sha512-O5otOc1c6UZh5HsHAaPdYBcUUR9HL6mtnKqvc8nxN/CKDGUBUpsdh0q8K04Uz/dd1i0TaGyIQuQNqoO7+ad2TQ==}
     engines: {node: '>=20.0.0'}
+    deprecated: |-
+      Deprecated due to Document number parsing bug in JSON, see
+        https://github.com/aws/aws-sdk-js-v3/issues/8246. Newer version available.
 
   '@aws-sdk/credential-provider-env@3.972.57':
     resolution: {integrity: sha512-1RfJaF7SW1TOnvNGU7kaYjwUf5H3sfm+synGH1bHhRlqcnxCt3szebH3dmKEyY4tuGcbQ6ffzUT89cRitBV8OQ==}
@@ -4706,6 +4715,10 @@ packages:
 
   '@utdk/remote@0.1.1':
     resolution: {integrity: sha512-KGTIFoGENtVQL+PVu7s3AqEb0U4Ad1/cX9rrszsONcouGIYidmi+VadjfjSTPTW+ZiNcIY+QPJyZBpP6SCyTBA==}
+    engines: {node: '>=20.0.0'}
+
+  '@utdk/remote@0.1.4':
+    resolution: {integrity: sha512-IQ/a12bu7gBJEjjAB058YzpR41GwIQ+4MveDSnqyyPV1eSVtOfTvotFFcYoyKCySoitoS9I7kLEX6qJOLkIBJQ==}
     engines: {node: '>=20.0.0'}
 
   '@utdk/sandbox@0.2.0':
@@ -13295,6 +13308,8 @@ snapshots:
 
   '@utdk/remote@0.1.1': {}
 
+  '@utdk/remote@0.1.4': {}
+
   '@utdk/sandbox@0.2.0': {}
 
   '@utdk/sandbox@0.2.1': {}
@@ -13374,6 +13389,14 @@ snapshots:
       '@vitest/utils': 3.2.7
       chai: 5.3.3
       tinyrainbow: 2.0.0
+
+  '@vitest/mocker@2.1.5(vite@5.4.21(@types/node@22.19.11)(lightningcss@1.32.0)(terser@5.49.0))':
+    dependencies:
+      '@vitest/spy': 2.1.5
+      estree-walker: 3.0.3
+      magic-string: 0.30.21
+    optionalDependencies:
+      vite: 5.4.21(@types/node@22.19.11)(lightningcss@1.32.0)(terser@5.49.0)
 
   '@vitest/mocker@2.1.5(vite@5.4.21(@types/node@25.9.5)(lightningcss@1.32.0)(terser@5.49.0))':
     dependencies:
@@ -17121,7 +17144,7 @@ snapshots:
   vitest@2.1.5(@types/node@22.19.11)(happy-dom@20.11.1)(jsdom@30.0.1)(lightningcss@1.32.0)(terser@5.49.0):
     dependencies:
       '@vitest/expect': 2.1.5
-      '@vitest/mocker': 2.1.5(vite@5.4.21(@types/node@25.9.5)(lightningcss@1.32.0)(terser@5.49.0))
+      '@vitest/mocker': 2.1.5(vite@5.4.21(@types/node@22.19.11)(lightningcss@1.32.0)(terser@5.49.0))
       '@vitest/pretty-format': 2.1.9
       '@vitest/runner': 2.1.5
       '@vitest/snapshot': 2.1.5
