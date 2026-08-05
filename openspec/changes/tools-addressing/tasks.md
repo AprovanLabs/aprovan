@@ -76,11 +76,11 @@ dispatches under its canonical name.
 
 > Depends-on: 2, 4 | Touches: aprovan `packages/editor/src/ts/**`, `packages/editor/src/ts/__tests__/**` | Verify: `pnpm --filter @aprovan/editor test -- type-environment`
 
-- [ ] 5.1 Key `.d.ts` fetches by scanned alias, resolved to canonical name through the
+- [x] 5.1 Key `.d.ts` fetches by scanned alias, resolved to canonical name through the
       catalog from 2.1. Do not eagerly load the catalog's type surface.
-- [ ] 5.2 Treat a scan miss as a cache miss, not an error — the scan is a hint (D3), and
+- [x] 5.2 Treat a scan miss as a cache miss, not an error — the scan is a hint (D3), and
       dynamic access legitimately produces incomplete lists.
-- [ ] 5.3 Test that a script touching two namespaces fetches exactly two type bundles.
+- [x] 5.3 Test that a script touching two namespaces fetches exactly two type bundles.
 
 **Done when** opening a script fetches types only for the namespaces it references, and
 an unresolvable reference degrades to no types rather than a broken editor.
