@@ -4,6 +4,9 @@
  * branding, supported auth methods, and provenance (the vendor's own domain
  * and spec, never an aggregator). Purely presentational so both the registry
  * playground and patchwork widgets can feed it their own catalog data.
+ *
+ * Dynamic `tools[expr]` access is a parse error in `@utdk/remote` (grant-
+ * enforcement §2); this panel no longer surfaces an "incomplete list" chip.
  */
 
 import * as React from "react";
@@ -36,8 +39,6 @@ export interface ProviderCatalogInfo {
 
 export interface DependencyPanelProps {
   dependencies: ScriptDependency[];
-  /** True when dynamic `tools[expr]` access makes the list incomplete. */
-  unresolved?: boolean;
   /** Lookup by provider id; missing entries render as "unregistered". */
   catalog?: Record<string, ProviderCatalogInfo>;
   /** Base URL for provider deep links (e.g. `/registry`). */
@@ -64,12 +65,11 @@ function ProviderIcon({ info, provider }: { info?: ProviderCatalogInfo; provider
 
 export function DependencyPanel({
   dependencies,
-  unresolved = false,
   catalog,
   registryBaseUrl = "",
   className,
 }: DependencyPanelProps): React.ReactElement {
-  if (dependencies.length === 0 && !unresolved) {
+  if (dependencies.length === 0) {
     return (
       <p className={`text-xs text-muted-foreground ${className ?? ""}`}>
         No tools.* accesses yet — call a namespace on the global tools root.
@@ -79,75 +79,68 @@ export function DependencyPanel({
 
   return (
     <div className={`flex flex-col gap-2 ${className ?? ""}`}>
-      {unresolved && (
-        <p className="text-xs text-amber-700 dark:text-amber-400">
-          Dependency list may be incomplete — dynamic tools[…] access detected.
-        </p>
-      )}
-      {dependencies.length === 0 ? null : (
-    <ul className="flex flex-col divide-y rounded-lg border">
-      {dependencies.map((dependency) => {
-        const info = catalog?.[dependency.provider];
-        const namespace = dependency.path
-          ? `${dependency.provider}.${dependency.path}`
-          : dependency.provider;
-        return (
-          <li
-            className="flex flex-wrap items-center gap-2 px-3 py-2"
-            key={`${dependency.identifier}:${dependency.specifier}`}
-          >
-            <ProviderIcon info={info} provider={dependency.provider} />
-            <span className="min-w-0 font-mono text-xs">
-              <span className="font-medium">{dependency.identifier}</span>
-              <span className="text-muted-foreground"> → </span>
-              {registryBaseUrl ? (
-                <a
-                  className="underline-offset-2 hover:underline"
-                  href={`${registryBaseUrl}/packages/${dependency.provider}`}
-                >
-                  {namespace}
-                </a>
-              ) : (
-                namespace
-              )}
-            </span>
-            <span className="ml-auto flex items-center gap-1.5">
-              {info?.authMethods?.map((method) => (
-                <span
-                  className="rounded border px-1.5 py-0.5 font-mono text-[0.6rem] text-muted-foreground"
-                  key={method}
-                >
-                  {method}
-                </span>
-              ))}
-              {info?.typed && (
-                <span className="rounded border border-syntax-type/40 px-1.5 py-0.5 font-mono text-[0.6rem] text-syntax-type">
-                  typed
-                </span>
-              )}
-              {info ? (
-                info.originDomain && (
+      <ul className="flex flex-col divide-y rounded-lg border">
+        {dependencies.map((dependency) => {
+          const info = catalog?.[dependency.provider];
+          const namespace = dependency.path
+            ? `${dependency.provider}.${dependency.path}`
+            : dependency.provider;
+          return (
+            <li
+              className="flex flex-wrap items-center gap-2 px-3 py-2"
+              key={`${dependency.identifier}:${dependency.specifier}`}
+            >
+              <ProviderIcon info={info} provider={dependency.provider} />
+              <span className="min-w-0 font-mono text-xs">
+                <span className="font-medium">{dependency.identifier}</span>
+                <span className="text-muted-foreground"> → </span>
+                {registryBaseUrl ? (
                   <a
-                    className="text-[0.65rem] text-muted-foreground underline-offset-2 hover:underline"
-                    href={info.originSpecUrl ?? info.site ?? `https://${info.originDomain}`}
-                    rel="noreferrer"
-                    target="_blank"
-                    title={`Spec source: ${info.originSpecUrl ?? info.originDomain}`}
+                    className="underline-offset-2 hover:underline"
+                    href={`${registryBaseUrl}/packages/${dependency.provider}`}
                   >
-                    {info.originDomain}
+                    {namespace}
                   </a>
-                )
-              ) : (
-                <span className="text-[0.65rem] text-muted-foreground/70">
-                  unregistered
-                </span>
-              )}
-            </span>
-          </li>
-        );
-      })}
-    </ul>
-      )}
+                ) : (
+                  namespace
+                )}
+              </span>
+              <span className="ml-auto flex items-center gap-1.5">
+                {info?.authMethods?.map((method) => (
+                  <span
+                    className="rounded border px-1.5 py-0.5 font-mono text-[0.6rem] text-muted-foreground"
+                    key={method}
+                  >
+                    {method}
+                  </span>
+                ))}
+                {info?.typed && (
+                  <span className="rounded border border-syntax-type/40 px-1.5 py-0.5 font-mono text-[0.6rem] text-syntax-type">
+                    typed
+                  </span>
+                )}
+                {info ? (
+                  info.originDomain && (
+                    <a
+                      className="text-[0.65rem] text-muted-foreground underline-offset-2 hover:underline"
+                      href={info.originSpecUrl ?? info.site ?? `https://${info.originDomain}`}
+                      rel="noreferrer"
+                      target="_blank"
+                      title={`Spec source: ${info.originSpecUrl ?? info.originDomain}`}
+                    >
+                      {info.originDomain}
+                    </a>
+                  )
+                ) : (
+                  <span className="text-[0.65rem] text-muted-foreground/70">
+                    unregistered
+                  </span>
+                )}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }
