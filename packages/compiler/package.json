@@ -1,6 +1,6 @@
 {
   "name": "@aprovan/patchwork",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "license": "MIT",
   "description": "Patchwork compiler - JSX→ESM compilation, image loading, DOM mounting",
   "type": "module",
