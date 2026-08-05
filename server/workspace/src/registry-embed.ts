@@ -6,6 +6,7 @@
 
 import { AsyncLocalStorage } from "node:async_hooks";
 import {
+  createMcpHandler,
   createRegistryServer,
   defaultCatalog,
   ProviderExecutor,
@@ -14,9 +15,11 @@ import {
   type ServiceContext as RegistryServiceContext,
 } from "@aprovan/registry-server";
 import { dispatchNativeAgentOp } from "./agents/runner.js";
+import { workspaceMcpExtensions } from "./mcp/extensions.js";
 import { dispatchAprovanNativeOp } from "./native-dispatch.js";
 import { getExecutor } from "./isolate.js";
 import { getAuthMode } from "./middleware/auth.js";
+import type { Principal } from "./middleware/auth.js";
 import { getRegistryStorage } from "./registry-storage.js";
 import {
   PLATFORM_PLUGIN_NAMES,
@@ -27,6 +30,7 @@ import { ensureTenantForWorkspace, tenantIdForWorkspace } from "./tenant-registr
 import type { ServiceContext } from "./service-kernel.js";
 
 let _server: Promise<RegistryServer> | undefined;
+let _mcpHandler: ((ctx: CallContext, request: Request) => Promise<Response>) | undefined;
 
 /**
  * Product ServiceContext carried across `server.dispatch` → compatDispatch.
@@ -77,6 +81,7 @@ async function bootRegistryServer(): Promise<RegistryServer> {
     catalog: defaultCatalog(),
     nativeServices,
     executorInstance: embedExecutor,
+    mcp: { extensions: workspaceMcpExtensions },
     ...(authMode === "none" ? { allowInsecure: true } : {}),
     auth:
       authMode === "none"
@@ -154,9 +159,63 @@ async function bootRegistryServer(): Promise<RegistryServer> {
 export async function resetRegistryServer(): Promise<void> {
   const pending = _server;
   _server = undefined;
+  _mcpHandler = undefined;
   if (pending) {
     await pending.then((s) => s.close()).catch(() => undefined);
   }
+}
+
+// ---------------------------------------------------------------------------
+// MCP surface (registry-server-extraction §9.4): the package's
+// `createMcpHandler` bound to THIS embed's dispatcher/resolveDeps, with the
+// product-plane tools/prompts/resources re-attached via §9.3's extensions.
+// Replaces the old parallel `mcp/server.ts` assembly (its own
+// `buildMcpServer`/`permittedTools`/`makeExecute`) — dispatch now runs
+// through the one pipeline (profiles, grants, limits, audit, attribution)
+// instead of the product's own permission-store check.
+// ---------------------------------------------------------------------------
+
+async function getMcpHandler(): Promise<(ctx: CallContext, request: Request) => Promise<Response>> {
+  if (_mcpHandler) return _mcpHandler;
+  const server = await getRegistryServer();
+  _mcpHandler = createMcpHandler({
+    dispatcher: server.dispatcher,
+    resolveDeps: server.resolveDeps,
+    extensions: workspaceMcpExtensions,
+    serverName: "@aprovan/workspace",
+  });
+  return _mcpHandler;
+}
+
+/**
+ * Narrow a workspace membership role to the registry's closed role set.
+ * `Principal.role` is `string` (identity-store rows aren't schema-constrained);
+ * fail closed rather than let an unrecognized role silently become "member"
+ * (undervisible) or "admin" (overprivileged) in `resolveProfile`'s grant check.
+ */
+function narrowRole(role: string): "admin" | "member" {
+  if (role === "admin" || role === "member") return role;
+  throw new Error(`Unknown principal role "${role}": expected "admin" or "member"`);
+}
+
+/** Build a registry CallContext from an authenticated product Principal (MCP surface). */
+export function callContextFromPrincipal(
+  principal: Principal,
+  source: CallContext["source"],
+): CallContext {
+  return {
+    tenantId: tenantIdForWorkspace(principal.workspaceId),
+    principal: principal.sub,
+    role: narrowRole(principal.role),
+    groupIds: principal.groupIds,
+    source,
+  };
+}
+
+/** Handle one MCP streamable-HTTP request for an authenticated principal. */
+export async function handleMcpRequest(principal: Principal, request: Request): Promise<Response> {
+  const handler = await getMcpHandler();
+  return handler(callContextFromPrincipal(principal, { type: "mcp" }), request);
 }
 
 /** Build a registry CallContext from a product ServiceContext. */

@@ -8,7 +8,7 @@ import {
   TELEMETRY_TOOLS,
   TELEMETRY_TOOL_NAMES,
   handleTelemetryTool,
-} from "../src/mcp/server.js";
+} from "../src/mcp/telemetry-tools.js";
 import { recordTelemetry } from "../src/telemetry/service.js";
 import type { Principal } from "../src/middleware/auth.js";
 
