@@ -55,6 +55,8 @@ server instances double whatever ceiling was intended.
 
 ## Open Questions
 
-- What is the default per-tenant rps against a platform app? Must be chosen **before**
-  the first platform app ships — loosening a limit is easy, tightening one people have
-  built against is not.
+- ~~What is the default per-tenant rps against a platform app?~~ **Resolved 2026-08-05** —
+  see [decisions.md](./decisions.md) and tech-plan D5. Defaults (platform path only):
+  **5 rps** (burst 10), **10 000 requests / 24h** per tenant; published pool ceiling
+  **50 rps**. BYO stays wider (no inherited platform ceiling). Env overrides allowed;
+  loosening later is fine, tightening is not the default posture.

@@ -102,7 +102,8 @@ TA §1 unlocks Wave-1: TA §2, TA §3, TA §4a.
 ## Wave 3d — unlocked by POA §2
 | Item | Status | Link |
 |------|--------|------|
-| platform-oauth-apps §5 onboard runbook | **merged (partial)** | [#142](https://github.com/AprovanLabs/registry/pull/142) — 5.2/5.4 done; 5.1/5.3 blocked on §4.1 OQ |
+| platform-oauth-apps §4 default quota | **dispatched** | worktree `registry-iw8-poa04` — defaults in `decisions.md` (5 rps / 10k day / pool 50) |
+| platform-oauth-apps §5 onboard runbook | **merged (partial)** | [#142](https://github.com/AprovanLabs/registry/pull/142) — 5.2/5.4 done; 5.1/5.3 wait §4 merge (OQ resolved in decisions.md) |
 
 ## Later
 grant-enforcement §4–§5; tools-addressing §5–§6; graphql §3–§5; platform-oauth §4–§5;

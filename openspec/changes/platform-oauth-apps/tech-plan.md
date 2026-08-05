@@ -90,3 +90,35 @@ enforce(key: { tenant, provider, principal, pool?: string }, limits?: ProfileLim
 
 `origin` is what makes the limiter correct: only `"platform"` calls contend for the
 shared ceiling.
+
+## D5 — Platform quota defaults (resolved open question)
+
+Shipped defaults apply **only** when `OAuthClientResolution.origin === "platform"`.
+BYO (`origin: "tenant"`) must not inherit them.
+
+| Knob | Default | Env override |
+|---|---|---|
+| Per-tenant rps | **5** | `REGISTRY_PLATFORM_DEFAULT_RPS` |
+| Burst | **10** | `REGISTRY_PLATFORM_DEFAULT_BURST` |
+| 24h budget | **10 000** req | `REGISTRY_PLATFORM_DEFAULT_BUDGET` |
+| Published pool ceiling | **50** rps | `REGISTRY_PLATFORM_POOL_RPS` |
+
+Effective platform rps = `min(publishedPoolRps ÷ tenantCount, platformDefaultRps)`.
+Budget is always the platform 24h budget on the pool path (BYO uses profile /
+`REGISTRY_DEFAULT_*` only).
+
+**Why these numbers** — full reasoning in [decisions.md](./decisions.md). Short version:
+interactive agent use needs a few calls/sec; shared-app abuse and secondary provider
+limits need a hard daily cap; arithmetic headroom at low tenant count should match the
+per-tenant cap (~10 tenants × 5 ≈ 50). Loosen via env before tightening tenants who
+built against these numbers.
+
+**Rejected — same defaults for BYO and platform.** Defeats the point of BYO (tenant
+owns the upstream quota).
+
+**Rejected — unlimited platform until abuse.** First live app would ship without a
+brake; tightening later breaks tenants (PRD open-question constraint).
+
+**Revisit if** `aprovan.rate_limit.pool_exceeded` is hot at modest tenant counts —
+that is the leased-bucket trigger (D3), not a reason to raise defaults blindly.
+
