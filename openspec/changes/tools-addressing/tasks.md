@@ -61,12 +61,12 @@ dispatches under its canonical name.
       comment case, string-literal immunity, sort/dedup order — into
       `packages/remote/__tests__/remote.test.ts`. The rest are already covered
       transitively by `parseScriptDependencies`.
-- [ ] 4.3 Repoint `packages/editor/src/lib/code-extractor.ts` at `@utdk/remote`; add the
+- [x] 4.3 Repoint `packages/editor/src/lib/code-extractor.ts` at `@utdk/remote`; add the
       dependency at the version already resolved in the workspace so pnpm reuses one
       instance. Delete `scan-tools-access.ts` and its test.
-- [ ] 4.4 Confirm the editor's public API is unchanged: `scanToolsAccess` and
+- [x] 4.4 Confirm the editor's public API is unchanged: `scanToolsAccess` and
       `ToolsAccessScan` still export from `packages/editor/src/index.ts`.
-- [ ] 4.5 Grep both repos for a second scanner definition and assert exactly one
+- [x] 4.5 Grep both repos for a second scanner definition and assert exactly one
       survives.
 
 **Done when** one implementation exists, the editor's exports are byte-compatible, and

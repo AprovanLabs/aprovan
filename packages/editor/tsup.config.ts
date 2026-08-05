@@ -15,6 +15,7 @@ export default defineConfig({
     "react-dom",
     "@aprovan/patchwork",
     "@aprovan/patchwork/namespace-types",
+    "@utdk/remote",
   ],
   treeshake: true,
 });

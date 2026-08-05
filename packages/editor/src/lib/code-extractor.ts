@@ -1,7 +1,7 @@
 import { createProjectFromFiles, detectMainFile } from '@aprovan/patchwork';
 import type { VirtualFile, VirtualProject } from '@aprovan/patchwork';
 
-export { scanToolsAccess, type ToolsAccessScan } from './scan-tools-access.js';
+export { scanToolsAccess, type ToolsAccessScan } from '@utdk/remote/tools-scan';
 
 // Matches fenced code blocks with optional attributes: ```language attr="value"\n...content...```
 // Captures: [1] = language (optional), [2] = attributes (optional), [3] = content
