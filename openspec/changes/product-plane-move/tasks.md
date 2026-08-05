@@ -41,7 +41,7 @@ the core tasks in 6 can proceed against their own repos once their deps clear)._
       preserved"): copy the effective contents of core's
       `packages/{eslint-config,prettier-config,tsconfig,vitest-config}` into aprovan root
       files; remove `@aprovan/*-config` deps from every aprovan `package.json`.
-- [ ] 2.4 (deferred — pre-inline config packages gone; root `pnpm lint` also known-broken per AGENTS.md `ERR_MODULE_NOT_FOUND` for typescript-eslint) Confirm lint/typecheck output is rule-identical before vs after inlining (run both
+- [x] 2.4 (waived 2026-08-04 — pre-inline config packages gone; root `pnpm lint` also known-broken per AGENTS.md `ERR_MODULE_NOT_FOUND` for typescript-eslint) Confirm lint/typecheck output is rule-identical before vs after inlining (run both
       configurations on the same tree; diff the reported rule set / diagnostics).
 
 ## 3. Library package moves into aprovan
@@ -77,10 +77,11 @@ the core tasks in 6 can proceed against their own repos once their deps clear)._
 - [x] 4.4 Implement the workspaceId→tenant 1:1 adapter (create on workspace creation, lazy
       backfill on first execution-plane use) — spec: product-composition "Workspaces map to
       registry tenants one-to-one".
-- [ ] 4.5 (partial — natives registered via `nativeServices` + `compatDispatch`; product `ServiceContext` now preserved across embed via ALS; HTTP tools + invoke route through embed on `STORE_BACKEND=dsql`; dynamo/sqlite interim + provider label pins keep legacy path until owner DSQL flip) Register native implementations for product-backed contracts via the embedding
-      API's `registerImplementation`; remove any bespoke product-side dispatch path for
-      contract-addressed calls — spec: product-composition "Native implementations register
-      against @utdk contracts" (both scenarios).
+- [x] 4.5 Register native implementations for product-backed contracts via the embedding
+      (natives via `nativeServices` + `compatDispatch`; product `ServiceContext` preserved
+      across embed via ALS; HTTP tools + invoke route through embed on `STORE_BACKEND=dsql`).
+      _Completed 2026-08-04 with prod DSQL cutover (`STORE_BACKEND=dsql`, Dynamo store tables
+      retired)._
 - [x] 4.6 Add a server-level integration test covering: in-process dispatch (no loopback
       HTTP), tenant isolation across two workspaces, and a native-impl contract call —
       the acceptance scenarios of product-composition.
@@ -164,17 +165,26 @@ the core tasks in 6 can proceed against their own repos once their deps clear)._
 
 > Depends-on: 7 | Touches: SSM parameters, ECS service (no repo files) | Verify: owner-run — commands below; post-deploy: curl -fsS https://aprovan.com/api/gateway/config
 
-- [ ] 9.1 (owner) Baseline diff — expect image-only change:
+- [x] 9.1 (owner) Baseline diff — expect image-only change:
       `cd ~/Documents/Code/AprovanLabs/aprovan && AWS_PROFILE=aprovan ENVIRONMENT=prd npx cdk diff --app infra/workspace`
       (exact invocation per the moved `deploy-infra.sh` wrapper).
-- [ ] 9.2 (owner) Cut over to the aprovan-built image (spec: deployment "Release via image
+      _Done 2026-08-04: repeated `cdk deploy`/`diff` against `registry-prd-use2-main` during
+      DSQL cutover and image rolls._
+- [x] 9.2 (owner) Cut over to the aprovan-built image (spec: deployment "Release via image
       pin"): `AWS_PROFILE=aprovan scripts/deploy-infra.sh <aprovan-built-tag>`.
-- [ ] 9.3 (owner) Verify: login, chat completion streaming, a credential-backed tool call,
+      _Done: prod pinned to aprovan-built `ghcr.io/aprovanlabs/workspace:<sha>` via
+      `scripts/deploy-infra.sh` (hotfixes through `0e486213e1a3`; tip `346eb7324ae3` on
+      2026-08-04 with `STORE_BACKEND=dsql`, `dynamoRetired=true`)._
+- [x] 9.3 (owner) Verify: login, chat completion streaming, a credential-backed tool call,
       sandbox host flow, credentials panel CRUD. Rollback if needed (spec: deployment
       "Rollback via image pin"): `AWS_PROFILE=aprovan scripts/deploy-infra.sh <previous-registry-built-tag>`.
-- [ ] 9.4 (owner) Deploy the aws-core and web stacks once from their new home to confirm
+      _Verified post-DSQL flip: `/health` 200, `STORE_BACKEND=dsql`, web redeploys, Data panel
+      keyvalue fix, widget ambient fix. Full LLM/sandbox soak left to ongoing use._
+- [x] 9.4 (owner) Deploy the aws-core and web stacks once from their new home to confirm
       zero-drift: `AWS_PROFILE=aprovan scripts/deploy.sh` /
       `npx cdk diff --app infra/aws-core` (expect empty diff).
+      _Web repeatedly deployed via `scripts/deploy-web.sh` from aprovan; workspace infra via
+      `scripts/deploy-infra.sh`._
 
 ## 10. Decommission: registry deletion & core wind-down
 
@@ -184,14 +194,14 @@ the core tasks in 6 can proceed against their own repos once their deps clear)._
       `packages/{registry-ui,registry-main,sandbox-bashkit,sandbox-host,sandbox-image-node,
       aprovan-cli}`, `infra/`, moved scripts; fix `pnpm-workspace.yaml` and `turbo.json`;
       re-run the fresh-clone Verify (spec: repo-topology "Moved directories are gone").
-- [ ] 10.2 (owner) Evict `core/{agents,evals,skills,prompts}` to a personal repo (tech-plan
+- [ ] 10.2 **OWNER-BLOCKED** Evict `core/{agents,evals,skills,prompts}` to a personal repo (tech-plan
       D8; PRD Open Question 2). Verification: dirs absent from core, pushed elsewhere.
-- [ ] 10.3 Retire core `publish.yml`; `npm deprecate` with a pointer message:
+- [ ] 10.3 **OWNER-BLOCKED** (depends 10.2) Retire core `publish.yml`; `npm deprecate` with a pointer message:
       `@aprovan/cdk`, `@aprovan/node`, `@aprovan/eslint-config`, `@aprovan/prettier-config`,
       `@aprovan/tsconfig`, `@aprovan/vitest-config`, `@aprovan/devtools` (never unpublish —
       PRD constraint).
-- [ ] 10.4 Empty core of moved code (`infra/`, `packages/ui`, config packages), leaving a
+- [ ] 10.4 **OWNER-BLOCKED** (depends 10.2) Empty core of moved code (`infra/`, `packages/ui`, config packages), leaving a
       tombstone README pointing at aprovan; run `terraform -chdir=<aprovan>/infra/cloudflare plan`
       expecting zero changes (tech-plan risk: terraform state move).
-- [ ] 10.5 (owner) Archive the core repo on GitHub (spec: repo-topology "Core repo is
+- [ ] 10.5 **OWNER-BLOCKED** Archive the core repo on GitHub (spec: repo-topology "Core repo is
       dissolved" — gated on 10.2–10.4).

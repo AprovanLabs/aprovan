@@ -71,7 +71,7 @@ checkouts contain untracked husk dirs that mask failures._
       the package loads. Streams 4 and 6 are blocked until this passes.
       _Verified 2026-08-04: `npm install @aprovan/registry-server` +
       `import('@aprovan/registry-server')` green (resolves `@utdk/clients/registry.json`)._
-- [ ] 3.3 Fresh-clone registry exit criterion (spec: registry-publish-integrity / "Fresh
+- [ ] 3.3 **DEFERRED** Fresh-clone registry exit criterion (spec: registry-publish-integrity / "Fresh
       registry clone is green").
       Verify: `T=$(mktemp -d) && git clone https://github.com/AprovanLabs/registry $T/registry && cd $T/registry && pnpm install && pnpm build && pnpm typecheck && pnpm test`
       _Still open: `pnpm install --frozen-lockfile` + execution-plane packages green;

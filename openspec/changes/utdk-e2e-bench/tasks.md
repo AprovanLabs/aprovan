@@ -55,7 +55,7 @@
 - [x] 2.4 Add a header comment (matching the style of `registry-deploy.yml`/`web.yml`) stating
       the required `vars.AWS_DEPLOY_ROLE_ARN` config, the SSM path this reads
       (`/aprovan/test/utdk-creds/*`), and that this workflow never gates merges.
-- [ ] 2.5 Manual verification (not automatable from this task list): `gh workflow run
+- [ ] 2.5 **OWNER-BLOCKED** Manual verification (not automatable from this task list): `gh workflow run
       utdk-e2e-nightly.yml --ref <branch>` against the registry repo once Task 3 has populated at
       least one provider's credentials; confirm the job completes, doctor output appears in the
       log, and — using a deliberately-broken credential to force a failure — the issue
@@ -75,26 +75,29 @@
 **Not delegable to an agent** — requires real third-party account creation and real secrets. The
 owner (or someone with access) must:
 
-- [ ] 3.1 For each provider to cover, create the real credential (following `credentialUrl` /
+- [ ] 3.1 **OWNER-BLOCKED** For each provider to cover, create the real credential (following `credentialUrl` /
       `credentialHint` already documented per-provider in `.env.example`) and write it to
       `/aprovan/test/utdk-creds/<ENV_VAR_NAME>` as a `SecureString`, e.g.:
       `aws ssm put-parameter --name /aprovan/test/utdk-creds/GITHUB_TOKEN --type SecureString
       --value <token>`.
-- [ ] 3.2 Confirm `vars.AWS_DEPLOY_ROLE_ARN` is set as a registry-repo Actions variable (should
+- [x] 3.2 Confirm `vars.AWS_DEPLOY_ROLE_ARN` is set as a registry-repo Actions variable (should
       already be true per `registry-deploy.yml`'s existing requirement — verify, don't assume).
-- [ ] 3.3 Spot-check the KMS assumption (PRD Open Question 3 / tech-plan Risk): run `aws ssm
+      _Verified 2026-08-04: `arn:aws:iam::748469276309:role/aprovan-prd-use2-registry-deploy`._
+- [ ] 3.3 **OWNER-BLOCKED** Spot-check the KMS assumption (PRD Open Question 3 / tech-plan Risk): run `aws ssm
       get-parameter --name /aprovan/test/utdk-creds/GITHUB_TOKEN --with-decryption` under a role
       that has only `ssm:GetParameter` (no explicit `kms:Decrypt` grant) and confirm it succeeds
       against the default `alias/aws/ssm` key before Task 2.5's manual workflow run.
-- [ ] 3.4 Not every provider needs to be populated immediately — even zero populated is a valid
+- [x] 3.4 Not every provider needs to be populated immediately — even zero populated is a valid
       state (the nightly job will just report 0 READY and take no issue action). Prioritize
       providers with `signup: "self-serve"` in `src/matrix.ts` first for fastest coverage.
+      _Acknowledged 2026-08-04: zero-populated is the accepted interim state._
 
 ## 4. Stub: seeded-tenant gateway-flow variant (blocked)
 
 > Depends-on: WS-4 `product-plane-move` (external, not yet implemented) | Touches: none in this pass | Verify: n/a — blocked, no code produced here
 
-- [ ] 4.1 **Blocked, listed for completeness only.** Once WS-4 lands the registry server
+- [ ] 4.1 **Unblocked by WS-4 landing; still deferred pending dedicated tenant-seed design.**
+      Once WS-4 lands the registry server
       extraction + product-plane move, add a fifth flow variant that runs the existing
       `gateway`/`store` flows against a seeded, dedicated test tenant (rather than the
       developer's own local/deployed workspace) so the nightly run doesn't depend on a
@@ -102,3 +105,5 @@ owner (or someone with access) must:
       PRD/tech-plan pass at that point (tenant seeding/teardown, isolation from other test
       tenants, credential-store cleanup ordering) rather than being speculatively designed now
       against infrastructure that doesn't exist yet.
+      _2026-08-04: product-plane-move + DSQL cutover landed; this variant remains a separate
+      follow-up — not closing without the tenant-seed design._
