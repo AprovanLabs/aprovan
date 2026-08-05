@@ -30,14 +30,14 @@ Stream 5 depends on 1 and 4. **Stream 1 gates section 9 of `registry-server-extr
 
 > Depends-on: - | Touches: registry `packages/remote/src/tools-scan.ts`, `packages/remote/src/imports.ts`, `packages/remote/__tests__/remote.test.ts` | Verify: `pnpm --filter @utdk/remote test`
 
-- [ ] 2.1 Make `tools[expr]` a parse error rather than an `unresolved` flag. The message
+- [x] 2.1 Make `tools[expr]` a parse error rather than an `unresolved` flag. The message
       names the construct and points at `tools.search()` for discovery and at
       `globalAlias` for slash-named providers.
-- [ ] 2.2 Remove `unresolved` from `ToolsAccessScan`, or retain it only as an always-false
+- [x] 2.2 Remove `unresolved` from `ToolsAccessScan`, or retain it only as an always-false
       field if downstream UI depends on the shape — decide by grepping consumers first.
-- [ ] 2.3 Update `packages/registry-ui/src/dependency-panel.tsx`, which renders the
+- [x] 2.3 Update `packages/registry-ui/src/dependency-panel.tsx`, which renders the
       warning chip today.
-- [ ] 2.4 Tests: bracket access throws; string-literal `"tools[x]"` inside source does not.
+- [x] 2.4 Tests: bracket access throws; string-literal `"tools[x]"` inside source does not.
 
 **Done when** no script can reach a namespace the static list does not contain, and the
 warning chip is gone rather than orphaned.
