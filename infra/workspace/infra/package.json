@@ -1,6 +1,7 @@
 {
   "name": "@aprovan/registry-infra",
   "version": "0.1.0",
+  "license": "MIT",
   "private": true,
   "type": "module",
   "description": "CDK infrastructure for the Aprovan registry gateway",

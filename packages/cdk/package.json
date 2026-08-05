@@ -1,6 +1,7 @@
 {
   "name": "@aprovan/cdk",
   "version": "0.1.0",
+  "license": "MIT",
   "description": "Shared Aprovan CDK naming, constants, and environment helpers",
   "type": "module",
   "exports": {

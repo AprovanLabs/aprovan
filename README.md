@@ -40,3 +40,7 @@ $> source .venv/bin/activate
 $> uv pip install aprovan-cicadas
 $> cicadas
 ```
+
+## License
+
+[MIT](LICENSE) © Aprovan Labs.

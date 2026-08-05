@@ -1,6 +1,7 @@
 {
   "name": "@aprovan/editor",
   "version": "0.2.0",
+  "license": "MIT",
   "description": "Components for facilitating widget generation and editing",
   "type": "module",
   "main": "./dist/index.js",

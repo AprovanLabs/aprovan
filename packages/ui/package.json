@@ -1,6 +1,7 @@
 {
   "name": "@aprovan/ui",
   "version": "0.5.0",
+  "license": "MIT",
   "description": "Aprovan design tokens and React primitives",
   "type": "module",
   "sideEffects": [

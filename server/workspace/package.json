@@ -1,6 +1,6 @@
 {
   "name": "@aprovan/workspace",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "description": "The Aprovan workspace — chat, apps, workflows, MCP, and the credential/permission gateway in one process",
   "license": "MIT",
