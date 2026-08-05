@@ -179,8 +179,9 @@ let _schemaReady: Promise<void> | undefined;
 
 function schemaStatements(): string[] {
   const here = dirname(fileURLToPath(import.meta.url));
-  // Runs from src (tests, tsx) and dist (build) — the .sql file is copied by
-  // neither, so resolve it relative to the source tree first.
+  // Built layout: dist/db/dsql-schema.sql (copied by the package build script /
+  // Dockerfile). Dev/tsx layout: src/db/dsql-schema.sql next to this module, or
+  // reached by walking up from dist/db to the source tree.
   const candidates = [
     join(here, "dsql-schema.sql"),
     join(here, "..", "..", "src", "db", "dsql-schema.sql"),
@@ -209,20 +210,27 @@ function schemaStatements(): string[] {
  * Postgres the test rig points DSQL_URL at.
  */
 export async function ensureDsqlSchema(): Promise<void> {
-  _schemaReady ??= (async () => {
-    const pool = await dsqlPool();
-    for (const statement of schemaStatements()) {
-      try {
-        await pool.query(statement);
-      } catch (err) {
-        if (/\bASYNC\b/iu.test(statement) && isSyntaxError(err)) {
-          await pool.query(statement.replace(/\bINDEX ASYNC\b/iu, "INDEX"));
-          continue;
+  if (!_schemaReady) {
+    _schemaReady = (async () => {
+      const pool = await dsqlPool();
+      for (const statement of schemaStatements()) {
+        try {
+          await pool.query(statement);
+        } catch (err) {
+          if (/\bASYNC\b/iu.test(statement) && isSyntaxError(err)) {
+            await pool.query(statement.replace(/\bINDEX ASYNC\b/iu, "INDEX"));
+            continue;
+          }
+          throw err;
         }
-        throw err;
       }
-    }
-  })();
+    })().catch((err) => {
+      // Allow a later request to retry after a transient failure (missing
+      // DDL file in a bad image, brief DSQL blip, etc.).
+      _schemaReady = undefined;
+      throw err;
+    });
+  }
   return _schemaReady;
 }
 

@@ -35,6 +35,10 @@ ENV NODE_ENV=production \
     WORKSPACE_PORT=4000
 WORKDIR /srv/workspace
 COPY --from=builder --chown=node:node /srv/workspace ./
+# pnpm deploy only packs package.json "files" (dist/). The DDL is not emitted by
+# tsc; the build script copies it into dist/db, and this line keeps the image
+# correct even if that copy is skipped.
+COPY --from=builder --chown=node:node /repo/server/workspace/src/db/dsql-schema.sql ./dist/db/dsql-schema.sql
 RUN mkdir -p /data && chown node:node /data
 VOLUME ["/data"]
 USER node
