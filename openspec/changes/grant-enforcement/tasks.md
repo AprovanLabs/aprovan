@@ -79,16 +79,16 @@ a failed write leaves no half-state.
 
 > Depends-on: 1, 4 | Touches: registry `packages/registry-server/src/mcp/**`, `packages/registry-server/src/mcp/__tests__/**` | Verify: `pnpm --filter @aprovan/registry-server test -- mcp`
 
-- [ ] 5.1 Register a sandboxed-TypeScript tool through the existing `McpExtensions` hook
+- [x] 5.1 Register a sandboxed-TypeScript tool through the existing `McpExtensions` hook
       — not as a special case in `buildMcpServer`.
-- [ ] 5.2 Route its `tools` global through the same `Dispatcher` as `call_tool`, so it
+- [x] 5.2 Route its `tools` global through the same `Dispatcher` as `call_tool`, so it
       passes `resolveProfile`. Assert with a test that a namespace hidden by
       `permittedTools` is also unreachable from inside a submitted script — this is the
       confused-deputy case and it is the reason this stream depends on stream 1.
-- [ ] 5.3 Refuse to register the tool when `authMode === "none"`. Not registered — not
+- [x] 5.3 Refuse to register the tool when `authMode === "none"`. Not registered — not
       registered-and-erroring.
-- [ ] 5.4 Accept an optional narrowing argument that feeds `CallContext.narrowedTo`.
-- [ ] 5.5 Tests: ungranted namespace unreachable from a submitted script; `authMode:
+- [x] 5.4 Accept an optional narrowing argument that feeds `CallContext.narrowedTo`.
+- [x] 5.5 Tests: ungranted namespace unreachable from a submitted script; `authMode:
       "none"` omits the tool from `list_tools` entirely; narrowing argument is honoured.
 
 **Done when** submitting arbitrary TypeScript through MCP reaches strictly less than or

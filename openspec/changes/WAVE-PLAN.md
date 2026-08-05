@@ -90,13 +90,13 @@ TA §1 unlocks Wave-1: TA §2, TA §3, TA §4a.
 ## Wave 3b — unlocked by GE §4
 | Item | Status | Link |
 |------|--------|------|
-| grant-enforcement §5 MCP sandbox tool | **dispatched** | worktree `registry-iw8-ge05` |
+| grant-enforcement §5 MCP sandbox tool | **merged** | [#141](https://github.com/AprovanLabs/registry/pull/141) — grant-enforcement **complete** |
 
 ## Wave 2b — unlocked by GQL §2
 | Item | Status | Link |
 |------|--------|------|
 | graphql-schema-surface §4 SDL overview docs | **merged** | [#138](https://github.com/AprovanLabs/registry/pull/138) |
-| graphql-schema-surface §3 schema_lookup | **blocked** | wait GE §5 (mcp/**) |
+| graphql-schema-surface §3 schema_lookup | **dispatched** | worktree `registry-iw8-gql03` |
 | graphql-schema-surface §5 api version | **dispatched** | worktree `registry-iw8-gql05` |
 
 ## Wave 3d — unlocked by POA §2
