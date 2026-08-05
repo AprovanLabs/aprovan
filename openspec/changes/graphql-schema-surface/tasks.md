@@ -40,12 +40,12 @@ corrupted SDL fails `pnpm build` with the provider named.
 
 > Depends-on: 2 | Touches: registry `packages/mcp-core/src/**`, `packages/registry-server/src/mcp/**` | Verify: `pnpm --filter @utdk/mcp-core test && pnpm --filter @aprovan/registry-server test -- mcp`
 
-- [ ] 3.1 Register `schema_lookup({ provider, type?, field?, version? })` through
+- [x] 3.1 Register `schema_lookup({ provider, type?, field?, version? })` through
       `McpExtensions`, returning one type's fields.
-- [ ] 3.2 With no `type`, return root entry points only — never the full type list.
-- [ ] 3.3 Cap response size explicitly and say so in the response when truncated; silent
+- [x] 3.2 With no `type`, return root entry points only — never the full type list.
+- [x] 3.3 Cap response size explicitly and say so in the response when truncated; silent
       truncation reads as "that's all there is".
-- [ ] 3.4 Tests: root listing; single type; unknown provider; a type large enough to
+- [x] 3.4 Tests: root listing; single type; unknown provider; a type large enough to
       trigger truncation.
 
 **Done when** an agent can go from "list issues" to the fields it needs in two calls
