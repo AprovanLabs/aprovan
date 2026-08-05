@@ -55,14 +55,14 @@ without the SDL entering context.
 
 > Depends-on: 2 | Touches: registry `packages/bundler/src/docs/**`, `packages/utdk/<provider>/docs/graphql.md` | Verify: `pnpm --filter @aprovan/utdk-bundler test -- docs`
 
-- [ ] 4.1 Generate the GraphQL overview page from SDL rather than OpenAPI metadata:
+- [x] 4.1 Generate the GraphQL overview page from SDL rather than OpenAPI metadata:
       root entry points, pagination convention (Relay connections vs offset), ID/node
       scheme, auth-scope model, and deprecation posture.
-- [ ] 4.2 Keep it provider-level. No per-query or per-mutation sections — that is the
+- [x] 4.2 Keep it provider-level. No per-query or per-mutation sections — that is the
       curation this change rejected.
-- [ ] 4.3 Bound its length so it can sit in a tool description, and state the budget in
+- [x] 4.3 Bound its length so it can sit in a tool description, and state the budget in
       the generator.
-- [ ] 4.4 Preserve the `prompt-hash` footer convention so regeneration stays detectable.
+- [x] 4.4 Preserve the `prompt-hash` footer convention so regeneration stays detectable.
 
 **Done when** `docs/graphql.md` tells an agent the provider's conventions, and
 `schema_lookup` covers everything it deliberately omits.

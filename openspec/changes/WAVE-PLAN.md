@@ -95,7 +95,7 @@ TA §1 unlocks Wave-1: TA §2, TA §3, TA §4a.
 ## Wave 2b — unlocked by GQL §2
 | Item | Status | Link |
 |------|--------|------|
-| graphql-schema-surface §4 SDL overview docs | **dispatched** | worktree `registry-iw8-gql04` |
+| graphql-schema-surface §4 SDL overview docs | **merged** | [#138](https://github.com/AprovanLabs/registry/pull/138) |
 | graphql-schema-surface §3 schema_lookup | **blocked** | wait GE §5 (mcp/**) |
 | graphql-schema-surface §5 api version | **blocked** | serialize `data/registry.json` after POA §2 |
 
