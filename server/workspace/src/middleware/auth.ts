@@ -4,6 +4,7 @@ import { getMembership } from "../memberships.js";
 import { getWorkspaceConfig, resolveAuthMode } from "../runtime/config.js";
 import { getCurrentWorkspace } from "../sessions.js";
 import { listUserGroupIds } from "../userGroups.js";
+import { getActiveWorkspaceId } from "../users.js";
 import type { Context, Next } from "hono";
 
 export type AuthMode = "none" | "oidc";
@@ -132,7 +133,13 @@ async function oidcPrincipal(c: Context): Promise<Principal> {
   if (cached) return cached;
 
   const sub = await verifyAccessToken(token);
-  const workspaceId = requestedHeader || (await getCurrentWorkspace(sub));
+  // Prefer the per-request header, then the TTL'd session row, then the durable
+  // Users.active_workspace_id preference (survives session expiry / cutover
+  // reseed which deliberately drops login sessions).
+  const workspaceId =
+    requestedHeader ||
+    (await getCurrentWorkspace(sub)) ||
+    (await getActiveWorkspaceId(sub));
   if (!workspaceId) throw new Error("workspace_not_selected");
   const membership = await getMembership(workspaceId, sub);
   if (!membership) throw new Error("workspace_forbidden");
@@ -172,6 +179,10 @@ export async function requireAuth(
     }
     if (code === "workspace_not_selected") {
       return c.json({ error: "No workspace selected", code }, 400);
+    }
+    if (code !== "missing_token") {
+      const detail = error instanceof Error ? error.message : String(error);
+      process.stderr.write(`[gateway] requireAuth failed: ${detail}\n`);
     }
     return c.json({ error: "Invalid or expired token" }, 401);
   }

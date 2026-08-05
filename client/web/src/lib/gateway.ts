@@ -27,6 +27,7 @@ export const GATEWAY_BASE =
 export const gateway: GatewayClient = createGatewayClient({
   baseUrl: GATEWAY_BASE,
   getToken: () => getAccessTokenSync() ?? undefined,
+  getWorkspaceId: () => localStorage.getItem(ACTIVE_WORKSPACE_KEY) ?? undefined,
 });
 
 /** Gateway client for `@aprovan/registry-ui` credential/admin widgets. */

@@ -364,8 +364,8 @@ export function createIdentityStoreSql(client: IdentitySqlClient): IIdentityStor
         );
         const row = rows[0];
         if (!row) return undefined;
-        const expiresAt = row["expires_at"];
-        if (typeof expiresAt === "number" && expiresAt <= nowEpoch()) return undefined;
+        const expiresAt = Number(row["expires_at"]);
+        if (Number.isFinite(expiresAt) && expiresAt <= nowEpoch()) return undefined;
         return str(row["current_workspace_id"]);
       },
       async setCurrentWorkspace(userId, workspaceId, ttlSeconds) {
