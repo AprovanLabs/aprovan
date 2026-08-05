@@ -2,12 +2,15 @@
  * Per-project type environment (editor-consolidation Stream 5 / 7).
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import ts from "typescript";
 import {
   AMBIENT_FALLBACK,
   AMBIENT_FALLBACK_PATH,
+  buildAliasMapFromCatalog,
   createTypeEnvironment,
+  mountLazyProviderTypes,
+  resolveScannedAliasesForTypes,
 } from "../index";
 
 /**
@@ -156,5 +159,89 @@ declare const tools: {
 describe("loadTsEnvironment deprecated wrapper", () => {
   it("still exposes createTypeEnvironment", () => {
     expect(typeof createTypeEnvironment).toBe("function");
+  });
+});
+
+const SAMPLE_CATALOG = buildAliasMapFromCatalog([
+  { name: "github", globalAlias: "github" },
+  { name: "google/drive", globalAlias: "googleDrive" },
+  { name: "stripe", globalAlias: "stripe" },
+]);
+
+describe("lazy type acquisition (tools-addressing §5)", () => {
+  it("fetches exactly two type bundles for two referenced namespaces", async () => {
+    const source = `
+      const user = await tools.github.users.getByUsername({ username: "octocat" });
+      const files = await tools.googleDrive.files.list({});
+      export { user, files };
+    `;
+    const fetchBundle = vi.fn(async (provider: string) => ({
+      module: `@utdk/${provider}`,
+      files: {
+        "index.d.ts": `declare const c: "${provider}"; export default c;\n`,
+      },
+    }));
+
+    const { fetchedProviders, files } = await mountLazyProviderTypes({
+      source,
+      catalog: SAMPLE_CATALOG,
+      fetchBundle,
+    });
+
+    expect(fetchBundle).toHaveBeenCalledTimes(2);
+    expect(fetchBundle).toHaveBeenCalledWith("github");
+    expect(fetchBundle).toHaveBeenCalledWith("google/drive");
+    expect(fetchedProviders.sort()).toEqual(["github", "google/drive"]);
+    expect(files["/node_modules/@utdk/github/index.d.ts"]).toContain("github");
+    expect(files["/node_modules/@utdk/google/drive/index.d.ts"]).toContain(
+      "google/drive",
+    );
+  });
+
+  it("does not fetch the full catalog — only scanned aliases", async () => {
+    const fetchBundle = vi.fn(async (provider: string) => ({
+      module: `@utdk/${provider}`,
+      files: { "index.d.ts": `// ${provider}\n` },
+    }));
+
+    await mountLazyProviderTypes({
+      source: `await tools.github.repos.list({});`,
+      catalog: SAMPLE_CATALOG,
+      fetchBundle,
+    });
+
+    expect(fetchBundle).toHaveBeenCalledTimes(1);
+    expect(fetchBundle).toHaveBeenCalledWith("github");
+    expect(fetchBundle).not.toHaveBeenCalledWith("stripe");
+    expect(fetchBundle).not.toHaveBeenCalledWith("google/drive");
+  });
+
+  it("treats an unresolvable alias as a cache miss, not an error", async () => {
+    const fetchBundle = vi.fn(async () => ({
+      module: "@utdk/unknown",
+      files: { "index.d.ts": "declare const x: unknown;\n" },
+    }));
+
+    const { fetchedProviders, files } = await mountLazyProviderTypes({
+      source: `await tools.unknownAlias.call({});`,
+      catalog: SAMPLE_CATALOG,
+      fetchBundle,
+    });
+
+    expect(fetchBundle).not.toHaveBeenCalled();
+    expect(fetchedProviders).toEqual([]);
+    expect(files).toEqual({});
+  });
+
+  it("resolves scanned aliases to canonical names via catalog", () => {
+    expect(
+      resolveScannedAliasesForTypes(
+        ["googleDrive", "github"],
+        SAMPLE_CATALOG,
+      ),
+    ).toEqual(["google/drive", "github"]);
+    expect(
+      resolveScannedAliasesForTypes(["missingAlias"], SAMPLE_CATALOG),
+    ).toEqual([]);
   });
 });

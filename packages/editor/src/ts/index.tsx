@@ -433,3 +433,12 @@ export async function createProjectChecker(
     dispose: () => environment.dispose(),
   };
 }
+
+export {
+  buildAliasMapFromCatalog,
+  mountLazyProviderTypes,
+  resolveScannedAliasesForTypes,
+  type LazyTypeMountOptions,
+  type NamespaceCatalogEntry,
+  type ProviderAliasMap,
+} from "./lazy-types";
