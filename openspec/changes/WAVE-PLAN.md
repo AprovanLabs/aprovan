@@ -61,10 +61,11 @@ TA §1 unlocks Wave-1: TA §2, TA §3, TA §4a.
 ## Wave 1 — in progress (unlocked by TA §1)
 | Item | Status | Link |
 |------|--------|------|
-| tools-addressing §2 catalog alias | **dispatched** | worktree `registry-iw8-ta02` |
-| tools-addressing §3 tools. bind | **dispatched** | worktree `registry-iw8-ta03` |
+| tools-addressing §2 catalog alias | **merged** | [#130](https://github.com/AprovanLabs/registry/pull/130) |
+| tools-addressing §3 tools. bind | **merged + published** | [#129](https://github.com/AprovanLabs/registry/pull/129) → `@utdk/remote@0.1.4` |
 | tools-addressing §4a scanner export | **merged + published** | [#128](https://github.com/AprovanLabs/registry/pull/128) → `@utdk/remote@0.1.3` |
 | tools-addressing §4b editor consume | **dispatched** | worktree `aprovan-iw8-ta04b` |
+| tools-addressing §6 documentation | **dispatched** | worktree `registry-iw8-ta06` |
 | platform-oauth-apps §1 resolution | pending | GE §3 |
 | platform-oauth-apps §2 flag/secrets | pending | serialize registry.json |
 | grant-enforcement §2 bracket error | pending | TA §4 |
