@@ -69,7 +69,7 @@ TA §1 unlocks Wave-1: TA §2, TA §3, TA §4a.
 | platform-oauth-apps §1 resolution | pending | GE §3 |
 | platform-oauth-apps §2 flag/secrets | pending | serialize registry.json |
 | grant-enforcement §2 bracket error | **merged** | see Wave 1b |
-| graphql-schema-surface §2 type index | pending | GQL §1 |
+| graphql-schema-surface §2 type index | **merged** | [#136](https://github.com/AprovanLabs/registry/pull/136) |
 
 ## Wave 1b — unlocked by TA §4
 | Item | Status | Link |
