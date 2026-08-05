@@ -55,6 +55,8 @@ export interface GatewayClientConfig {
   baseUrl: string;
   /** Supplies the current access token (sync or async). */
   getToken: TokenSource;
+  /** Supplies the active workspace id for the workspace header (sync). */
+  getWorkspaceId?: () => string | null | undefined;
   /** Header carrying the bearer token. Default: {@link DEFAULT_AUTH_HEADER}. */
   authHeader?: string;
   /** Header used to pin the active workspace per request. Default: `X-Aprovan-Workspace`. */
@@ -100,7 +102,8 @@ export function createGatewayClient(config: GatewayClientConfig): GatewayClient 
     const token = await config.getToken();
     const merged: Record<string, string> = { ...headers };
     if (token) merged[authHeader] = `Bearer ${token}`;
-    if (workspaceId) merged[workspaceHeader] = workspaceId;
+    const workspace = workspaceId ?? config.getWorkspaceId?.() ?? undefined;
+    if (workspace) merged[workspaceHeader] = workspace;
 
     const res = await fetch(`${base}${path}`, { ...init, headers: merged });
     if (!res.ok) throw await parseError(res);

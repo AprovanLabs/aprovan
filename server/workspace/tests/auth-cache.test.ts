@@ -21,6 +21,7 @@ import type { Context } from "hono";
 const getMembership = vi.fn();
 const getCurrentWorkspace = vi.fn();
 const listUserGroupIds = vi.fn();
+const getActiveWorkspaceId = vi.fn();
 
 vi.mock("../src/memberships.js", () => ({
   getMembership: (...args: unknown[]) => getMembership(...args),
@@ -31,6 +32,10 @@ vi.mock("../src/sessions.js", () => ({
 }));
 vi.mock("../src/userGroups.js", () => ({
   listUserGroupIds: (...args: unknown[]) => listUserGroupIds(...args),
+}));
+vi.mock("../src/users.js", () => ({
+  getActiveWorkspaceId: (...args: unknown[]) => getActiveWorkspaceId(...args),
+  setActiveWorkspaceId: vi.fn(),
 }));
 
 const { invalidatePrincipal, resetAuthCache } = await import("../src/auth-cache.js");
@@ -49,6 +54,7 @@ describe("auth principal cache", () => {
     resetAuthCache();
     getMembership.mockReset().mockResolvedValue({ role: "member" });
     getCurrentWorkspace.mockReset().mockResolvedValue("ws-default");
+    getActiveWorkspaceId.mockReset().mockResolvedValue(undefined);
     listUserGroupIds.mockReset().mockResolvedValue([]);
     process.env["OIDC_ISSUER"] = "https://cognito-idp.us-east-2.amazonaws.com/us-east-2_authcache";
     process.env["OIDCAUDIENCE"] = "auth-cache-test";
@@ -76,6 +82,16 @@ describe("auth principal cache", () => {
     expect(getCurrentWorkspace).toHaveBeenCalledTimes(1);
     expect(getMembership).toHaveBeenCalledTimes(1);
     expect(listUserGroupIds).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls back to durable users.active_workspace_id when session row is empty", async () => {
+    getCurrentWorkspace.mockResolvedValue(undefined);
+    getActiveWorkspaceId.mockResolvedValue("ws-durable");
+    const c = fakeContext({ Authorization: "Bearer tok-a" });
+    const principal = await resolvePrincipal(c);
+    expect(principal.workspaceId).toBe("ws-durable");
+    expect(getActiveWorkspaceId).toHaveBeenCalledWith("user-a");
+    expect(getMembership).toHaveBeenCalledWith("ws-durable", "user-a");
   });
 
   it("revocation takes effect immediately, no TTL wait", async () => {

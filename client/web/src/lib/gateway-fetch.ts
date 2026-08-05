@@ -15,18 +15,31 @@
  * only still here to attach the token.
  */
 
+import { ACTIVE_WORKSPACE_KEY } from "@/features/tabs/useTabs";
 import { getAccessTokenSync } from "./auth";
 
 /** Header carrying the Cognito bearer token. */
 export const GATEWAY_AUTH_HEADER = "Authorization";
 
-/** `fetch` with the workspace bearer token applied. */
+/** Header pinning the active workspace (matches gateway `requireAuth`). */
+export const GATEWAY_WORKSPACE_HEADER = "X-Aprovan-Workspace";
+
+/** `fetch` with the workspace bearer token + active workspace applied. */
 export const gatewayFetch: typeof fetch = async (input, init) => {
   const headers = new Headers(init?.headers);
 
   const token = getAccessTokenSync();
   if (token && !headers.has(GATEWAY_AUTH_HEADER)) {
     headers.set(GATEWAY_AUTH_HEADER, `Bearer ${token}`);
+  }
+
+  if (!headers.has(GATEWAY_WORKSPACE_HEADER)) {
+    try {
+      const workspaceId = localStorage.getItem(ACTIVE_WORKSPACE_KEY);
+      if (workspaceId) headers.set(GATEWAY_WORKSPACE_HEADER, workspaceId);
+    } catch {
+      // storage may be unavailable; gateway falls back to session / durable preference.
+    }
   }
 
   return fetch(input, { ...init, headers });
