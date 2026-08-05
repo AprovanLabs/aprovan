@@ -27,11 +27,11 @@ alias, and a seeded collision fails `loadRegistryProviders` rather than surfacin
 
 > Depends-on: 1 | Touches: registry `packages/registry-server/src/catalog/**`, `packages/registry-server/src/routes/tools.ts` | Verify: `pnpm --filter @aprovan/registry-server test -- catalog`
 
-- [ ] 2.1 Add `globalAlias` to the namespace entries returned by `GET /tools/namespaces`,
+- [x] 2.1 Add `globalAlias` to the namespace entries returned by `GET /tools/namespaces`,
       alongside the existing `name`. `name` stays the key.
-- [ ] 2.2 Confirm nothing persists the alias: grep profiles, grants, credentials, and
+- [x] 2.2 Confirm nothing persists the alias: grep profiles, grants, credentials, and
       dispatch for writes of `globalAlias`. It is a binding surface only.
-- [ ] 2.3 Test that a slash-named provider appears exactly once, with both renderings.
+- [x] 2.3 Test that a slash-named provider appears exactly once, with both renderings.
 
 **Done when** a client can build the full `tools.` binding map from one catalog call
 without deriving aliases itself.
@@ -40,12 +40,12 @@ without deriving aliases itself.
 
 > Depends-on: 1 | Touches: registry `packages/remote/src/imports.ts`, `packages/remote/src/proxy.ts`, `packages/remote/__tests__/remote.test.ts` | Verify: `pnpm --filter @utdk/remote test`
 
-- [ ] 3.1 Resolve a scanned alias back to its canonical provider name when building
+- [x] 3.1 Resolve a scanned alias back to its canonical provider name when building
       `RuntimeDependency` — `identifier: "googleDrive"`, `provider: "google/drive"`,
       `path: ""`. The alias never reaches `transport.call`.
-- [ ] 3.2 Test that `tools.googleDrive.files.list({})` dispatches
+- [x] 3.2 Test that `tools.googleDrive.files.list({})` dispatches
       `call("google/drive", "files.list", …)`.
-- [ ] 3.3 Test that an unknown alias produces a resolution error naming the alias and
+- [x] 3.3 Test that an unknown alias produces a resolution error naming the alias and
       suggesting `tools.search()`, not a silent `undefined`.
 
 **Done when** any of the 1,996 slash-named providers is reachable from `tools.` and
@@ -55,9 +55,9 @@ dispatches under its canonical name.
 
 > Depends-on: - | Touches: registry `packages/remote/package.json`, `packages/remote/__tests__/remote.test.ts`; aprovan `packages/editor/package.json`, `packages/editor/src/lib/code-extractor.ts`, `packages/editor/src/lib/scan-tools-access.ts`, `packages/editor/src/lib/__tests__/scan-tools-access.test.ts` | Verify: `pnpm --filter @utdk/remote test && pnpm --filter @aprovan/editor test && pnpm --filter @aprovan/editor typecheck`
 
-- [ ] 4.1 Add `"./tools-scan"` to `@utdk/remote`'s `exports` and set
+- [x] 4.1 Add `"./tools-scan"` to `@utdk/remote`'s `exports` and set
       `"sideEffects": false`; publish the resulting version.
-- [ ] 4.2 Port the scanner cases the canonical suite does not cover — the `uses="…"`
+- [x] 4.2 Port the scanner cases the canonical suite does not cover — the `uses="…"`
       comment case, string-literal immunity, sort/dedup order — into
       `packages/remote/__tests__/remote.test.ts`. The rest are already covered
       transitively by `parseScriptDependencies`.
