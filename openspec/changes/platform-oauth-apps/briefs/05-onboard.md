@@ -11,8 +11,8 @@ the human answers the §4.1 quota open question** — ship runbook + deferral no
 3. §4.1 is still an Open Question — surface in report if blocked on 5.1
 
 ## Tasks
-- [ ] 5.2 Write the runbook (required now)
-- [ ] 5.4 Defer Google; note the decision
+- [x] 5.2 Write the runbook (required now)
+- [x] 5.4 Defer Google; note the decision
 - [ ] 5.1 / 5.3 **blocked** on §4.1 human quota decision — leave unchecked; document in report
 
 ## Verify

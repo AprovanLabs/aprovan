@@ -82,12 +82,12 @@ current scheme is sufficient is written down next to the code.
 
 - [ ] 5.1 Register and ship the first platform app end-to-end as the proving run —
       GitHub or Slack, whichever review queue moves first.
-- [ ] 5.2 Write the runbook: what app review requires per provider, redirect URI
+- [x] 5.2 Write the runbook: what app review requires per provider, redirect URI
       conventions, scope selection, and how to rotate a platform secret without
       invalidating tenant grants.
 - [ ] 5.3 Add remaining providers one flag flip at a time. Each is a one-line registry
       change plus a secret, with no code change.
-- [ ] 5.4 Defer Google until there is a concrete reason to endure its verification
+- [x] 5.4 Defer Google until there is a concrete reason to endure its verification
       process; note the decision so it is not repeatedly rediscovered.
 
 **Done when** adding a platform app is a one-line change plus a secret, and the runbook

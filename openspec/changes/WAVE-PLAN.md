@@ -102,7 +102,7 @@ TA §1 unlocks Wave-1: TA §2, TA §3, TA §4a.
 ## Wave 3d — unlocked by POA §2
 | Item | Status | Link |
 |------|--------|------|
-| platform-oauth-apps §5 onboard runbook | **dispatched** | worktree `registry-iw8-poa05` (runbook + defer Google; no live app until §4 OQ) |
+| platform-oauth-apps §5 onboard runbook | **merged (partial)** | [#142](https://github.com/AprovanLabs/registry/pull/142) — 5.2/5.4 done; 5.1/5.3 blocked on §4.1 OQ |
 
 ## Later
 grant-enforcement §4–§5; tools-addressing §5–§6; graphql §3–§5; platform-oauth §4–§5;
