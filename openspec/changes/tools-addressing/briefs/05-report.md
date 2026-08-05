@@ -42,3 +42,4 @@ pnpm --filter @aprovan/editor typecheck
 ## Branch / PR
 - Worktree: `/Users/jacob/Documents/Code/AprovanLabs/.worktrees/aprovan-iw8-ta05`
 - Branch: `iw8/tools-addressing-05-types`
+- PR: https://github.com/AprovanLabs/aprovan/pull/103
