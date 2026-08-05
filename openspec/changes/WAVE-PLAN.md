@@ -58,14 +58,14 @@ editor-consolidation (#84/#122, `@aprovan/editor@0.2.0`). Prod chat redeployed.
 Hard-order gate cleared for `registry-server-extraction` §9.4 (still wait for GE §3 per task 9.2).
 TA §1 unlocks Wave-1: TA §2, TA §3, TA §4a.
 
-## Wave 1 — blocked on Wave 0 merges
-| Item | Status | Blocked by |
-|------|--------|------------|
-| tools-addressing §2 catalog alias | pending | TA §1 |
-| tools-addressing §3 tools. bind | pending | TA §1 |
-| tools-addressing §4 scanner (registry half) | pending | — (after W0; before GE §2) |
+## Wave 1 — in progress (unlocked by TA §1)
+| Item | Status | Link |
+|------|--------|------|
+| tools-addressing §2 catalog alias | **dispatched** | worktree `registry-iw8-ta02` |
+| tools-addressing §3 tools. bind | **dispatched** | worktree `registry-iw8-ta03` |
+| tools-addressing §4a scanner export | **dispatched** | worktree `registry-iw8-ta04a` |
 | platform-oauth-apps §1 resolution | pending | GE §3 |
-| platform-oauth-apps §2 flag/secrets | pending | — (after W0; serialize registry.json) |
+| platform-oauth-apps §2 flag/secrets | pending | serialize registry.json |
 | grant-enforcement §2 bracket error | pending | TA §4 |
 | graphql-schema-surface §2 type index | pending | GQL §1 |
 
