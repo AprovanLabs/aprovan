@@ -51,7 +51,7 @@ editor-consolidation (#84/#122, `@aprovan/editor@0.2.0`). Prod chat redeployed.
 |------|--------|------|
 | tools-addressing §1 naming authority | **merged** | [#127](https://github.com/AprovanLabs/registry/pull/127) → `main` |
 | grant-enforcement §1 gate step 5 | **merged** | [#125](https://github.com/AprovanLabs/registry/pull/125) → `main` |
-| grant-enforcement §3 provision default | **dispatched** | worktree `registry-iw8-ge03` |
+| grant-enforcement §3 provision default | **merged** | [#134](https://github.com/AprovanLabs/registry/pull/134) |
 | graphql-schema-surface §1 ingest SDL | **merged** | [#132](https://github.com/AprovanLabs/registry/pull/132) Linear schema shipped |
 | platform-oauth-apps §3 pool limiter | **merged** | [#126](https://github.com/AprovanLabs/registry/pull/126) → `main` |
 
@@ -79,6 +79,13 @@ TA §1 unlocks Wave-1: TA §2, TA §3, TA §4a.
 
 ## Settled (mid-wave addendum)
 - tools-addressing §1–§6 **complete** on main.
+
+## Wave 3 — unlocked by GE §3
+| Item | Status | Link |
+|------|--------|------|
+| platform-oauth-apps §1 resolution | **dispatched** | worktree `registry-iw8-poa01` |
+| grant-enforcement §4 run-scoped narrowing | **dispatched** | worktree `registry-iw8-ge04` |
+| registry-server-extraction §9 MCP closeout | **dispatched** | worktree `aprovan-iw8-rse09` |
 
 ## Later
 grant-enforcement §4–§5; tools-addressing §5–§6; graphql §3–§5; platform-oauth §4–§5;

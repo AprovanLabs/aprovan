@@ -30,3 +30,10 @@ pnpm --filter @aprovan/registry-server test -- credentials
 - May stub platform secret lookup if §2 not merged yet — document the seam
 - Touches: credentials/service.ts, oauth.ts, credentials/__tests__/**
 - Branch `iw8/platform-oauth-01-resolve`; report `briefs/01-report.md`
+
+## GE §3 rebase notes (settled)
+- `CredentialService` constructor now requires `(credentialStore, provisionCredential)`.
+- Atomic write is `RegistryStorage.provisionCredential` — do not bypass it.
+- `create()` signature/return type unchanged for callers; OAuth client resolution belongs
+  in oauth.ts / create path *before* provision, returning `origin` for audit + pool key.
+- New `SqlClient.transaction()` available if you need multi-step writes.

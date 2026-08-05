@@ -46,14 +46,14 @@ warning chip is gone rather than orphaned.
 
 > Depends-on: - | Touches: registry `packages/registry-server/src/credentials/service.ts`, `packages/registry-server/src/profiles/service.ts`, `packages/registry-server/src/storage/**` | Verify: `pnpm --filter @aprovan/registry-server test -- credentials`
 
-- [ ] 3.1 On credential creation, write a `default` profile row bound to it and a grant
+- [x] 3.1 On credential creation, write a `default` profile row bound to it and a grant
       to the connecting principal, in the **same transaction** as the credential.
-- [ ] 3.2 Apply to every creation path — direct create, OAuth authcode exchange, and any
+- [x] 3.2 Apply to every creation path — direct create, OAuth authcode exchange, and any
       admin import. Grep for `credentials.create` call sites; a path that skips this
       reintroduces the hole 1.1 closed.
-- [ ] 3.3 If a `default` row already exists for that (tenant, target), bind the new
+- [x] 3.3 If a `default` row already exists for that (tenant, target), bind the new
       credential only when the row has none; never silently repoint a pinned profile.
-- [ ] 3.4 Tests: connect → immediately dispatch, no admin step; transaction rollback
+- [x] 3.4 Tests: connect → immediately dispatch, no admin step; transaction rollback
       leaves neither credential nor profile; second credential for the same provider does
       not steal the existing default.
 
