@@ -83,7 +83,7 @@ TA §1 unlocks Wave-1: TA §2, TA §3, TA §4a.
 ## Wave 3 — unlocked by GE §3
 | Item | Status | Link |
 |------|--------|------|
-| platform-oauth-apps §1 resolution | **dispatched** | worktree `registry-iw8-poa01` |
+| platform-oauth-apps §1 resolution | **merged** | [#137](https://github.com/AprovanLabs/registry/pull/137) |
 | grant-enforcement §4 run-scoped narrowing | **merged** | [#135](https://github.com/AprovanLabs/registry/pull/135) |
 | registry-server-extraction §9 MCP closeout | **dispatched** | worktree `aprovan-iw8-rse09` |
 

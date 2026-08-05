@@ -24,14 +24,14 @@ corrupted SDL fails `pnpm build` with the provider named.
 
 > Depends-on: 1 | Touches: registry `packages/bundler/src/graphql-index.ts` (new), `packages/bundler/src/__tests__/graphql-index.test.ts` | Verify: `pnpm --filter @aprovan/utdk-bundler test -- graphql-index`
 
-- [ ] 2.1 Generate a type index from SDL at bundle time: type name → kind, fields, field
+- [x] 2.1 Generate a type index from SDL at bundle time: type name → kind, fields, field
       args, deprecation, description. Root `Query`/`Mutation`/`Subscription` fields are
       marked as entry points.
-- [ ] 2.2 Store it as a queryable artifact, not as prose. Size it so a single-type lookup
+- [x] 2.2 Store it as a queryable artifact, not as prose. Size it so a single-type lookup
       never requires loading the whole index.
-- [ ] 2.3 Record index size per provider in the build output — this is the number that
+- [x] 2.3 Record index size per provider in the build output — this is the number that
       tells you when the artifact needs splitting.
-- [ ] 2.4 Tests: a known type resolves to its fields; an unknown type returns a miss, not
+- [x] 2.4 Tests: a known type resolves to its fields; an unknown type returns a miss, not
       an error; deprecated fields carry their reason.
 
 **Done when** looking up one type costs a bounded read regardless of schema size.

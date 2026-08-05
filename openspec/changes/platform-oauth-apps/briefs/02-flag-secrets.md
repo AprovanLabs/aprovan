@@ -30,3 +30,8 @@ pnpm --filter @aprovan/utdk-bundler test && pnpm --filter @aprovan/registry-serv
   with GQL §5 / POA §5
 - Do not flip real providers to `platformApp: true` yet (§5 onboarding)
 - Branch `iw8/platform-oauth-02-flag`; report `briefs/02-report.md`
+
+## §1 seam (merged #137)
+Wire `setPlatformOAuthLookup` at hosted startup from `PLATFORM_OAUTH_<PROVIDER>_CLIENT_ID` /
+`_SECRET`. Do not change `resolveOAuthClient` contract. Self-host with flag+no-secret
+must boot clean (one startup log).
