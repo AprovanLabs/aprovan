@@ -71,6 +71,12 @@ TA §1 unlocks Wave-1: TA §2, TA §3, TA §4a.
 | grant-enforcement §2 bracket error | pending | TA §4 |
 | graphql-schema-surface §2 type index | pending | GQL §1 |
 
+## Wave 1b — unlocked by TA §4
+| Item | Status | Link |
+|------|--------|------|
+| grant-enforcement §2 bracket error | **dispatched** | worktree `registry-iw8-ge02` |
+| tools-addressing §5 lazy types | **dispatched** | worktree `aprovan-iw8-ta05` |
+
 ## Later
 grant-enforcement §4–§5; tools-addressing §5–§6; graphql §3–§5; platform-oauth §4–§5;
 registry-server-extraction §9 (after GE §1).
