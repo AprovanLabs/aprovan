@@ -325,6 +325,9 @@ function NewFileRow({
             if (error) setError(null);
           }}
           onKeyDown={(e) => {
+            // Keep @pierre/trees typeahead from treating letter/number keys as
+            // "open search" while this header input is focused.
+            e.stopPropagation();
             if (e.key === 'Enter') {
               e.preventDefault();
               submit();
