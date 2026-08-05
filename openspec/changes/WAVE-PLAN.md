@@ -97,7 +97,7 @@ TA §1 unlocks Wave-1: TA §2, TA §3, TA §4a.
 |------|--------|------|
 | graphql-schema-surface §4 SDL overview docs | **merged** | [#138](https://github.com/AprovanLabs/registry/pull/138) |
 | graphql-schema-surface §3 schema_lookup | **dispatched** | worktree `registry-iw8-gql03` |
-| graphql-schema-surface §5 api version | **dispatched** | worktree `registry-iw8-gql05` |
+| graphql-schema-surface §5 api version | **merged** | [#143](https://github.com/AprovanLabs/registry/pull/143) — 5.4 disk lint deferred (needs versioned SDL ingest) |
 
 ## Wave 3d — unlocked by POA §2
 | Item | Status | Link |

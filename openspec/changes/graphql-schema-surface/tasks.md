@@ -71,17 +71,17 @@ without the SDL entering context.
 
 > Depends-on: - | Touches: registry `packages/registry-server/src/profiles/resolve.ts`, `packages/registry-server/src/storage/types.ts`, `data/registry.json` | Verify: `pnpm --filter @aprovan/registry-server test -- profiles`
 
-- [ ] 5.1 Add `apiVersions` and `defaultVersion` to provider entries; add `version` to
+- [x] 5.1 Add `apiVersions` and `defaultVersion` to provider entries; add `version` to
       profiles. A profile version absent from `apiVersions` is a resolution error naming
       the supported set.
-- [ ] 5.2 **Derive** `baseUrl` from the resolved version via `versionedBaseUrl`; do not
+- [x] 5.2 **Derive** `baseUrl` from the resolved version via `versionedBaseUrl`; do not
       let a profile set both. A profile setting `baseUrl` on a versioned provider is a
       400 — that is the drift this change exists to prevent.
-- [ ] 5.3 Keep both fields optional: most of the ~2,000 providers have no version
+- [x] 5.3 Keep both fields optional: most of the ~2,000 providers have no version
       concept.
 - [ ] 5.4 Lint: a provider with `schemas/` must declare `defaultVersion`, and every
       declared version must have a schema file.
-- [ ] 5.5 Tests: pinned version selects its schema and its endpoint; a version with no
+- [x] 5.5 Tests: pinned version selects its schema and its endpoint; a version with no
       schema fails loudly; unversioned providers are unaffected.
 
 **Done when** the endpoint and the schema for a given call are provably derived from one
