@@ -80,7 +80,7 @@ current scheme is sufficient is written down next to the code.
 
 > Depends-on: 2 | Touches: registry `data/registry.json` (one entry per provider) | Verify: `pnpm --filter @aprovan/registry-server test -- credentials`
 
-- [ ] 5.1 Register and ship the first platform app end-to-end as the proving run —
+- [x] 5.1 Register and ship the first platform app end-to-end as the proving run —
       GitHub or Slack, whichever review queue moves first.
 - [x] 5.2 Write the runbook: what app review requires per provider, redirect URI
       conventions, scope selection, and how to rotate a platform secret without
