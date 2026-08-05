@@ -646,8 +646,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/compiler
       '@aprovan/registry-server':
-        specifier: ^0.2.2
-        version: 0.2.2(zod@3.25.76)
+        specifier: ^0.2.4
+        version: 0.2.4(zod@3.25.76)
       '@aws-sdk/client-cognito-identity-provider':
         specifier: ^3.1077.0
         version: 3.1101.0
@@ -820,8 +820,8 @@ packages:
     peerDependencies:
       ajv: '>=8'
 
-  '@aprovan/registry-server@0.2.2':
-    resolution: {integrity: sha512-OT9twmtXJIzh0pl0+U3kTefqFxiAq96DF26bPCVuP28OCo0ypJyoOMpxNQIlEywkJB+6OSTSLEhKIkJyu/RPOg==}
+  '@aprovan/registry-server@0.2.4':
+    resolution: {integrity: sha512-KmtgLTbxgvYvwmriPIfhI7y87sKVLkSW2TBn97Zfc4b2jLKS6RM2B913PBOGj2Bq4xthkeLSisrBsSBBYjFFXA==}
     engines: {node: '>=20.0.0'}
 
   '@asamuzakjp/css-color@6.0.5':
@@ -8368,7 +8368,7 @@ snapshots:
       jsonpointer: 5.0.1
       leven: 3.1.0
 
-  '@aprovan/registry-server@0.2.2(zod@3.25.76)':
+  '@aprovan/registry-server@0.2.4(zod@3.25.76)':
     dependencies:
       '@hono/node-server': 1.19.17(hono@4.12.33)
       '@jitl/quickjs-wasmfile-debug-asyncify': 0.32.0

@@ -88,7 +88,7 @@ async function profileService(): Promise<{
   storage: Awaited<ReturnType<typeof getRegistryStorage>>;
 }> {
   const storage = await getRegistryStorage();
-  const credentials = new CredentialService(storage.credentials);
+  const credentials = new CredentialService(storage.credentials, storage.provisionCredential);
   const service = new ProfileService(
     storage.profiles,
     storage.grants,

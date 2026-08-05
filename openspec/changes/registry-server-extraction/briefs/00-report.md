@@ -54,6 +54,13 @@ on main without further WS-3 code:
    natives + agent `compatDispatch`). Cipher, OAuth, sandbox, isolate, and
    `ServiceError` come from `@aprovan/registry-server`. Registry `apps/workspace`
    source is gone.
+   **Amended (§9.1, registry-server-extraction §9):** the claim above did not
+   extend to MCP — `server/workspace/src/mcp/server.ts` was still a 326-line
+   parallel assembly with its own `buildMcpServer`/`permittedTools`/`makeExecute`,
+   never rewired to the package's `createMcpHandler`. That gap is what §9 closed;
+   see `briefs/09-report.md`. This bullet should not have been read as covering
+   MCP, and is corrected here rather than rewritten, so the history stays honest
+   about when the claim was actually true.
 2. **8.4** — `profiles-unified` (#85) deleted `interfaces.bind`/`unbind`, added
    `profiles.*`, rejected colon namespaces, and made credential labels display-only.
    Sandbox `getClient({` is gone. Leftover `readBindings`/`listInstances` names are

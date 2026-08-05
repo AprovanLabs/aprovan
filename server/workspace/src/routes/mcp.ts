@@ -1,6 +1,5 @@
-import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { Hono } from "hono";
-import { buildMcpServer } from "../mcp/server.js";
+import { handleMcpRequest } from "../registry-embed.js";
 import { getAuthMode, resolvePrincipal } from "../middleware/auth.js";
 import { rateLimitByUserId } from "../middleware/rateLimitMiddleware.js";
 
@@ -31,12 +30,8 @@ mcpRouter.use("*", async (c, next) => {
 });
 mcpRouter.use("*", rateLimitByUserId);
 
-mcpRouter.all("/", async (c) => {
-  const transport = new WebStandardStreamableHTTPServerTransport({
-    sessionIdGenerator: undefined,
-    enableJsonResponse: true,
-  });
-  const server = await buildMcpServer(c.get("principal"));
-  await server.connect(transport);
-  return transport.handleRequest(c.req.raw);
-});
+// The transport (streamable-HTTP session wiring) now lives in
+// `createMcpHandler` (`@aprovan/registry-server`), bound to this embed's
+// dispatcher/resolveDeps in `registry-embed.ts` (registry-server-extraction
+// §9.4) — this route only derives the principal and hands off the raw request.
+mcpRouter.all("/", async (c) => handleMcpRequest(c.get("principal"), c.req.raw));
