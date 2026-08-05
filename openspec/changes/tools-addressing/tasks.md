@@ -89,8 +89,8 @@ an unresolvable reference degrades to no types rather than a broken editor.
 
 > Depends-on: 3 | Touches: registry `packages/remote/src/imports.ts` (docstring), aprovan `openspec/changes/tools-addressing/**` | Verify: `pnpm --filter @utdk/remote typecheck`
 
-- [ ] 6.1 State in the `imports.ts` module docstring that the scan is a type-loading
+- [x] 6.1 State in the `imports.ts` module docstring that the scan is a type-loading
       hint and that enforcement lives at `resolveProfile` — the next reader will
       otherwise assume the dependency list is a security boundary.
-- [ ] 6.2 Record that transport-specific namespace segments (`gql`, `mcp`) were
+- [x] 6.2 Record that transport-specific namespace segments (`gql`, `mcp`) were
       considered and rejected, so the question is not reopened from scratch.
