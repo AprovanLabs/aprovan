@@ -27,16 +27,16 @@ override with their own at any point without a different code path.
 
 > Depends-on: - | Touches: registry `data/registry.json`, `packages/bundler/src/provider.ts`, `packages/registry-server/src/config/env.ts` | Verify: `pnpm --filter @aprovan/utdk-bundler test && pnpm --filter @aprovan/registry-server test -- config`
 
-- [ ] 2.1 Add an optional `platformApp: boolean` to provider entries; validate it at
+- [x] 2.1 Add an optional `platformApp: boolean` to provider entries; validate it at
       registry load like other provider fields.
-- [ ] 2.2 Read platform secrets from `PLATFORM_OAUTH_<PROVIDER>_CLIENT_ID` / `_SECRET`,
+- [x] 2.2 Read platform secrets from `PLATFORM_OAUTH_<PROVIDER>_CLIENT_ID` / `_SECRET`,
       KMS-wrapped, at hosted startup only.
-- [ ] 2.3 A provider flagged `platformApp: true` with no secret configured must **not**
+- [x] 2.3 A provider flagged `platformApp: true` with no secret configured must **not**
       fail boot — that is the self-host case. It falls back to BYO and logs once at
       startup, not per call.
-- [ ] 2.4 Store platform secrets under their own key prefix with their own access audit
+- [x] 2.4 Store platform secrets under their own key prefix with their own access audit
       (D4); assert no tenant-scoped read path can reach the prefix.
-- [ ] 2.5 Tests: flag present + secret present → platform; flag present + secret absent →
+- [x] 2.5 Tests: flag present + secret present → platform; flag present + secret absent →
       BYO with a single startup log; flag absent → BYO.
 
 **Done when** the public repo states which providers have platform apps and contains no

@@ -97,7 +97,12 @@ TA §1 unlocks Wave-1: TA §2, TA §3, TA §4a.
 |------|--------|------|
 | graphql-schema-surface §4 SDL overview docs | **merged** | [#138](https://github.com/AprovanLabs/registry/pull/138) |
 | graphql-schema-surface §3 schema_lookup | **blocked** | wait GE §5 (mcp/**) |
-| graphql-schema-surface §5 api version | **blocked** | serialize `data/registry.json` after POA §2 |
+| graphql-schema-surface §5 api version | **dispatched** | worktree `registry-iw8-gql05` |
+
+## Wave 3d — unlocked by POA §2
+| Item | Status | Link |
+|------|--------|------|
+| platform-oauth-apps §5 onboard runbook | **dispatched** | worktree `registry-iw8-poa05` (runbook + defer Google; no live app until §4 OQ) |
 
 ## Later
 grant-enforcement §4–§5; tools-addressing §5–§6; graphql §3–§5; platform-oauth §4–§5;
