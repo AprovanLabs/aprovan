@@ -38,7 +38,7 @@
   "dependencies": {
     "@aprovan/node": "workspace:*",
     "@aprovan/patchwork": "workspace:*",
-    "@aprovan/registry-server": "^0.2.2",
+    "@aprovan/registry-server": "^0.2.5",
     "@aprovan/native": "workspace:*",
     "@aws-sdk/client-cognito-identity-provider": "^3.1077.0",
     "@aws-sdk/client-dynamodb": "^3.1077.0",
