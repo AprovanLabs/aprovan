@@ -49,6 +49,7 @@
   "dependencies": {
     "@aprovan/editor": "workspace:*",
     "@aprovan/registry-main": "workspace:*",
+    "@aprovan/registry-server": "^0.2.7",
     "@aprovan/ui": "workspace:*",
     "@observablehq/plot": "^0.6.17",
     "@xyflow/react": "^12.8.2",

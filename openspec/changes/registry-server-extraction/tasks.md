@@ -234,3 +234,10 @@ enforcement chokepoint the profiles spec designates.
       `packages/mcp-app-server/` hold `dist`/`.turbo`/`node_modules` with no `src` and
       no `package.json`, and are tracked by git in zero files. Leftovers from the WS-4
       move; they shadow the real `@utdk/mcp*` packages during local resolution.
+      _Was marked `[x]` while all three were still on disk — corrected and actually done
+      by the `MIGRATION-DEBT` pass. The count was also low: the zero-tracked-file scan
+      found **19** husks, not 3 (10 in aprovan, 9 in registry). Two were not inert —
+      `aprovan/packages/contracts/` made `interfaces.ts:155` take its monorepo branch and
+      silently load zero compat documents instead of the nine published ones, and
+      `aprovan/packages/registry-server/dist/` was a stale full build of the server
+      package. See `openspec/changes/MIGRATION-DEBT.md` §2._

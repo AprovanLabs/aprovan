@@ -50,13 +50,16 @@ export interface ApiKey {
   revokedAt?: string;
 }
 
-export type ProfileTargetKind = "interface" | "provider";
+/**
+ * Owned by `@aprovan/registry-server`. This was the second of two independent
+ * local redeclarations of `ProfileTargetKind` in this package (the other was in
+ * `../credentials/types.ts`); both predated the `"path"` member, and both
+ * escaped through the package barrel as same-named, structurally different
+ * types.
+ */
+export type { ProfileLimits, ProfileTargetKind } from "@aprovan/registry-server";
 
-export interface ProfileLimits {
-  rps?: number;
-  burst?: number;
-  budget?: number;
-}
+import type { ProfileLimits, ProfileTargetKind } from "@aprovan/registry-server";
 
 export interface Profile {
   id: string;

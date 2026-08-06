@@ -568,6 +568,9 @@ importers:
       '@aprovan/registry-main':
         specifier: workspace:*
         version: link:../registry-main
+      '@aprovan/registry-server':
+        specifier: ^0.2.7
+        version: 0.2.7(zod@3.25.76)
       '@aprovan/ui':
         specifier: workspace:*
         version: link:../ui
@@ -822,6 +825,11 @@ packages:
 
   '@aprovan/registry-server@0.2.5':
     resolution: {integrity: sha512-ibSEBV8ddg5nNEsZmmTPUgJ7y6LMuHW/e7sB4JWvMsQdROdALh3oL66zwfuam8LGmL0DmFdlvrjqIwALP/b9XQ==}
+    engines: {node: '>=20.0.0'}
+    deprecated: 'Broken: pins @utdk/mcp-core@0.1.0, which lacks lookupGraphqlType — any import throws. Use 0.2.7+.'
+
+  '@aprovan/registry-server@0.2.7':
+    resolution: {integrity: sha512-UlB67aQzxjLnFMPzsoJcom9GxlSvY22X8FEKiwiZYxQJvOTA/biOhe4/pNGMQeDW1d+mq82zPxrnDJ7tcdNlhA==}
     engines: {node: '>=20.0.0'}
 
   '@asamuzakjp/css-color@6.0.5':
@@ -4713,6 +4721,10 @@ packages:
     resolution: {integrity: sha512-mv41aZxedt2cNlvVSyJ3fE/Oo8RysqLmhFKsJaYP3V75PIh0bdGF0okY1AvqbCNUsBU0wvT+ch43SQ1ais10Og==}
     engines: {node: '>=20.0.0'}
 
+  '@utdk/mcp-core@0.1.2':
+    resolution: {integrity: sha512-drhxZ6sKqQrBvgNuu/JXGFJ5hRV+qwHxMzVBebzcJcNPP8mrkSwpiRy6YqzunSKcReB3y4ezAGGx7/uP1RtN0A==}
+    engines: {node: '>=20.0.0'}
+
   '@utdk/remote@0.1.1':
     resolution: {integrity: sha512-KGTIFoGENtVQL+PVu7s3AqEb0U4Ad1/cX9rrszsONcouGIYidmi+VadjfjSTPTW+ZiNcIY+QPJyZBpP6SCyTBA==}
     engines: {node: '>=20.0.0'}
@@ -8383,6 +8395,34 @@ snapshots:
       '@utdk/common': 0.1.1(@opentelemetry/api@1.9.0)
       '@utdk/llm': 0.2.0
       '@utdk/mcp-core': 0.1.0(@opentelemetry/api@1.9.0)
+      better-sqlite3: 12.11.1
+      hono: 4.12.33
+      jose: 5.10.0
+      quickjs-emscripten-core: 0.32.0
+    optionalDependencies:
+      '@aws-sdk/client-kms': 3.1101.0
+    transitivePeerDependencies:
+      - '@cfworker/json-schema'
+      - debug
+      - pg-native
+      - supports-color
+      - zod
+
+  '@aprovan/registry-server@0.2.7(zod@3.25.76)':
+    dependencies:
+      '@hono/node-server': 1.19.17(hono@4.12.33)
+      '@jitl/quickjs-wasmfile-debug-asyncify': 0.32.0
+      '@modelcontextprotocol/sdk': 1.30.0(zod@3.25.76)
+      '@opentelemetry/api': 1.9.0
+      '@opentelemetry/exporter-trace-otlp-http': 0.57.2(@opentelemetry/api@1.9.0)
+      '@opentelemetry/resources': 1.30.1(@opentelemetry/api@1.9.0)
+      '@opentelemetry/sdk-trace-base': 1.30.1(@opentelemetry/api@1.9.0)
+      '@opentelemetry/sdk-trace-node': 1.30.1(@opentelemetry/api@1.9.0)
+      '@utdk/agent': 0.2.0
+      '@utdk/clients': 0.1.1
+      '@utdk/common': 0.1.1(@opentelemetry/api@1.9.0)
+      '@utdk/llm': 0.2.0
+      '@utdk/mcp-core': 0.1.2(@opentelemetry/api@1.9.0)
       better-sqlite3: 12.11.1
       hono: 4.12.33
       jose: 5.10.0
@@ -13304,6 +13344,18 @@ snapshots:
     transitivePeerDependencies:
       - '@opentelemetry/api'
       - debug
+      - supports-color
+
+  '@utdk/mcp-core@0.1.2(@opentelemetry/api@1.9.0)':
+    dependencies:
+      '@utcp/http': 1.1.11
+      '@utdk/common': 0.1.1(@opentelemetry/api@1.9.0)
+    optionalDependencies:
+      '@utdk/clients': 0.1.1
+    transitivePeerDependencies:
+      - '@opentelemetry/api'
+      - debug
+      - pg-native
       - supports-color
 
   '@utdk/remote@0.1.1': {}

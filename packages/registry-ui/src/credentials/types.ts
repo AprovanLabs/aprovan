@@ -1,44 +1,26 @@
-export type CredentialType =
-  | "bearer_token"
-  | "api_key"
-  | "oauth2_client"
-  | "oauth2_authcode";
+/**
+ * Credential payload shapes are OWNED by `@aprovan/registry-server` and
+ * re-exported here so the UI has exactly one definition. These were redeclared
+ * locally until the MIGRATION-DEBT pass and had drifted: `clientId`/
+ * `clientSecret` were required (they are optional upstream, so a redacted
+ * platform-OAuth payload could not be represented), `clientOrigin` was absent,
+ * and `oauth2_authcode` was missing the `accessToken`/`refreshToken`/
+ * `expiresAt` fields the server writes back after the token exchange.
+ *
+ * Do not reintroduce copies — extend the package instead. These are `export
+ * type` only, so nothing from the server package reaches the browser bundle.
+ */
+export type {
+  ApiKeyPayload,
+  BearerTokenPayload,
+  CredentialPayload,
+  CredentialType,
+  OAuth2AuthCodePayload,
+  OAuth2ClientPayload,
+  OAuthClientOrigin,
+} from "@aprovan/registry-server";
 
-export interface BearerTokenPayload {
-  type: "bearer_token";
-  token: string;
-}
-
-export interface ApiKeyPayload {
-  type: "api_key";
-  value: string;
-  headerName?: string;
-}
-
-export interface OAuth2ClientPayload {
-  type: "oauth2_client";
-  clientId: string;
-  clientSecret: string;
-  tokenUrl: string;
-  scopes?: string[];
-}
-
-export interface OAuth2AuthCodePayload {
-  type: "oauth2_authcode";
-  clientId: string;
-  clientSecret: string;
-  tokenUrl: string;
-  code: string;
-  redirectUri: string;
-  codeVerifier?: string;
-  scopes?: string[];
-}
-
-export type CredentialPayload =
-  | BearerTokenPayload
-  | ApiKeyPayload
-  | OAuth2ClientPayload
-  | OAuth2AuthCodePayload;
+import type { CredentialPayload, CredentialType } from "@aprovan/registry-server";
 
 export interface CredentialInput {
   provider: string;
@@ -85,14 +67,16 @@ export interface OAuthPendingState {
   state: string;
 }
 
-/** Workspace profile wire shape (no credential payload). */
-export type ProfileTargetKind = "interface" | "provider";
+/**
+ * Workspace profile wire shape (no credential payload).
+ *
+ * `ProfileTargetKind` and `ProfileLimits` are owned by
+ * `@aprovan/registry-server`. The local copy of `ProfileTargetKind` predated
+ * the `"path"` member and so could not represent a path profile at all.
+ */
+export type { ProfileLimits, ProfileTargetKind } from "@aprovan/registry-server";
 
-export interface ProfileLimits {
-  rps?: number;
-  burst?: number;
-  budget?: number;
-}
+import type { ProfileLimits, ProfileTargetKind } from "@aprovan/registry-server";
 
 export interface ProfileWire {
   id: string;
