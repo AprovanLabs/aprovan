@@ -121,6 +121,7 @@ async function resolveCredentials(
   try {
     return {
       credentials: await resolveToInjectable(record.payload, {
+        provider: providerId,
         cacheKey: `${workspaceId}:${providerId}:${record.id}`,
         persist: (payload) => store.updatePayload(workspaceId, record.id, payload),
       }),

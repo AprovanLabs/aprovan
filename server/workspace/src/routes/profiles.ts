@@ -17,6 +17,7 @@ import {
   defaultCatalog,
   type CallContext,
   type ProfileRow,
+  type ProfileTargetKind,
 } from "@aprovan/registry-server";
 import { requireAdmin, requireAuth } from "../middleware/auth.js";
 import { validateBody } from "../middleware/validate.js";
@@ -27,7 +28,12 @@ import { ServiceError } from "../service-kernel.js";
 export interface ProfileWire {
   id: string;
   name: string;
-  targetKind: "interface" | "provider";
+  /**
+   * Read shape mirrors the stored row, which now includes `"path"`. The
+   * create/update schemas stay narrower — this route does not mint path
+   * profiles (those come from profiles/store.ts).
+   */
+  targetKind: ProfileTargetKind;
   targetId: string;
   provider?: string;
   credentialId?: string;

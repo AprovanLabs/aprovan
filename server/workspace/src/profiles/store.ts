@@ -10,8 +10,8 @@
  * Profile names are any non-empty string (no identifier regex). The default
  * profile uses the reserved name {@link DEFAULT_PROFILE_NAME}.
  *
- * `"path"` is stored as a target_kind string; the published @aprovan/registry-server
- * type union gains it in the companion registry PR.
+ * `"path"` is a first-class member of the published @aprovan/registry-server
+ * `ProfileTargetKind` union as of 0.2.5 — no local widening needed.
  */
 
 import { getRegistryStorage } from "../registry-storage.js";
@@ -24,15 +24,8 @@ import {
   type ProfileValue,
 } from "./types.js";
 
-/** Includes `path` ahead of the published registry-server type union. */
-export type ProfileTargetKind = "interface" | "provider" | "path";
-
-/** Narrow the storage API's targetKind parameter without fighting package types. */
-type StorageKind = "interface" | "provider";
-
-function asStorageKind(kind: ProfileTargetKind): StorageKind {
-  return kind as StorageKind;
-}
+/** Owned by `@aprovan/registry-server` — re-exported here, never redeclared. */
+export type { ProfileTargetKind } from "@aprovan/registry-server";
 
 function normalizeName(name: string | undefined): string {
   if (name === undefined || name === "") return DEFAULT_PROFILE_NAME;
@@ -104,10 +97,9 @@ export async function setProfile(
 
   if (hasPath) {
     const path = input.path!;
-    const pathKind: ProfileTargetKind = "path";
     const existing = await storage.profiles.getByName(
       workspaceId,
-      asStorageKind(pathKind),
+      "path",
       path,
       DEFAULT_PROFILE_NAME,
     );
@@ -122,7 +114,7 @@ export async function setProfile(
     }
     const created = await storage.profiles.create(workspaceId, {
       name: DEFAULT_PROFILE_NAME,
-      targetKind: asStorageKind(pathKind),
+      targetKind: "path",
       targetId: path,
       ...(input.provider ? { provider: input.provider } : {}),
       ...(input.credential ? { credentialId: input.credential } : {}),
@@ -201,10 +193,9 @@ export async function removeProfile(
   const storage = await ensureTenant(workspaceId);
 
   if (hasPath) {
-    const pathKind: ProfileTargetKind = "path";
     const existing = await storage.profiles.getByName(
       workspaceId,
-      asStorageKind(pathKind),
+      "path",
       input.path!,
       DEFAULT_PROFILE_NAME,
     );
@@ -236,9 +227,8 @@ export async function getNamespaceProfile(
 /** All path-keyed profiles for longest-prefix resolution. */
 export async function listPathProfiles(workspaceId: string): Promise<ProfileRecord[]> {
   const storage = await ensureTenant(workspaceId);
-  const pathKind: ProfileTargetKind = "path";
   const rows = await storage.profiles.list(workspaceId, {
-    targetKind: asStorageKind(pathKind),
+    targetKind: "path",
   });
   return rows.map(rowToRecord);
 }

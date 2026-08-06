@@ -32,6 +32,8 @@ import {
 } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
+import type { CredentialType } from "@utdk/common/auth";
+import type { CredentialPayload } from "@aprovan/registry-server";
 import { getCredentialCipher } from "./credentialCipher.js";
 import { dynamo } from "./db/client.js";
 import { getRegistryStorage } from "./registry-storage.js";
@@ -48,53 +50,26 @@ const loadSqlite = (): typeof import("better-sqlite3") => {
 // Types
 // ---------------------------------------------------------------------------
 
-export type CredentialType =
-  | "bearer_token"
-  | "api_key"
-  | "oauth2_client"
-  | "oauth2_authcode";
-
-export interface BearerTokenPayload {
-  type: "bearer_token";
-  token: string;
-}
-
-export interface ApiKeyPayload {
-  type: "api_key";
-  value: string;
-  /** Header to inject (default: X-Api-Key) */
-  headerName?: string;
-}
-
-export interface OAuth2ClientPayload {
-  type: "oauth2_client";
-  clientId: string;
-  clientSecret: string;
-  tokenUrl: string;
-  scopes?: string[];
-}
-
-export interface OAuth2AuthCodePayload {
-  type: "oauth2_authcode";
-  clientId: string;
-  clientSecret: string;
-  tokenUrl: string;
-  code: string;
-  redirectUri: string;
-  codeVerifier?: string;
-  scopes?: string[];
-  /** Resolved tokens, written after the authorization-code exchange. */
-  accessToken?: string;
-  refreshToken?: string;
-  /** Epoch ms when the access token expires. */
-  expiresAt?: number;
-}
-
-export type CredentialPayload =
-  | BearerTokenPayload
-  | ApiKeyPayload
-  | OAuth2ClientPayload
-  | OAuth2AuthCodePayload;
+/**
+ * Payload shapes are OWNED by `@aprovan/registry-server` (its
+ * `credentials/types`) and re-exported here so the workspace has exactly one
+ * definition. Redeclaring them locally silently drifts and produces
+ * type-identity errors at every `resolveToInjectable` boundary — which is
+ * precisely what happened before the 0.2.5 pin. Do not reintroduce copies;
+ * extend the package instead.
+ *
+ * `CredentialType` is the shared WS-2 tuple from `@utdk/common/auth`, the same
+ * source registry-server re-exports.
+ */
+export type { CredentialType } from "@utdk/common/auth";
+export type {
+  ApiKeyPayload,
+  BearerTokenPayload,
+  CredentialPayload,
+  OAuth2AuthCodePayload,
+  OAuth2ClientPayload,
+  OAuthClientOrigin,
+} from "@aprovan/registry-server";
 
 export interface CredentialInput {
   provider: string;

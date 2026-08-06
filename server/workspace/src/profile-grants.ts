@@ -18,13 +18,18 @@
 
 import { getRegistryStorage } from "./registry-storage.js";
 import { ServiceError } from "./service-kernel.js";
-import type { GrantSubject, ProfileRow, RegistryStorage } from "@aprovan/registry-server";
+import type {
+  GrantSubject,
+  ProfileRow,
+  ProfileTargetKind,
+  RegistryStorage,
+} from "@aprovan/registry-server";
 
 /** Wire shape of one attached profile (tech-plan groups/profiles admin API). */
 export interface GroupProfileSummary {
   id: string;
   name: string;
-  target: { kind: "interface" | "provider"; id: string; provider?: string };
+  target: { kind: ProfileTargetKind; id: string; provider?: string };
   /** The pinned credential's label (falling back to its provider) — display only. */
   credentialLabel?: string;
 }

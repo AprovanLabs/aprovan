@@ -81,7 +81,7 @@ credentialsRouter.post("/", requireAdmin, validateBody(credentialSchema), async 
   // for tokens now and store the token set instead of the dead code.
   if (input.payload.type === "oauth2_authcode") {
     try {
-      const tokens = await exchangeAuthorizationCode(input.payload);
+      const tokens = await exchangeAuthorizationCode(input.provider, input.payload);
       input.payload = {
         ...input.payload,
         code: "",

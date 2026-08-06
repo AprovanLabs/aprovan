@@ -1170,6 +1170,7 @@ toolsRouter.post("/:provider/:operation{.*}", rateLimitByUserId, async (c) => {
       // grant or refresh); the executor only ever sees injectable credentials.
       try {
         credentials = await resolveToInjectable(record.payload, {
+          provider,
           cacheKey: `${workspaceId}:${provider}:${record.id}`,
           persist: (payload) => store.updatePayload(workspaceId, record.id, payload),
         });
