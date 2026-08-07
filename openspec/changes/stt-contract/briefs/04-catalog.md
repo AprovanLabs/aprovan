@@ -13,8 +13,8 @@ Add `stt` to `INTERFACE_ORDER` in registry-server catalog; assert session-mode o
 Streams 2–3 merged (Deepgram + AssemblyAI unavailable).
 
 ## Tasks
-- [ ] 4.1 Add `stt` to `INTERFACE_ORDER` so it sorts deliberately rather than alphabetically after the pre-instance set.
-- [ ] 4.2 Assert in tests that the loaded interface exposes a session-mode operation and that binding an unavailable entry fails with its declared reason.
+- [x] 4.1 Add `stt` to `INTERFACE_ORDER` so it sorts deliberately rather than alphabetically after the pre-instance set.
+- [x] 4.2 Assert in tests that the loaded interface exposes a session-mode operation and that binding an unavailable entry fails with its declared reason.
 
 ## Verify
 `pnpm --filter @aprovan/registry-server test`
