@@ -517,4 +517,57 @@ describe("gateway supervision scenarios (spec coverage notes)", () => {
     expect(child.killed || child.signalCode != null).toBe(true);
     fs.rmSync(dataDir, { recursive: true, force: true });
   });
+
+  it("merges extraEnv into each spawn and reload respawns with a fresh env", async () => {
+    const { statuses, onStatus } = collectStatuses();
+    const children: FakeChild[] = [];
+    const spawnEnvs: Array<NodeJS.ProcessEnv | undefined> = [];
+    let appleBaseUrl: string | undefined;
+    let port = 55_000;
+
+    const supervisor = createGatewaySupervisor({
+      nodeBinary: "/node",
+      gatewayDir: "/gateway",
+      dataDir: "/data",
+      onStatus,
+      maxAttempts: 5,
+      healthIntervalMs: 5,
+      healthTimeoutMs: 1_000,
+      initialBackoffMs: 1,
+      maxBackoffMs: 1,
+      sleep: immediateSleep,
+      extraEnv: () =>
+        appleBaseUrl ? { LLM_APPLE_BASE_URL: appleBaseUrl } : {},
+      reservePort: async () => {
+        port += 1;
+        return port;
+      },
+      spawn: ((_cmd, _args, opts) => {
+        spawnEnvs.push(opts.env as NodeJS.ProcessEnv | undefined);
+        const child = new FakeChild();
+        child.pid = 55_000 + children.length;
+        children.push(child);
+        return child;
+      }) as SpawnFn,
+      fetch: async () => ({ ok: true, status: 200 }),
+    });
+
+    const started = supervisor.start();
+    await waitFor(() => supervisor.getStatus().state === "ready");
+    expect(spawnEnvs[0]?.LLM_APPLE_BASE_URL).toBeUndefined();
+
+    appleBaseUrl = "http://127.0.0.1:61234/v1";
+    await supervisor.reload();
+
+    await waitFor(() => children.length >= 2);
+    await waitFor(() => supervisor.getStatus().state === "ready");
+    expect(spawnEnvs[1]?.LLM_APPLE_BASE_URL).toBe(
+      "http://127.0.0.1:61234/v1",
+    );
+    // Intentional reload must not surface a crashy "restarting" status.
+    expect(statuses.some((s) => s.state === "restarting")).toBe(false);
+
+    await supervisor.stop();
+    await started;
+  });
 });

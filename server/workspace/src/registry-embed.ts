@@ -16,6 +16,7 @@ import {
   type ServiceContext as RegistryServiceContext,
 } from "@aprovan/registry-server";
 import { dispatchNativeAgentOp } from "./agents/runner.js";
+import { createHelperAvailabilityProbe } from "./helper-availability-probe.js";
 import { workspaceMcpExtensions } from "./mcp/extensions.js";
 import { dispatchAprovanNativeOp } from "./native-dispatch.js";
 import { getExecutor } from "./isolate.js";
@@ -107,6 +108,7 @@ async function bootRegistryServer(): Promise<RegistryServer> {
     nativeServices: toRegistryNativeServices(nativeServices),
     executorInstance: embedExecutor,
     mcp: { extensions: workspaceMcpExtensions },
+    runAvailabilityProbe: createHelperAvailabilityProbe(),
     ...(authMode === "none" ? { allowInsecure: true } : {}),
     auth:
       authMode === "none"
