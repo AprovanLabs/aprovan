@@ -68,6 +68,21 @@ contract change** — message shapes and dispatch path unchanged; rebinding from
 a hosted provider to on-device is a binding change only. That is the evidence
 for the pattern's central claim.
 
+## Evidence: local STT passed the same conformance suite
+
+The `stt` contract already had a remote fulfiller. On-device transcription landed
+as a **credentialless** catalog entry (`provider: "local"`, module
+`@aprovan/native/stt`, helper routes under `/stt/…`) with no contract fork —
+callers push the same framed audio either provider receives.
+
+The suite written for remote `stt` was run against the local driver: every case
+that passes for the remote provider passes locally. That is the evidence that
+native capability and vendor capability are interchangeable behind the contract.
+Local sessions additionally assert that no audio leaves the machine (egress
+guard / zero external fetch during the session). See [voice.md](./voice.md) for
+capture, models, and diarization, and [stt.md](./stt.md) for encoding and
+segment rules.
+
 ## How to add the next native provider
 
 1. **Expose it on the helper** — add an HTTP route (or reuse an existing

@@ -11,6 +11,7 @@ See [core-beliefs](./design-docs/core-beliefs.md) for fundamental instructions.
 - [app-data.md](./app-data.md) App/install partitions, records vs files (shipped model)
 - [streaming-sessions.md](./streaming-sessions.md) Session-mode tools: SSE + POST push (MCP-aligned)
 - [stt.md](./stt.md) Speech-to-text sessions: required encoding, per-segment `final`, session-scoped speakers
+- [voice.md](./voice.md) Capture in the client, on-device models, diarization, panel↔chat continuity
 - [local-first.md](./local-first.md) Local vs cloud execution locus, VFS root, offline (D5)
 - [desktop.md](./desktop.md) Desktop shell: architecture, update channels, Application Support, local gateway
 - [native-providers.md](./native-providers.md) Loopback helper, portable gateway, availability states, adding providers

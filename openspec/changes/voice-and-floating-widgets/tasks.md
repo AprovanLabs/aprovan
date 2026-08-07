@@ -62,7 +62,7 @@
 
 > Depends-on: 6 | Touches: docs/voice.md, docs/index.md, docs/native-providers.md | Verify: `pnpm lint`
 
-- [ ] 7.1 Write `docs/voice.md`: capture in the client and why providers never capture, model selection and installation, what diarization requires, and how continuity works across surfaces.
-- [ ] 7.2 State plainly that there is no wake word and no always-on listening, and that capture is always explicitly started.
-- [ ] 7.3 Record in `docs/native-providers.md` that the local provider passed the same conformance suite as the remote one — the evidence that native capability and vendor capability are interchangeable.
-- [ ] 7.4 Link from `docs/index.md`.
+- [x] 7.1 Write `docs/voice.md`: capture in the client and why providers never capture, model selection and installation, what diarization requires, and how continuity works across surfaces.
+- [x] 7.2 State plainly that there is no wake word and no always-on listening, and that capture is always explicitly started.
+- [x] 7.3 Record in `docs/native-providers.md` that the local provider passed the same conformance suite as the remote one — the evidence that native capability and vendor capability are interchangeable.
+- [x] 7.4 Link from `docs/index.md`.
