@@ -43,6 +43,11 @@ export function resolvePreloadPath(): string {
   return path.join(here, "preload.cjs");
 }
 
+/** Preload for the floating panel window (PanelBridge only). */
+export function resolvePanelPreloadPath(): string {
+  return path.join(here, "preload-panel.cjs");
+}
+
 /** Vendored gateway deploy directory (stream 2). */
 export function resolveGatewayVendorDir(): string {
   if (app.isPackaged) {

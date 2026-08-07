@@ -42,12 +42,12 @@
 
 > Depends-on: 4 | Touches: desktop/src/panel.ts, desktop/src/hotkey.ts, desktop/src/preload-panel.ts, client/web/src/features/panel/** | Verify: `pnpm --filter @aprovan/desktop test && pnpm --filter @aprovan/patchwork-web typecheck`
 
-- [ ] 5.1 Create a non-activating floating panel at launch, hidden, so summoning shows rather than constructs it (D4).
-- [ ] 5.2 Register a user-configurable global hotkey; report a registration conflict at startup instead of leaving a dead key.
-- [ ] 5.3 Add the `PanelBridge` surface exactly as declared — summon, hide, resize — and nothing more.
-- [ ] 5.4 Mount widgets in the panel through the existing mount contract, with the same sandboxing as the chat surface; add mount tests running against both hosts.
-- [ ] 5.5 Size the panel to its content within configured bounds.
-- [ ] 5.6 Cover every scenario in `specs/floating-widget-panel/spec.md` except continuity, which is group 6.
+- [x] 5.1 Create a non-activating floating panel at launch, hidden, so summoning shows rather than constructs it (D4).
+- [x] 5.2 Register a user-configurable global hotkey; report a registration conflict at startup instead of leaving a dead key.
+- [x] 5.3 Add the `PanelBridge` surface exactly as declared — summon, hide, resize — and nothing more.
+- [x] 5.4 Mount widgets in the panel through the existing mount contract, with the same sandboxing as the chat surface; add mount tests running against both hosts.
+- [x] 5.5 Size the panel to its content within configured bounds.
+- [x] 5.6 Cover every scenario in `specs/floating-widget-panel/spec.md` except continuity, which is group 6.
 
 ## 6. Cross-surface continuity
 

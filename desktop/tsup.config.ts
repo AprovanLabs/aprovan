@@ -24,6 +24,7 @@ export default defineConfig([
   {
     entry: {
       preload: "src/preload.ts",
+      "preload-panel": "src/preload-panel.ts",
     },
     format: ["cjs"],
     platform: "node",
