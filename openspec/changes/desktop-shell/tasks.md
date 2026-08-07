@@ -40,12 +40,12 @@
 
 > Depends-on: 2 | Touches: desktop/src/bundle-manager.ts, desktop/src/__tests__/bundle-manager.test.ts | Verify: `pnpm --filter @aprovan/desktop test`
 
-- [ ] 5.1 Implement manifest fetch, detached-signature verification against a pinned public key, and content-hash verification (D3).
-- [ ] 5.2 Enforce `minShell`, refusing a bundle that requires a newer host and indicating the shell update path.
-- [ ] 5.3 Stage into a temporary directory and activate by rename so exactly one complete bundle is active at every moment; retain the previous bundle.
-- [ ] 5.4 Track boot success via renderer readiness reported over the bridge; roll back automatically after two consecutive failed boots.
-- [ ] 5.5 Expose `BundleInfo` over the bridge.
-- [ ] 5.6 Cover every scenario in `specs/renderer-hydration/spec.md`, including interrupted staging and tampered content.
+- [x] 5.1 Implement manifest fetch, detached-signature verification against a pinned public key, and content-hash verification (D3).
+- [x] 5.2 Enforce `minShell`, refusing a bundle that requires a newer host and indicating the shell update path.
+- [x] 5.3 Stage into a temporary directory and activate by rename so exactly one complete bundle is active at every moment; retain the previous bundle.
+- [x] 5.4 Track boot success via renderer readiness reported over the bridge; roll back automatically after two consecutive failed boots.
+- [x] 5.5 Expose `BundleInfo` over the bridge.
+- [x] 5.6 Cover every scenario in `specs/renderer-hydration/spec.md`, including interrupted staging and tampered content.
 
 ## 6. Directory picker and workspace creation
 
