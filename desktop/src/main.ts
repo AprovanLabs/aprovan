@@ -29,6 +29,7 @@ import {
   resolveEsmSeedDir,
   resolveGatewayVendorDir,
   resolveHelperBinary,
+  resolveSttModelsDir,
 } from "./paths.js";
 import {
   APP_SCHEME,
@@ -195,6 +196,7 @@ export async function startDesktopApp(): Promise<void> {
   const helperSupervisor = createHelperSupervisor({
     helperBinary: resolveHelperBinary(),
     seedDir: resolveEsmSeedDir(),
+    modelsDir: resolveSttModelsDir(),
     onStatus: (status) => {
       if (status.state === "ready") {
         bridgeState.helperUrl = status.url;

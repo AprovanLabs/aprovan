@@ -1,0 +1,10 @@
+{
+  "id": "whisper-tiny.en",
+  "filename": "ggml-tiny.en.bin",
+  "sha1": "c78c86eb1a8faa21b369bcd33207cc90d64ae9df",
+  "sizeBytes": 77676013,
+  "source": "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en.bin",
+  "license": "MIT",
+  "bundled": true,
+  "note": "Binary is download-at-build via desktop/scripts/fetch-stt-models.sh — not stored in git."
+}

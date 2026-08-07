@@ -3,12 +3,15 @@ import Foundation
 import EsmCache
 import MacOSHelperLib
 import ChatCompletions
+import SttModels
 
 struct CLIOptions {
     var host: String = "127.0.0.1"
     var port: UInt16 = 0
     var cacheDir: String?
     var seedDir: String?
+    var modelsDir: String?
+    var modelsInstallDir: String?
 }
 
 func parseArgs(_ args: [String]) -> CLIOptions {
@@ -33,6 +36,16 @@ func parseArgs(_ args: [String]) -> CLIOptions {
         }
         if arg == "--seed-dir", i + 1 < args.count {
             options.seedDir = args[i + 1]
+            i += 2
+            continue
+        }
+        if arg == "--models-dir", i + 1 < args.count {
+            options.modelsDir = args[i + 1]
+            i += 2
+            continue
+        }
+        if arg == "--models-install-dir", i + 1 < args.count {
+            options.modelsInstallDir = args[i + 1]
             i += 2
             continue
         }
@@ -88,6 +101,12 @@ func defaultCacheDirectory() -> URL {
     return base.appendingPathComponent("Aprovan/esm-cache", isDirectory: true)
 }
 
+func defaultModelsInstallDirectory() -> URL {
+    let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+        ?? FileManager.default.temporaryDirectory
+    return base.appendingPathComponent("Aprovan/stt-models", isDirectory: true)
+}
+
 func defaultSeedDirectory() -> URL? {
     // Packaged: Resources/esm-seed next to the binary's resource bundle.
     // Unpackaged / tests: native/macos-helper/Resources/esm-seed or CLI --seed-dir.
@@ -102,6 +121,34 @@ func defaultSeedDirectory() -> URL? {
             .appendingPathComponent("Resources/esm-seed", isDirectory: true),
     ]
     for url in candidates {
+        var isDir: ObjCBool = false
+        if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir), isDir.boolValue {
+            return url
+        }
+    }
+    return nil
+}
+
+/// Bundled ggml weights: packaged `Resources/models`, build output
+/// `desktop/build/models`, or CLI `--models-dir`.
+func defaultBundledModelsDirectory() -> URL? {
+    let exe = URL(fileURLWithPath: CommandLine.arguments[0]).resolvingSymlinksInPath()
+    let candidates = [
+        exe.deletingLastPathComponent().appendingPathComponent("models", isDirectory: true),
+        exe.deletingLastPathComponent().appendingPathComponent("Resources/models", isDirectory: true),
+        // Unpackaged: desktop/build/models relative to a helper built from the monorepo.
+        exe
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("desktop/build/models", isDirectory: true),
+    ]
+    for url in candidates {
+        let weights = url.appendingPathComponent(BundledSttModel.filename)
+        if FileManager.default.fileExists(atPath: weights.path) {
+            return url
+        }
         var isDir: ObjCBool = false
         if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir), isDir.boolValue {
             return url
@@ -131,12 +178,44 @@ let esmCache = EsmCacheService(
 )
 try esmCache.prepare()
 
+let bundledModelsDir: URL? = {
+    if let dir = options.modelsDir {
+        return URL(fileURLWithPath: dir, isDirectory: true)
+    }
+    return defaultBundledModelsDirectory()
+}()
+let modelsInstallDir = URL(
+    fileURLWithPath: options.modelsInstallDir ?? defaultModelsInstallDirectory().path,
+    isDirectory: true
+)
+let sttModels = SttModelStore(
+    installDirectory: modelsInstallDir,
+    bundledDirectory: bundledModelsDir
+)
+try sttModels.prepare()
+// D2 / "Model is ready before the first session": load bundled default at start.
+do {
+    try sttModels.loadBundledDefault()
+    FileHandle.standardError.write(
+        Data("macos-helper loaded STT model \(BundledSttModel.id)\n".utf8)
+    )
+} catch {
+    FileHandle.standardError.write(
+        Data("macos-helper warning: bundled STT model not loaded: \(error.localizedDescription)\n".utf8)
+    )
+}
+
 let reporter = AvailabilityReporter()
 let chat = ChatCompletionsService(engine: makeDefaultChatEngine())
 let server = try LoopbackHTTPServer(
     host: options.host,
     port: port,
-    router: makeRouter(reporter: reporter, esmCache: esmCache, chat: chat)
+    router: makeRouter(
+        reporter: reporter,
+        esmCache: esmCache,
+        chat: chat,
+        sttModels: sttModels
+    )
 )
 
 try await server.start()

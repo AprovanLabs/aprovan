@@ -3,10 +3,10 @@
 > Depends-on: - | Touches: native/macos-helper/Sources/SttModels/**, desktop/build/models/**, docs/decisions/** | Verify: `swift test --package-path native/macos-helper`
 
 - [x] 1.1 **Blocking**: check the redistribution licence of each candidate default model for bundling inside a signed application, and record the decision as an ADR before fixing a default (tech-plan Open Questions). → [ADR 0001](../../../docs/decisions/0001-bundle-whisper-tiny-en-stt.md) (`whisper-tiny.en`)
-- [ ] 1.2 Implement the model store: resolve a model id to weights on disk, list installed and available models with sizes and capabilities.
-- [ ] 1.3 Implement `/stt/models`, `/stt/models/:id/install` with SSE progress, and `DELETE /stt/models/:id`; refuse deletion of the bundled default.
-- [ ] 1.4 Verify fetched weights against a published hash and discard on mismatch, leaving installed models untouched.
-- [ ] 1.5 Bundle the chosen default model in the application and load it when the helper starts, not on first session (D2, and the "Model is ready before the first session" requirement).
+- [x] 1.2 Implement the model store: resolve a model id to weights on disk, list installed and available models with sizes and capabilities.
+- [x] 1.3 Implement `/stt/models`, `/stt/models/:id/install` with SSE progress, and `DELETE /stt/models/:id`; refuse deletion of the bundled default.
+- [x] 1.4 Verify fetched weights against a published hash and discard on mismatch, leaving installed models untouched.
+- [x] 1.5 Bundle the chosen default model in the application and load it when the helper starts, not on first session (D2, and the "Model is ready before the first session" requirement).
 
 ## 2. Local STT driver
 

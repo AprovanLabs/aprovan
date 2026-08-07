@@ -18,5 +18,6 @@ fi
 "$SCRIPT_DIR/assert-gateway.sh"
 "$SCRIPT_DIR/seed-esm.sh"
 "$SCRIPT_DIR/build-helper.sh"
+"$SCRIPT_DIR/fetch-stt-models.sh"
 
 log "desktop resources ready under $BUILD_DIR"

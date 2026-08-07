@@ -32,7 +32,12 @@ extraResources:
   # under Hardened Runtime when CSC_* secrets are present.
   - from: build/macos-helper
     to: macos-helper
-
+  # Bundled STT default (voice stream 1). Fetched hash-pinned by fetch-stt-models.sh.
+  - from: build/models
+    to: models
+    filter:
+      - "**/*"
+      - "!**/*.partial"
 asar: true
 
 # Shell update feed — independent of the OTA renderer bundle channel (D6).

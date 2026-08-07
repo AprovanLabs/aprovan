@@ -41,6 +41,8 @@ export type HelperSupervisorOptions = {
   /** Optional seed directory (stream 2 widget dependency cache). */
   seedDir?: string;
   cacheDir?: string;
+  /** Bundled STT weights directory (voice stream 1). */
+  modelsDir?: string;
   maxAttempts?: number;
   initialBackoffMs?: number;
   maxBackoffMs?: number;
@@ -74,6 +76,8 @@ export function buildHelperSpawnPlan(input: {
   /** Optional seed directory shipped with the app (stream 2). */
   seedDir?: string;
   cacheDir?: string;
+  /** Bundled STT models directory (voice stream 1). */
+  modelsDir?: string;
 }): HelperSpawnPlan {
   const host = input.host ?? LOOPBACK_HOST;
   const binary = path.resolve(input.helperBinary);
@@ -84,6 +88,9 @@ export function buildHelperSpawnPlan(input: {
   }
   if (input.cacheDir) {
     args.push("--cache-dir", path.resolve(input.cacheDir));
+  }
+  if (input.modelsDir) {
+    args.push("--models-dir", path.resolve(input.modelsDir));
   }
   return {
     command: binary,
@@ -224,6 +231,7 @@ export class HelperSupervisor {
           baseEnv: process.env,
           seedDir: this.opts.seedDir,
           cacheDir: this.opts.cacheDir,
+          modelsDir: this.opts.modelsDir,
         });
 
         await this.spawnChild(plan);

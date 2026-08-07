@@ -2,6 +2,7 @@ import Foundation
 import Network
 import EsmCache
 import ChatCompletions
+import SttModels
 
 public struct HTTPRequest: Sendable {
     public var method: String
@@ -219,8 +220,10 @@ public final class LoopbackHTTPServer: @unchecked Sendable {
         switch code {
         case 200: return "OK"
         case 400: return "Bad Request"
+        case 403: return "Forbidden"
         case 404: return "Not Found"
         case 405: return "Method Not Allowed"
+        case 422: return "Unprocessable Entity"
         case 502: return "Bad Gateway"
         case 503: return "Service Unavailable"
         default: return "Error"
@@ -294,6 +297,95 @@ public func makeChatRouter(chat: ChatCompletionsService) -> HTTPRouter {
     }
 }
 
+/// Additive `/stt/models*` registration (voice stream 1 — model store).
+public func makeSttModelsRouter(store: SttModelStore) -> HTTPRouter {
+    { request in
+        if request.path == "/stt/models" {
+            guard request.method == "GET" else {
+                return .text(405, "Method Not Allowed")
+            }
+            do {
+                return try .json(object: store.listResponse())
+            } catch {
+                return .text(500, "Failed to encode STT models")
+            }
+        }
+
+        if let modelId = sttInstallModelId(path: request.path) {
+            guard request.method == "POST" else {
+                return .text(405, "Method Not Allowed")
+            }
+            let result = await store.installSSE(id: modelId)
+            return HTTPResponse(
+                status: result.status,
+                contentType: "text/event-stream; charset=utf-8",
+                body: result.body
+            )
+        }
+
+        if let modelId = sttDeleteModelId(path: request.path) {
+            guard request.method == "DELETE" else {
+                return .text(405, "Method Not Allowed")
+            }
+            do {
+                try store.remove(id: modelId)
+                struct Ok: Encodable { var ok: Bool; var id: String }
+                return try .json(object: Ok(ok: true, id: modelId))
+            } catch let error as SttModelStoreError {
+                return sttModelErrorResponse(error)
+            } catch {
+                return .text(500, error.localizedDescription)
+            }
+        }
+
+        return .text(404, "Not Found")
+    }
+}
+
+/// Parse `/stt/models/:id/install`.
+public func sttInstallModelId(path: String) -> String? {
+    let prefix = "/stt/models/"
+    let suffix = "/install"
+    guard path.hasPrefix(prefix), path.hasSuffix(suffix) else { return nil }
+    let start = path.index(path.startIndex, offsetBy: prefix.count)
+    let end = path.index(path.endIndex, offsetBy: -suffix.count)
+    guard start < end else { return nil }
+    let id = String(path[start..<end])
+    return id.isEmpty || id.contains("/") ? nil : id
+}
+
+/// Parse `/stt/models/:id` (DELETE) — not `/install` and not bare `/stt/models`.
+public func sttDeleteModelId(path: String) -> String? {
+    let prefix = "/stt/models/"
+    guard path.hasPrefix(prefix), path != "/stt/models" else { return nil }
+    if path.hasSuffix("/install") { return nil }
+    let id = String(path.dropFirst(prefix.count))
+    return id.isEmpty || id.contains("/") ? nil : id
+}
+
+private func sttModelErrorResponse(_ error: SttModelStoreError) -> HTTPResponse {
+    switch error {
+    case .unknownModel(let id):
+        return .text(404, "Unknown model: \(id)")
+    case .notInstalled(let id):
+        return .text(404, "Model not installed: \(id)")
+    case .bundledCannotBeRemoved(let id):
+        return .text(403, "Bundled model cannot be removed: \(id)")
+    case .hashMismatch(let expected, let actual):
+        return .text(422, "Hash mismatch: expected \(expected), got \(actual)")
+    case .downloadFailed(let message):
+        return .text(502, "Download failed: \(message)")
+    case .bundledMissing(let id):
+        return .text(503, "Bundled model missing on disk: \(id)")
+    case .alreadyInstalled:
+        return HTTPResponse(
+            status: 200,
+            contentType: "application/json",
+            body: Data(#"{"ok":true}"#.utf8)
+        )
+    }
+}
+
 /// Compose routers left-to-right; first non-404 wins. Additive registration for later streams.
 public func composeRouters(_ routers: HTTPRouter...) -> HTTPRouter {
     { request in
@@ -307,11 +399,12 @@ public func composeRouters(_ routers: HTTPRouter...) -> HTTPRouter {
     }
 }
 
-/// Stream 1+2+3 default: health/availability + optional ESM cache + optional chat.
+/// Stream 1+2+3 + STT models: health/availability + optional ESM / chat / model store.
 public func makeRouter(
     reporter: AvailabilityReporter,
     esmCache: EsmCacheService? = nil,
-    chat: ChatCompletionsService? = nil
+    chat: ChatCompletionsService? = nil,
+    sttModels: SttModelStore? = nil
 ) -> HTTPRouter {
     var built: [HTTPRouter] = []
     if let esmCache {
@@ -319,6 +412,9 @@ public func makeRouter(
     }
     if let chat {
         built.append(makeChatRouter(chat: chat))
+    }
+    if let sttModels {
+        built.append(makeSttModelsRouter(store: sttModels))
     }
     built.append(makeBaseRouter(reporter: reporter))
     let routers = built

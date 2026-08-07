@@ -163,6 +163,9 @@ desktop/build/bundles/
 desktop/build/gateway/
 desktop/build/runtime/
 desktop/build/macos-helper/
+# STT ggml weights (~75 MiB) — download-at-build; keep README + manifest
+desktop/build/models/*.bin
+desktop/build/models/*.partial
 desktop/resources/bundle/chat/
 desktop/release/
 
