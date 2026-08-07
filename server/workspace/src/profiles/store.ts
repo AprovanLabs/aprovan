@@ -17,6 +17,7 @@
 import { getRegistryStorage } from "../registry-storage.js";
 import { isInterface } from "../interfaces.js";
 import { ServiceError } from "../service-kernel.js";
+import { assertProviderBindingAllowed } from "../workspaces.js";
 import {
   DEFAULT_PROFILE_NAME,
   type ProfileOptions,
@@ -91,6 +92,8 @@ export async function setProfile(
   if (hasNamespace === hasPath) {
     throw new ServiceError("profiles.set requires exactly one of namespace or path", 400);
   }
+
+  await assertProviderBindingAllowed(workspaceId, input.provider);
 
   const storage = await ensureTenant(workspaceId);
   const createdBy = input.createdBy ?? "workspace";

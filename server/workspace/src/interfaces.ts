@@ -26,6 +26,7 @@ import { getCredentialStore } from "./credentials.js";
 import { listLlmProviders } from "./llm.js";
 import { getRegistryStorage } from "./registry-storage.js";
 import { ServiceError } from "./service-kernel.js";
+import { assertProviderBindingAllowed } from "./workspaces.js";
 
 const BINDINGS_PATH = ".services/bindings.json";
 
@@ -426,6 +427,9 @@ export async function writeBinding(
   binding: InterfaceBinding | null,
   updatedBy = "workspace",
 ): Promise<void> {
+  if (binding) {
+    await assertProviderBindingAllowed(workspaceId, binding.provider);
+  }
   await writeProfileBinding(workspaceId, instance, binding, updatedBy);
 }
 

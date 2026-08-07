@@ -57,7 +57,9 @@ CREATE TABLE IF NOT EXISTS users (
 );
 CREATE INDEX IF NOT EXISTS users_by_email ON users(email);
 CREATE TABLE IF NOT EXISTS workspaces (
-  workspace_id TEXT PRIMARY KEY, name TEXT, plan TEXT, created_at TEXT, updated_at TEXT
+  workspace_id TEXT PRIMARY KEY, name TEXT, plan TEXT,
+  locus TEXT, data_dir TEXT, vfs_root TEXT,
+  created_at TEXT, updated_at TEXT
 );
 CREATE TABLE IF NOT EXISTS memberships (
   workspace_id TEXT NOT NULL, user_id TEXT NOT NULL, role TEXT NOT NULL, created_at TEXT,
@@ -98,11 +100,30 @@ CREATE TABLE IF NOT EXISTS api_keys (
 CREATE INDEX IF NOT EXISTS api_keys_by_secret ON api_keys(secret_hash);
 `;
 
+/** Additive columns for workspaces that predate the locus field (D2). */
+const WORKSPACE_LOCUS_COLUMNS: Array<{ name: string; ddl: string }> = [
+  { name: "locus", ddl: "ALTER TABLE workspaces ADD COLUMN locus TEXT" },
+  { name: "data_dir", ddl: "ALTER TABLE workspaces ADD COLUMN data_dir TEXT" },
+  { name: "vfs_root", ddl: "ALTER TABLE workspaces ADD COLUMN vfs_root TEXT" },
+];
+
+function ensureWorkspaceLocusColumns(db: InstanceType<ReturnType<typeof loadSqlite>>): void {
+  const existing = new Set(
+    (db.prepare("PRAGMA table_info(workspaces)").all() as Array<{ name: string }>).map(
+      (row) => row.name,
+    ),
+  );
+  for (const column of WORKSPACE_LOCUS_COLUMNS) {
+    if (!existing.has(column.name)) db.exec(column.ddl);
+  }
+}
+
 export function createSqliteIdentityClient(directory = workspaceDataDir()): IdentitySqlClient {
   mkdirSync(directory, { recursive: true, mode: 0o700 });
   const SqliteDatabase = loadSqlite();
   const db = new SqliteDatabase(join(directory, "workspace.db"));
   db.exec(SQLITE_IDENTITY_DDL);
+  ensureWorkspaceLocusColumns(db);
   return {
     async all<T>(sql: string, params: unknown[] = []): Promise<T[]> {
       return db.prepare(sql).all(...params) as T[];
@@ -290,6 +311,11 @@ export function createIdentityStoreSql(client: IdentitySqlClient): IIdentityStor
           workspaceId: String(row["workspace_id"]),
           name: String(row["name"] ?? ""),
           plan: str(row["plan"]),
+          ...(row["locus"] === "local" || row["locus"] === "cloud"
+            ? { locus: row["locus"] as WorkspaceRecord["locus"] }
+            : {}),
+          dataDir: str(row["data_dir"]),
+          vfsRoot: str(row["vfs_root"]),
           createdAt: str(row["created_at"]),
           updatedAt: str(row["updated_at"]),
         };
@@ -303,18 +329,25 @@ export function createIdentityStoreSql(client: IdentitySqlClient): IIdentityStor
         return results;
       },
       async put(workspace) {
+        // Locus is write-once: INSERT sets it; ON CONFLICT never overwrites it.
         await client.run(
-          `INSERT INTO workspaces (workspace_id, name, plan, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?)
-           ON CONFLICT (workspace_id) DO UPDATE SET name = ?, plan = ?, updated_at = ?`,
+          `INSERT INTO workspaces (workspace_id, name, plan, locus, data_dir, vfs_root, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT (workspace_id) DO UPDATE SET
+             name = ?, plan = ?, data_dir = ?, vfs_root = ?, updated_at = ?`,
           [
             workspace.workspaceId,
             workspace.name,
             workspace.plan ?? null,
+            workspace.locus ?? null,
+            workspace.dataDir ?? null,
+            workspace.vfsRoot ?? null,
             workspace.createdAt ?? new Date().toISOString(),
             workspace.updatedAt ?? new Date().toISOString(),
             workspace.name,
             workspace.plan ?? null,
+            workspace.dataDir ?? null,
+            workspace.vfsRoot ?? null,
             workspace.updatedAt ?? new Date().toISOString(),
           ],
         );

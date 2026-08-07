@@ -30,11 +30,11 @@
 
 > Depends-on: - | Touches: server/workspace/src/workspaces.ts, server/workspace/src/db/**, server/workspace/src/__tests__/workspace-locus.test.ts | Verify: `pnpm --filter @aprovan/workspace test && pnpm check-types`
 
-- [ ] 4.1 Add `locus`, `dataDir`, and `vfsRoot` to the workspace record; default existing records to `cloud` so no deployed behavior changes (D2).
-- [ ] 4.2 Set locus at creation and reject any attempt to change it afterwards.
-- [ ] 4.3 Refuse a local-machine-backed provider binding in a cloud workspace, with a message explaining that inbound access is unavailable.
-- [ ] 4.4 Refuse to initialise a local workspace when no cipher key provider is configured, rather than falling through to plaintext.
-- [ ] 4.5 Cover every scenario in `specs/workspace-execution-locus/spec.md`.
+- [x] 4.1 Add `locus`, `dataDir`, and `vfsRoot` to the workspace record; default existing records to `cloud` so no deployed behavior changes (D2).
+- [x] 4.2 Set locus at creation and reject any attempt to change it afterwards.
+- [x] 4.3 Refuse a local-machine-backed provider binding in a cloud workspace, with a message explaining that inbound access is unavailable.
+- [x] 4.4 Refuse to initialise a local workspace when no cipher key provider is configured, rather than falling through to plaintext.
+- [x] 4.5 Cover every scenario in `specs/workspace-execution-locus/spec.md`.
 
 ## 5. Locus-aware resolution in the gateway
 
