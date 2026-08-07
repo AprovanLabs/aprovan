@@ -14,6 +14,10 @@ import {
 import type { UIMessage } from "ai";
 import { MergeDialog } from "@/components/MergeDialog";
 import { ProviderModelControls } from "@/components/ProviderPicker";
+import {
+  SpeechSettingsButton,
+  useSelectedSttModel,
+} from "@/components/SpeechSettings";
 import { SessionBar } from "@/components/SessionBar";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -27,6 +31,12 @@ import { ChatComposer } from "./ChatComposer";
 import { fileLabel } from "./chat-file-context";
 import { APROVAN_LOGO, MessageBubble } from "./MessageParts";
 import type { useChatProviders } from "./useChatSubmit";
+import { useVoiceCapture } from "./useVoiceCapture";
+import {
+  VoiceCaptureControls,
+  VoiceDestinationBanner,
+  VoiceStatusBanners,
+} from "./VoiceComposerControls";
 
 // ---------------------------------------------------------------------------
 // Chat side-dock layout
@@ -318,9 +328,33 @@ export function ChatDock({
   const { chatDragging, chatDockRef, resizeChatBy, startChatDrag } = layout;
   const scrollRef = useRef<HTMLDivElement>(null);
   const notifiedConflictRef = useRef<string | null>(null);
+  const inputBeforeVoiceRef = useRef("");
+  const { selectedModel, setSelectedModel } = useSelectedSttModel();
 
   const isLoading = status === "submitted" || status === "streaming";
   const sideMode = hasContentTab;
+
+  const voice = useVoiceCapture({
+    model: selectedModel,
+    disabled: isLoading || session.sessionReadOnly,
+    onPartial: (text) => {
+      setInput(text);
+    },
+    onFinal: (text) => {
+      setInput(text);
+    },
+    onDiscard: () => {
+      setInput(inputBeforeVoiceRef.current);
+    },
+  });
+
+  const voiceStartRef = useRef(voice.start);
+  voiceStartRef.current = voice.start;
+
+  const startVoice = useCallback(async () => {
+    inputBeforeVoiceRef.current = input;
+    await voiceStartRef.current();
+  }, [input]);
 
   // Fold diff-based widget edits: `patch` fences are applied against the
   // sources accumulated across the conversation and rewritten into full
@@ -585,7 +619,7 @@ export function ChatDock({
 
       <div className="shrink-0 border-t p-2.5 sm:p-4">
         <div className="mx-auto w-full max-w-3xl space-y-2">
-          <div className="flex items-center">
+          <div className="flex items-center gap-2 flex-wrap">
             <ProviderModelControls
               providers={providers.llmProviders}
               active={providers.chatProvider}
@@ -594,7 +628,14 @@ export function ChatDock({
               onSelectModel={providers.handleModelChange}
               loadModels={fetchLlmModels}
             />
+            <SpeechSettingsButton
+              selectedModel={selectedModel}
+              onSelectedModelChange={setSelectedModel}
+            />
           </div>
+
+          <VoiceDestinationBanner voice={voice} />
+          <VoiceStatusBanners voice={voice} />
 
           {!providers.providerConnected && (
             <div className="px-3 py-2 text-xs rounded-md border border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 flex items-center gap-2">
@@ -647,6 +688,7 @@ export function ChatDock({
               onSubmit={() => {
                 if (
                   !isLoading &&
+                  voice.status !== "listening" &&
                   input.trim() &&
                   providers.providerConnected &&
                   !session.sessionReadOnly
@@ -654,13 +696,26 @@ export function ChatDock({
                   handleSubmit();
                 }
               }}
-              placeholder={composerPlaceholder}
+              placeholder={
+                voice.status === "listening"
+                  ? "Listening… speak, then stop"
+                  : composerPlaceholder
+              }
+              disabled={
+                isLoading ||
+                session.sessionReadOnly ||
+                voice.status === "listening"
+              }
+            />
+            <VoiceCaptureControls
+              voice={{ ...voice, start: startVoice }}
               disabled={isLoading || session.sessionReadOnly}
             />
             <Button
               type="submit"
               disabled={
                 isLoading ||
+                voice.status === "listening" ||
                 !input.trim() ||
                 !providers.providerConnected ||
                 session.sessionReadOnly

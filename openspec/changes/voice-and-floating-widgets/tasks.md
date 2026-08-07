@@ -33,10 +33,10 @@
 
 > Depends-on: 2, 3 | Touches: client/web/src/features/chat/**, client/web/src/components/** | Verify: `pnpm --filter @aprovan/patchwork-web test`
 
-- [ ] 4.1 Add a capture control to the chat composer, showing partial transcripts live while speaking.
-- [ ] 4.2 Display which provider is receiving audio during capture, distinguishing on-this-machine from a named remote provider.
-- [ ] 4.3 Show model selection and installation through the helper's model endpoints.
-- [ ] 4.4 Verify voice is usable in chat with the panel not yet built — this is the step that makes step 5 optional rather than blocking.
+- [x] 4.1 Add a capture control to the chat composer, showing partial transcripts live while speaking.
+- [x] 4.2 Display which provider is receiving audio during capture, distinguishing on-this-machine from a named remote provider.
+- [x] 4.3 Show model selection and installation through the helper's model endpoints.
+- [x] 4.4 Verify voice is usable in chat with the panel not yet built — this is the step that makes step 5 optional rather than blocking.
 
 ## 5. Floating panel and hotkey
 

@@ -16,6 +16,8 @@ export interface CaptureOptions {
   /** Browser audio processing. Defaults on. */
   echoCancellation?: boolean;
   noiseSuppression?: boolean;
+  /** Optional model id forwarded to `stt.open` (local catalogue). */
+  model?: string;
 }
 
 export interface CaptureHandle {
@@ -48,7 +50,7 @@ export async function startCapture(o?: CaptureOptions): Promise<CaptureHandle> {
 
   let opened;
   try {
-    opened = await openSttSession();
+    opened = await openSttSession(o?.model ? { model: o.model } : {});
   } catch (err) {
     for (const track of stream.getTracks()) track.stop();
     throw err;
