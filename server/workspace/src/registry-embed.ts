@@ -11,6 +11,7 @@ import {
   defaultCatalog,
   ProviderExecutor,
   type CallContext,
+  type CoreService as RegistryCoreService,
   type RegistryServer,
   type ServiceContext as RegistryServiceContext,
 } from "@aprovan/registry-server";
@@ -38,6 +39,30 @@ let _mcpHandler: ((ctx: CallContext, request: Request) => Promise<Response>) | u
  * interface redirects live here for the duration of one in-process call.
  */
 const productDispatchContext = new AsyncLocalStorage<ServiceContext>();
+
+/**
+ * Adapt workspace {@link PlatformPlugin}s for `@aprovan/registry-server`, which
+ * still types `streaming` as boolean. Map mode strings to `true` (any streaming
+ * shape) until that package widens to `StreamingMode`.
+ */
+// sync: drop this adapter when @aprovan/registry-server ToolEntry.streaming is StreamingMode
+function toRegistryNativeServices(
+  services: Record<string, PlatformPlugin>,
+): Record<string, RegistryCoreService> {
+  const out: Record<string, RegistryCoreService> = {};
+  for (const [name, svc] of Object.entries(services)) {
+    out[name] = {
+      meta: svc.meta,
+      call: (ctx, procedure, args) => svc.call(ctx as ServiceContext, procedure, args),
+      tools: svc.tools.map((tool) => {
+        const { streaming, ...rest } = tool;
+        if (streaming === undefined) return rest;
+        return { ...rest, streaming: streaming !== false };
+      }),
+    };
+  }
+  return out;
+}
 
 /** Route embed execution through the workspace executor (shared test seams). */
 class WorkspaceBackedExecutor extends ProviderExecutor {
@@ -79,7 +104,7 @@ async function bootRegistryServer(): Promise<RegistryServer> {
   const server = await createRegistryServer({
     storage,
     catalog: defaultCatalog(),
-    nativeServices,
+    nativeServices: toRegistryNativeServices(nativeServices),
     executorInstance: embedExecutor,
     mcp: { extensions: workspaceMcpExtensions },
     ...(authMode === "none" ? { allowInsecure: true } : {}),

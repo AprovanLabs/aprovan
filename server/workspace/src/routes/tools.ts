@@ -37,7 +37,11 @@ import { isLlmProvider, resolveLlmProvider } from "../llm.js";
 import { getAuthMode, requireAuth } from "../middleware/auth.js";
 import { rateLimitByUserId } from "../middleware/rateLimitMiddleware.js";
 import { OAuthExchangeError, resolveToInjectable } from "../oauthTokens.js";
-import { ServiceError } from "../service-kernel.js";
+import {
+  normalizeStreamingMode,
+  ServiceError,
+  type StreamingMode,
+} from "../service-kernel.js";
 import { parseTelemetrySourceHeader, recordTelemetry } from "../telemetry/service.js";
 import {
   catalogToolEntries,
@@ -71,7 +75,8 @@ export interface ToolEntry {
   outputSchema?: unknown;
   /** Result belongs to a bound implementation; any outputSchema is advisory. */
   passthrough?: boolean;
-  streaming?: boolean;
+  /** Streaming call shape. Absent ≡ false. Surfaced on GET /tools. */
+  streaming?: StreamingMode;
 }
 
 interface CachedToolList {
@@ -125,6 +130,9 @@ function deriveToolEntries(provider: string, mod: ProviderModule): ToolEntry[] {
       const operation = name.startsWith(`${provider}.`)
         ? name.slice(provider.length + 1)
         : name;
+      const streaming = normalizeStreamingMode(
+        entry["streaming"] as boolean | StreamingMode | undefined,
+      );
       entries.push({
         provider,
         name,
@@ -132,6 +140,7 @@ function deriveToolEntries(provider: string, mod: ProviderModule): ToolEntry[] {
         description: typeof entry["description"] === "string" ? entry["description"] : undefined,
         inputSchema: entry["inputSchema"],
         outputSchema: entry["outputSchema"],
+        ...(streaming !== undefined ? { streaming } : {}),
       });
     }
     return entries;
@@ -221,22 +230,26 @@ function toContractToolEntries(
     description: string;
     inputSchema: Record<string, unknown>;
     outputSchema?: unknown;
-    streaming?: boolean;
+    /** Legacy boolean or widened mode; `true` maps to `"response"`. */
+    streaming?: boolean | StreamingMode;
   }>,
 ): ToolEntry[] {
-  return entries.map((entry) => ({
-    provider: namespace,
-    name: entry.name,
-    // Strip the namespace by length, not by the first dot: namespaces contain
-    // dots and colons of their own (`synthetic.new`, `agent:reviewer`).
-    operation: entry.name.startsWith(`${namespace}.`)
-      ? entry.name.slice(namespace.length + 1)
-      : entry.name.slice(entry.name.indexOf(".") + 1),
-    description: entry.description,
-    inputSchema: entry.inputSchema,
-    ...(entry.outputSchema !== undefined ? { outputSchema: entry.outputSchema } : {}),
-    ...(entry.streaming !== undefined ? { streaming: entry.streaming } : {}),
-  }));
+  return entries.map((entry) => {
+    const streaming = normalizeStreamingMode(entry.streaming);
+    return {
+      provider: namespace,
+      name: entry.name,
+      // Strip the namespace by length, not by the first dot: namespaces contain
+      // dots and colons of their own (`synthetic.new`, `agent:reviewer`).
+      operation: entry.name.startsWith(`${namespace}.`)
+        ? entry.name.slice(namespace.length + 1)
+        : entry.name.slice(entry.name.indexOf(".") + 1),
+      description: entry.description,
+      inputSchema: entry.inputSchema,
+      ...(entry.outputSchema !== undefined ? { outputSchema: entry.outputSchema } : {}),
+      ...(streaming !== undefined ? { streaming } : {}),
+    };
+  });
 }
 
 /** Workspace commit-store ops advertised for the aprovan native vcs binding. */

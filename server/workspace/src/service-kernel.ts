@@ -111,6 +111,26 @@ export interface CoreServiceMeta {
   icon: string;
 }
 
+/**
+ * Mode declared per operation in discovery. Absent ≡ false.
+ * `"response"` is today's SSE pass-through; `"session"` selects the session path.
+ */
+// sync: import from @utdk/common/streaming when published
+export type StreamingMode = "response" | "session" | false;
+
+/**
+ * Map a legacy boolean or already-widened mode onto {@link StreamingMode}.
+ * `true` → `"response"` so existing declarations keep today's wire behavior.
+ * Absent stays absent (semantically ≡ false).
+ */
+export function normalizeStreamingMode(
+  value: boolean | StreamingMode | undefined,
+): StreamingMode | undefined {
+  if (value === undefined) return undefined;
+  if (value === true) return "response";
+  return value;
+}
+
 /** Tool metadata declared by a core/plugin service (provider filled at install). */
 export interface ServiceToolEntry {
   name: string;
@@ -119,7 +139,7 @@ export interface ServiceToolEntry {
   inputSchema?: unknown;
   outputSchema?: unknown;
   passthrough?: boolean;
-  streaming?: boolean;
+  streaming?: StreamingMode;
 }
 
 export interface CoreService {
