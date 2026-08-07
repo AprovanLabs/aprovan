@@ -10,9 +10,13 @@ import { createInitialBridgeState, publishGatewayStatus } from "../src/bridge-ha
 import {
   DEVELOPMENT_GATEWAY_PORT,
   LOOPBACK_HOST,
+  WORKSPACE_KEY_BYTES,
+  WORKSPACE_KEY_FD_ENV,
+  WORKSPACE_KEY_STDIO_FD,
   backoffMs,
   buildGatewaySpawnPlan,
   createGatewaySupervisor,
+  deliverWorkspaceKey,
   reserveLoopbackPort,
   type SpawnFn,
 } from "../src/gateway-supervisor.js";
@@ -25,7 +29,15 @@ class FakeChild extends EventEmitter {
   stdin = null;
   stdout = new PassThrough();
   stderr = new PassThrough();
+  /** Extra stdio slot for WORKSPACE_KEY_FD delivery (fd 3). */
+  keyPipe = new PassThrough();
+  stdio: Array<null | PassThrough> = [];
   lastSignal: NodeJS.Signals | undefined;
+
+  constructor() {
+    super();
+    this.stdio = [null, this.stdout, this.stderr, this.keyPipe];
+  }
 
   kill(signal?: NodeJS.Signals | number): boolean {
     const sig =
@@ -157,6 +169,43 @@ describe("buildGatewaySpawnPlan", () => {
     expect(plan.env.WORKSPACE_DATA_DIR).toBe(
       path.resolve("/app-support/gateway-data"),
     );
+    expect(plan.env[WORKSPACE_KEY_FD_ENV]).toBeUndefined();
+    expect(plan.workspaceKey).toBeUndefined();
+  });
+
+  it("sets WORKSPACE_KEY_FD to the stdio fd number without putting key bytes in env", () => {
+    const key = Buffer.alloc(WORKSPACE_KEY_BYTES, 0x11);
+    const plan = buildGatewaySpawnPlan({
+      nodeBinary: "/runtime/node",
+      gatewayDir: "/vendor/gateway",
+      dataDir: "/data",
+      port: 52_431,
+      workspaceKey: key,
+    });
+
+    expect(plan.env[WORKSPACE_KEY_FD_ENV]).toBe(String(WORKSPACE_KEY_STDIO_FD));
+    expect(plan.workspaceKey?.equals(key)).toBe(true);
+    // Key material must not appear in env values.
+    for (const value of Object.values(plan.env)) {
+      if (typeof value !== "string") continue;
+      expect(value).not.toContain(key.toString("base64"));
+      expect(value).not.toContain(key.toString("hex"));
+      expect(Buffer.from(value, "utf8").equals(key)).toBe(false);
+    }
+  });
+});
+
+describe("deliverWorkspaceKey", () => {
+  it("writes exactly 32 bytes on stdio[3] and ends the stream", async () => {
+    const child = new FakeChild();
+    const key = Buffer.alloc(WORKSPACE_KEY_BYTES, 0x5a);
+    const chunks: Buffer[] = [];
+    child.keyPipe.on("data", (c: Buffer) => chunks.push(Buffer.from(c)));
+    const ended = new Promise<void>((resolve) => child.keyPipe.on("end", resolve));
+
+    deliverWorkspaceKey(child, key);
+    await ended;
+    expect(Buffer.concat(chunks).equals(key)).toBe(true);
   });
 });
 
@@ -366,6 +415,55 @@ describe("GatewaySupervisor", () => {
       url: "http://127.0.0.1:1",
     });
     expect(pushed).toHaveLength(2);
+  });
+
+  it("delivers the workspace key on stdio[3] with WORKSPACE_KEY_FD only in env", async () => {
+    const { onStatus } = collectStatuses();
+    const child = new FakeChild();
+    const key = Buffer.alloc(WORKSPACE_KEY_BYTES, 0x77);
+    const chunks: Buffer[] = [];
+    child.keyPipe.on("data", (c: Buffer) => chunks.push(Buffer.from(c)));
+    const keyEnded = new Promise<void>((resolve) =>
+      child.keyPipe.on("end", resolve),
+    );
+
+    let spawnEnv: NodeJS.ProcessEnv | undefined;
+    let spawnStdio: unknown;
+
+    const supervisor = createGatewaySupervisor({
+      nodeBinary: "/node",
+      gatewayDir: "/gateway",
+      dataDir: "/data",
+      onStatus,
+      maxAttempts: 2,
+      healthIntervalMs: 5,
+      healthTimeoutMs: 1_000,
+      sleep: immediateSleep,
+      reservePort: async () => 51_777,
+      resolveWorkspaceKey: async () => key,
+      spawn: ((_cmd, _args, opts) => {
+        spawnEnv = opts.env;
+        spawnStdio = opts.stdio;
+        return child;
+      }) as SpawnFn,
+      fetch: async () => ({ ok: true, status: 200 }),
+    });
+
+    const started = supervisor.start();
+    await waitFor(() => supervisor.getStatus().state === "ready");
+    await keyEnded;
+
+    expect(spawnStdio).toEqual(["ignore", "pipe", "pipe", "pipe"]);
+    expect(spawnEnv?.[WORKSPACE_KEY_FD_ENV]).toBe(String(WORKSPACE_KEY_STDIO_FD));
+    for (const value of Object.values(spawnEnv ?? {})) {
+      if (typeof value !== "string") continue;
+      expect(value).not.toContain(key.toString("hex"));
+      expect(value).not.toContain(key.toString("base64"));
+    }
+    expect(Buffer.concat(chunks).equals(key)).toBe(true);
+
+    await supervisor.stop();
+    await started;
   });
 });
 

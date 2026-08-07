@@ -10,6 +10,7 @@ export default defineConfig([
       "app-support": "src/app-support.ts",
       "bundle-manager": "src/bundle-manager.ts",
       "gateway-supervisor": "src/gateway-supervisor.ts",
+      "key-provider": "src/key-provider.ts",
     },
     format: ["esm"],
     platform: "node",

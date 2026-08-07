@@ -24,6 +24,11 @@ export const DEFAULT_HEALTH_TIMEOUT_MS = 15_000;
 export const DEFAULT_HEALTH_INTERVAL_MS = 200;
 export const DEFAULT_SHUTDOWN_TIMEOUT_MS = 10_000;
 
+/** Child stdio index for the inherited workspace-key pipe (fd 3). */
+export const WORKSPACE_KEY_STDIO_FD = 3;
+export const WORKSPACE_KEY_FD_ENV = "WORKSPACE_KEY_FD";
+export const WORKSPACE_KEY_BYTES = 32;
+
 export type SpawnFn = (
   command: string,
   args: readonly string[],
@@ -54,6 +59,11 @@ export type GatewaySupervisorOptions = {
   reservePort?: () => Promise<number>;
   sleep?: (ms: number) => Promise<void>;
   now?: () => number;
+  /**
+   * Resolve the 32-byte workspace cipher key for each spawn. Delivered to the
+   * child via an inherited pipe + WORKSPACE_KEY_FD=<n> (never in argv/env).
+   */
+  resolveWorkspaceKey?: () => Promise<Buffer>;
 };
 
 export type GatewaySpawnPlan = {
@@ -64,6 +74,8 @@ export type GatewaySpawnPlan = {
   url: string;
   port: number;
   host: string;
+  /** Raw key bytes written once on stdio[WORKSPACE_KEY_STDIO_FD] after spawn. */
+  workspaceKey?: Buffer;
 };
 
 /**
@@ -108,6 +120,8 @@ export function buildGatewaySpawnPlan(input: {
   port: number;
   host?: string;
   baseEnv?: NodeJS.ProcessEnv;
+  /** When set, child env gets WORKSPACE_KEY_FD only (fd number, not key bytes). */
+  workspaceKey?: Buffer;
 }): GatewaySpawnPlan {
   const host = input.host ?? LOOPBACK_HOST;
   const cwd = path.resolve(input.gatewayDir);
@@ -121,6 +135,14 @@ export function buildGatewaySpawnPlan(input: {
     // Desktop owns scheduling; avoid a background cron lease in the child.
     WORKSPACE_CRON: "0",
   };
+  if (input.workspaceKey) {
+    if (input.workspaceKey.length !== WORKSPACE_KEY_BYTES) {
+      throw new Error(
+        `workspaceKey must be ${WORKSPACE_KEY_BYTES} bytes, got ${input.workspaceKey.length}`,
+      );
+    }
+    env[WORKSPACE_KEY_FD_ENV] = String(WORKSPACE_KEY_STDIO_FD);
+  }
   return {
     command: input.nodeBinary,
     args: ["dist/cli.js", "start", "--mode", "local", "--port", String(input.port), "--data-dir", path.resolve(input.dataDir), "--host", host],
@@ -129,6 +151,7 @@ export function buildGatewaySpawnPlan(input: {
     url,
     port: input.port,
     host,
+    ...(input.workspaceKey ? { workspaceKey: input.workspaceKey } : {}),
   };
 }
 
@@ -137,6 +160,22 @@ function defaultSleep(ms: number): Promise<void> {
     const t = setTimeout(resolve, ms);
     t.unref?.();
   });
+}
+
+/** Write 32 raw key bytes once on the inherited pipe, then close the write end. */
+export function deliverWorkspaceKey(
+  child: Pick<ChildProcess, "stdio">,
+  key: Buffer,
+): void {
+  const sink = child.stdio[WORKSPACE_KEY_STDIO_FD];
+  if (!sink || typeof (sink as NodeJS.WritableStream).write !== "function") {
+    throw new Error(
+      `Gateway child missing writable stdio[${WORKSPACE_KEY_STDIO_FD}] for workspace key`,
+    );
+  }
+  const writable = sink as NodeJS.WritableStream;
+  writable.write(key);
+  writable.end();
 }
 
 function defaultFetch(
@@ -245,6 +284,10 @@ export class GatewaySupervisor {
           this.opts.reservePort ?? (() => reserveLoopbackPort(LOOPBACK_HOST))
         )();
 
+        const workspaceKey = this.opts.resolveWorkspaceKey
+          ? await this.opts.resolveWorkspaceKey()
+          : undefined;
+
         const plan = buildGatewaySpawnPlan({
           nodeBinary: this.opts.nodeBinary,
           gatewayDir: this.opts.gatewayDir,
@@ -252,6 +295,7 @@ export class GatewaySupervisor {
           port,
           host: LOOPBACK_HOST,
           baseEnv: process.env,
+          workspaceKey,
         });
 
         await this.spawnChild(plan);
@@ -295,12 +339,19 @@ export class GatewaySupervisor {
 
   private spawnChild(plan: GatewaySpawnPlan): Promise<void> {
     const spawnImpl = this.opts.spawn ?? spawn;
+    const stdio: SpawnOptions["stdio"] = plan.workspaceKey
+      ? ["ignore", "pipe", "pipe", "pipe"]
+      : ["ignore", "pipe", "pipe"];
     const child = spawnImpl(plan.command, plan.args, {
       cwd: plan.cwd,
       env: plan.env,
-      stdio: ["ignore", "pipe", "pipe"],
+      stdio,
     });
     this.child = child;
+
+    if (plan.workspaceKey) {
+      deliverWorkspaceKey(child, plan.workspaceKey);
+    }
 
     return new Promise((resolve, reject) => {
       let settled = false;
