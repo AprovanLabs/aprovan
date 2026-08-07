@@ -20,14 +20,29 @@ import { getMembership } from "../memberships.js";
 import { getAuthMode } from "../middleware/auth.js";
 import { OAuthExchangeError, resolveToInjectable } from "../oauthTokens.js";
 import { registryDispatch } from "../registry-embed.js";
-import { storeBackend } from "../runtime/config.js";
+import {
+  resolveLocusDispatch,
+  storeBackend,
+  storeBackendForLocus,
+  type WorkspaceLocusKind,
+} from "../runtime/config.js";
+import {
+  getCloudProxyAuthToken,
+  proxyCloudToolInvoke,
+} from "../routes/proxy.js";
 import { getCoreService, ServiceError } from "../service-kernel.js";
 import { ensureTenantForWorkspace } from "../tenant-registry.js";
 import { listUserGroupIds } from "../userGroups.js";
+import { getWorkspace, resolveLocus } from "../workspaces.js";
 import type { ServiceContext } from "../service-kernel.js";
 
-/** Interface dispatch routes through the embed on dsql (unified credential/profile store). Dynamo/sqlite keep the legacy path until cutover. */
-export function usesEmbedInterfaceDispatch(): boolean {
+/**
+ * Interface dispatch routes through the embed on dsql (unified
+ * credential/profile store). When a locus is supplied, the backend follows
+ * that workspace rather than the process-wide switch alone.
+ */
+export function usesEmbedInterfaceDispatch(locus?: WorkspaceLocusKind): boolean {
+  if (locus !== undefined) return storeBackendForLocus(locus) === "dsql";
   return storeBackend() === "dsql";
 }
 
@@ -142,6 +157,17 @@ export async function invokeTool(
   // calls all answer to the same list.
   assertToolGranted(ctx.grants, namespace, procedure);
 
+  // Cloud-locus workspace on a local gateway → outbound proxy (principal
+  // forwarded via Authorization when a token is bound for this turn).
+  // No workspace row → in-process (legacy / unregistered ids).
+  const workspace = await getWorkspace(ctx.workspaceId);
+  if (workspace && resolveLocusDispatch(resolveLocus(workspace)) === "proxy") {
+    return proxyCloudToolInvoke(ctx, namespace, procedure, args, {
+      ...(profile !== undefined ? { profile } : {}),
+      token: getCloudProxyAuthToken(),
+    });
+  }
+
   if (callSiteOptions) {
     const { assertCallOptions } = await import("../profiles/types.js");
     try {
@@ -230,7 +256,16 @@ export async function dispatchInterface(
   profile?: string,
   callSiteOptions?: Record<string, unknown>,
 ): Promise<unknown> {
-  if (usesEmbedInterfaceDispatch()) {
+  const workspace = await getWorkspace(ctx.workspaceId);
+  if (workspace && resolveLocusDispatch(resolveLocus(workspace)) === "proxy") {
+    return proxyCloudToolInvoke(ctx, namespace, procedure, args, {
+      ...(profile !== undefined ? { profile } : {}),
+      token: getCloudProxyAuthToken(),
+    });
+  }
+
+  const locus = workspace ? resolveLocus(workspace) : undefined;
+  if (usesEmbedInterfaceDispatch(locus)) {
     const { namespace: ns, profile: embedProfile } = resolveEmbedTarget(
       ctx,
       namespace,
