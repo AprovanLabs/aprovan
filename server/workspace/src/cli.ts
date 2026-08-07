@@ -29,12 +29,13 @@ Usage:
 Options for \`start\`:
   --mode <local|aws>   Where state lives (default: local, or $WORKSPACE_MODE)
   --port <n>           HTTP port (default: 4000, or $WORKSPACE_PORT)
+  --host <addr>        Bind address (default: all interfaces, or $WORKSPACE_HOST)
   --data-dir <path>    Local-mode data directory (default: ~/.aprovan)
   --no-cron            Do not contend for the workflow cron lease
 
 Environment:
-  WORKSPACE_MODE, WORKSPACE_PORT, WORKSPACE_DATA_DIR, WORKSPACE_CRON,
-  WORKSPACE_ALLOW_INSECURE, WORKSPACE_CRON_SECRET
+  WORKSPACE_MODE, WORKSPACE_PORT, WORKSPACE_HOST, WORKSPACE_DATA_DIR,
+  WORKSPACE_CRON, WORKSPACE_ALLOW_INSECURE, WORKSPACE_CRON_SECRET
   aws mode additionally reads /aprovan/<env>/env from SSM.
 `;
 
@@ -99,6 +100,8 @@ async function commandStart(flags: ParsedArgs["flags"]): Promise<void> {
   if (mode) process.env["WORKSPACE_MODE"] = mode;
   const dataDir = stringFlag(flags, "data-dir");
   if (dataDir) process.env["WORKSPACE_DATA_DIR"] = dataDir;
+  const host = stringFlag(flags, "host");
+  if (host) process.env["WORKSPACE_HOST"] = host;
   if (flags.get("no-cron")) process.env["WORKSPACE_CRON"] = "0";
 
   const portFlag = stringFlag(flags, "port");
@@ -106,7 +109,7 @@ async function commandStart(flags: ParsedArgs["flags"]): Promise<void> {
   if (port !== undefined && !Number.isInteger(port)) die(`--port must be an integer`);
 
   const { startWorkspace } = await import("./server.js");
-  await startWorkspace({ port });
+  await startWorkspace({ port, hostname: host });
 }
 
 async function commandCredentials(

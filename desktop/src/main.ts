@@ -6,12 +6,18 @@ import { app, dialog, net, protocol } from "electron";
 import { ensureAppSupportLayout } from "./app-support.js";
 import {
   createInitialBridgeState,
+  publishGatewayStatus,
   registerBridgeHandlers,
 } from "./bridge-handlers.js";
 import { BundleManager } from "./bundle-manager.js";
 import { BUNDLE_PUBLIC_KEY_PEM } from "./bundle-public-key.js";
+import { createGatewaySupervisor } from "./gateway-supervisor.js";
 import { evaluatePlatformFloor } from "./platform.js";
-import { resolveActiveBundleDirWithSupport } from "./paths.js";
+import {
+  resolveActiveBundleDirWithSupport,
+  resolveBundledNodeBinary,
+  resolveGatewayVendorDir,
+} from "./paths.js";
 import {
   APP_SCHEME,
   filePathToResponseUrl,
@@ -116,7 +122,27 @@ export async function startDesktopApp(): Promise<void> {
   const bridgeState = createInitialBridgeState(bundles);
   registerBridgeHandlers(bridgeState);
 
+  const supervisor = createGatewaySupervisor({
+    nodeBinary: resolveBundledNodeBinary(),
+    gatewayDir: resolveGatewayVendorDir(),
+    dataDir: layout.gatewayDataDir,
+    onStatus: (status) => publishGatewayStatus(bridgeState, status),
+  });
+
+  let shuttingDown = false;
+  app.on("before-quit", (event) => {
+    if (shuttingDown) return;
+    event.preventDefault();
+    shuttingDown = true;
+    void supervisor.stop().finally(() => {
+      app.quit();
+    });
+  });
+
   createMainWindow();
+
+  // Window stays open regardless of gateway status (crash → restarting/failed).
+  void supervisor.start();
 
   app.on("activate", () => {
     createMainWindow();

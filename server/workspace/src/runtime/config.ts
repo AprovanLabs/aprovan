@@ -58,6 +58,12 @@ export interface WorkspaceConfig {
   mode: WorkspaceMode;
   /** HTTP port. */
   port: number;
+  /**
+   * Bind address for the HTTP listener. When unset, the Node server keeps its
+   * default (all interfaces). Desktop sets `127.0.0.1` via WORKSPACE_HOST so
+   * the supervised gateway is loopback-only.
+   */
+  hostname?: string;
   data: DataConfig;
   /**
    * Auth is a consequence of configuration, not an independent knob: OIDC when
@@ -138,11 +144,18 @@ function resolveAuth(): WorkspaceConfig["auth"] {
     : { mode: "none", ...common };
 }
 
+function resolveHostname(): string | undefined {
+  const raw = process.env["WORKSPACE_HOST"]?.trim();
+  return raw ? raw : undefined;
+}
+
 function resolveConfig(): WorkspaceConfig {
   const mode = resolveMode();
+  const hostname = resolveHostname();
   return {
     mode,
     port: Number(process.env["WORKSPACE_PORT"] ?? DEFAULT_PORT),
+    ...(hostname ? { hostname } : {}),
     data: resolveData(mode),
     auth: resolveAuth(),
     cron: { enabled: process.env["WORKSPACE_CRON"] !== "0" },

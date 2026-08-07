@@ -33,8 +33,28 @@ export function createInitialBridgeState(
 }
 
 /**
+ * Update bridge status and push it to every renderer listening on
+ * `onGatewayStatus`.
+ */
+export function publishGatewayStatus(
+  state: BridgeHostState,
+  status: GatewayStatus,
+  broadcast: (channel: string, payload: GatewayStatus) => void = broadcastToWindows,
+): void {
+  state.status = status;
+  broadcast(IPC.gatewayStatusEvent, status);
+}
+
+function broadcastToWindows(channel: string, payload: GatewayStatus): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) {
+      win.webContents.send(channel, payload);
+    }
+  }
+}
+
+/**
  * Register main-process IPC handlers that back the preload DesktopBridge.
- * Gateway supervision lands in a later stream; directory picking is live.
  */
 export function registerBridgeHandlers(
   state: BridgeHostState,

@@ -22,11 +22,11 @@
 
 > Depends-on: 2 | Touches: desktop/src/gateway-supervisor.ts, desktop/src/__tests__/gateway-supervisor.test.ts | Verify: `pnpm --filter @aprovan/desktop test`
 
-- [ ] 3.1 Spawn the gateway on an ephemeral loopback port with `WORKSPACE_MODE=local` and the app's data directory, passing the resolved URL to the renderer (D5).
-- [ ] 3.2 Poll health and emit `GatewayStatus` transitions over the bridge.
-- [ ] 3.3 Restart with exponential backoff; after the retry ceiling, hold at `failed` with the last error rather than looping silently.
-- [ ] 3.4 Shut down cleanly on quit — signal, await, then terminate — leaving no orphan and no database requiring repair.
-- [ ] 3.5 Cover every scenario in `specs/gateway-supervision/spec.md`, including the port-collision case with a gateway already on the development port.
+- [x] 3.1 Spawn the gateway on an ephemeral loopback port with `WORKSPACE_MODE=local` and the app's data directory, passing the resolved URL to the renderer (D5).
+- [x] 3.2 Poll health and emit `GatewayStatus` transitions over the bridge.
+- [x] 3.3 Restart with exponential backoff; after the retry ceiling, hold at `failed` with the last error rather than looping silently.
+- [x] 3.4 Shut down cleanly on quit — signal, await, then terminate — leaving no orphan and no database requiring repair.
+- [x] 3.5 Cover every scenario in `specs/gateway-supervision/spec.md`, including the port-collision case with a gateway already on the development port.
 
 ## 4. Keychain key provider
 
