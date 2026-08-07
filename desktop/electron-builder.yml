@@ -28,6 +28,10 @@ extraResources:
     to: gateway
   - from: build/runtime/node
     to: runtime/node
+  # Swift helper (macos-native-providers). Signed with entitlementsInherit
+  # under Hardened Runtime when CSC_* secrets are present.
+  - from: build/macos-helper
+    to: macos-helper
 
 asar: true
 

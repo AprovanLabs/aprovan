@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  Lean entitlements for Resources/macos-helper/macos-helper when signed
+	  as a nested binary. The helper is a Swift HTTP process: loopback listen,
+	  outbound HTTPS for the ESM fetch-through cache, and (when the SDK links)
+	  FoundationModels. It does not need Electron's JIT / unsigned-memory
+	  exceptions.
+
+	  electron-builder still applies entitlementsInherit (the main Electron
+	  plist) to nested code by default. This file documents the intended
+	  helper surface and is the reference for any future afterSign re-sign
+	  of the helper alone. Keep App Sandbox off (same trust domain as the
+	  shell — tech-plan D1).
+	-->
+	<!--
+	  On-device model: SystemLanguageModel.default needs no entitlement.
+	  Notification centre lives in Electron main, not this binary.
+	-->
+</dict>
+</plist>

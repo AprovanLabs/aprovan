@@ -162,6 +162,7 @@ packages/contracts
 desktop/build/bundles/
 desktop/build/gateway/
 desktop/build/runtime/
+desktop/build/macos-helper/
 desktop/resources/bundle/chat/
 desktop/release/
 

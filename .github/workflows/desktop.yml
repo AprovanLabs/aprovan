@@ -15,11 +15,16 @@ name: Desktop
 #   secrets.BUNDLE_SIGNING_PRIVATE_KEY — CI only; public pin lives in
 #   desktop/src/bundle-public-key.ts (rotation ⇒ shell update). See
 #   desktop/docs/signing.md.
+#
+# Native helper (macos-native-providers):
+#   native/macos-helper is built (SwiftPM release) into
+#   desktop/build/macos-helper and packed under Resources/macos-helper.
 
 on:
   pull_request:
     paths:
       - "desktop/**"
+      - "native/macos-helper/**"
       - ".github/workflows/desktop.yml"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
@@ -61,6 +66,11 @@ jobs:
           pnpm --filter @aprovan/desktop build:main
           pnpm --filter @aprovan/desktop test
           pnpm --filter @aprovan/desktop check-types
+      - name: Build + test Swift helper
+        run: |
+          swift test --package-path native/macos-helper
+          bash desktop/scripts/build-helper.sh
+          test -x desktop/build/macos-helper/macos-helper
       - name: Package unsigned dir (scaffolding smoke)
         working-directory: desktop
         env:
@@ -69,11 +79,16 @@ jobs:
           DESKTOP_SKIP_RESOURCES: "1"
         run: |
           # Prepare minimal placeholders so electron-builder can resolve extraResources.
+          # macos-helper was built in the previous step.
           mkdir -p resources/bundle build/gateway build/runtime/node/bin
           printf '%s\n' '<!doctype html><title>seed</title>' > resources/bundle/index.html
           printf '%s\n' '#!/bin/sh' > build/runtime/node/bin/node
           chmod +x build/runtime/node/bin/node
+          mkdir -p resources/esm-seed
+          printf '%s\n' '{"packages":[]}' > resources/esm-seed/manifest.json
+          test -x build/macos-helper/macos-helper
           pnpm exec electron-builder --config electron-builder.yml --mac --arm64 --dir
+          test -x release/mac-arm64/Aprovan.app/Contents/Resources/macos-helper/macos-helper
 
   release:
     name: Sign, notarize, staple
@@ -137,7 +152,9 @@ jobs:
           # Prefer publishing only when explicitly requested or on a desktop-v* tag.
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # prepare-resources.sh builds the Swift helper into build/macos-helper.
           pnpm run build
+          test -x build/macos-helper/macos-helper
           pnpm run dist
 
       - name: Upload release artifacts

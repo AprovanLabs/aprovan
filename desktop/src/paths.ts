@@ -60,9 +60,9 @@ export function resolveBundledNodeBinary(): string {
 }
 
 /**
- * Native macOS helper binary (macos-native-providers stream 1).
+ * Native macOS helper binary (macos-native-providers stream 1 / 5).
  * Unpackaged: SwiftPM debug build under native/macos-helper/.build.
- * Packaged: Resources/macos-helper/macos-helper (wired in signing stream).
+ * Packaged: Resources/macos-helper/macos-helper (extraResources + Hardened Runtime).
  */
 export function resolveHelperBinary(): string {
   if (app.isPackaged) {

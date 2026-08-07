@@ -15,7 +15,21 @@ Configured in `electron-builder.yml` + `build/entitlements.plist`:
 
 - Hardened Runtime on; **App Sandbox off** (local agent spawn — D4).
 - Entitlements cover JIT / unsigned executable memory / library validation so Electron and the bundled Node helper can run.
+- Nested binaries under `Resources/` (gateway Node, **macos-helper**) are re-signed with `entitlementsInherit` when `CSC_*` is present.
 - Notarization + stapling run in CI when Apple credentials are present (`notarize: true`).
+
+### Native helper (`Resources/macos-helper/macos-helper`)
+
+Built by `desktop/scripts/build-helper.sh` (SwiftPM release, arm64) during
+`pnpm --filter @aprovan/desktop build`, then packed via `extraResources`.
+
+| Capability | Entitlement |
+| --- | --- |
+| On-device model (`SystemLanguageModel.default`) | **None** — no Hardened Runtime or developer entitlement for the system default model. Custom adapters would need `com.apple.developer.foundation-model-adapter` (not used). |
+| Notification centre (Electron `Notification`) | **None** under Hardened Runtime — gated by Notification TCC permission on first use. |
+| Helper process itself | Signed as nested code with the app; lean reference plist at `build/entitlements.helper.plist` (no Electron JIT exceptions). |
+
+`build/entitlements.plist` documents the same facts for reviewers.
 
 ### CI secrets (Apple)
 
@@ -43,7 +57,7 @@ Rules:
 3. Never check in the private key; never leave it on a laptop.
 4. **Rotation requires a shell update** — the public key is pinned in the binary. Ship a new shell that embeds the new pin, then start signing manifests with the new private key. Old shells will reject new manifests (by design).
 
-## Gatekeeper verification (task 7.5)
+## Gatekeeper verification (desktop-shell task 7.5)
 
 Run on a clean Mac (or a fresh user account / VM) with no prior Aprovan quarantine exemptions:
 
@@ -62,3 +76,34 @@ codesign --verify --deep --strict --verbose=2 /Applications/Aprovan.app
 ```
 
 If Apple signing secrets were unavailable when this stream landed, treat the above as the release gate before the first external build — do not distribute unsigned builds.
+
+## Helper under Hardened Runtime (macos-native-providers task 5.2)
+
+After a notarized build is available, confirm the nested Swift helper starts on a
+clean machine (same Gatekeeper rules as above):
+
+1. Install and launch the notarized app (double-click only).
+2. Confirm the helper binary is present and Hardened Runtime–signed:
+
+```bash
+HELPER="/Applications/Aprovan.app/Contents/Resources/macos-helper/macos-helper"
+codesign --verify --strict --verbose=2 "$HELPER"
+codesign --display --verbose=2 --entitlements :- "$HELPER"
+# expect: runtime flag set (flags=0x10000 / runtime), nested signature valid
+```
+
+3. Confirm the supervised helper becomes ready (loopback `/health`):
+   - App log should show helper ready with a `http://127.0.0.1:<port>` URL, **or**
+   - From a second terminal, after launch:
+
+```bash
+# Replace <port> with the port from the helper supervisor log line.
+curl -fsS "http://127.0.0.1:<port>/health"
+# expect: {"ok":true}
+curl -fsS "http://127.0.0.1:<port>/availability"
+# expect: JSON AvailabilityReport (llm/esm capabilities)
+```
+
+4. Negative check: killing the helper must not quit the app; the supervisor should restart it (stream 1).
+
+**Not executed in the stream-5 environment** when Apple `CSC_*` / notarization secrets are absent — treat this checklist as the release gate alongside 7.5.

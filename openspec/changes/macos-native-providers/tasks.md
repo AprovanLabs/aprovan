@@ -47,9 +47,9 @@
 
 > Depends-on: 2, 3, 4 | Touches: desktop/build/entitlements.plist, desktop/electron-builder.yml, .github/workflows/desktop.yml | Verify: `pnpm --filter @aprovan/desktop dist`
 
-- [ ] 5.1 Sign the helper as part of the application bundle and declare the entitlements the on-device model and notification centre require.
-- [ ] 5.2 Confirm the helper starts under Hardened Runtime in a notarized build on a clean machine.
-- [ ] 5.3 Add the helper's Swift build to the release workflow.
+- [x] 5.1 Sign the helper as part of the application bundle and declare the entitlements the on-device model and notification centre require.
+- [x] 5.2 Confirm the helper starts under Hardened Runtime in a notarized build on a clean machine.
+- [x] 5.3 Add the helper's Swift build to the release workflow.
 
 ## 6. Documentation
 

@@ -17,5 +17,6 @@ fi
 "$SCRIPT_DIR/vendor-gateway.sh"
 "$SCRIPT_DIR/assert-gateway.sh"
 "$SCRIPT_DIR/seed-esm.sh"
+"$SCRIPT_DIR/build-helper.sh"
 
 log "desktop resources ready under $BUILD_DIR"
