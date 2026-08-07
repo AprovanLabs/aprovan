@@ -164,3 +164,6 @@ desktop/build/gateway/
 desktop/build/runtime/
 desktop/resources/bundle/chat/
 desktop/release/
+
+# SwiftPM build products
+native/**/.build/

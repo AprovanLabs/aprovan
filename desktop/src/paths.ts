@@ -58,3 +58,24 @@ export function resolveBundledNodeBinary(): string {
   }
   return path.resolve(here, "..", "build", "runtime", "node", "bin", "node");
 }
+
+/**
+ * Native macOS helper binary (macos-native-providers stream 1).
+ * Unpackaged: SwiftPM debug build under native/macos-helper/.build.
+ * Packaged: Resources/macos-helper/macos-helper (wired in signing stream).
+ */
+export function resolveHelperBinary(): string {
+  if (app.isPackaged) {
+    return path.join(process.resourcesPath, "macos-helper", "macos-helper");
+  }
+  return path.resolve(
+    here,
+    "..",
+    "..",
+    "native",
+    "macos-helper",
+    ".build",
+    "debug",
+    "macos-helper",
+  );
+}

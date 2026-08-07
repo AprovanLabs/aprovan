@@ -2,11 +2,11 @@
 
 > Depends-on: - | Touches: native/macos-helper/**, desktop/src/helper-supervisor.ts, desktop/src/__tests__/helper-supervisor.test.ts | Verify: `pnpm --filter @aprovan/desktop test && swift test --package-path native/macos-helper`
 
-- [ ] 1.1 Create the Swift package producing a single binary that binds an ephemeral loopback port and serves `/health` (D1).
-- [ ] 1.2 Implement `/availability` returning `AvailabilityReport` with the three capability states from the tech plan (D3).
-- [ ] 1.3 Supervise the helper from Electron main using the same pattern as the gateway supervisor: start, health-poll, restart with backoff, stop on quit.
-- [ ] 1.4 Ensure helper absence degrades cleanly — the application runs, native capabilities report unavailable, everything else is unaffected.
-- [ ] 1.5 Cover every scenario in `specs/loopback-provider-host/spec.md`.
+- [x] 1.1 Create the Swift package producing a single binary that binds an ephemeral loopback port and serves `/health` (D1).
+- [x] 1.2 Implement `/availability` returning `AvailabilityReport` with the three capability states from the tech plan (D3).
+- [x] 1.3 Supervise the helper from Electron main using the same pattern as the gateway supervisor: start, health-poll, restart with backoff, stop on quit.
+- [x] 1.4 Ensure helper absence degrades cleanly — the application runs, native capabilities report unavailable, everything else is unaffected.
+- [x] 1.5 Cover every scenario in `specs/loopback-provider-host/spec.md`.
 
 ## 2. Widget dependency cache
 
