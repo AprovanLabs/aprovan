@@ -108,7 +108,11 @@ export {
   matchAlias,
   getCommonExports,
 } from "./transforms/cdn.js";
-export { DEFAULT_CDN_BASE } from "./cdn-config.js";
+export {
+  DEFAULT_CDN_BASE,
+  helperEsmBaseUrl,
+  formatUnresolvedDependencyError,
+} from "./cdn-config.js";
 export type { CdnTransformOptions } from "./transforms/cdn.js";
 export { vfsPlugin } from "./transforms/vfs.js";
 export type { VFSPluginOptions } from "./transforms/vfs.js";

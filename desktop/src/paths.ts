@@ -79,3 +79,14 @@ export function resolveHelperBinary(): string {
     "macos-helper",
   );
 }
+
+/**
+ * Seed directory for the helper's `/esm/*` cache (stream 2).
+ * Contains `manifest.json` plus prefetched package bodies keyed by specifier.
+ */
+export function resolveEsmSeedDir(): string {
+  if (app.isPackaged) {
+    return path.join(process.resourcesPath, "esm-seed");
+  }
+  return path.resolve(here, "..", "resources", "esm-seed");
+}

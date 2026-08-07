@@ -78,15 +78,12 @@ public struct AvailabilityReporter: Sendable {
         AvailabilityReport(helperVersion: helperVersion, capabilities: capabilities())
     }
 
-    /// Skeleton probes: `llm` and `esm` are not implemented yet. `llm` uses an
-    /// OS-floor check so unsupported vs disabled are distinguishable in tests
-    /// and on real hardware; `esm` stays unsupported until stream 2.
+    /// `llm` remains a stub until stream 3; `esm` is available once the
+    /// fetch-through cache is wired (stream 2).
     public static nonisolated func defaultCapabilities() -> [String: CapabilityState] {
         [
             "llm": llmCapability(),
-            "esm": .unsupported(
-                reason: "Widget dependency cache is not available in this helper build"
-            ),
+            "esm": .available,
         ]
     }
 

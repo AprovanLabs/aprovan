@@ -38,6 +38,9 @@ export type HelperSupervisorOptions = {
   /** Absolute path to the macos-helper executable. */
   helperBinary: string;
   onStatus: (status: HelperStatus) => void;
+  /** Optional seed directory (stream 2 widget dependency cache). */
+  seedDir?: string;
+  cacheDir?: string;
   maxAttempts?: number;
   initialBackoffMs?: number;
   maxBackoffMs?: number;
@@ -68,13 +71,23 @@ export function buildHelperSpawnPlan(input: {
   port: number;
   host?: string;
   baseEnv?: NodeJS.ProcessEnv;
+  /** Optional seed directory shipped with the app (stream 2). */
+  seedDir?: string;
+  cacheDir?: string;
 }): HelperSpawnPlan {
   const host = input.host ?? LOOPBACK_HOST;
   const binary = path.resolve(input.helperBinary);
   const url = `http://${host}:${input.port}`;
+  const args = ["--host", host, "--port", String(input.port)];
+  if (input.seedDir) {
+    args.push("--seed-dir", path.resolve(input.seedDir));
+  }
+  if (input.cacheDir) {
+    args.push("--cache-dir", path.resolve(input.cacheDir));
+  }
   return {
     command: binary,
-    args: ["--host", host, "--port", String(input.port)],
+    args,
     env: { ...input.baseEnv },
     cwd: path.dirname(binary),
     url,
@@ -209,6 +222,8 @@ export class HelperSupervisor {
           port,
           host: LOOPBACK_HOST,
           baseEnv: process.env,
+          seedDir: this.opts.seedDir,
+          cacheDir: this.opts.cacheDir,
         });
 
         await this.spawnChild(plan);

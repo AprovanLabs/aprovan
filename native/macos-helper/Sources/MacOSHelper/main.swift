@@ -1,10 +1,13 @@
 import Darwin
 import Foundation
+import EsmCache
 import MacOSHelperLib
 
 struct CLIOptions {
     var host: String = "127.0.0.1"
     var port: UInt16 = 0
+    var cacheDir: String?
+    var seedDir: String?
 }
 
 func parseArgs(_ args: [String]) -> CLIOptions {
@@ -19,6 +22,16 @@ func parseArgs(_ args: [String]) -> CLIOptions {
         }
         if arg == "--port", i + 1 < args.count {
             options.port = UInt16(args[i + 1]) ?? 0
+            i += 2
+            continue
+        }
+        if arg == "--cache-dir", i + 1 < args.count {
+            options.cacheDir = args[i + 1]
+            i += 2
+            continue
+        }
+        if arg == "--seed-dir", i + 1 < args.count {
+            options.seedDir = args[i + 1]
             i += 2
             continue
         }
@@ -68,13 +81,60 @@ func resolvePort(_ requested: UInt16) throws -> UInt16 {
     return UInt16(bigEndian: addr.sin_port)
 }
 
+func defaultCacheDirectory() -> URL {
+    let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+        ?? FileManager.default.temporaryDirectory
+    return base.appendingPathComponent("Aprovan/esm-cache", isDirectory: true)
+}
+
+func defaultSeedDirectory() -> URL? {
+    // Packaged: Resources/esm-seed next to the binary's resource bundle.
+    // Unpackaged / tests: native/macos-helper/Resources/esm-seed or CLI --seed-dir.
+    let exe = URL(fileURLWithPath: CommandLine.arguments[0]).resolvingSymlinksInPath()
+    let candidates = [
+        exe.deletingLastPathComponent().appendingPathComponent("esm-seed", isDirectory: true),
+        exe.deletingLastPathComponent().appendingPathComponent("Resources/esm-seed", isDirectory: true),
+        exe
+            .deletingLastPathComponent() // debug
+            .deletingLastPathComponent() // .build
+            .deletingLastPathComponent() // macos-helper package root? varies
+            .appendingPathComponent("Resources/esm-seed", isDirectory: true),
+    ]
+    for url in candidates {
+        var isDir: ObjCBool = false
+        if FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir), isDir.boolValue {
+            return url
+        }
+    }
+    return nil
+}
+
 let options = parseArgs(Array(CommandLine.arguments.dropFirst()))
 let port = try resolvePort(options.port)
+let cacheDir = URL(
+    fileURLWithPath: options.cacheDir ?? defaultCacheDirectory().path,
+    isDirectory: true
+)
+let seedDir: URL? = {
+    if let seed = options.seedDir {
+        return URL(fileURLWithPath: seed, isDirectory: true)
+    }
+    return defaultSeedDirectory()
+}()
+
+let localEsmBase = "http://\(options.host):\(port)/esm"
+let esmCache = EsmCacheService(
+    cacheDirectory: cacheDir,
+    seedDirectory: seedDir,
+    localEsmBase: localEsmBase
+)
+try esmCache.prepare()
+
 let reporter = AvailabilityReporter()
 let server = try LoopbackHTTPServer(
     host: options.host,
     port: port,
-    router: makeRouter(reporter: reporter)
+    router: makeRouter(reporter: reporter, esmCache: esmCache)
 )
 
 try await server.start()

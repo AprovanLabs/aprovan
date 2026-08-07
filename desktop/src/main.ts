@@ -25,6 +25,7 @@ import { evaluatePlatformFloor } from "./platform.js";
 import {
   resolveActiveBundleDirWithSupport,
   resolveBundledNodeBinary,
+  resolveEsmSeedDir,
   resolveGatewayVendorDir,
   resolveHelperBinary,
 } from "./paths.js";
@@ -178,9 +179,20 @@ export async function startDesktopApp(): Promise<void> {
   // gateway and the rest of the app continue (loopback-provider-host lifecycle).
   const helperSupervisor = createHelperSupervisor({
     helperBinary: resolveHelperBinary(),
+    seedDir: resolveEsmSeedDir(),
     onStatus: (status) => {
-      if (status.state === "unavailable" || status.state === "failed") {
-        console.warn("[helper]", status);
+      if (status.state === "ready") {
+        bridgeState.helperUrl = status.url;
+      } else if (
+        status.state === "unavailable" ||
+        status.state === "failed" ||
+        status.state === "starting" ||
+        status.state === "restarting"
+      ) {
+        if (status.state === "unavailable" || status.state === "failed") {
+          bridgeState.helperUrl = null;
+          console.warn("[helper]", status);
+        }
       }
     },
   });

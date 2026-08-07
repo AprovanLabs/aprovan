@@ -6,6 +6,8 @@ import type { Plugin } from "esbuild-wasm";
 import {
   setCdnBaseUrl,
   getCdnBaseUrl,
+  helperEsmBaseUrl,
+  formatUnresolvedDependencyError,
   toEsmShUrl,
   isBareImport,
   parsePackageSpec,
@@ -18,6 +20,8 @@ import {
 export {
   setCdnBaseUrl,
   getCdnBaseUrl,
+  helperEsmBaseUrl,
+  formatUnresolvedDependencyError,
   toEsmShUrl,
   isBareImport,
   parsePackageSpec,

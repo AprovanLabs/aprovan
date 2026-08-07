@@ -1,7 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { createCompiler, type Compiler } from "@aprovan/patchwork";
+import {
+  createCompiler,
+  helperEsmBaseUrl,
+  type Compiler,
+} from "@aprovan/patchwork";
 import type { ServiceInfo } from "@aprovan/editor";
 import { ACTIVE_WORKSPACE_KEY } from "@/features/tabs/useTabs";
+import { getDesktopHelperUrl } from "@/features/workspaces/desktop";
 import { getAccessTokenSync } from "@/lib/auth";
 import { GATEWAY_BASE } from "@/lib/gateway";
 import { gatewayFetch } from "@/lib/gateway-fetch";
@@ -28,6 +33,22 @@ interface GatewayToolEntry {
   operation: string;
   description?: string;
   inputSchema?: unknown;
+}
+
+/**
+ * Prefer the helper's `/esm` cache when the desktop shell reports it ready;
+ * otherwise keep the public CDN default (D5 / task 2.4).
+ */
+export async function resolveWidgetCdnBaseUrl(
+  publicDefault: string = WIDGET_CDN_URL,
+): Promise<string> {
+  try {
+    const helperOrigin = await getDesktopHelperUrl();
+    if (helperOrigin) return helperEsmBaseUrl(helperOrigin);
+  } catch {
+    // Helper probe is best-effort — fall through to the public default.
+  }
+  return publicDefault;
 }
 
 /**
@@ -104,31 +125,36 @@ export function useCompilerBootstrap(args: { refreshWorkspace: () => Promise<voi
 
     // Initialize compiler; the loaded image carries its own runtime prompt
     // (PROMPT.md via the `patchwork.prompt` manifest field), composed into
-    // the system prompt at send time.
-    createCompiler({
-      image: IMAGE_SPEC,
-      proxyUrl: PROXY_URL,
-      proxyFetch: gatewayFetch,
-      cdnBaseUrl: IMAGE_CDN_URL,
-      widgetCdnBaseUrl: WIDGET_CDN_URL,
-      // Console output, uncaught errors, and service calls from every
-      // mounted widget land in the local logs buffer (editor Logs panel)
-      // and — for console/errors — ship to the workspace telemetry store.
-      telemetry: recordWidgetEvent,
-    })
-      .then((created) => {
+    // the system prompt at send time. When the helper is available, point
+    // widget imports at its `/esm` cache (setCdnBaseUrl via createCompiler).
+    void (async () => {
+      const widgetCdnBaseUrl = await resolveWidgetCdnBaseUrl();
+      try {
+        const created = await createCompiler({
+          image: IMAGE_SPEC,
+          proxyUrl: PROXY_URL,
+          proxyFetch: gatewayFetch,
+          cdnBaseUrl: IMAGE_CDN_URL,
+          widgetCdnBaseUrl,
+          // Console output, uncaught errors, and service calls from every
+          // mounted widget land in the local logs buffer (editor Logs panel)
+          // and — for console/errors — ship to the workspace telemetry store.
+          telemetry: recordWidgetEvent,
+        });
         setCompiler(created);
         setCompilerError(null);
         imagePromptsRef.current = [created.getImage(IMAGE_SPEC)]
           .flatMap((img) => (img?.prompt ? [img.prompt] : []))
           .join("\n\n");
-      })
-      .catch((err) => {
+      } catch (err) {
         console.error(err);
         // Without a compiler every widget silently falls back to "Compiler
         // not initialized" — surface the real cause instead.
-        setCompilerError(err instanceof Error ? err.message : "Failed to load the widget compiler");
-      });
+        setCompilerError(
+          err instanceof Error ? err.message : "Failed to load the widget compiler",
+        );
+      }
+    })();
 
     void refreshWorkspace();
     // eslint-disable-next-line react-hooks/exhaustive-deps

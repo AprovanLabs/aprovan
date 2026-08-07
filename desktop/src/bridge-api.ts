@@ -9,6 +9,7 @@ export const IPC = {
   gatewayStatus: "desktop:gatewayStatus",
   pickDirectory: "desktop:pickDirectory",
   bundleInfo: "desktop:bundleInfo",
+  helperUrl: "desktop:helperUrl",
   /** Renderer readiness — not part of the public DesktopBridge surface. */
   rendererReady: "desktop:rendererReady",
   gatewayStatusEvent: "desktop:gatewayStatus",
@@ -43,5 +44,6 @@ export function createPreloadBridgeApi(ipc: {
     pickDirectory: (purpose) =>
       ipc.invoke(IPC.pickDirectory, purpose) as Promise<string | undefined>,
     bundleInfo: () => ipc.invoke(IPC.bundleInfo) as Promise<BundleInfo>,
+    helperUrl: () => ipc.invoke(IPC.helperUrl) as Promise<string | null>,
   };
 }

@@ -27,6 +27,23 @@ export function getCdnBaseUrl(): string {
 }
 
 /**
+ * Map a helper loopback origin to the `/esm` CDN base the compiler should use.
+ * `setCdnBaseUrl(helperEsmBaseUrl(helperOrigin))` when the helper is ready;
+ * leave `DEFAULT_CDN_BASE` in place otherwise.
+ */
+export function helperEsmBaseUrl(helperOrigin: string): string {
+  const trimmed = helperOrigin.replace(/\/+$/, "");
+  return `${trimmed}/esm`;
+}
+
+/**
+ * Named failure for an unresolvable dependency — never hang or render blank.
+ */
+export function formatUnresolvedDependencyError(specifier: string): string {
+  return `Unresolvable dependency: ${specifier}`;
+}
+
+/**
  * Convert a package specifier to a CDN URL
  *
  * @param packageName - The npm package name
