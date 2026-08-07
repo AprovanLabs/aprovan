@@ -140,7 +140,7 @@
     "@utdk/events": "^0.2.0",
     "@utdk/keyvalue": "^0.2.0",
     "@utdk/sandbox": "^0.2.0",
-    "@utdk/stt": "^0.1.2",
+    "@utdk/stt": "^0.1.3",
     "@utdk/telemetry": "^0.3.0",
     "@utdk/vfs": "^0.2.0"
   },
