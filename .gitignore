@@ -157,3 +157,9 @@ hardcopy.yaml
 packages/contracts
 
 .DS_Store
+
+# Desktop shell build artifacts (renderer seed, gateway deploy, stock Node)
+desktop/build/bundles/
+desktop/build/gateway/
+desktop/build/runtime/
+desktop/resources/bundle/chat/

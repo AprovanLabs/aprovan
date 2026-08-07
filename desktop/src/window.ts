@@ -11,7 +11,8 @@ import {
 export { MAIN_WINDOW_PREFERENCES, mainWindowWebPreferences };
 
 export function createMainWindow(
-  loadUrl = "app://bundle/index.html",
+  // Shared client ships under /chat/ (same Vite base as the website).
+  loadUrl = "app://bundle/chat/index.html",
   overrides: BrowserWindowConstructorOptions = {},
 ): BrowserWindow {
   const preload = resolvePreloadPath();

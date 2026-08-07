@@ -7,6 +7,7 @@ export default defineConfig([
       bridge: "src/bridge.ts",
       protocol: "src/protocol.ts",
       platform: "src/platform.ts",
+      "app-support": "src/app-support.ts",
     },
     format: ["esm"],
     platform: "node",

@@ -13,10 +13,10 @@
 
 > Depends-on: 1 | Touches: desktop/build/**, desktop/scripts/**, scripts/image.sh | Verify: `pnpm --filter @aprovan/desktop build`
 
-- [ ] 2.1 Produce the renderer bundle from the existing `client/web` build with no desktop-only fork (spec: "One renderer source").
-- [ ] 2.2 Vendor the gateway artifact exactly as the Dockerfile's `pnpm deploy` step produces it, plus a stock Node runtime for the target architecture (D2).
-- [ ] 2.3 Add a build assertion comparing the vendored gateway against the container build, failing if they differ.
-- [ ] 2.4 Lay out Application Support directories per the tech plan: `bundles/`, `gateway-data/`.
+- [x] 2.1 Produce the renderer bundle from the existing `client/web` build with no desktop-only fork (spec: "One renderer source").
+- [x] 2.2 Vendor the gateway artifact exactly as the Dockerfile's `pnpm deploy` step produces it, plus a stock Node runtime for the target architecture (D2).
+- [x] 2.3 Add a build assertion comparing the vendored gateway against the container build, failing if they differ.
+- [x] 2.4 Lay out Application Support directories per the tech plan: `bundles/`, `gateway-data/`.
 
 ## 3. Gateway supervision
 

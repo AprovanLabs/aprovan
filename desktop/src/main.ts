@@ -1,12 +1,13 @@
 import fs from "node:fs";
 import os from "node:os";
 import { app, dialog, net, protocol } from "electron";
+import { ensureAppSupportLayout } from "./app-support.js";
 import {
   createInitialBridgeState,
   registerBridgeHandlers,
 } from "./bridge-handlers.js";
 import { evaluatePlatformFloor } from "./platform.js";
-import { resolveActiveBundleDir } from "./paths.js";
+import { resolveActiveBundleDirWithSupport } from "./paths.js";
 import {
   APP_SCHEME,
   filePathToResponseUrl,
@@ -66,9 +67,15 @@ export async function startDesktopApp(): Promise<void> {
     return;
   }
 
+  // Clean Application Support path (not `@aprovan/desktop`).
+  app.setName("Aprovan");
+
   await app.whenReady();
 
-  const activeBundleDir = resolveActiveBundleDir();
+  // Tech-plan layout: bundles/ + gateway-data/ under Application Support.
+  ensureAppSupportLayout(app.getPath("userData"));
+
+  const activeBundleDir = resolveActiveBundleDirWithSupport();
   if (!fs.existsSync(activeBundleDir)) {
     await refuseAndQuit(
       `Active renderer bundle is missing at ${activeBundleDir}.`,
@@ -76,7 +83,7 @@ export async function startDesktopApp(): Promise<void> {
     return;
   }
 
-  registerAppProtocol(() => activeBundleDir);
+  registerAppProtocol(() => resolveActiveBundleDirWithSupport());
 
   const bridgeState = createInitialBridgeState();
   registerBridgeHandlers(bridgeState);
