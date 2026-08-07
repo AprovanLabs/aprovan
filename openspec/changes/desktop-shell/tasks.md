@@ -2,12 +2,12 @@
 
 > Depends-on: - | Touches: desktop/**, package.json, pnpm-workspace.yaml, turbo.json | Verify: `pnpm --filter @aprovan/desktop build && pnpm --filter @aprovan/desktop test`
 
-- [ ] 1.1 Create the `desktop/` workspace package with main, preload, and build config. Register it in `pnpm-workspace.yaml` and `turbo.json`.
-- [ ] 1.2 Register the `app://` protocol handler serving files from the active bundle directory only; reject any path resolving outside it (spec: "Origin serves only the active bundle").
-- [ ] 1.3 Open the main window with `contextIsolation: true` and `nodeIntegration: false`, loading the renderer from `app://`.
-- [ ] 1.4 Implement the `DesktopBridge` over `contextBridge` with exactly the surface in the tech plan — no filesystem, process, or credential operations.
-- [ ] 1.5 Enforce the platform floor at launch: macOS 14+, Apple Silicon, reported in plain language and refusing to start otherwise.
-- [ ] 1.6 Test that the bridge surface matches the declared interface and nothing more.
+- [x] 1.1 Create the `desktop/` workspace package with main, preload, and build config. Register it in `pnpm-workspace.yaml` and `turbo.json`.
+- [x] 1.2 Register the `app://` protocol handler serving files from the active bundle directory only; reject any path resolving outside it (spec: "Origin serves only the active bundle").
+- [x] 1.3 Open the main window with `contextIsolation: true` and `nodeIntegration: false`, loading the renderer from `app://`.
+- [x] 1.4 Implement the `DesktopBridge` over `contextBridge` with exactly the surface in the tech plan — no filesystem, process, or credential operations.
+- [x] 1.5 Enforce the platform floor at launch: macOS 14+, Apple Silicon, reported in plain language and refusing to start otherwise.
+- [x] 1.6 Test that the bridge surface matches the declared interface and nothing more.
 
 ## 2. Bundle the renderer and the gateway build
 
