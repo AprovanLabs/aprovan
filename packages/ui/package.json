@@ -36,7 +36,8 @@
   "scripts": {
     "build": "tsup && cp src/theme.css dist/theme.css",
     "lint": "eslint src",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@aprovan/patchwork": "workspace:*",

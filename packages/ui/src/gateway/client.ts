@@ -90,7 +90,6 @@ async function parseError(res: Response): Promise<GatewayError> {
 }
 
 export function createGatewayClient(config: GatewayClientConfig): GatewayClient {
-  const base = config.baseUrl.replace(/\/$/, "");
   const authHeader = config.authHeader ?? DEFAULT_AUTH_HEADER;
   const workspaceHeader = config.workspaceHeader ?? "X-Aprovan-Workspace";
 
@@ -105,6 +104,8 @@ export function createGatewayClient(config: GatewayClientConfig): GatewayClient 
     const workspace = workspaceId ?? config.getWorkspaceId?.() ?? undefined;
     if (workspace) merged[workspaceHeader] = workspace;
 
+    // Resolve per request so a getter / live baseUrl tracks the active workspace.
+    const base = config.baseUrl.replace(/\/$/, "");
     const res = await fetch(`${base}${path}`, { ...init, headers: merged });
     if (!res.ok) throw await parseError(res);
     if (res.status === 204) return undefined as T;
