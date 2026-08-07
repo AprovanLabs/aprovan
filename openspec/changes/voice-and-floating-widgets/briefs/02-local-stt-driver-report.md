@@ -1,5 +1,10 @@
 # Report: Local STT driver (stream 2)
 
+## PRs
+
+- aprovan: https://github.com/AprovanLabs/aprovan/pull/155
+- registry: https://github.com/AprovanLabs/registry/pull/158
+
 ## What was built
 
 ### aprovan (`native/macos-helper/Sources/Stt` + `@aprovan/native/stt`)
