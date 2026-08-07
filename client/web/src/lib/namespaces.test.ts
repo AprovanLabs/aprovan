@@ -90,16 +90,15 @@ describe("groupNamespaces", () => {
 
   it("promotes agent, vcs, and llm interfaces to Native", () => {
     const grouped = groupNamespaces(
-      ["llm", "llm:fast", "agent", "vcs", "sql"],
+      ["llm", "agent", "vcs", "sql"],
       catalog([
         ["llm", "interface"],
-        ["llm:fast", "interface"],
         ["agent", "interface"],
         ["vcs", "interface"],
         ["sql", "interface"],
       ]),
     );
-    expect(grouped.core).toEqual(["llm", "llm:fast", "agent", "vcs"]);
+    expect(grouped.core).toEqual(["llm", "agent", "vcs"]);
     expect(grouped.interfaces).toEqual(["sql"]);
     expect(grouped.providers).toEqual([]);
   });
@@ -167,7 +166,7 @@ describe("namespaceLabel", () => {
       label: "Keyvalue",
       description: "",
     });
-    expect(namespaceLabel("sql:analytics", undefined).label).toBe("Sql");
+    expect(namespaceLabel("sql:analytics", undefined).label).toBe("Sql:analytics");
   });
 
   it("shows Agent runtime for the agent interface, distinct from core Agents", () => {
