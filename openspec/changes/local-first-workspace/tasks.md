@@ -11,11 +11,11 @@
 
 > Depends-on: 1 | Touches: packages/native/src/local-directory.ts, packages/native/src/index.ts, packages/native/__tests__/local-directory.test.ts, registry/packages/contracts/vfs/compat.json | Verify: `pnpm --filter @aprovan/native test`
 
-- [ ] 2.1 Implement `createLocalDirectoryBackend({ root })` as a `NativeVfsBackend` — read, write, delete, list, stat — routing every path through `containPath`.
-- [ ] 2.2 Derive `etag` from file content hash and `modifiedAt` from filesystem mtime so conditional writes behave as the contract requires.
-- [ ] 2.3 Implement prefix listing with cursor and limit over directory traversal, honouring the contract's `recursive` flag.
-- [ ] 2.4 Export the provider and add the `local-directory` compat entry with `moduleSpecifier: "@aprovan/native"` and `credentialless: true`.
-- [ ] 2.5 Run the existing vfs conformance suite against this backend; satisfy every scenario in `specs/local-directory-vfs/spec.md`.
+- [x] 2.1 Implement `createLocalDirectoryBackend({ root })` as a `NativeVfsBackend` — read, write, delete, list, stat — routing every path through `containPath`.
+- [x] 2.2 Derive `etag` from file content hash and `modifiedAt` from filesystem mtime so conditional writes behave as the contract requires.
+- [x] 2.3 Implement prefix listing with cursor and limit over directory traversal, honouring the contract's `recursive` flag.
+- [x] 2.4 Export the provider and add the `local-directory` compat entry with `moduleSpecifier: "@aprovan/native"` and `credentialless: true`.
+- [x] 2.5 Run the existing vfs conformance suite against this backend; satisfy every scenario in `specs/local-directory-vfs/spec.md`.
 
 ## 3. Keystore cipher envelope
 
