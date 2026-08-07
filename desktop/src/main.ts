@@ -11,6 +11,7 @@ import {
 } from "./bridge-handlers.js";
 import { BundleManager } from "./bundle-manager.js";
 import { BUNDLE_PUBLIC_KEY_PEM } from "./bundle-public-key.js";
+import { appleLlmEnvFromHelperOrigin } from "./apple-helper-env.js";
 import { createGatewaySupervisor } from "./gateway-supervisor.js";
 import { createHelperSupervisor } from "./helper-supervisor.js";
 import { createSafeStorageKeyProvider } from "./key-provider.js";
@@ -140,11 +141,15 @@ export async function startDesktopApp(): Promise<void> {
 
   let notificationMirror: NotificationMirror | null = null;
   let gatewayOrigin: string | null = null;
+  /** Live helper loopback origin — drives `LLM_APPLE_BASE_URL` for the gateway. */
+  let helperOrigin: string | null = null;
+  let appliedAppleBaseUrl: string | undefined;
 
   const supervisor = createGatewaySupervisor({
     nodeBinary: resolveBundledNodeBinary(),
     gatewayDir: resolveGatewayVendorDir(),
     dataDir: layout.gatewayDataDir,
+    extraEnv: () => appleLlmEnvFromHelperOrigin(helperOrigin),
     onStatus: (status) => {
       publishGatewayStatus(bridgeState, status);
       if (status.state === "ready") {
@@ -175,6 +180,16 @@ export async function startDesktopApp(): Promise<void> {
     resolveWorkspaceKey: () => keyProvider.getKey(),
   });
 
+  const syncGatewayAppleEnv = (): void => {
+    const nextEnv = appleLlmEnvFromHelperOrigin(helperOrigin);
+    const nextUrl = nextEnv["LLM_APPLE_BASE_URL"];
+    if (nextUrl === appliedAppleBaseUrl) return;
+    appliedAppleBaseUrl = nextUrl;
+    // Reload only once supervision is running; the next spawn otherwise
+    // picks up `extraEnv()` on its own.
+    void supervisor.reload();
+  };
+
   // Helper is optional: missing binary or crash → native caps unavailable;
   // gateway and the rest of the app continue (loopback-provider-host lifecycle).
   const helperSupervisor = createHelperSupervisor({
@@ -183,6 +198,8 @@ export async function startDesktopApp(): Promise<void> {
     onStatus: (status) => {
       if (status.state === "ready") {
         bridgeState.helperUrl = status.url;
+        helperOrigin = status.url;
+        syncGatewayAppleEnv();
       } else if (
         status.state === "unavailable" ||
         status.state === "failed" ||
@@ -191,6 +208,8 @@ export async function startDesktopApp(): Promise<void> {
       ) {
         if (status.state === "unavailable" || status.state === "failed") {
           bridgeState.helperUrl = null;
+          helperOrigin = null;
+          syncGatewayAppleEnv();
           console.warn("[helper]", status);
         }
       }

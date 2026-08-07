@@ -64,6 +64,11 @@ export type GatewaySupervisorOptions = {
    * child via an inherited pipe + WORKSPACE_KEY_FD=<n> (never in argv/env).
    */
   resolveWorkspaceKey?: () => Promise<Buffer>;
+  /**
+   * Extra child env evaluated at each spawn (e.g. `LLM_APPLE_BASE_URL` when the
+   * macOS helper is ready). Merged over `process.env` / baseEnv.
+   */
+  extraEnv?: () => NodeJS.ProcessEnv;
 };
 
 export type GatewaySpawnPlan = {
@@ -204,6 +209,8 @@ export class GatewaySupervisor {
   private url: string | undefined;
   private attempt = 0;
   private stopping = false;
+  /** Intentional config reload — skip failure accounting / scary restart copy. */
+  private reloading = false;
   private runLoop: Promise<void> | undefined;
   private wake: (() => void) | undefined;
 
@@ -253,10 +260,23 @@ export class GatewaySupervisor {
   }
 
   /**
+   * Respawn the gateway child so a fresh `extraEnv()` applies (e.g. helper port
+   * changed). No-op when supervision is not running. Resets the failure budget.
+   */
+  async reload(): Promise<void> {
+    if (this.stopping || !this.runLoop) return;
+    this.reloading = true;
+    this.attempt = 0;
+    await this.terminateChild("reload");
+    this.wake?.();
+  }
+
+  /**
    * Signal → await → terminate. Leaves no orphan. Safe to call repeatedly.
    */
   async stop(): Promise<void> {
     this.stopping = true;
+    this.reloading = false;
     this.wake?.();
     await this.terminateChild("shutdown");
     if (this.runLoop) {
@@ -294,7 +314,10 @@ export class GatewaySupervisor {
           dataDir: this.opts.dataDir,
           port,
           host: LOOPBACK_HOST,
-          baseEnv: process.env,
+          baseEnv: {
+            ...process.env,
+            ...(this.opts.extraEnv?.() ?? {}),
+          },
           workspaceKey,
         });
 
@@ -306,6 +329,12 @@ export class GatewaySupervisor {
         const exit = await this.waitForChildExit();
         if (this.stopping) break;
 
+        if (this.reloading) {
+          this.reloading = false;
+          this.setStatus({ state: "starting" });
+          continue;
+        }
+
         lastError =
           exit.signal != null
             ? `Gateway exited on ${exit.signal}`
@@ -313,6 +342,11 @@ export class GatewaySupervisor {
       } catch (err) {
         lastError = err instanceof Error ? err.message : String(err);
         await this.terminateChild("spawn-error");
+        if (this.reloading && !this.stopping) {
+          this.reloading = false;
+          this.setStatus({ state: "starting" });
+          continue;
+        }
       }
 
       if (this.stopping) break;

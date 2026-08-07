@@ -49,7 +49,9 @@ jobs:
   verify:
     name: Verify (unsigned)
     if: github.event_name == 'pull_request'
-    runs-on: macos-14
+    # macos-15 ships Xcode 16 / Swift Testing (import Testing).
+    # macos-14's default toolchain lacks the Testing module.
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
