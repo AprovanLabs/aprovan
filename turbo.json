@@ -20,6 +20,10 @@
     "test": {
       "dependsOn": ["^build"]
     },
+    "dist": {
+      "dependsOn": ["build"],
+      "cache": false
+    },
     "lint": {},
     "clean": {
       "cache": false
