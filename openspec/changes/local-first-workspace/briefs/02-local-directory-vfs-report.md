@@ -12,6 +12,11 @@ Paired registry change: `local-directory` compat entry on `@utdk/vfs` (`moduleSp
 2. `pnpm --filter @aprovan/native check-types` — passed.
 3. Spec scenarios covered: round-trip, listing, containment (relative escape, absolute, symlink escape, write-outside creates nothing), shared `containPath`, ifMatch/etag, cursor/limit/recursive.
 
+## PRs
+
+- aprovan: https://github.com/AprovanLabs/aprovan/pull/113
+- registry (compat): https://github.com/AprovanLabs/registry/pull/153
+
 ## Deviations
 
 None from brief scope. Compat lives only in the registry repo (no second source of truth in aprovan). Read encoding is inferred from bytes (utf8 when round-trippable, else base64) because the disk store has no encoding sidecar.
