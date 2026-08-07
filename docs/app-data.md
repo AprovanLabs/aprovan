@@ -50,3 +50,7 @@ Inert-bundle export/import for offline / desktop hosts is **out of scope** for
 this model flip (PRD Non-Goals). If origin workspaces go offline, installs
 would need to snapshot release content at install time — that is a later
 change, not a silent assumption of the current serve-from-origin path.
+
+For workspace **execution locus** (local vs cloud), immutable locus, local
+directory VFS containment, and why cloud workspaces have no offline cache, see
+[local-first.md](./local-first.md).

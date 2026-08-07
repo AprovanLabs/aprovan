@@ -58,6 +58,6 @@
 
 > Depends-on: 5, 6 | Touches: docs/local-first.md, docs/index.md, docs/app-data.md | Verify: `pnpm lint`
 
-- [ ] 7.1 Write `docs/local-first.md`: what a local workspace is, why locus is immutable, what a cloud workspace cannot do, and why there is no offline cache for cloud workspaces (D5).
-- [ ] 7.2 State plainly that the VFS root is a user-chosen boundary enforced in application code, not by the operating system.
-- [ ] 7.3 Link from `docs/index.md` and cross-reference `docs/app-data.md`.
+- [x] 7.1 Write `docs/local-first.md`: what a local workspace is, why locus is immutable, what a cloud workspace cannot do, and why there is no offline cache for cloud workspaces (D5).
+- [x] 7.2 State plainly that the VFS root is a user-chosen boundary enforced in application code, not by the operating system.
+- [x] 7.3 Link from `docs/index.md` and cross-reference `docs/app-data.md`.
