@@ -21,10 +21,10 @@
 
 > Depends-on: - | Touches: registry/packages/registry-server/src/credentials/cipher.ts, registry/packages/registry-server/src/credentials/__tests__/cipher.test.ts, registry/packages/registry-server/src/index.ts | Verify: `pnpm --filter @aprovan/registry-server test && pnpm --filter @aprovan/registry-server check-types`
 
-- [ ] 3.1 Add the `KeyProvider` interface and `KeystoreCipher` alongside `KmsCipher` / `LocalCipher` / `NoneCipher`, following their existing structure (D4).
-- [ ] 3.2 Cache the unsealed key for the process lifetime so a provider that prompts is consulted at most once.
-- [ ] 3.3 Extend backend selection to prefer a supplied key provider over the environment-variable backends, leaving current selection untouched when none is supplied.
-- [ ] 3.4 Ship an in-memory key provider for tests and cover every scenario in `specs/protected-credential-envelope/spec.md`.
+- [x] 3.1 Add the `KeyProvider` interface and `KeystoreCipher` alongside `KmsCipher` / `LocalCipher` / `NoneCipher`, following their existing structure (D4).
+- [x] 3.2 Cache the unsealed key for the process lifetime so a provider that prompts is consulted at most once.
+- [x] 3.3 Extend backend selection to prefer a supplied key provider over the environment-variable backends, leaving current selection untouched when none is supplied.
+- [x] 3.4 Ship an in-memory key provider for tests and cover every scenario in `specs/protected-credential-envelope/spec.md`.
 
 ## 4. Workspace execution locus
 
