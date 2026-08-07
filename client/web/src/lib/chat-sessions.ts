@@ -50,12 +50,47 @@ export function changedFileCount(session: ChatSessionInfo): number {
   return changes.added.length + changes.modified.length + changes.removed.length;
 }
 
+/** Marker stored in session `tabs` so chat can recognize panel-originated chats. */
+export const PANEL_SESSION_ORIGIN = "panel" as const;
+
+export type PanelOriginTabs = { origin: typeof PANEL_SESSION_ORIGIN };
+
+export function panelOriginTabs(): PanelOriginTabs {
+  return { origin: PANEL_SESSION_ORIGIN };
+}
+
+export function isPanelOriginatedSession(session: {
+  tabs?: unknown;
+}): boolean {
+  const tabs = session.tabs;
+  return (
+    !!tabs &&
+    typeof tabs === "object" &&
+    (tabs as { origin?: unknown }).origin === PANEL_SESSION_ORIGIN
+  );
+}
+
 export async function createChatSession(options: {
   title?: string;
   mode?: SessionMode;
 }): Promise<ChatSessionInfo> {
   const data = (await invokeSessionsTool("create", options)) as { session: ChatSessionInfo };
   return data.session;
+}
+
+/**
+ * Open a gateway session from the floating panel and tag it as panel-originated.
+ * Lives in the workspace session list so chat can attach by id (`?session=`).
+ */
+export async function createPanelChatSession(options: {
+  title?: string;
+  mode?: SessionMode;
+} = {}): Promise<ChatSessionInfo> {
+  const created = await createChatSession({
+    title: options.title?.trim() || "Panel",
+    mode: options.mode,
+  });
+  return updateChatSession(created.id, { tabs: panelOriginTabs() });
 }
 
 export async function listChatSessions(status?: SessionStatus): Promise<ChatSessionInfo[]> {
