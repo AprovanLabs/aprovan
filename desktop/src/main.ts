@@ -12,12 +12,14 @@ import {
 import { BundleManager } from "./bundle-manager.js";
 import { BUNDLE_PUBLIC_KEY_PEM } from "./bundle-public-key.js";
 import { createGatewaySupervisor } from "./gateway-supervisor.js";
+import { createHelperSupervisor } from "./helper-supervisor.js";
 import { createSafeStorageKeyProvider } from "./key-provider.js";
 import { evaluatePlatformFloor } from "./platform.js";
 import {
   resolveActiveBundleDirWithSupport,
   resolveBundledNodeBinary,
   resolveGatewayVendorDir,
+  resolveHelperBinary,
 } from "./paths.js";
 import {
   APP_SCHEME,
@@ -136,20 +138,35 @@ export async function startDesktopApp(): Promise<void> {
     resolveWorkspaceKey: () => keyProvider.getKey(),
   });
 
+  // Helper is optional: missing binary or crash → native caps unavailable;
+  // gateway and the rest of the app continue (loopback-provider-host lifecycle).
+  const helperSupervisor = createHelperSupervisor({
+    helperBinary: resolveHelperBinary(),
+    onStatus: (status) => {
+      if (status.state === "unavailable" || status.state === "failed") {
+        console.warn("[helper]", status);
+      }
+    },
+  });
+
   let shuttingDown = false;
   app.on("before-quit", (event) => {
     if (shuttingDown) return;
     event.preventDefault();
     shuttingDown = true;
-    void supervisor.stop().finally(() => {
-      app.quit();
-    });
+    void Promise.all([supervisor.stop(), helperSupervisor.stop()]).finally(
+      () => {
+        app.quit();
+      },
+    );
   });
 
   createMainWindow();
 
   // Window stays open regardless of gateway status (crash → restarting/failed).
   void supervisor.start();
+  // Helper start never blocks the shell; absence degrades cleanly.
+  void helperSupervisor.start();
 
   // Shell channel is independent of BundleManager's OTA renderer feed (D6).
   startShellUpdater({ isPackaged: app.isPackaged });
