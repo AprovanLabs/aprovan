@@ -64,6 +64,13 @@ const CHAT_PROVIDERS: LlmChatProvider[] = [
     baseUrl: "https://openrouter.ai/api/v1",
     defaultModel: "openrouter/auto",
   },
+  {
+    id: "apple",
+    label: "Apple on-device",
+    module: "openai",
+    baseUrl: "http://127.0.0.1:0/v1",
+    defaultModel: "apple-on-device",
+  },
 ];
 
 export function listLlmProviders(): LlmChatProvider[] {

@@ -7,6 +7,7 @@ let package = Package(
     products: [
         .executable(name: "macos-helper", targets: ["MacOSHelper"]),
         .library(name: "MacOSHelperLib", targets: ["MacOSHelperLib"]),
+        .library(name: "ChatCompletions", targets: ["ChatCompletions"]),
     ],
     targets: [
         // Widget dependency cache (stream 2). Separate target so stream 3 can
@@ -16,18 +17,22 @@ let package = Package(
             path: "Sources/EsmCache"
         ),
         .target(
+            name: "ChatCompletions",
+            path: "Sources/ChatCompletions"
+        ),
+        .target(
             name: "MacOSHelperLib",
-            dependencies: ["EsmCache"],
+            dependencies: ["EsmCache", "ChatCompletions"],
             path: "Sources/MacOSHelperLib"
         ),
         .executableTarget(
             name: "MacOSHelper",
-            dependencies: ["MacOSHelperLib", "EsmCache"],
+            dependencies: ["MacOSHelperLib", "EsmCache", "ChatCompletions"],
             path: "Sources/MacOSHelper"
         ),
         .testTarget(
             name: "MacOSHelperTests",
-            dependencies: ["MacOSHelperLib", "EsmCache"],
+            dependencies: ["MacOSHelperLib", "EsmCache", "ChatCompletions"],
             path: "Tests/MacOSHelperTests"
         ),
     ]
