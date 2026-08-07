@@ -115,8 +115,8 @@ export interface CoreServiceMeta {
  * Mode declared per operation in discovery. Absent ≡ false.
  * `"response"` is today's SSE pass-through; `"session"` selects the session path.
  */
-// sync: import from @utdk/common/streaming when published
-export type StreamingMode = "response" | "session" | false;
+export type { StreamingMode } from "@utdk/common/streaming";
+import type { StreamingMode } from "@utdk/common/streaming";
 
 /**
  * Map a legacy boolean or already-widened mode onto {@link StreamingMode}.

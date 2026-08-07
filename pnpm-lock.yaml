@@ -706,8 +706,8 @@ importers:
         specifier: ^0.1.1
         version: 0.1.1
       '@utdk/common':
-        specifier: ^0.1.1
-        version: 0.1.1(@opentelemetry/api@1.9.0)
+        specifier: ^0.1.2
+        version: 0.1.2(@opentelemetry/api@1.9.0)
       '@utdk/events':
         specifier: ^0.2.1
         version: 0.2.1

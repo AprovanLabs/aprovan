@@ -36,10 +36,10 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@aprovan/native": "workspace:*",
     "@aprovan/node": "workspace:*",
     "@aprovan/patchwork": "workspace:*",
     "@aprovan/registry-server": "^0.2.8",
-    "@aprovan/native": "workspace:*",
     "@aws-sdk/client-cognito-identity-provider": "^3.1077.0",
     "@aws-sdk/client-dynamodb": "^3.1077.0",
     "@aws-sdk/client-kms": "^3.1077.0",
@@ -58,7 +58,7 @@
     "@opentelemetry/semantic-conventions": "^1.28.0",
     "@utdk/agent": "^0.2.0",
     "@utdk/clients": "^0.1.1",
-    "@utdk/common": "^0.1.1",
+    "@utdk/common": "^0.1.2",
     "@utdk/events": "^0.2.1",
     "@utdk/keyvalue": "^0.2.1",
     "@utdk/llm": "^0.2.0",
