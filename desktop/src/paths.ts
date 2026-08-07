@@ -90,3 +90,15 @@ export function resolveEsmSeedDir(): string {
   }
   return path.resolve(here, "..", "resources", "esm-seed");
 }
+
+/**
+ * Bundled STT model weights directory (voice stream 1).
+ * Packaged: Resources/models (ggml-tiny.en.bin via fetch-stt-models.sh).
+ * Unpackaged: desktop/build/models after prepare-resources.
+ */
+export function resolveSttModelsDir(): string {
+  if (app.isPackaged) {
+    return path.join(process.resourcesPath, "models");
+  }
+  return path.resolve(here, "..", "build", "models");
+}

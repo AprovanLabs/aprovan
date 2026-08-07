@@ -8,6 +8,7 @@ let package = Package(
         .executable(name: "macos-helper", targets: ["MacOSHelper"]),
         .library(name: "MacOSHelperLib", targets: ["MacOSHelperLib"]),
         .library(name: "ChatCompletions", targets: ["ChatCompletions"]),
+        .library(name: "SttModels", targets: ["SttModels"]),
     ],
     targets: [
         // Widget dependency cache (stream 2). Separate target so stream 3 can
@@ -20,19 +21,24 @@ let package = Package(
             name: "ChatCompletions",
             path: "Sources/ChatCompletions"
         ),
+        // STT model store (voice-and-floating-widgets stream 1).
+        .target(
+            name: "SttModels",
+            path: "Sources/SttModels"
+        ),
         .target(
             name: "MacOSHelperLib",
-            dependencies: ["EsmCache", "ChatCompletions"],
+            dependencies: ["EsmCache", "ChatCompletions", "SttModels"],
             path: "Sources/MacOSHelperLib"
         ),
         .executableTarget(
             name: "MacOSHelper",
-            dependencies: ["MacOSHelperLib", "EsmCache", "ChatCompletions"],
+            dependencies: ["MacOSHelperLib", "EsmCache", "ChatCompletions", "SttModels"],
             path: "Sources/MacOSHelper"
         ),
         .testTarget(
             name: "MacOSHelperTests",
-            dependencies: ["MacOSHelperLib", "EsmCache", "ChatCompletions"],
+            dependencies: ["MacOSHelperLib", "EsmCache", "ChatCompletions", "SttModels"],
             path: "Tests/MacOSHelperTests"
         ),
     ]

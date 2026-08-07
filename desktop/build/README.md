@@ -8,6 +8,7 @@
 #   runtime/node-v…/          — stock Node matching Dockerfile NODE_VERSION
 #   runtime/node              — symlink → current runtime
 #   macos-helper/macos-helper — Swift release binary (native/macos-helper)
+#   models/ggml-tiny.en.bin  — bundled STT default (fetch-stt-models.sh; ~75 MiB, gitignored)
 #
 # Packaging (desktop-shell stream 7 + macos-native-providers stream 5):
 #   entitlements.plist        — Hardened Runtime entitlements (no App Sandbox)
