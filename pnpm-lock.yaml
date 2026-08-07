@@ -649,8 +649,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/compiler
       '@aprovan/registry-server':
-        specifier: ^0.2.7
-        version: 0.2.7(zod@3.25.76)
+        specifier: ^0.2.8
+        version: 0.2.8(zod@3.25.76)
       '@aws-sdk/client-cognito-identity-provider':
         specifier: ^3.1077.0
         version: 3.1101.0
@@ -825,6 +825,10 @@ packages:
 
   '@aprovan/registry-server@0.2.7':
     resolution: {integrity: sha512-UlB67aQzxjLnFMPzsoJcom9GxlSvY22X8FEKiwiZYxQJvOTA/biOhe4/pNGMQeDW1d+mq82zPxrnDJ7tcdNlhA==}
+    engines: {node: '>=20.0.0'}
+
+  '@aprovan/registry-server@0.2.8':
+    resolution: {integrity: sha512-T6RC/DRVBwBOQd2lgUIwQ5HR4K5PV7gE51qmWEnp9uq2btURQuKZfh4Em6cqMHpZGik47fOLPLQ5FrXeKQrOGQ==}
     engines: {node: '>=20.0.0'}
 
   '@asamuzakjp/css-color@6.0.5':
@@ -4697,6 +4701,14 @@ packages:
       '@opentelemetry/api':
         optional: true
 
+  '@utdk/common@0.1.2':
+    resolution: {integrity: sha512-9wNdjlpZULIsIIA0e1vEIh1qiL4SmUE2VHk/z8mWM4oG9czMFOSYElUsqeTEqqkkSOKgVb6S7fZxMkZgHvIVCw==}
+    peerDependencies:
+      '@opentelemetry/api': ^1.0.0
+    peerDependenciesMeta:
+      '@opentelemetry/api':
+        optional: true
+
   '@utdk/events@0.2.0':
     resolution: {integrity: sha512-EplTggUDvvW6ETwLIeGT1TqSRvIRo/5EfU+wBvqpRXlBvcAeeK0mTQgo8Km9gv9XZFcZZF1sKkZIB/UKbO2SYw==}
 
@@ -8388,6 +8400,34 @@ snapshots:
       '@utdk/agent': 0.2.0
       '@utdk/clients': 0.1.1
       '@utdk/common': 0.1.1(@opentelemetry/api@1.9.0)
+      '@utdk/llm': 0.2.0
+      '@utdk/mcp-core': 0.1.2(@opentelemetry/api@1.9.0)
+      better-sqlite3: 12.11.1
+      hono: 4.12.33
+      jose: 5.10.0
+      quickjs-emscripten-core: 0.32.0
+    optionalDependencies:
+      '@aws-sdk/client-kms': 3.1101.0
+    transitivePeerDependencies:
+      - '@cfworker/json-schema'
+      - debug
+      - pg-native
+      - supports-color
+      - zod
+
+  '@aprovan/registry-server@0.2.8(zod@3.25.76)':
+    dependencies:
+      '@hono/node-server': 1.19.17(hono@4.12.33)
+      '@jitl/quickjs-wasmfile-debug-asyncify': 0.32.0
+      '@modelcontextprotocol/sdk': 1.30.0(zod@3.25.76)
+      '@opentelemetry/api': 1.9.0
+      '@opentelemetry/exporter-trace-otlp-http': 0.57.2(@opentelemetry/api@1.9.0)
+      '@opentelemetry/resources': 1.30.1(@opentelemetry/api@1.9.0)
+      '@opentelemetry/sdk-trace-base': 1.30.1(@opentelemetry/api@1.9.0)
+      '@opentelemetry/sdk-trace-node': 1.30.1(@opentelemetry/api@1.9.0)
+      '@utdk/agent': 0.2.0
+      '@utdk/clients': 0.1.1
+      '@utdk/common': 0.1.2(@opentelemetry/api@1.9.0)
       '@utdk/llm': 0.2.0
       '@utdk/mcp-core': 0.1.2(@opentelemetry/api@1.9.0)
       better-sqlite3: 12.11.1
@@ -13285,6 +13325,10 @@ snapshots:
       '@opentelemetry/api': 1.9.0
 
   '@utdk/common@0.1.1(@opentelemetry/api@1.9.0)':
+    optionalDependencies:
+      '@opentelemetry/api': 1.9.0
+
+  '@utdk/common@0.1.2(@opentelemetry/api@1.9.0)':
     optionalDependencies:
       '@opentelemetry/api': 1.9.0
 

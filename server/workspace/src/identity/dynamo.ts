@@ -313,7 +313,8 @@ export function createIdentityStoreDynamo(): IIdentityStore {
           new GetCommand({
             TableName: DYNAMODB_WORKSPACES_TABLE(),
             Key: { workspaceId },
-            ProjectionExpression: "workspaceId, #n, plan, createdAt, updatedAt",
+            ProjectionExpression:
+              "workspaceId, #n, plan, locus, dataDir, vfsRoot, createdAt, updatedAt",
             ExpressionAttributeNames: { "#n": "name" },
           }),
         );
@@ -329,7 +330,8 @@ export function createIdentityStoreDynamo(): IIdentityStore {
                 new GetCommand({
                   TableName: DYNAMODB_WORKSPACES_TABLE(),
                   Key: { workspaceId: id },
-                  ProjectionExpression: "workspaceId, #n",
+                  ProjectionExpression:
+                    "workspaceId, #n, plan, locus, dataDir, vfsRoot, createdAt, updatedAt",
                   ExpressionAttributeNames: { "#n": "name" },
                 }),
               )
@@ -339,9 +341,21 @@ export function createIdentityStoreDynamo(): IIdentityStore {
         return results.filter((w): w is WorkspaceRecord => w !== undefined);
       },
       async put(workspace) {
-        const { client, PutCommand } = await dynamo();
+        const { client, PutCommand, GetCommand } = await dynamo();
+        // Preserve an existing locus — write-once at creation (D2).
+        const existing = await client.send(
+          new GetCommand({
+            TableName: DYNAMODB_WORKSPACES_TABLE(),
+            Key: { workspaceId: workspace.workspaceId },
+            ProjectionExpression: "locus",
+          }),
+        );
+        const item = { ...workspace };
+        if (existing.Item?.["locus"] !== undefined) {
+          item.locus = existing.Item["locus"] as WorkspaceRecord["locus"];
+        }
         await client.send(
-          new PutCommand({ TableName: DYNAMODB_WORKSPACES_TABLE(), Item: { ...workspace } }),
+          new PutCommand({ TableName: DYNAMODB_WORKSPACES_TABLE(), Item: item }),
         );
       },
     },

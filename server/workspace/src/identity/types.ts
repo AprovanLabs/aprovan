@@ -16,10 +16,22 @@ export interface UserRecord {
   updatedAt?: string;
 }
 
+/** Where a workspace's state, credentials, and execution resolve. */
+export type WorkspaceLocus = "local" | "cloud";
+
 export interface WorkspaceRecord {
   workspaceId: string;
   name: string;
   plan?: string;
+  /**
+   * Execution locus — fixed at creation. Absent on pre-locus rows; readers
+   * MUST treat missing as `"cloud"` (deployed behavior unchanged).
+   */
+  locus?: WorkspaceLocus;
+  /** Local-workspace data directory (SQLite + credential store). */
+  dataDir?: string;
+  /** Optional local VFS containment root for the local-directory provider. */
+  vfsRoot?: string;
   createdAt?: string;
   updatedAt?: string;
 }

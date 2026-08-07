@@ -79,9 +79,18 @@ CREATE TABLE IF NOT EXISTS workspaces (
   workspace_id text PRIMARY KEY,
   name text,
   plan text,
+  locus text,
+  data_dir text,
+  vfs_root text,
   created_at text,
   updated_at text
 );
+
+-- Deployments that created workspaces before locus existed should also run:
+--   ALTER TABLE workspaces ADD COLUMN locus text;
+--   ALTER TABLE workspaces ADD COLUMN data_dir text;
+--   ALTER TABLE workspaces ADD COLUMN vfs_root text;
+-- (SQLite applies these additively in identity/sql.ts on open.)
 
 CREATE TABLE IF NOT EXISTS memberships (
   workspace_id text NOT NULL,
