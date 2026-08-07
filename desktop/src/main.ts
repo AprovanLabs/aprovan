@@ -14,6 +14,12 @@ import { BUNDLE_PUBLIC_KEY_PEM } from "./bundle-public-key.js";
 import { appleLlmEnvFromHelperOrigin } from "./apple-helper-env.js";
 import { createGatewaySupervisor } from "./gateway-supervisor.js";
 import { createHelperSupervisor } from "./helper-supervisor.js";
+import {
+  createFileHotkeyPrefsStore,
+  createHotkeyRegistrar,
+  formatHotkeyConflictMessage,
+  type HotkeyRegistrar,
+} from "./hotkey.js";
 import { createSafeStorageKeyProvider } from "./key-provider.js";
 import {
   createElectronNotificationHost,
@@ -22,6 +28,12 @@ import {
   openApplicationToNotification,
   type NotificationMirror,
 } from "./notifications.js";
+import {
+  createFloatingPanel,
+  isFloatingPanelWindow,
+  type FloatingPanel,
+} from "./panel.js";
+import { registerPanelHandlers } from "./panel-handlers.js";
 import { evaluatePlatformFloor } from "./platform.js";
 import {
   resolveActiveBundleDirWithSupport,
@@ -136,6 +148,31 @@ export async function startDesktopApp(): Promise<void> {
   const bridgeState = createInitialBridgeState(bundles);
   registerBridgeHandlers(bridgeState);
 
+  // D4: pre-warm the floating panel at launch (hidden). Summon only shows it.
+  let floatingPanel: FloatingPanel | null = createFloatingPanel();
+  registerPanelHandlers(() => floatingPanel);
+
+  let hotkeyRegistrar: HotkeyRegistrar | null = createHotkeyRegistrar({
+    prefs: createFileHotkeyPrefsStore(layout.root),
+    onTrigger: () => {
+      const panel = floatingPanel;
+      if (!panel || panel.isDestroyed()) return;
+      if (panel.window.isVisible()) {
+        panel.hide();
+      } else {
+        panel.show(hotkeyRegistrar?.accelerator ?? "");
+      }
+    },
+    onConflict: (result) => {
+      console.error(formatHotkeyConflictMessage(result.accelerator));
+      dialog.showErrorBox(
+        "Floating panel hotkey unavailable",
+        formatHotkeyConflictMessage(result.accelerator),
+      );
+    },
+  });
+  hotkeyRegistrar.register();
+
   const keyProvider = createSafeStorageKeyProvider({
     storageDir: layout.root,
   });
@@ -164,7 +201,7 @@ export async function startDesktopApp(): Promise<void> {
             onOpenNotification: (id) => {
               openApplicationToNotification(id, () => {
                 const existing = BrowserWindow.getAllWindows().find(
-                  (w) => !w.isDestroyed(),
+                  (w) => !w.isDestroyed() && !isFloatingPanelWindow(w),
                 );
                 return existing ?? createMainWindow();
               });
@@ -223,6 +260,10 @@ export async function startDesktopApp(): Promise<void> {
     if (shuttingDown) return;
     event.preventDefault();
     shuttingDown = true;
+    hotkeyRegistrar?.unregister();
+    hotkeyRegistrar = null;
+    floatingPanel?.destroy();
+    floatingPanel = null;
     notificationMirror?.stop();
     notificationMirror = null;
     void Promise.all([supervisor.stop(), helperSupervisor.stop()]).finally(
@@ -243,12 +284,20 @@ export async function startDesktopApp(): Promise<void> {
   startShellUpdater({ isPackaged: app.isPackaged });
 
   app.on("activate", () => {
-    createMainWindow();
+    const hasMain = BrowserWindow.getAllWindows().some(
+      (w) => !w.isDestroyed() && !isFloatingPanelWindow(w),
+    );
+    if (!hasMain) createMainWindow();
   });
 }
 
 app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") {
+  // The pre-warmed panel stays alive (hidden) so the hotkey keeps working;
+  // only quit when every non-panel window is gone on non-darwin.
+  const remaining = BrowserWindow.getAllWindows().filter(
+    (w) => !w.isDestroyed() && !isFloatingPanelWindow(w),
+  );
+  if (remaining.length === 0 && process.platform !== "darwin") {
     app.quit();
   }
 });
