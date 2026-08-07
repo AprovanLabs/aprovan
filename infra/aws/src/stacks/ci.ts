@@ -36,14 +36,30 @@ export class CiStack extends Stack {
       clientIds: ["sts.amazonaws.com"],
     });
 
+    // Newer GitHub repos emit immutable org/repo IDs in `sub`
+    // (repo:ORG@ORG_ID/NAME@REPO_ID:...), which do not match classic
+    // repo:ORG/NAME:* patterns. Allow both forms.
+    const subjectPatterns = [
+      ...repositories.map((repo) => `repo:${repo}:*`),
+      ...repositories.flatMap((repo) => {
+        const [owner, name] = repo.split("/");
+        if (!owner || !name) return [];
+        // Known IDs for AprovanLabs repos that already emit immutable subs.
+        const known: Record<string, string> = {
+          "AprovanLabs/aprovan": "repo:AprovanLabs@98067664/aprovan@1314502878:*",
+          "AprovanLabs/registry": "repo:AprovanLabs@98067664/registry@1194733705:*",
+        };
+        const key = `${owner}/${name}`;
+        return known[key] ? [known[key]] : [];
+      }),
+    ];
+
     const principal = new iam.OpenIdConnectPrincipal(provider, {
       StringEquals: {
         "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
       },
       StringLike: {
-        "token.actions.githubusercontent.com:sub": repositories.map(
-          (repo) => `repo:${repo}:*`,
-        ),
+        "token.actions.githubusercontent.com:sub": subjectPatterns,
       },
     });
 
@@ -88,10 +104,12 @@ export class CiStack extends Stack {
 
     // Discovery + shared identity parameters the deploy scripts read, plus the
     // CDK bootstrap version parameter the CLI checks.
+    // Get for discovery; Put so CI can pin /aprovan/<env>/workspace/image
+    // before `cdk deploy` (scripts/deploy-infra.sh).
     this.deployRole.addToPolicy(
       new iam.PolicyStatement({
         sid: "ReadDeployParameters",
-        actions: ["ssm:GetParameter", "ssm:GetParameters"],
+        actions: ["ssm:GetParameter", "ssm:GetParameters", "ssm:PutParameter"],
         resources: [
           `arn:aws:ssm:*:${account}:parameter/aprovan/*`,
           `arn:aws:ssm:*:${account}:parameter/cdk-bootstrap/*`,
