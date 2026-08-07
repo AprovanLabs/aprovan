@@ -15,6 +15,14 @@ export {
 } from "./client";
 
 export {
+  createGatewayResolver,
+  type CreateGatewayResolverOptions,
+  type GatewayResolver,
+  type WorkspaceEndpoint,
+  type WorkspaceEndpointSource,
+} from "./resolver";
+
+export {
   useGatewaySession,
   type GatewaySessionState,
   type GatewaySessionStatus,

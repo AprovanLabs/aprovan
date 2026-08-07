@@ -48,11 +48,11 @@
 
 > Depends-on: - | Touches: packages/ui/src/gateway/**, client/web/src/lib/gateway.ts, client/web/src/features/tabs/**, client/web/src/lib/__tests__/gateway.test.ts | Verify: `pnpm --filter @aprovan/ui test && pnpm --filter @aprovan/patchwork-web typecheck`
 
-- [ ] 6.1 Add `GatewayResolver` and `WorkspaceEndpoint` to `@aprovan/ui` exactly as declared in the tech plan (D1).
-- [ ] 6.2 Replace the module-level `GATEWAY_BASE` constant with resolution through the active workspace, keeping `createGatewayClient`'s existing `getToken` and `getWorkspaceId` function seams.
-- [ ] 6.3 Keep the build-time `VITE_GATEWAY_URL` as the fallback when a workspace carries no explicit URL, and test that behavior with no workspace record present.
-- [ ] 6.4 Do the same for `createRegistryGatewayClient` and `MCP_URL`, which read the same constant today.
-- [ ] 6.5 Cover every scenario in `specs/runtime-gateway-resolution/spec.md`, including two workspaces of different loci in one session.
+- [x] 6.1 Add `GatewayResolver` and `WorkspaceEndpoint` to `@aprovan/ui` exactly as declared in the tech plan (D1).
+- [x] 6.2 Replace the module-level `GATEWAY_BASE` constant with resolution through the active workspace, keeping `createGatewayClient`'s existing `getToken` and `getWorkspaceId` function seams.
+- [x] 6.3 Keep the build-time `VITE_GATEWAY_URL` as the fallback when a workspace carries no explicit URL, and test that behavior with no workspace record present.
+- [x] 6.4 Do the same for `createRegistryGatewayClient` and `MCP_URL`, which read the same constant today.
+- [x] 6.5 Cover every scenario in `specs/runtime-gateway-resolution/spec.md`, including two workspaces of different loci in one session.
 
 ## 7. Documentation
 
