@@ -69,6 +69,6 @@
 
 > Depends-on: 7 | Touches: docs/desktop.md, docs/index.md | Verify: `pnpm lint`
 
-- [ ] 8.1 Write `docs/desktop.md`: architecture, the two update channels and why both exist, on-disk layout, and how to run the desktop shell against a locally built gateway.
-- [ ] 8.2 State plainly that the app is not sandboxed, that the workspace root is enforced by the application, and that App Store distribution is a deliberate non-goal.
-- [ ] 8.3 Link from `docs/index.md`.
+- [x] 8.1 Write `docs/desktop.md`: architecture, the two update channels and why both exist, on-disk layout, and how to run the desktop shell against a locally built gateway.
+- [x] 8.2 State plainly that the app is not sandboxed, that the workspace root is enforced by the application, and that App Store distribution is a deliberate non-goal.
+- [x] 8.3 Link from `docs/index.md`.
