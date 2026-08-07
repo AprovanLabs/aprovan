@@ -1,5 +1,8 @@
 # Report: Bind-time streaming capability enforcement
 
+## PR
+https://github.com/AprovanLabs/aprovan/pull/119
+
 ## Summary
 During profile/interface bind (`writeBinding` / `profiles.set` → `setProfile`), when the target contract declares any session operation, the provider's `StreamingCapabilities` are checked and bind fails with `streaming-unsupported` if unsupported — at bind time, not call time. (`interfaces.bind` was removed earlier; this is the current bind path.)
 
