@@ -56,6 +56,8 @@ export interface WorkspaceHandle {
 export interface StartWorkspaceOptions {
   /** Override the resolved port (the CLI's `--port`). */
   port?: number;
+  /** Override the bind address (the CLI's `--host` / WORKSPACE_HOST). */
+  hostname?: string;
   /** Install SIGTERM/SIGINT handlers. Off when embedded in another host. */
   handleSignals?: boolean;
   /** How long to let in-flight requests finish before forcing exit. */
@@ -71,6 +73,7 @@ export async function startWorkspace(
 ): Promise<WorkspaceHandle> {
   const config = await loadWorkspaceConfig();
   const port = options.port ?? config.port;
+  const hostname = options.hostname ?? config.hostname;
 
   // Registers a real tracer provider when OTEL_EXPORTER_OTLP_ENDPOINT is set,
   // and loads no OpenTelemetry module at all when it isn't.
@@ -83,14 +86,18 @@ export async function startWorkspace(
   const app = createWorkspaceApp();
   // WebSocket upgrade only — a plain GET answers 426 Upgrade Required.
   app.get("/api/gateway/ws", (c) => c.text("Upgrade Required", 426));
-  const server = serve({ fetch: app.fetch, port }, (info) => {
-    const where =
-      config.data.kind === "sqlite" ? `sqlite ${config.data.dir}` : `aws ${config.data.region}`;
-    process.stderr.write(
-      `[workspace] listening on http://localhost:${info.port} ` +
-        `(mode=${config.mode} auth=${getAuthMode()} data=${where})\n`,
-    );
-  });
+  const server = serve(
+    { fetch: app.fetch, port, ...(hostname ? { hostname } : {}) },
+    (info) => {
+      const where =
+        config.data.kind === "sqlite" ? `sqlite ${config.data.dir}` : `aws ${config.data.region}`;
+      const bindHost = hostname ?? "localhost";
+      process.stderr.write(
+        `[workspace] listening on http://${bindHost}:${info.port} ` +
+          `(mode=${config.mode} auth=${getAuthMode()} data=${where})\n`,
+      );
+    },
+  );
 
   // Realtime requires a Node HTTP server (tech-plan D2). Fetch-embedded hosts
   // that only call createWorkspaceApp() have no upgrade path.
