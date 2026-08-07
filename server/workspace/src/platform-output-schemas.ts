@@ -4,6 +4,7 @@
  */
 
 import type { CoreService, ServiceToolEntry } from "./service-kernel.js";
+import { normalizeStreamingMode } from "./service-kernel.js";
 import type { PlatformPluginName } from "./platform-plugins.js";
 
 const obj = (
@@ -195,21 +196,26 @@ const SCHEMAS: Record<string, Record<string, unknown>> = {
 };
 
 function sealTool(tool: ServiceToolEntry): ServiceToolEntry {
-  if (PASSTHROUGH_OPS.has(tool.name)) {
+  // Preserve / normalize streaming mode through seal (legacy true → "response").
+  const streaming = normalizeStreamingMode(tool.streaming);
+  const withMode: ServiceToolEntry =
+    streaming !== undefined ? { ...tool, streaming } : tool;
+
+  if (PASSTHROUGH_OPS.has(withMode.name)) {
     return {
-      ...tool,
+      ...withMode,
       passthrough: true,
-      outputSchema: SCHEMAS[tool.name] ?? tool.outputSchema ?? obj({}),
+      outputSchema: SCHEMAS[withMode.name] ?? withMode.outputSchema ?? obj({}),
     };
   }
-  if (tool.outputSchema !== undefined) return tool;
-  const schema = SCHEMAS[tool.name];
+  if (withMode.outputSchema !== undefined) return withMode;
+  const schema = SCHEMAS[withMode.name];
   if (!schema) {
     throw new Error(
-      `Platform operation "${tool.name}" has no output schema and is not marked passthrough`,
+      `Platform operation "${withMode.name}" has no output schema and is not marked passthrough`,
     );
   }
-  return { ...tool, outputSchema: schema };
+  return { ...withMode, outputSchema: schema };
 }
 
 /** Attach output schemas / passthrough marks; fails closed on silent unknowns. */

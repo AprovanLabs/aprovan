@@ -12,10 +12,10 @@
 
 > Depends-on: - | Touches: server/workspace/src/service-kernel.ts, server/workspace/src/routes/tools.ts, server/workspace/src/platform-output-schemas.ts | Verify: `pnpm --filter @aprovan/workspace test && pnpm check-types`
 
-- [ ] 2.1 Change `ServiceToolEntry.streaming` to `StreamingMode` (D2); absent stays equivalent to `false`.
-- [ ] 2.2 Map any existing `streaming: true` declaration to `"response"` so no current wire behavior changes.
-- [ ] 2.3 Surface the mode in `GET /tools` discovery output, satisfying the "Session operation is discoverable" scenario.
-- [ ] 2.4 Fix downstream type errors the widening surfaces.
+- [x] 2.1 Change `ServiceToolEntry.streaming` to `StreamingMode` (D2); absent stays equivalent to `false`.
+- [x] 2.2 Map any existing `streaming: true` declaration to `"response"` so no current wire behavior changes.
+- [x] 2.3 Surface the mode in `GET /tools` discovery output, satisfying the "Session operation is discoverable" scenario.
+- [x] 2.4 Fix downstream type errors the widening surfaces.
 
 ## 3. Session routes on the tools surface
 
