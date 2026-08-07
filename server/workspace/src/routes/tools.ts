@@ -51,11 +51,26 @@ import {
 } from "../services.js";
 import type { ToolCallRequest } from "../contract.js";
 import type { CredentialPayload } from "../credentials.js";
+import {
+  isSessionOperation,
+  mountSessionRoutes,
+  openStreamingSession,
+  sessionErrorResponse,
+} from "./sessions-streaming.js";
 
 export const toolsRouter = new Hono();
 
 // Every tool route requires a verified Cognito access token + resolved principal.
 toolsRouter.use("*", requireAuth);
+
+/** Shared SSE response headers — session channels reuse these (tech plan D1). */
+export const SSE_HEADERS: Record<string, string> = {
+  "Content-Type": "text/event-stream; charset=utf-8",
+  "Cache-Control": "no-cache, no-transform",
+};
+
+// Session event / push / close — registered before the catch-all procedure POST.
+mountSessionRoutes(toolsRouter, SSE_HEADERS);
 
 // ---------------------------------------------------------------------------
 // GET /tools — workspace-filtered tool discovery
@@ -1047,6 +1062,66 @@ toolsRouter.post("/:provider/:operation{.*}", rateLimitByUserId, async (c) => {
     return c.json({ error: "Missing provider or operation" }, 400);
   }
 
+  // Session-mode operations: mint a session via SessionManager instead of
+  // one-shot isolate dispatch. Registration is the gate until a session
+  // contract (e.g. stt) wires its driver; other modes stay on the path below.
+  if (requestNamespace && isSessionOperation(requestNamespace, operation)) {
+    try {
+      const opened = await openStreamingSession(
+        requestNamespace,
+        operation,
+        callerId,
+        body.args as Record<string, unknown>,
+      );
+      const durationMs = Date.now() - startTime;
+      getAuditStore().append({
+        requestId,
+        workspaceId,
+        callerId,
+        provider: requestNamespace,
+        operation,
+        status: 200,
+        durationMs,
+      });
+      recordDispatch(200, durationMs);
+      return c.json({
+        data: { sessionId: opened.sessionId, capabilities: opened.capabilities },
+        meta: { requestId, durationMs },
+      });
+    } catch (err) {
+      const mapped = sessionErrorResponse(c, err);
+      if (mapped) {
+        const status = mapped.status;
+        getAuditStore().append({
+          requestId,
+          workspaceId,
+          callerId,
+          provider: requestNamespace,
+          operation,
+          status,
+        });
+        recordDispatch(
+          status,
+          Date.now() - startTime,
+          err instanceof Error ? err.message : String(err),
+        );
+        return mapped;
+      }
+      const status = err instanceof ServiceError ? err.status : 500;
+      const message = err instanceof Error ? err.message : String(err);
+      getAuditStore().append({
+        requestId,
+        workspaceId,
+        callerId,
+        provider: requestNamespace,
+        operation,
+        status,
+      });
+      recordDispatch(status, Date.now() - startTime, message);
+      return c.json({ error: message }, status as 400);
+    }
+  }
+
   // Contract-addressed calls: route through the embedded registry server on
   // STORE_BACKEND=dsql (same path as workflows/invoke). Dynamo/sqlite keep
   // the legacy short-circuits below until cutover.
@@ -1348,11 +1423,6 @@ toolsRouter.post("/:provider/:operation{.*}", rateLimitByUserId, async (c) => {
 // ---------------------------------------------------------------------------
 // Streaming pass-through helpers
 // ---------------------------------------------------------------------------
-
-const SSE_HEADERS: Record<string, string> = {
-  "Content-Type": "text/event-stream; charset=utf-8",
-  "Cache-Control": "no-cache, no-transform",
-};
 
 interface StreamBody {
   stream: ReadableStream<Uint8Array>;

@@ -21,12 +21,12 @@
 
 > Depends-on: 1, 2 | Touches: server/workspace/src/routes/sessions-streaming.ts, server/workspace/src/routes/tools.ts, server/workspace/src/__tests__/streaming-sessions.test.ts | Verify: `pnpm --filter @aprovan/workspace test`
 
-- [ ] 3.1 Route `POST /tools/:ns/:proc` to `SessionManager.open` when the resolved tool entry declares mode `"session"`; leave every other mode on the existing dispatch path.
-- [ ] 3.2 Add `GET /tools/:ns/sessions/:id` emitting `text/event-stream`, reusing the existing `SSE_HEADERS` constant rather than defining new headers.
-- [ ] 3.3 Add `POST /tools/:ns/sessions/:id/push` returning 202 with an empty body, and `POST /tools/:ns/sessions/:id/close` returning the terminal result.
-- [ ] 3.4 Emit a terminal `{type:"end"}` frame and close the channel when a session leaves `active`, however it leaves.
-- [ ] 3.5 Map every failure to the declared codes: `session-not-found`, `session-expired`, `session-forbidden`.
-- [ ] 3.6 Integration tests covering each scenario in `specs/streaming-sessions/spec.md` under "Session lifecycle" and "Session ownership".
+- [x] 3.1 Route `POST /tools/:ns/:proc` to `SessionManager.open` when the resolved tool entry declares mode `"session"`; leave every other mode on the existing dispatch path.
+- [x] 3.2 Add `GET /tools/:ns/sessions/:id` emitting `text/event-stream`, reusing the existing `SSE_HEADERS` constant rather than defining new headers.
+- [x] 3.3 Add `POST /tools/:ns/sessions/:id/push` returning 202 with an empty body, and `POST /tools/:ns/sessions/:id/close` returning the terminal result.
+- [x] 3.4 Emit a terminal `{type:"end"}` frame and close the channel when a session leaves `active`, however it leaves.
+- [x] 3.5 Map every failure to the declared codes: `session-not-found`, `session-expired`, `session-forbidden`.
+- [x] 3.6 Integration tests covering each scenario in `specs/streaming-sessions/spec.md` under "Session lifecycle" and "Session ownership".
 
 ## 4. Bind-time capability enforcement
 
