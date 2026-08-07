@@ -12,6 +12,7 @@
 #   scripts/image.sh build --multi      # both architectures, load unsupported
 #   scripts/image.sh push               # both architectures → GHCR
 #   scripts/image.sh run                # build :dev and run it on :4000
+#   DEST=… scripts/image.sh extract-gateway  # copy /srv/workspace out of IMAGE:TAG
 #
 # Publishing needs a GitHub token with `write:packages`:
 #   echo "$GITHUB_TOKEN" | docker login ghcr.io -u <you> --password-stdin
@@ -96,9 +97,27 @@ cmd_run() {
     "$IMAGE:$tag"
 }
 
+# Copy /srv/workspace out of a built image for desktop gateway parity checks.
+# Usage: DEST=/path/to/dir [IMAGE=…] [TAG=…] scripts/image.sh extract-gateway
+cmd_extract_gateway() {
+  local tag="${TAG:-dev}"
+  local image="$IMAGE:$tag"
+  local dest="${DEST:?DEST must be set to the extract directory}"
+  command -v docker >/dev/null || die "docker is not installed"
+  log "extracting /srv/workspace from $image → $dest"
+  mkdir -p "$dest"
+  local cid
+  cid="$(docker create "$image")"
+  docker cp "$cid:/srv/workspace/." "$dest"
+  docker rm "$cid" >/dev/null
+  [[ -f "$dest/dist/cli.js" ]] || die "extract missing dist/cli.js"
+  log "extracted gateway artifact"
+}
+
 case "${1:-}" in
   build) shift; cmd_build "$@" ;;
   push) shift; cmd_push "$@" ;;
   run) shift; cmd_run "$@" ;;
-  *) echo "usage: scripts/image.sh [build [--multi]|push|run]" >&2; exit 2 ;;
+  extract-gateway) shift; cmd_extract_gateway "$@" ;;
+  *) echo "usage: scripts/image.sh [build [--multi]|push|run|extract-gateway]" >&2; exit 2 ;;
 esac
