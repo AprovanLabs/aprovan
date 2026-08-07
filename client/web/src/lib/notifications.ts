@@ -31,6 +31,27 @@ export interface NotificationChoice {
   call: { namespace: string; procedure: string; args: Record<string, unknown> };
 }
 
+/**
+ * Gateway path for a notification choice — shared by the in-app feed and the
+ * desktop native surface. App-sourced choices go through `/apps/…/tools/…` so
+ * the emitting app's allow-list is enforced at click time; member choices use
+ * `/tools/…`.
+ */
+export function buildChoiceDispatchPath(
+  workspaceId: string | null,
+  notification: Pick<AppNotification, "source">,
+  choice: Pick<NotificationChoice, "call">,
+): string {
+  const { namespace, procedure } = choice.call;
+  if (notification.source?.app) {
+    const ws = workspaceId ?? "local";
+    return `/apps/${encodeURIComponent(ws)}/${encodeURIComponent(
+      notification.source.app,
+    )}/tools/${encodeURIComponent(namespace)}/${procedure}`;
+  }
+  return `/tools/${encodeURIComponent(namespace)}/${procedure}`;
+}
+
 /** Client-known deep-involvement actions. */
 export type NotificationAction =
   | { kind: "open-merge"; sessionId: string }
@@ -306,3 +327,35 @@ export function unreadCount(notifications: AppNotification[]): number {
   // The badge is signal only: decisions and warnings, never activity.
   return notifications.filter((n) => !n.seen && n.category !== "activity").length;
 }
+
+// ---------------------------------------------------------------------------
+// Focus — desktop native surface asks the renderer to open a notification
+// ---------------------------------------------------------------------------
+
+type FocusListener = (id: string) => void;
+const focusListeners = new Set<FocusListener>();
+
+/** Open / highlight a notification in the in-app feed (system notification click). */
+export function focusNotification(id: string): void {
+  for (const listener of focusListeners) listener(id);
+}
+
+export function subscribeNotificationFocus(listener: FocusListener): () => void {
+  focusListeners.add(listener);
+  return () => {
+    focusListeners.delete(listener);
+  };
+}
+
+const FOCUS_EVENT = "aprovan:focus-notification";
+
+function installFocusEventBridge(): void {
+  if (typeof window === "undefined") return;
+  window.addEventListener(FOCUS_EVENT, ((event: Event) => {
+    const detail = (event as CustomEvent<{ id?: string }>).detail;
+    if (detail?.id) focusNotification(detail.id);
+  }) as EventListener);
+}
+
+installFocusEventBridge();
+

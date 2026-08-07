@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { app, dialog, net, protocol } from "electron";
+import { app, BrowserWindow, dialog, net, protocol } from "electron";
 import { ensureAppSupportLayout } from "./app-support.js";
 import {
   createInitialBridgeState,
@@ -14,6 +14,13 @@ import { BUNDLE_PUBLIC_KEY_PEM } from "./bundle-public-key.js";
 import { createGatewaySupervisor } from "./gateway-supervisor.js";
 import { createHelperSupervisor } from "./helper-supervisor.js";
 import { createSafeStorageKeyProvider } from "./key-provider.js";
+import {
+  createElectronNotificationHost,
+  createGatewayNotificationClient,
+  createNotificationMirror,
+  openApplicationToNotification,
+  type NotificationMirror,
+} from "./notifications.js";
 import { evaluatePlatformFloor } from "./platform.js";
 import {
   resolveActiveBundleDirWithSupport,
@@ -130,11 +137,40 @@ export async function startDesktopApp(): Promise<void> {
     storageDir: layout.root,
   });
 
+  let notificationMirror: NotificationMirror | null = null;
+  let gatewayOrigin: string | null = null;
+
   const supervisor = createGatewaySupervisor({
     nodeBinary: resolveBundledNodeBinary(),
     gatewayDir: resolveGatewayVendorDir(),
     dataDir: layout.gatewayDataDir,
-    onStatus: (status) => publishGatewayStatus(bridgeState, status),
+    onStatus: (status) => {
+      publishGatewayStatus(bridgeState, status);
+      if (status.state === "ready") {
+        gatewayOrigin = status.url;
+        if (!notificationMirror) {
+          notificationMirror = createNotificationMirror({
+            host: createElectronNotificationHost(),
+            gateway: createGatewayNotificationClient({
+              getGatewayOrigin: () => gatewayOrigin,
+            }),
+            onOpenNotification: (id) => {
+              openApplicationToNotification(id, () => {
+                const existing = BrowserWindow.getAllWindows().find(
+                  (w) => !w.isDestroyed(),
+                );
+                return existing ?? createMainWindow();
+              });
+            },
+          });
+          notificationMirror.start();
+        }
+      } else {
+        gatewayOrigin = null;
+        notificationMirror?.stop();
+        notificationMirror = null;
+      }
+    },
     resolveWorkspaceKey: () => keyProvider.getKey(),
   });
 
@@ -154,6 +190,8 @@ export async function startDesktopApp(): Promise<void> {
     if (shuttingDown) return;
     event.preventDefault();
     shuttingDown = true;
+    notificationMirror?.stop();
+    notificationMirror = null;
     void Promise.all([supervisor.stop(), helperSupervisor.stop()]).finally(
       () => {
         app.quit();
