@@ -2,11 +2,11 @@
 
 > Depends-on: - | Touches: registry/packages/utdk/common/streaming.ts, registry/packages/utdk/common/__tests__/streaming.test.ts, registry/packages/utdk/common/package.json | Verify: `pnpm --filter @utdk/common test && pnpm --filter @utdk/common check-types`
 
-- [ ] 1.1 Add `StreamingMode`, `StreamingCapabilities`, `SessionEvent`, and `StreamingSessionDriver` exactly as declared in the tech plan's Interfaces & Data (D3).
-- [ ] 1.2 Implement `SessionManager`: id minting, principal ownership recorded at open, driver subscription fan-out, monotonic `seq` per session, and the `open → active → closed` state machine.
-- [ ] 1.3 Implement idle-timeout and absolute-cap reclamation with injectable clock and timer so expiry is testable without wall time (D5).
-- [ ] 1.4 Export `./streaming` from the package exports map.
-- [ ] 1.5 Tests: event ordering with zero pushes, push-after-close returns the 409 condition, idle reclamation releases the driver, absolute cap fires while pushes continue, ownership check distinguishes `session-forbidden` from `session-not-found`.
+- [x] 1.1 Add `StreamingMode`, `StreamingCapabilities`, `SessionEvent`, and `StreamingSessionDriver` exactly as declared in the tech plan's Interfaces & Data (D3).
+- [x] 1.2 Implement `SessionManager`: id minting, principal ownership recorded at open, driver subscription fan-out, monotonic `seq` per session, and the `open → active → closed` state machine.
+- [x] 1.3 Implement idle-timeout and absolute-cap reclamation with injectable clock and timer so expiry is testable without wall time (D5).
+- [x] 1.4 Export `./streaming` from the package exports map.
+- [x] 1.5 Tests: event ordering with zero pushes, push-after-close returns the 409 condition, idle reclamation releases the driver, absolute cap fires while pushes continue, ownership check distinguishes `session-forbidden` from `session-not-found`.
 
 ## 2. Widen the streaming declaration
 
