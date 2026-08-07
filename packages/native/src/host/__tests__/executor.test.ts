@@ -1,14 +1,11 @@
 /**
- * The local executor, with containment as the point.
+ * The local executor — lifecycle, files, exec, cloneRepo.
  *
- * A local host is not a microVM — the registered root is the only boundary
- * there is, so these cases are load-bearing rather than decorative: if a path
- * can escape, `aprovan sandbox host run` hands the whole disk to whatever the
- * workspace asks for.
+ * Path containment cases live in `__tests__/contain.test.ts`.
  */
 
 import { createHash } from "node:crypto";
-import { mkdtempSync, rmSync, symlinkSync, writeFileSync, mkdirSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -34,53 +31,6 @@ async function newSandbox(): Promise<string> {
   const instance = (await executor.run("create", {})) as { id: string };
   return instance.id;
 }
-
-describe("containment", () => {
-  it("refuses traversal out of the sandbox", async () => {
-    const id = await newSandbox();
-    await expect(
-      executor.run("writeFile", { id, path: "../escape.txt", content: "no" }),
-    ).rejects.toThrow(/escapes the sandbox/u);
-    await expect(
-      executor.run("readFile", { id, path: "a/../../../etc/hosts" }),
-    ).rejects.toThrow(/escapes the sandbox/u);
-  });
-
-  it("refuses absolute paths", async () => {
-    const id = await newSandbox();
-    await expect(
-      executor.run("writeFile", { id, path: "/etc/hosts", content: "no" }),
-    ).rejects.toThrow(/must be relative/u);
-  });
-
-  it("refuses a symlink that resolves outside the sandbox", async () => {
-    const id = await newSandbox();
-    const secret = join(outside, "secret.txt");
-    writeFileSync(secret, "classified");
-    symlinkSync(secret, join(root, id, "link.txt"));
-
-    // Lexically innocent, which is exactly why the realpath check exists.
-    await expect(executor.run("readFile", { id, path: "link.txt" })).rejects.toThrow(
-      /resolves outside the sandbox/u,
-    );
-  });
-
-  it("never follows a symlink into a listing", async () => {
-    const id = await newSandbox();
-    writeFileSync(join(outside, "secret.txt"), "classified");
-    symlinkSync(outside, join(root, id, "peek"));
-    writeFileSync(join(root, id, "real.txt"), "mine");
-
-    const entries = (await executor.run("listFiles", { id })) as Array<{ path: string }>;
-    expect(entries.map((entry) => entry.path)).toEqual(["real.txt"]);
-  });
-
-  it("rejects a sandbox id that is not one", async () => {
-    await expect(executor.run("readFile", { id: "../..", path: "x" })).rejects.toThrow(
-      /id must be a sandbox id/u,
-    );
-  });
-});
 
 describe("files", () => {
   it("hashes with the same identity the workspace FS store uses", async () => {

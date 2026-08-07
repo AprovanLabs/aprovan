@@ -28,6 +28,7 @@ export {
   type ExecutorOptions,
 } from "./host/index.js";
 
+export { containPath } from "./contain.js";
 export { createNativeVfs, type NativeVfsBackend, type NativeVfsOptions } from "./vfs.js";
 export {
   createNativeVcs,
