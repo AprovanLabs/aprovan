@@ -32,9 +32,9 @@
 
 > Depends-on: 3 | Touches: server/workspace/src/interfaces.ts, server/workspace/src/interfaces-service.ts, server/workspace/src/__tests__/interfaces-streaming.test.ts | Verify: `pnpm --filter @aprovan/workspace test && pnpm check-types`
 
-- [ ] 4.1 Read the provider's `StreamingCapabilities` during `interfaces.bind` when the target contract declares any session operation (D4).
-- [ ] 4.2 Reject with code `streaming-unsupported` and a message naming provider and capability; do not defer the failure to call time.
-- [ ] 4.3 Tests for both bind scenarios in the spec's "Bind-time streaming capability enforcement" requirement.
+- [x] 4.1 Read the provider's `StreamingCapabilities` during `interfaces.bind` when the target contract declares any session operation (D4).
+- [x] 4.2 Reject with code `streaming-unsupported` and a message naming provider and capability; do not defer the failure to call time.
+- [x] 4.3 Tests for both bind scenarios in the spec's "Bind-time streaming capability enforcement" requirement.
 
 ## 5. Document the mechanism
 
