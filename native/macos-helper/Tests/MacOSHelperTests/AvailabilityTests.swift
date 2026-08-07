@@ -111,11 +111,12 @@ struct LoopbackHTTPServerTests {
         }
     }
 
-    @Test("request parser strips query string from path")
+    @Test("request parser strips query string from path but keeps it on query")
     func parsePath() {
         let req = LoopbackHTTPServer.parseRequest(Data("GET /availability?x=1 HTTP/1.1".utf8))
         #expect(req?.method == "GET")
         #expect(req?.path == "/availability")
+        #expect(req?.query == "x=1")
     }
 }
 

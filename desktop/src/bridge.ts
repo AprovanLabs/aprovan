@@ -11,6 +11,11 @@ export interface DesktopBridge {
   onGatewayStatus(cb: (s: GatewayStatus) => void): () => void;
   pickDirectory(purpose: "workspace-root"): Promise<string | undefined>;
   bundleInfo(): Promise<BundleInfo>;
+  /**
+   * Loopback origin of the macOS helper when ready (`http://127.0.0.1:<port>`),
+   * else null. Used by the renderer to point `setCdnBaseUrl` at `/esm`.
+   */
+  helperUrl(): Promise<string | null>;
 }
 
 export type GatewayStatus =
@@ -32,6 +37,7 @@ export const DESKTOP_BRIDGE_METHODS = [
   "onGatewayStatus",
   "pickDirectory",
   "bundleInfo",
+  "helperUrl",
 ] as const satisfies ReadonlyArray<keyof DesktopBridge>;
 
 export type DesktopBridgeMethod = (typeof DESKTOP_BRIDGE_METHODS)[number];

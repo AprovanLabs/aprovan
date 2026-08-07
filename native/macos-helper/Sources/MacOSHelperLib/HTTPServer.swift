@@ -1,13 +1,18 @@
 import Foundation
 import Network
+import EsmCache
 
 public struct HTTPRequest: Sendable {
     public var method: String
+    /// Path without query string (used for routing).
     public var path: String
+    /// Raw query string without leading `?`, if present.
+    public var query: String?
 
-    public init(method: String, path: String) {
+    public init(method: String, path: String, query: String? = nil) {
         self.method = method
         self.path = path
+        self.query = query
     }
 }
 
@@ -38,9 +43,9 @@ public struct HTTPResponse: Sendable {
     }
 }
 
-public typealias HTTPRouter = @Sendable (HTTPRequest) -> HTTPResponse
+public typealias HTTPRouter = @Sendable (HTTPRequest) async -> HTTPResponse
 
-/// Minimal loopback-only HTTP/1.1 server for GET health and availability.
+/// Minimal loopback-only HTTP/1.1 server for health, availability, and `/esm/*`.
 public final class LoopbackHTTPServer: @unchecked Sendable {
     private let listener: NWListener
     private let router: HTTPRouter
@@ -122,8 +127,10 @@ public final class LoopbackHTTPServer: @unchecked Sendable {
             if let range = next.range(of: Data("\r\n\r\n".utf8)) {
                 let headerData = next.subdata(in: next.startIndex..<range.lowerBound)
                 let request = Self.parseRequest(headerData) ?? HTTPRequest(method: "GET", path: "/")
-                let response = self.router(request)
-                self.send(response, on: connection)
+                Task {
+                    let response = await self.router(request)
+                    self.send(response, on: connection)
+                }
                 return
             }
             if isComplete {
@@ -154,21 +161,26 @@ public final class LoopbackHTTPServer: @unchecked Sendable {
         guard parts.count >= 2 else { return nil }
         let method = String(parts[0])
         let rawPath = String(parts[1])
-        let path = rawPath.split(separator: "?", maxSplits: 1).first.map(String.init) ?? rawPath
-        return HTTPRequest(method: method, path: path)
+        let split = rawPath.split(separator: "?", maxSplits: 1).map(String.init)
+        let path = split.first ?? rawPath
+        let query = split.count > 1 ? split[1] : nil
+        return HTTPRequest(method: method, path: path, query: query)
     }
 
     static func statusText(_ code: Int) -> String {
         switch code {
         case 200: return "OK"
+        case 400: return "Bad Request"
         case 404: return "Not Found"
         case 405: return "Method Not Allowed"
+        case 502: return "Bad Gateway"
         default: return "Error"
         }
     }
 }
 
-public func makeRouter(reporter: AvailabilityReporter) -> HTTPRouter {
+/// Core routes from stream 1 (`/health`, `/availability`).
+public func makeBaseRouter(reporter: AvailabilityReporter) -> HTTPRouter {
     { request in
         guard request.method == "GET" else {
             return .text(405, "Method Not Allowed")
@@ -190,4 +202,51 @@ public func makeRouter(reporter: AvailabilityReporter) -> HTTPRouter {
             return .text(404, "Not Found")
         }
     }
+}
+
+/// Additive `/esm/*` registration — keeps stream 3 ChatCompletions rebases easy.
+public func makeEsmRouter(cache: EsmCacheService) -> HTTPRouter {
+    { request in
+        guard request.path == "/esm" || request.path.hasPrefix("/esm/") else {
+            return .text(404, "Not Found")
+        }
+        guard request.method == "GET" else {
+            return .text(405, "Method Not Allowed")
+        }
+        guard let specifier = esmSpecifier(path: request.path, query: request.query) else {
+            return .text(400, "Unresolvable dependency: (empty)")
+        }
+        do {
+            let hit = try await cache.resolve(specifier: specifier)
+            return HTTPResponse(status: 200, contentType: hit.contentType, body: hit.data)
+        } catch let error as UnresolvedDependencyError {
+            return .text(502, error.message)
+        } catch {
+            return .text(502, UnresolvedDependencyError(specifier: specifier).message)
+        }
+    }
+}
+
+/// Compose routers left-to-right; first non-404 wins. Additive registration for later streams.
+public func composeRouters(_ routers: HTTPRouter...) -> HTTPRouter {
+    { request in
+        for router in routers {
+            let response = await router(request)
+            if response.status != 404 {
+                return response
+            }
+        }
+        return .text(404, "Not Found")
+    }
+}
+
+/// Stream 1+2 default: health/availability + optional ESM cache.
+public func makeRouter(
+    reporter: AvailabilityReporter,
+    esmCache: EsmCacheService? = nil
+) -> HTTPRouter {
+    if let esmCache {
+        return composeRouters(makeEsmRouter(cache: esmCache), makeBaseRouter(reporter: reporter))
+    }
+    return makeBaseRouter(reporter: reporter)
 }

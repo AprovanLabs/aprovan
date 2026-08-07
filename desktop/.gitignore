@@ -1,0 +1,4 @@
+
+# Extracted ESM seed cache (shipped as esm-seed.tar.gz; extracted by seed-esm.sh)
+resources/esm-seed/*
+!resources/esm-seed/manifest.json

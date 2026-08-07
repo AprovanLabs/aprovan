@@ -22,6 +22,8 @@ files:
 extraResources:
   - from: resources/bundle
     to: bundle
+  - from: resources/esm-seed
+    to: esm-seed
   - from: build/gateway
     to: gateway
   - from: build/runtime/node

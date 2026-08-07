@@ -12,12 +12,12 @@
 
 > Depends-on: 1 | Touches: native/macos-helper/Sources/EsmCache/**, desktop/src/seed-deps.ts, packages/compiler/src/cdn-config.ts | Verify: `pnpm --filter @aprovan/patchwork test && swift test --package-path native/macos-helper`
 
-- [ ] 2.1 Implement `/esm/*` mirroring the public CDN's specifier grammar, serving from disk and fetching through on a miss (D5).
-- [ ] 2.2 Key the cache by fully resolved specifier including version; never satisfy a request from a different version.
-- [ ] 2.3 Generate the seed set from the default workspace's widget dependencies at build time rather than hand-maintaining a list, and ship it in the app.
-- [ ] 2.4 Call `setCdnBaseUrl()` at renderer startup when the helper is available; leave the public default in place otherwise.
-- [ ] 2.5 Make an unresolvable dependency fail with a message naming it, never hang or render blank.
-- [ ] 2.6 Cover every scenario in `specs/widget-dependency-cache/spec.md`, including a first-run offline render against seeded dependencies only.
+- [x] 2.1 Implement `/esm/*` mirroring the public CDN's specifier grammar, serving from disk and fetching through on a miss (D5).
+- [x] 2.2 Key the cache by fully resolved specifier including version; never satisfy a request from a different version.
+- [x] 2.3 Generate the seed set from the default workspace's widget dependencies at build time rather than hand-maintaining a list, and ship it in the app.
+- [x] 2.4 Call `setCdnBaseUrl()` at renderer startup when the helper is available; leave the public default in place otherwise.
+- [x] 2.5 Make an unresolvable dependency fail with a message naming it, never hang or render blank.
+- [x] 2.6 Cover every scenario in `specs/widget-dependency-cache/spec.md`, including a first-run offline render against seeded dependencies only.
 
 ## 3. On-device chat provider
 

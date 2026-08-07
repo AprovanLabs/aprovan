@@ -20,6 +20,8 @@ export type BridgeHostState = {
   /** Fallback when no BundleManager is wired (tests / early scaffold). */
   bundleInfo: BundleInfo;
   bundles?: BundleManager;
+  /** Loopback helper origin when ready; null when absent/unavailable. */
+  helperUrl: string | null;
 };
 
 export function createInitialBridgeState(
@@ -29,6 +31,7 @@ export function createInitialBridgeState(
     status: { state: "starting" },
     bundleInfo: bundles?.getBundleInfo() ?? scaffoldBundleInfo(),
     bundles,
+    helperUrl: null,
   };
 }
 
@@ -86,6 +89,8 @@ export function registerBridgeHandlers(
     }
     return state.bundleInfo;
   });
+
+  ipc.handle(IPC.helperUrl, async () => state.helperUrl);
 
   ipc.handle(IPC.rendererReady, async () => {
     state.bundles?.reportRendererReady();

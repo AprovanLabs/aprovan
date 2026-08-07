@@ -16,5 +16,6 @@ fi
 "$SCRIPT_DIR/bundle-renderer.sh"
 "$SCRIPT_DIR/vendor-gateway.sh"
 "$SCRIPT_DIR/assert-gateway.sh"
+"$SCRIPT_DIR/seed-esm.sh"
 
 log "desktop resources ready under $BUILD_DIR"
