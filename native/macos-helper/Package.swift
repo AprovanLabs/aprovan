@@ -9,6 +9,7 @@ let package = Package(
         .library(name: "MacOSHelperLib", targets: ["MacOSHelperLib"]),
         .library(name: "ChatCompletions", targets: ["ChatCompletions"]),
         .library(name: "SttModels", targets: ["SttModels"]),
+        .library(name: "Stt", targets: ["Stt"]),
     ],
     targets: [
         // Widget dependency cache (stream 2). Separate target so stream 3 can
@@ -26,19 +27,25 @@ let package = Package(
             name: "SttModels",
             path: "Sources/SttModels"
         ),
+        // Local STT StreamingSessionDriver (voice-and-floating-widgets stream 2).
+        .target(
+            name: "Stt",
+            dependencies: ["SttModels"],
+            path: "Sources/Stt"
+        ),
         .target(
             name: "MacOSHelperLib",
-            dependencies: ["EsmCache", "ChatCompletions", "SttModels"],
+            dependencies: ["EsmCache", "ChatCompletions", "SttModels", "Stt"],
             path: "Sources/MacOSHelperLib"
         ),
         .executableTarget(
             name: "MacOSHelper",
-            dependencies: ["MacOSHelperLib", "EsmCache", "ChatCompletions", "SttModels"],
+            dependencies: ["MacOSHelperLib", "EsmCache", "ChatCompletions", "SttModels", "Stt"],
             path: "Sources/MacOSHelper"
         ),
         .testTarget(
             name: "MacOSHelperTests",
-            dependencies: ["MacOSHelperLib", "EsmCache", "ChatCompletions", "SttModels"],
+            dependencies: ["MacOSHelperLib", "EsmCache", "ChatCompletions", "SttModels", "Stt"],
             path: "Tests/MacOSHelperTests"
         ),
     ]

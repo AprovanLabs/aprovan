@@ -531,6 +531,9 @@ importers:
       '@everruns/bashkit-wasm':
         specifier: ^0.14.4
         version: 0.14.5
+      '@utdk/common':
+        specifier: ^0.1.3
+        version: 0.1.3(@opentelemetry/api@1.9.0)
       '@utdk/events':
         specifier: ^0.2.0
         version: 0.2.0
@@ -540,6 +543,9 @@ importers:
       '@utdk/sandbox':
         specifier: ^0.2.0
         version: 0.2.0
+      '@utdk/stt':
+        specifier: ^0.1.2
+        version: 0.1.2(@opentelemetry/api@1.9.0)
       '@utdk/telemetry':
         specifier: ^0.3.0
         version: 0.3.0
@@ -14246,7 +14252,7 @@ snapshots:
 
   '@utdk/stt@0.1.2(@opentelemetry/api@1.9.0)':
     dependencies:
-      '@utdk/common': 0.1.2(@opentelemetry/api@1.9.0)
+      '@utdk/common': 0.1.3(@opentelemetry/api@1.9.0)
     transitivePeerDependencies:
       - '@opentelemetry/api'
 

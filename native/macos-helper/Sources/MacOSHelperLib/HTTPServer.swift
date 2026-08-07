@@ -3,6 +3,7 @@ import Network
 import EsmCache
 import ChatCompletions
 import SttModels
+import Stt
 
 public struct HTTPRequest: Sendable {
     public var method: String
@@ -399,12 +400,13 @@ public func composeRouters(_ routers: HTTPRouter...) -> HTTPRouter {
     }
 }
 
-/// Stream 1+2+3 + STT models: health/availability + optional ESM / chat / model store.
+/// Stream 1+2+3 + STT models + local STT sessions: health/availability + optional ESM / chat / model store / driver.
 public func makeRouter(
     reporter: AvailabilityReporter,
     esmCache: EsmCacheService? = nil,
     chat: ChatCompletionsService? = nil,
-    sttModels: SttModelStore? = nil
+    sttModels: SttModelStore? = nil,
+    stt: LocalSttService? = nil
 ) -> HTTPRouter {
     var built: [HTTPRouter] = []
     if let esmCache {
@@ -416,6 +418,9 @@ public func makeRouter(
     if let sttModels {
         built.append(makeSttModelsRouter(store: sttModels))
     }
+    if let stt {
+        built.append(makeSttSessionRouter(service: stt))
+    }
     built.append(makeBaseRouter(reporter: reporter))
     let routers = built
     return { request in
@@ -426,6 +431,110 @@ public func makeRouter(
             }
         }
         return .text(404, "Not Found")
+    }
+}
+
+/// Additive local STT session routes (voice stream 2 — StreamingSessionDriver).
+public func makeSttSessionRouter(service: LocalSttService) -> HTTPRouter {
+    { request in
+        if request.path == "/stt/capabilities" {
+            guard request.method == "GET" else {
+                return .text(405, "Method Not Allowed")
+            }
+            do {
+                return try .json(object: service.capabilities)
+            } catch {
+                return .text(500, "Failed to encode STT capabilities")
+            }
+        }
+
+        if request.path == "/stt/sessions", request.method == "POST" {
+            return await handleSttOpen(service: service, request: request)
+        }
+
+        if let sessionId = sttSessionId(path: request.path, suffix: nil) {
+            switch request.method {
+            case "POST" where request.path.hasSuffix("/push"):
+                return await handleSttPush(service: service, sessionId: sessionId, request: request)
+            case "POST" where request.path.hasSuffix("/close"):
+                return await handleSttClose(service: service, sessionId: sessionId)
+            default:
+                break
+            }
+        }
+
+        return .text(404, "Not Found")
+    }
+}
+
+private func sttSessionId(path: String, suffix: String?) -> String? {
+    let prefix = "/stt/sessions/"
+    guard path.hasPrefix(prefix) else { return nil }
+    let rest = String(path.dropFirst(prefix.count))
+    if rest.hasSuffix("/push") {
+        let id = String(rest.dropLast("/push".count))
+        return id.isEmpty || id.contains("/") ? nil : id
+    }
+    if rest.hasSuffix("/close") {
+        let id = String(rest.dropLast("/close".count))
+        return id.isEmpty || id.contains("/") ? nil : id
+    }
+    _ = suffix
+    return nil
+}
+
+private func handleSttOpen(service: LocalSttService, request: HTTPRequest) async -> HTTPResponse {
+    let args: [String: Any]
+    if request.body.isEmpty {
+        args = [:]
+    } else {
+        guard let obj = try? JSONSerialization.jsonObject(with: request.body) as? [String: Any] else {
+            return .text(400, "invalid STT open body")
+        }
+        args = obj
+    }
+    do {
+        let sessionId = try await service.driver.openSession(args)
+        struct OpenResponse: Encodable {
+            var sessionId: String
+            var capabilities: SttCapabilities
+        }
+        return try .json(
+            object: OpenResponse(sessionId: sessionId, capabilities: service.driver.capabilities)
+        )
+    } catch let error as SttDriverError {
+        return .text(error.status, error.message)
+    } catch {
+        return .text(500, error.localizedDescription)
+    }
+}
+
+private func handleSttPush(
+    service: LocalSttService,
+    sessionId: String,
+    request: HTTPRequest
+) async -> HTTPResponse {
+    guard let obj = try? JSONSerialization.jsonObject(with: request.body) as? [String: Any] else {
+        return .text(400, "invalid STT push body")
+    }
+    do {
+        try await service.driver.push(providerSessionId: sessionId, message: obj)
+        return HTTPResponse(status: 202, contentType: "text/plain", body: Data())
+    } catch let error as SttDriverError {
+        return .text(error.status, error.message)
+    } catch {
+        return .text(500, error.localizedDescription)
+    }
+}
+
+private func handleSttClose(service: LocalSttService, sessionId: String) async -> HTTPResponse {
+    do {
+        let result = try await service.driver.close(providerSessionId: sessionId)
+        return try .json(object: result)
+    } catch let error as SttDriverError {
+        return .text(error.status, error.message)
+    } catch {
+        return .text(500, error.localizedDescription)
     }
 }
 

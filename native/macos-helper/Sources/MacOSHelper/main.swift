@@ -4,6 +4,7 @@ import EsmCache
 import MacOSHelperLib
 import ChatCompletions
 import SttModels
+import Stt
 
 struct CLIOptions {
     var host: String = "127.0.0.1"
@@ -207,6 +208,16 @@ do {
 
 let reporter = AvailabilityReporter()
 let chat = ChatCompletionsService(engine: makeDefaultChatEngine())
+let sttService: LocalSttService? = {
+    do {
+        return try LocalSttService(store: sttModels)
+    } catch {
+        FileHandle.standardError.write(
+            Data("macos-helper warning: local STT driver not ready: \(error.localizedDescription)\n".utf8)
+        )
+        return nil
+    }
+}()
 let server = try LoopbackHTTPServer(
     host: options.host,
     port: port,
@@ -214,7 +225,8 @@ let server = try LoopbackHTTPServer(
         reporter: reporter,
         esmCache: esmCache,
         chat: chat,
-        sttModels: sttModels
+        sttModels: sttModels,
+        stt: sttService
     )
 )
 
