@@ -1,7 +1,7 @@
 # Report: Workspace execution locus (stream 4)
 
 ## PR
-https://github.com/AprovanLabs/aprovan/pull/TBD
+https://github.com/AprovanLabs/aprovan/pull/115
 
 ## Version bump
 `@aprovan/registry-server` **0.2.7 → 0.2.8** (KeystoreCipher / `requireEncryption` from stream 3)
