@@ -31,8 +31,8 @@
 
 > Depends-on: 2 | Touches: registry/packages/registry-server/src/catalog/default.ts, registry/packages/registry-server/src/catalog/__tests__/** | Verify: `pnpm --filter @aprovan/registry-server test`
 
-- [ ] 4.1 Add `stt` to `INTERFACE_ORDER` so it sorts deliberately rather than alphabetically after the pre-instance set.
-- [ ] 4.2 Assert in tests that the loaded interface exposes a session-mode operation and that binding an unavailable entry fails with its declared reason.
+- [x] 4.1 Add `stt` to `INTERFACE_ORDER` so it sorts deliberately rather than alphabetically after the pre-instance set.
+- [x] 4.2 Assert in tests that the loaded interface exposes a session-mode operation and that binding an unavailable entry fails with its declared reason.
 
 ## 5. Workspace integration and docs
 
