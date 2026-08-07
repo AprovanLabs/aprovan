@@ -13,19 +13,19 @@
 
 > Depends-on: 1 | Touches: registry/packages/utdk/deepgram/**, registry/packages/contracts/stt/compat.json | Verify: `pnpm --filter @utdk/clients build && pnpm --filter @utdk/clients check-types`
 
-- [ ] 2.1 Implement `StreamingSessionDriver` over Deepgram's streaming API: hold the vendor socket inside the driver, translate `push` to vendor frames and vendor messages to `SessionEvent`s.
-- [ ] 2.2 Publish a capability descriptor reflecting what Deepgram actually supports — diarization, word timestamps, VAD, language list — rather than the contract's full surface.
-- [ ] 2.3 Map a dropped upstream connection to an `error` event with `retryable: true`, leaving the session active (spec: "Recoverable provider errors do not end the session").
-- [ ] 2.4 Take the secret from the standard `Authorization: Bearer …` header injection, as every other provider does.
-- [ ] 2.5 Add the `deepgram` entry to `compat.json`.
-- [ ] 2.6 Run the conformance suite from 1.6 against this module.
+- [x] 2.1 Implement `StreamingSessionDriver` over Deepgram's streaming API: hold the vendor socket inside the driver, translate `push` to vendor frames and vendor messages to `SessionEvent`s.
+- [x] 2.2 Publish a capability descriptor reflecting what Deepgram actually supports — diarization, word timestamps, VAD, language list — rather than the contract's full surface.
+- [x] 2.3 Map a dropped upstream connection to an `error` event with `retryable: true`, leaving the session active (spec: "Recoverable provider errors do not end the session").
+- [x] 2.4 Take the secret from the standard `Authorization: Bearer …` header injection, as every other provider does.
+- [x] 2.5 Add the `deepgram` entry to `compat.json`.
+- [x] 2.6 Run the conformance suite from 1.6 against this module.
 
 ## 3. Second provider shape, declared unavailable
 
 > Depends-on: 1 | Touches: registry/packages/contracts/stt/compat.json, registry/packages/contracts/stt/AUDIT.md | Verify: `pnpm --filter @utdk/stt test`
 
-- [ ] 3.1 Add the `assemblyai` entry with an `unavailable` reason, following the `agent` contract's precedent.
-- [ ] 3.2 Record in `AUDIT.md` where AssemblyAI's surface differs from Deepgram's and which contract choices those differences drove — this is the evidence that the contract was not shaped by one vendor (D5).
+- [x] 3.1 Add the `assemblyai` entry with an `unavailable` reason, following the `agent` contract's precedent.
+- [x] 3.2 Record in `AUDIT.md` where AssemblyAI's surface differs from Deepgram's and which contract choices those differences drove — this is the evidence that the contract was not shaped by one vendor (D5).
 
 ## 4. Catalog registration
 
