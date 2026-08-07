@@ -4,21 +4,31 @@ import {
   type IpcMain,
   type IpcMainInvokeEvent,
 } from "electron";
-import { type BundleInfo, type GatewayStatus, scaffoldBundleInfo } from "./bridge.js";
+import {
+  type BundleInfo,
+  type GatewayStatus,
+  scaffoldBundleInfo,
+} from "./bridge.js";
 import { IPC } from "./bridge-api.js";
+import type { BundleManager } from "./bundle-manager.js";
 import { pickDirectory } from "./dialogs.js";
 
 export { IPC };
 
 export type BridgeHostState = {
   status: GatewayStatus;
+  /** Fallback when no BundleManager is wired (tests / early scaffold). */
   bundleInfo: BundleInfo;
+  bundles?: BundleManager;
 };
 
-export function createInitialBridgeState(): BridgeHostState {
+export function createInitialBridgeState(
+  bundles?: BundleManager,
+): BridgeHostState {
   return {
     status: { state: "starting" },
-    bundleInfo: scaffoldBundleInfo(),
+    bundleInfo: bundles?.getBundleInfo() ?? scaffoldBundleInfo(),
+    bundles,
   };
 }
 
@@ -50,5 +60,14 @@ export function registerBridgeHandlers(
     },
   );
 
-  ipc.handle(IPC.bundleInfo, async () => state.bundleInfo);
+  ipc.handle(IPC.bundleInfo, async () => {
+    if (state.bundles) {
+      return state.bundles.getBundleInfo();
+    }
+    return state.bundleInfo;
+  });
+
+  ipc.handle(IPC.rendererReady, async () => {
+    state.bundles?.reportRendererReady();
+  });
 }

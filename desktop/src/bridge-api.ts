@@ -9,6 +9,8 @@ export const IPC = {
   gatewayStatus: "desktop:gatewayStatus",
   pickDirectory: "desktop:pickDirectory",
   bundleInfo: "desktop:bundleInfo",
+  /** Renderer readiness — not part of the public DesktopBridge surface. */
+  rendererReady: "desktop:rendererReady",
   gatewayStatusEvent: "desktop:gatewayStatus",
 } as const;
 

@@ -8,6 +8,7 @@ export default defineConfig([
       protocol: "src/protocol.ts",
       platform: "src/platform.ts",
       "app-support": "src/app-support.ts",
+      "bundle-manager": "src/bundle-manager.ts",
     },
     format: ["esm"],
     platform: "node",
