@@ -34,8 +34,10 @@ import {
   refreshNotifications,
   setIncludeSeen,
   setNotificationPrefs,
+  subscribeNotificationFocus,
   subscribeToNotifications,
   unreadCount,
+  buildChoiceDispatchPath,
   type AppNotification,
   type NotificationAction,
   type NotificationChoice,
@@ -60,25 +62,21 @@ async function dispatchChoice(
   notification: AppNotification,
   choice: NotificationChoice,
 ): Promise<void> {
-  const { namespace, procedure, args } = choice.call;
+  const { args } = choice.call;
+  const path = buildChoiceDispatchPath(workspaceId, notification, choice);
   if (notification.source?.app) {
-    const ws = workspaceId ?? "local";
-    const response = await gatewayFetch(
-      `${GATEWAY_BASE}/apps/${encodeURIComponent(ws)}/${encodeURIComponent(
-        notification.source.app,
-      )}/tools/${encodeURIComponent(namespace)}/${procedure}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ args }),
-      },
-    );
+    const response = await gatewayFetch(`${GATEWAY_BASE}${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ args }),
+    });
     if (!response.ok) {
       const body = (await response.json().catch(() => ({}))) as { error?: string };
       throw new Error(body.error ?? `Choice failed (${response.status})`);
     }
     return;
   }
+  const { namespace, procedure } = choice.call;
   await invokeNamespaceTool(namespace)(procedure, args);
 }
 
@@ -109,6 +107,17 @@ export function NotificationsBell({ workspaceId, onAction, renderWidget }: Notif
   const [choiceError, setChoiceError] = useState<string | null>(null);
 
   useEffect(() => subscribeToNotifications(setNotifications), []);
+
+  useEffect(
+    () =>
+      subscribeNotificationFocus(() => {
+        refreshNotifications();
+        setOpen(true);
+        setIncludeSeen(true);
+        setShowSeen(true);
+      }),
+    [],
+  );
 
   const runChoice = useCallback(
     async (notification: AppNotification, choice: NotificationChoice) => {

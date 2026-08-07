@@ -35,13 +35,13 @@
 
 > Depends-on: 1 | Touches: desktop/src/notifications.ts, desktop/src/__tests__/notifications.test.ts, client/web/src/lib/notifications.ts | Verify: `pnpm --filter @aprovan/desktop test && pnpm --filter @aprovan/patchwork-web typecheck`
 
-- [ ] 4.1 Subscribe to the existing notification feed from Electron main and present new items through the system notification centre (D4).
-- [ ] 4.2 Map each `choice` to a notification action, dispatching its call through the same gateway path the in-app feed uses — do not add a second dispatch path.
-- [ ] 4.3 Use the notification id as the system identifier so a seen item is withdrawn and nothing is presented twice.
-- [ ] 4.4 Open the application to the notification when one carrying no choices is activated.
-- [ ] 4.5 Request notification authorization on first use and treat denial as a non-fatal loss of the surface.
-- [ ] 4.6 Assert no bindable notification interface was added, satisfying "Native presentation is not a delivery contract".
-- [ ] 4.7 Cover every scenario in `specs/native-notification-surface/spec.md`.
+- [x] 4.1 Subscribe to the existing notification feed from Electron main and present new items through the system notification centre (D4).
+- [x] 4.2 Map each `choice` to a notification action, dispatching its call through the same gateway path the in-app feed uses — do not add a second dispatch path.
+- [x] 4.3 Use the notification id as the system identifier so a seen item is withdrawn and nothing is presented twice.
+- [x] 4.4 Open the application to the notification when one carrying no choices is activated.
+- [x] 4.5 Request notification authorization on first use and treat denial as a non-fatal loss of the surface.
+- [x] 4.6 Assert no bindable notification interface was added, satisfying "Native presentation is not a delivery contract".
+- [x] 4.7 Cover every scenario in `specs/native-notification-surface/spec.md`.
 
 ## 5. Signing and entitlements
 
