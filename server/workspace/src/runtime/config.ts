@@ -238,3 +238,49 @@ export function storeBackend(): StoreBackend {
   if (raw === "sqlite" || raw === "dsql") return raw;
   throw new Error(`STORE_BACKEND must be "sqlite" or "dsql" (got "${raw}")`);
 }
+
+// ---------------------------------------------------------------------------
+// Locus-aware resolution (local-first-workspace stream 5)
+// ---------------------------------------------------------------------------
+
+export type WorkspaceLocusKind = "local" | "cloud";
+
+/**
+ * Where a workspace's state / credentials / bindings resolve relative to
+ * *this* gateway process:
+ *
+ *   local   — workspace locus is local; use sqlite (and local cipher).
+ *   process — workspace locus is cloud and this process *is* the cloud
+ *             gateway (WORKSPACE_MODE=aws); use {@link storeBackend}.
+ *   proxy   — workspace locus is cloud but this process is a local gateway;
+ *             do not touch local stores — forward to {@link cloudGatewayBaseUrl}.
+ */
+export type LocusDispatch = "local" | "process" | "proxy";
+
+/** Resolve dispatch target from a workspace locus and the process mode. */
+export function resolveLocusDispatch(locus: WorkspaceLocusKind): LocusDispatch {
+  if (locus === "local") return "local";
+  return isAwsMode() ? "process" : "proxy";
+}
+
+/**
+ * Store backend for in-process lookups keyed by workspace locus.
+ * Callers must not use this when {@link resolveLocusDispatch} returns
+ * `"proxy"` — cloud state lives on the remote gateway.
+ */
+export function storeBackendForLocus(locus: WorkspaceLocusKind): StoreBackend {
+  if (resolveLocusDispatch(locus) === "local") return "sqlite";
+  return storeBackend();
+}
+
+/**
+ * Base URL of the hosted cloud gateway (no trailing slash). Used when a
+ * local-mode process must proxy a cloud-locus workspace.
+ */
+export function cloudGatewayBaseUrl(): string {
+  const raw =
+    process.env["CLOUD_GATEWAY_URL"]?.trim() ||
+    process.env["GATEWAY_CLOUD_URL"]?.trim() ||
+    "https://aprovan.com/api/gateway";
+  return raw.replace(/\/$/, "");
+}

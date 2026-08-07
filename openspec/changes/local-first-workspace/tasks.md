@@ -40,9 +40,9 @@
 
 > Depends-on: 4 | Touches: server/workspace/src/runtime/config.ts, server/workspace/src/routes/proxy.ts, server/workspace/src/workflows/invoke.ts, server/workspace/src/__tests__/locus-dispatch.test.ts | Verify: `pnpm --filter @aprovan/workspace test`
 
-- [ ] 5.1 Resolve store, credential, and binding lookups from the workspace's locus rather than from process-wide `storeBackend()` alone.
-- [ ] 5.2 Add outbound proxying for workspaces whose locus is `cloud`, forwarding the principal and preserving error shapes.
-- [ ] 5.3 Assert a local workspace binding an interface to a remote provider makes the outbound call from the local gateway and never writes the credential upstream.
+- [x] 5.1 Resolve store, credential, and binding lookups from the workspace's locus rather than from process-wide `storeBackend()` alone.
+- [x] 5.2 Add outbound proxying for workspaces whose locus is `cloud`, forwarding the principal and preserving error shapes.
+- [x] 5.3 Assert a local workspace binding an interface to a remote provider makes the outbound call from the local gateway and never writes the credential upstream.
 
 ## 6. Runtime gateway resolution in the client
 
