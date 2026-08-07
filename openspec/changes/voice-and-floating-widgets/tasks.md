@@ -12,12 +12,12 @@
 
 > Depends-on: 1 | Touches: native/macos-helper/Sources/Stt/**, registry/packages/contracts/stt/compat.json | Verify: `swift test --package-path native/macos-helper && pnpm --filter @utdk/stt test`
 
-- [ ] 2.1 Implement `StreamingSessionDriver` over the transcription engine, mapping engine output to `SttEvent` partials, finals, and speech boundaries.
-- [ ] 2.2 Derive the capability descriptor from the loaded model so diarization is reported only when the model supports it; fail at open when an unsupported capability is requested (D3).
-- [ ] 2.3 Accept the contract's required encoding; advertise any additional encodings the engine supports rather than assuming them.
-- [ ] 2.4 Add the compat entry with `moduleSpecifier` and `credentialless: true`, following the existing first-party-provider precedent.
-- [ ] 2.5 Run the `stt` conformance suite against this driver; every case that passes for the remote provider must pass here.
-- [ ] 2.6 Assert no audio reaches an external endpoint during a local session.
+- [x] 2.1 Implement `StreamingSessionDriver` over the transcription engine, mapping engine output to `SttEvent` partials, finals, and speech boundaries.
+- [x] 2.2 Derive the capability descriptor from the loaded model so diarization is reported only when the model supports it; fail at open when an unsupported capability is requested (D3).
+- [x] 2.3 Accept the contract's required encoding; advertise any additional encodings the engine supports rather than assuming them.
+- [x] 2.4 Add the compat entry with `moduleSpecifier` and `credentialless: true`, following the existing first-party-provider precedent.
+- [x] 2.5 Run the `stt` conformance suite against this driver; every case that passes for the remote provider must pass here.
+- [x] 2.6 Assert no audio reaches an external endpoint during a local session.
 
 ## 3. Renderer audio capture
 

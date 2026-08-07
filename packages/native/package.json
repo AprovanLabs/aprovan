@@ -1,13 +1,14 @@
 {
   "name": "@aprovan/native",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
-  "description": "Aprovan-supplied native implementations: workspace contract backends (vfs, vcs, keyvalue, events, telemetry) and sandbox execution (bashkit, machine host, Node image)",
+  "description": "Aprovan-supplied native implementations: workspace contract backends (vfs, vcs, keyvalue, events, telemetry), on-device STT, and sandbox execution (bashkit, machine host, Node image)",
   "keywords": [
     "aprovan",
     "native",
     "sandbox",
     "vfs",
+    "stt",
     "utdk"
   ],
   "license": "MIT",
@@ -53,6 +54,11 @@
       "types": "./dist/telemetry.d.ts",
       "import": "./dist/telemetry.js",
       "default": "./dist/telemetry.js"
+    },
+    "./stt": {
+      "types": "./dist/stt/index.d.ts",
+      "import": "./dist/stt/index.js",
+      "default": "./dist/stt/index.js"
     }
   },
   "files": [
@@ -130,9 +136,11 @@
   },
   "dependencies": {
     "@everruns/bashkit-wasm": "^0.14.4",
+    "@utdk/common": "^0.1.3",
     "@utdk/events": "^0.2.0",
     "@utdk/keyvalue": "^0.2.0",
     "@utdk/sandbox": "^0.2.0",
+    "@utdk/stt": "^0.1.3",
     "@utdk/telemetry": "^0.3.0",
     "@utdk/vfs": "^0.2.0"
   },
