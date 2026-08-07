@@ -668,8 +668,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/compiler
       '@aprovan/registry-server':
-        specifier: ^0.2.8
-        version: 0.2.8(zod@3.25.76)
+        specifier: ^0.2.9
+        version: 0.2.9(zod@3.25.76)
       '@aws-sdk/client-cognito-identity-provider':
         specifier: ^3.1077.0
         version: 3.1101.0
@@ -745,6 +745,9 @@ importers:
       '@utdk/sql':
         specifier: ^0.2.0
         version: 0.2.0
+      '@utdk/stt':
+        specifier: ^0.1.2
+        version: 0.1.2(@opentelemetry/api@1.9.0)
       '@utdk/telemetry':
         specifier: ^0.3.1
         version: 0.3.1
@@ -846,8 +849,8 @@ packages:
     resolution: {integrity: sha512-UlB67aQzxjLnFMPzsoJcom9GxlSvY22X8FEKiwiZYxQJvOTA/biOhe4/pNGMQeDW1d+mq82zPxrnDJ7tcdNlhA==}
     engines: {node: '>=20.0.0'}
 
-  '@aprovan/registry-server@0.2.8':
-    resolution: {integrity: sha512-T6RC/DRVBwBOQd2lgUIwQ5HR4K5PV7gE51qmWEnp9uq2btURQuKZfh4Em6cqMHpZGik47fOLPLQ5FrXeKQrOGQ==}
+  '@aprovan/registry-server@0.2.9':
+    resolution: {integrity: sha512-JsYcJzFFIN2hxDC8rVf0YcMg7V/fg4ThvstNeSBcwrNNYOdXmfDOqXbbvQ0juc7U1I/wCusEHdBw48QhkO+XlQ==}
     engines: {node: '>=20.0.0'}
 
   '@asamuzakjp/css-color@6.0.5':
@@ -4734,6 +4737,9 @@ packages:
   '@utdk/clients@0.1.1':
     resolution: {integrity: sha512-22XB10gbsXi66ni6tN9tbiUzTlDtzKU0PCRWfkkYGQdm2MwIlr9ANbUf1BGcHn8bhTxtM8R99xhGwP4f3ZZw7w==}
 
+  '@utdk/clients@0.1.2':
+    resolution: {integrity: sha512-DkdpRTPi08V+PEqUuExnmdVxtRdBD9qnSmkINcqvkKkcTuzpZW1fr7MCcT06MZu8cqrnQj9y9cj3igs8o/99wg==}
+
   '@utdk/common@0.1.0':
     resolution: {integrity: sha512-jQwhZFW5T3jTycXyu0VChaJbYNMVwP3274KVdhNcSqhxm4ZZTm4t5Q5I9Q4XfIqzQ4x4q5XHn+4IvaGyfO8wuQ==}
     peerDependencies:
@@ -4798,6 +4804,9 @@ packages:
   '@utdk/sql@0.2.0':
     resolution: {integrity: sha512-lP4OArRGKchKEF4YLtzyz3E1ZRg7py08dTzcn+SUfAvc7/J9t1EScFXEHib1ckKTYkivH0eyVMa7Pv8dJdhXlw==}
 
+  '@utdk/stt@0.1.2':
+    resolution: {integrity: sha512-X7FyTLTRyYIdpLycm33ih67OTFww8/OkSfr8r7ra6aveF6qoYv/m9lb0hmdMakpCzqpcXchiE7dUY9bmz1loeQ==}
+
   '@utdk/telemetry@0.2.0':
     resolution: {integrity: sha512-fkLVNNIH96fFJ+TLkcnEzJJinf6ArP8T3K4/S93Q40byjH8QCZwx8yu+z7cwyx7zI7iQ3bkZVrBKkUIskihnBg==}
 
@@ -4818,6 +4827,9 @@ packages:
 
   '@utdk/vfs@0.2.1':
     resolution: {integrity: sha512-FSahaMpNC8BFSq8WrgEmrAiVC24Csv1wL6sEI6hD5GUnELyMxQAsMehnLw08V/m+oUIQjhmjBJNjek8lvxFDcg==}
+
+  '@utdk/vfs@0.2.2':
+    resolution: {integrity: sha512-h8yOqYOcmKWyodZLrXNl+H7CPh78IT2lqp/8zIqvr214s/oFERPXPtgPjo8enXqnRimHpLU7IOLnzZA7JePI1Q==}
 
   '@valtown/codemirror-ts@2.3.1':
     resolution: {integrity: sha512-v5XiI4WA+bUy0XDgkrqZksqBWgIUeyLZuC94Px/rhXBph8ASmVXaimlGDtt0vH/9t8aDdIZYdr59r9H3oKMFOg==}
@@ -8604,7 +8616,7 @@ snapshots:
       - supports-color
       - zod
 
-  '@aprovan/registry-server@0.2.8(zod@3.25.76)':
+  '@aprovan/registry-server@0.2.9(zod@3.25.76)':
     dependencies:
       '@hono/node-server': 1.19.17(hono@4.12.33)
       '@jitl/quickjs-wasmfile-debug-asyncify': 0.32.0
@@ -8615,10 +8627,11 @@ snapshots:
       '@opentelemetry/sdk-trace-base': 1.30.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/sdk-trace-node': 1.30.1(@opentelemetry/api@1.9.0)
       '@utdk/agent': 0.2.0
-      '@utdk/clients': 0.1.1
+      '@utdk/clients': 0.1.2(@opentelemetry/api@1.9.0)
       '@utdk/common': 0.1.2(@opentelemetry/api@1.9.0)
       '@utdk/llm': 0.2.0
       '@utdk/mcp-core': 0.1.2(@opentelemetry/api@1.9.0)
+      '@utdk/stt': 0.1.2(@opentelemetry/api@1.9.0)
       better-sqlite3: 12.11.1
       hono: 4.12.33
       jose: 5.10.0
@@ -8627,9 +8640,11 @@ snapshots:
       '@aws-sdk/client-kms': 3.1101.0
     transitivePeerDependencies:
       - '@cfworker/json-schema'
+      - bufferutil
       - debug
       - pg-native
       - supports-color
+      - utf-8-validate
       - zod
 
   '@asamuzakjp/css-color@6.0.5':
@@ -13555,6 +13570,29 @@ snapshots:
       - pg-native
       - supports-color
 
+  '@utdk/clients@0.1.2(@opentelemetry/api@1.9.0)':
+    dependencies:
+      '@utcp/http': 1.1.11
+      '@utcp/sdk': 1.1.2
+      '@utdk/common': 0.1.2(@opentelemetry/api@1.9.0)
+      '@utdk/events': 0.2.1
+      '@utdk/keyvalue': 0.2.1
+      '@utdk/llm': 0.2.0
+      '@utdk/sandbox': 0.2.1
+      '@utdk/sql': 0.2.0
+      '@utdk/stt': 0.1.2(@opentelemetry/api@1.9.0)
+      '@utdk/telemetry': 0.3.1
+      '@utdk/vcs': 0.2.1
+      '@utdk/vfs': 0.2.2
+      ws: 8.21.1
+    transitivePeerDependencies:
+      - '@opentelemetry/api'
+      - bufferutil
+      - debug
+      - pg-native
+      - supports-color
+      - utf-8-validate
+
   '@utdk/common@0.1.0(@opentelemetry/api@1.9.0)':
     optionalDependencies:
       '@opentelemetry/api': 1.9.0
@@ -13618,6 +13656,12 @@ snapshots:
     transitivePeerDependencies:
       - pg-native
 
+  '@utdk/stt@0.1.2(@opentelemetry/api@1.9.0)':
+    dependencies:
+      '@utdk/common': 0.1.2(@opentelemetry/api@1.9.0)
+    transitivePeerDependencies:
+      - '@opentelemetry/api'
+
   '@utdk/telemetry@0.2.0': {}
 
   '@utdk/telemetry@0.3.0': {}
@@ -13631,6 +13675,10 @@ snapshots:
   '@utdk/vfs@0.2.0': {}
 
   '@utdk/vfs@0.2.1':
+    dependencies:
+      '@aws-sdk/client-s3': 3.1101.0
+
+  '@utdk/vfs@0.2.2':
     dependencies:
       '@aws-sdk/client-s3': 3.1101.0
 
