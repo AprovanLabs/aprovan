@@ -40,6 +40,6 @@
 
 > Depends-on: 3 | Touches: docs/streaming-sessions.md, docs/index.md | Verify: `pnpm lint`
 
-- [ ] 5.1 Write `docs/streaming-sessions.md` covering the wire table, the state machine, the error codes, and how a provider implements `StreamingSessionDriver` around a vendor duplex socket.
-- [ ] 5.2 State explicitly that continuous upstream input is a sequence of POSTs, not a duplex channel, and why (MCP alignment) — this is the single most likely thing for an implementor to get wrong.
-- [ ] 5.3 Link it from `docs/index.md`.
+- [x] 5.1 Write `docs/streaming-sessions.md` covering the wire table, the state machine, the error codes, and how a provider implements `StreamingSessionDriver` around a vendor duplex socket.
+- [x] 5.2 State explicitly that continuous upstream input is a sequence of POSTs, not a duplex channel, and why (MCP alignment) — this is the single most likely thing for an implementor to get wrong.
+- [x] 5.3 Link it from `docs/index.md`.
