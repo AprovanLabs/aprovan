@@ -36,6 +36,7 @@ Options for \`start\`:
 Environment:
   WORKSPACE_MODE, WORKSPACE_PORT, WORKSPACE_HOST, WORKSPACE_DATA_DIR,
   WORKSPACE_CRON, WORKSPACE_ALLOW_INSECURE, WORKSPACE_CRON_SECRET
+  WORKSPACE_KEY_FD   (desktop) inherited fd with 32 raw key bytes — not key material
   aws mode additionally reads /aprovan/<env>/env from SSM.
 `;
 

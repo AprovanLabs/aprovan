@@ -32,9 +32,9 @@
 
 > Depends-on: 3 | Touches: desktop/src/key-provider.ts, desktop/src/__tests__/key-provider.test.ts | Verify: `pnpm --filter @aprovan/desktop test`
 
-- [ ] 4.1 Implement the `KeyProvider` seam from `local-first-workspace` over Electron `safeStorage`, generating and persisting a 32-byte key on first run.
-- [ ] 4.2 Pass the provider to the gateway child so `KeystoreCipher` is selected, without the key transiting a command-line argument or an environment variable readable by other processes.
-- [ ] 4.3 Test that a local workspace created through the app stores sealed, non-plaintext credential bytes.
+- [x] 4.1 Implement the `KeyProvider` seam from `local-first-workspace` over Electron `safeStorage`, generating and persisting a 32-byte key on first run.
+- [x] 4.2 Pass the provider to the gateway child so `KeystoreCipher` is selected, without the key transiting a command-line argument or an environment variable readable by other processes.
+- [x] 4.3 Test that a local workspace created through the app stores sealed, non-plaintext credential bytes.
 
 ## 5. Bundle manager
 

@@ -12,6 +12,7 @@ import {
 import { BundleManager } from "./bundle-manager.js";
 import { BUNDLE_PUBLIC_KEY_PEM } from "./bundle-public-key.js";
 import { createGatewaySupervisor } from "./gateway-supervisor.js";
+import { createSafeStorageKeyProvider } from "./key-provider.js";
 import { evaluatePlatformFloor } from "./platform.js";
 import {
   resolveActiveBundleDirWithSupport,
@@ -122,11 +123,16 @@ export async function startDesktopApp(): Promise<void> {
   const bridgeState = createInitialBridgeState(bundles);
   registerBridgeHandlers(bridgeState);
 
+  const keyProvider = createSafeStorageKeyProvider({
+    storageDir: layout.root,
+  });
+
   const supervisor = createGatewaySupervisor({
     nodeBinary: resolveBundledNodeBinary(),
     gatewayDir: resolveGatewayVendorDir(),
     dataDir: layout.gatewayDataDir,
     onStatus: (status) => publishGatewayStatus(bridgeState, status),
+    resolveWorkspaceKey: () => keyProvider.getKey(),
   });
 
   let shuttingDown = false;

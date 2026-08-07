@@ -28,6 +28,7 @@ import { wellKnownRouter } from "./routes/well-known.js";
 import { getWorkspaceConfig, loadWorkspaceConfig, type WorkspaceConfig } from "./runtime/config.js";
 import { startCronScheduler, type CronScheduler } from "./runtime/cron.js";
 import { startTelemetry } from "./runtime/telemetry.js";
+import { initCipherFromWorkspaceKeyFd } from "./workspace-key-fd.js";
 
 /** The complete HTTP surface, with no server bound to it. */
 export function createWorkspaceApp(): Hono {
@@ -71,6 +72,10 @@ export interface StartWorkspaceOptions {
 export async function startWorkspace(
   options: StartWorkspaceOptions = {},
 ): Promise<WorkspaceHandle> {
+  // Desktop shell delivers the cipher key on an inherited fd (WORKSPACE_KEY_FD).
+  // No-op when unset — CLI/container keep env-based cipher selection.
+  initCipherFromWorkspaceKeyFd();
+
   const config = await loadWorkspaceConfig();
   const port = options.port ?? config.port;
   const hostname = options.hostname ?? config.hostname;
