@@ -2,7 +2,7 @@
 
 > Depends-on: - | Touches: native/macos-helper/Sources/SttModels/**, desktop/build/models/**, docs/decisions/** | Verify: `swift test --package-path native/macos-helper`
 
-- [ ] 1.1 **Blocking**: check the redistribution licence of each candidate default model for bundling inside a signed application, and record the decision as an ADR before fixing a default (tech-plan Open Questions).
+- [x] 1.1 **Blocking**: check the redistribution licence of each candidate default model for bundling inside a signed application, and record the decision as an ADR before fixing a default (tech-plan Open Questions). → [ADR 0001](../../../docs/decisions/0001-bundle-whisper-tiny-en-stt.md) (`whisper-tiny.en`)
 - [ ] 1.2 Implement the model store: resolve a model id to weights on disk, list installed and available models with sizes and capabilities.
 - [ ] 1.3 Implement `/stt/models`, `/stt/models/:id/install` with SSE progress, and `DELETE /stt/models/:id`; refuse deletion of the bundled default.
 - [ ] 1.4 Verify fetched weights against a published hash and discard on mismatch, leaving installed models untouched.

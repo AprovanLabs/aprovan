@@ -47,9 +47,9 @@ flowchart TD
 - **Revisit if**: browser capture proves inadequate for a quality bar native capture would meet, in which case capture becomes its own contract rather than moving into this one.
 
 ### D2: A small default model bundled; the rest fetched
-- **Choice**: One compact streaming model ships inside the application so voice works on first launch with no network and no account. Larger, multilingual, and diarization-capable models are fetched on request from an endpoint under our control.
+- **Choice**: One compact streaming model ships inside the application so voice works on first launch with no network and no account. Larger, multilingual, and diarization-capable models are fetched on request from an endpoint under our control. Default model id and licence: [ADR 0001](../../../docs/decisions/0001-bundle-whisper-tiny-en-stt.md) (`whisper-tiny.en`, MIT).
 - **Alternatives**: *Fetch everything from the public model host on first use* — lost because a core feature would depend on a third party's uptime and rate limits, and local-only mode would not be genuinely offline. *Fetch everything from our own endpoint* — lost for the same offline-first-run reason. *Weights as workspace artifacts* — lost because it needs the most machinery and a first run would require a workspace before the application could listen.
-- **Revisit if**: no candidate model's licence permits redistribution inside a signed application, which would force fetch-on-first-use and a revised first-run experience.
+- **Revisit if**: a future default changes family or licence (supersede ADR 0001), or installer size forces a quantized artifact.
 
 ### D3: Diarization is a model choice reported as a capability
 - **Choice**: The provider's declared capabilities depend on which model is loaded. Diarization is reported true only when a diarization-capable model is present, and requesting it otherwise fails at session open.
@@ -142,4 +142,4 @@ Rollback: each step is additive. Step 3 delivers usable voice without the panel,
 
 ## Open Questions
 
-Model licensing for redistribution inside a signed application, which is the one open item and is legal rather than technical. Recommendation: resolve before fixing the default in task group 1, and prefer a permissively licensed model even at some quality cost, because the offline first run is a stated goal and fetch-on-first-use would undermine it.
+Resolved — see [ADR 0001](../../../docs/decisions/0001-bundle-whisper-tiny-en-stt.md): bundle `whisper-tiny.en` (MIT); no fetch-on-first-run fallback required for the default.
