@@ -1,7 +1,7 @@
 # Report: Locus-aware resolution in the gateway (stream 5)
 
 ## PR
-(filled after open)
+https://github.com/AprovanLabs/aprovan/pull/120
 
 ## What was built
 - **`runtime/config.ts`**: `resolveLocusDispatch`, `storeBackendForLocus`, `cloudGatewayBaseUrl` — local locus always sqlite; cloud on a local-mode process is `"proxy"`; cloud on aws is in-process via `storeBackend()`.
