@@ -1,7 +1,8 @@
 # Bundle signing fixtures (test only)
 
 Ed25519 keypair used by `bundle-manager` unit tests. The public key is also
-pinned in `desktop/src/bundle-public-key.ts` for local/dev verification.
+pinned in `desktop/src/bundle-public-key.ts` until the production pin lands.
 
-**Not for production.** Stream 7 replaces the pin with the CI release key;
-this private key must never sign shipping manifests.
+**Not for production.** The shipping private key is held only in CI
+(`BUNDLE_SIGNING_PRIVATE_KEY`). Rotating the pin requires a shell update —
+see `desktop/docs/signing.md`.

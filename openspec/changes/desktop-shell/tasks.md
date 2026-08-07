@@ -59,11 +59,11 @@
 
 > Depends-on: 5 | Touches: desktop/build/entitlements.plist, desktop/electron-builder.yml, .github/workflows/desktop.yml | Verify: `pnpm --filter @aprovan/desktop dist`
 
-- [ ] 7.1 Configure signing with Hardened Runtime and declare the entitlements the bundled runtime and helper processes require (D4).
-- [ ] 7.2 Add notarization and stapling to the release workflow.
-- [ ] 7.3 Wire the shell auto-updater against a signed release feed, independent of the bundle channel (D6).
-- [ ] 7.4 Hold the bundle-signing key in CI only; document rotation as requiring a shell update, since the public key is pinned.
-- [ ] 7.5 Verify a downloaded build launches on a clean machine without a Gatekeeper block.
+- [x] 7.1 Configure signing with Hardened Runtime and declare the entitlements the bundled runtime and helper processes require (D4).
+- [x] 7.2 Add notarization and stapling to the release workflow.
+- [x] 7.3 Wire the shell auto-updater against a signed release feed, independent of the bundle channel (D6).
+- [x] 7.4 Hold the bundle-signing key in CI only; document rotation as requiring a shell update, since the public key is pinned.
+- [x] 7.5 Verify a downloaded build launches on a clean machine without a Gatekeeper block.
 
 ## 8. Documentation
 

@@ -24,6 +24,7 @@ import {
   filePathToResponseUrl,
   resolveAppProtocolPath,
 } from "./protocol.js";
+import { startShellUpdater } from "./shell-updater.js";
 import { createMainWindow } from "./window.js";
 
 // Must be registered before the app is ready.
@@ -149,6 +150,9 @@ export async function startDesktopApp(): Promise<void> {
 
   // Window stays open regardless of gateway status (crash → restarting/failed).
   void supervisor.start();
+
+  // Shell channel is independent of BundleManager's OTA renderer feed (D6).
+  startShellUpdater({ isPackaged: app.isPackaged });
 
   app.on("activate", () => {
     createMainWindow();
