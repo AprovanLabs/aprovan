@@ -51,9 +51,9 @@
 
 > Depends-on: 1 | Touches: desktop/src/dialogs.ts, client/web/src/features/workspaces/** | Verify: `pnpm --filter @aprovan/patchwork-web typecheck`
 
-- [ ] 6.1 Implement `pickDirectory` over the native panel, returning the selected path.
-- [ ] 6.2 Have the workspace creation flow use it when available, falling back to the plain path input `local-first-workspace` shipped.
-- [ ] 6.3 Propose a subdirectory as the default root, never the home directory, and display the containment statement alongside it.
+- [x] 6.1 Implement `pickDirectory` over the native panel, returning the selected path.
+- [x] 6.2 Have the workspace creation flow use it when available, falling back to the plain path input `local-first-workspace` shipped.
+- [x] 6.3 Propose a subdirectory as the default root, never the home directory, and display the containment statement alongside it.
 
 ## 7. Signing, notarization, and shell updates
 

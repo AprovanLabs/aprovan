@@ -1,6 +1,12 @@
-import { ipcMain, type IpcMain } from "electron";
+import {
+  BrowserWindow,
+  ipcMain,
+  type IpcMain,
+  type IpcMainInvokeEvent,
+} from "electron";
 import { type BundleInfo, type GatewayStatus, scaffoldBundleInfo } from "./bridge.js";
 import { IPC } from "./bridge-api.js";
+import { pickDirectory } from "./dialogs.js";
 
 export { IPC };
 
@@ -18,8 +24,7 @@ export function createInitialBridgeState(): BridgeHostState {
 
 /**
  * Register main-process IPC handlers that back the preload DesktopBridge.
- * Gateway supervision and the native directory picker land in later streams;
- * this scaffold returns starting/placeholder values only.
+ * Gateway supervision lands in a later stream; directory picking is live.
  */
 export function registerBridgeHandlers(
   state: BridgeHostState,
@@ -36,12 +41,12 @@ export function registerBridgeHandlers(
 
   ipc.handle(
     IPC.pickDirectory,
-    async (_event, purpose: "workspace-root"): Promise<string | undefined> => {
-      if (purpose !== "workspace-root") {
-        return undefined;
-      }
-      // Native panel arrives in stream 6.
-      return undefined;
+    async (
+      event: IpcMainInvokeEvent,
+      purpose: "workspace-root",
+    ): Promise<string | undefined> => {
+      const parent = BrowserWindow.fromWebContents(event.sender);
+      return pickDirectory(purpose, { parent });
     },
   );
 
