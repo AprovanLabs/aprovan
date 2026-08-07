@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Electron / Chromium V8 requires JIT under Hardened Runtime. -->
+	<key>com.apple.security.cs.allow-jit</key>
+	<true/>
+	<!-- Electron internals allocate executable pages that are not JIT regions. -->
+	<key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+	<true/>
+	<!--
+	  Required so the shell can load Electron frameworks and spawn the
+	  bundled stock Node runtime + gateway helpers that are re-signed as
+	  nested binaries (not App Store sandboxed). Deliberately omit
+	  com.apple.security.app-sandbox — local agent execution needs process
+	  spawn outside the sandbox (tech-plan D4).
+	-->
+	<key>com.apple.security.cs.disable-library-validation</key>
+	<true/>
+</dict>
+</plist>

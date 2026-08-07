@@ -1,0 +1,64 @@
+# Packaging for @aprovan/desktop (macOS arm64 only — platform floor).
+# Signing + notarization activate when CSC_* / APPLE_* secrets are present;
+# otherwise `pnpm dist` produces an unsigned local artifact for smoke checks.
+
+appId: com.aprovan.desktop
+productName: Aprovan
+copyright: Copyright © Aprovan Labs
+
+directories:
+  output: release
+  buildResources: build
+
+# Main/preload compiled by tsup into dist/; do not pack desktop/src.
+files:
+  - dist/**/*
+  - package.json
+  - "!**/*.{md,map}"
+  - "!**/__tests__/**"
+
+# Seed renderer + vendored gateway/runtime live beside the .app Resources
+# (see desktop/src/paths.ts packaged layout).
+extraResources:
+  - from: resources/bundle
+    to: bundle
+  - from: build/gateway
+    to: gateway
+  - from: build/runtime/node
+    to: runtime/node
+
+asar: true
+
+# Shell update feed — independent of the OTA renderer bundle channel (D6).
+# electron-updater reads latest-mac.yml from this URL; artifacts are
+# Developer ID–signed (and notarized) so Gatekeeper verifies the update.
+publish:
+  provider: generic
+  url: https://releases.aprovan.com/desktop
+  channel: latest
+
+mac:
+  category: public.app-category.developer-tools
+  # Apple Silicon only (desktop platform floor).
+  target:
+    - target: dmg
+      arch:
+        - arm64
+    # zip required for electron-updater differential/full updates on macOS
+    - target: zip
+      arch:
+        - arm64
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.plist
+  entitlementsInherit: build/entitlements.plist
+  # Built-in @electron/notarize + staple when APPLE_* credentials are set.
+  notarize: true
+  minimumSystemVersion: "14.0"
+  artifactName: "${productName}-${version}-${arch}.${ext}"
+
+dmg:
+  sign: true
+
+# electron-updater verifies the Developer ID signature on downloaded updates.
+# Do not point this publish block at the renderer bundle CDN.

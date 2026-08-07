@@ -18,8 +18,9 @@ const execFileAsync = promisify(execFile);
 /** Max consecutive failed boots before automatic rollback to `previous`. */
 export const MAX_FAILED_BOOTS = 2;
 
-export const DEFAULT_SHELL_UPDATE_PATH =
-  "https://aprovan.com/download";
+import { DEFAULT_SHELL_UPDATE_PATH } from "./shell-updater.js";
+
+export { DEFAULT_SHELL_UPDATE_PATH };
 
 export type BundlePendingState = NonNullable<BundleInfo["pending"]>["state"];
 
