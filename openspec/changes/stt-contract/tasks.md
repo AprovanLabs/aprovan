@@ -2,12 +2,12 @@
 
 > Depends-on: - | Touches: registry/packages/contracts/stt/** | Verify: `pnpm --filter @utdk/stt test && pnpm --filter @utdk/stt check-types`
 
-- [ ] 1.1 Scaffold the package alongside the other contracts: `index.ts`, `compat.json`, `tsconfig.json`, `__tests__/`, `package.json` with `utdk.contract: "stt"` and `handwritten: true`.
-- [ ] 1.2 Declare the types exactly as in the tech plan's Interfaces & Data: `SttCapabilities`, `SttOpenArgs`, `SttPushMessage`, `SttWord`, `SttSegment`, `SttEvent`, `SttResult`, `SttError`, `REQUIRED_ENCODING`.
-- [ ] 1.3 Implement open-argument validation: reject a requested capability the descriptor does not declare, and reject an unadvertised encoding, both naming what was asked and what is supported (D2, D4).
-- [ ] 1.4 Add `sttToolEntries()` following the `sandboxToolEntries` pattern, declaring `open` with streaming mode `"session"`.
-- [ ] 1.5 Write the module header in the house style: what the contract is, why diarization is a capability rather than an operation, and that providers never capture audio.
-- [ ] 1.6 Tests for every validation branch, plus a conformance suite a provider module can run against itself.
+- [x] 1.1 Scaffold the package alongside the other contracts: `index.ts`, `compat.json`, `tsconfig.json`, `__tests__/`, `package.json` with `utdk.contract: "stt"` and `handwritten: true`.
+- [x] 1.2 Declare the types exactly as in the tech plan's Interfaces & Data: `SttCapabilities`, `SttOpenArgs`, `SttPushMessage`, `SttWord`, `SttSegment`, `SttEvent`, `SttResult`, `SttError`, `REQUIRED_ENCODING`.
+- [x] 1.3 Implement open-argument validation: reject a requested capability the descriptor does not declare, and reject an unadvertised encoding, both naming what was asked and what is supported (D2, D4).
+- [x] 1.4 Add `sttToolEntries()` following the `sandboxToolEntries` pattern, declaring `open` with streaming mode `"session"`.
+- [x] 1.5 Write the module header in the house style: what the contract is, why diarization is a capability rather than an operation, and that providers never capture audio.
+- [x] 1.6 Tests for every validation branch, plus a conformance suite a provider module can run against itself.
 
 ## 2. Deepgram provider module
 
