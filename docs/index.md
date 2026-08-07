@@ -13,6 +13,7 @@ See [core-beliefs](./design-docs/core-beliefs.md) for fundamental instructions.
 - [stt.md](./stt.md) Speech-to-text sessions: required encoding, per-segment `final`, session-scoped speakers
 - [local-first.md](./local-first.md) Local vs cloud execution locus, VFS root, offline (D5)
 - [desktop.md](./desktop.md) Desktop shell: architecture, update channels, Application Support, local gateway
+- [native-providers.md](./native-providers.md) Loopback helper, portable gateway, availability states, adding providers
 - [native-surfaces.md](./native-surfaces.md) Apps + native panes (no SidebarApps / Personal)
 - [design-docs](./design-docs)/ Core references for generative documentation and code
 - [references](./references)/ General reference area

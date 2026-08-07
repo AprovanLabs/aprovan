@@ -45,6 +45,14 @@ List/detail payloads carry `appId` / `installId` / `originAppId` / `requires` /
 pin fields. Names remain display aliases. Client code must not synthesize a
 Personal / builtin entry.
 
+## System notifications
+
+System notification centre is a **presentation** of the existing workspace
+notification feed (polled and mirrored by Electron main), not a bindable
+delivery interface. Choices dispatch the same gateway calls the in-app feed
+already dispatches. A `notify` delivery contract remains a separate future
+change — do not conflate the durable inbox with a delivery channel here.
+
 ## Future
 
 Inert-bundle export/import and desktop host tiers remain explicit non-goals of
