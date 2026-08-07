@@ -23,11 +23,11 @@
 
 > Depends-on: - | Touches: client/web/src/features/voice/**, client/web/src/lib/capture.ts, client/web/src/features/voice/__tests__/** | Verify: `pnpm --filter @aprovan/patchwork-web typecheck && pnpm --filter @aprovan/patchwork-web test`
 
-- [ ] 3.1 Implement `startCapture` per the tech plan: acquire the microphone with echo cancellation and noise suppression on, resample to the contract's required encoding, frame at the configured cadence (D1).
-- [ ] 3.2 Drive the contract session — open, push per frame, close — and expose events through `CaptureHandle`.
-- [ ] 3.3 Distinguish permission denial from a missing device, reporting each with its own message and not re-prompting after a denial.
-- [ ] 3.4 End capture on explicit stop or on a provider-signalled end of speech where declared; implement no wake word and no always-on listening (D6).
-- [ ] 3.5 Cover every scenario in `specs/audio-capture/spec.md`.
+- [x] 3.1 Implement `startCapture` per the tech plan: acquire the microphone with echo cancellation and noise suppression on, resample to the contract's required encoding, frame at the configured cadence (D1).
+- [x] 3.2 Drive the contract session — open, push per frame, close — and expose events through `CaptureHandle`.
+- [x] 3.3 Distinguish permission denial from a missing device, reporting each with its own message and not re-prompting after a denial.
+- [x] 3.4 End capture on explicit stop or on a provider-signalled end of speech where declared; implement no wake word and no always-on listening (D6).
+- [x] 3.5 Cover every scenario in `specs/audio-capture/spec.md`.
 
 ## 4. Voice in the chat surface
 

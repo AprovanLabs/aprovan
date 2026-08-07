@@ -14,6 +14,10 @@ import { gatewayFetch } from "./gateway-fetch";
 import { runChatCompletionJob } from "./llm";
 
 vi.mock("./gateway-fetch", () => ({ gatewayFetch: vi.fn() }));
+vi.mock("./gateway", () => ({
+  GATEWAY_BASE: "http://gateway.test",
+  getGatewayBase: () => "http://gateway.test",
+}));
 
 const mockFetch = vi.mocked(gatewayFetch);
 
