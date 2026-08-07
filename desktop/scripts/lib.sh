@@ -15,6 +15,7 @@ BUILD_DIR="$DESKTOP_ROOT/build"
 RENDERER_STAGING="$BUILD_DIR/bundles"
 GATEWAY_VENDOR="$BUILD_DIR/gateway"
 RUNTIME_VENDOR="$BUILD_DIR/runtime"
+HELPER_VENDOR="$BUILD_DIR/macos-helper"
 ACTIVE_BUNDLE_SEED="$DESKTOP_ROOT/resources/bundle"
 
 DOCKERFILE="$REPO_ROOT/server/workspace/Dockerfile"

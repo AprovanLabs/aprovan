@@ -7,13 +7,15 @@
 #   gateway/                  — `pnpm --prod deploy` of @aprovan/workspace (+ schema)
 #   runtime/node-v…/          — stock Node matching Dockerfile NODE_VERSION
 #   runtime/node              — symlink → current runtime
+#   macos-helper/macos-helper — Swift release binary (native/macos-helper)
 #
-# Packaging (stream 7):
+# Packaging (desktop-shell stream 7 + macos-native-providers stream 5):
 #   entitlements.plist        — Hardened Runtime entitlements (no App Sandbox)
+#   entitlements.helper.plist — lean reference entitlements for the Swift helper
 #   ../electron-builder.yml   — macOS arm64 dmg/zip, notarize, shell update feed
 #   ../release/               — electron-builder output (gitignored)
 #
-# Signing / key rotation / Gatekeeper checks: see `desktop/docs/signing.md`.
+# Signing / key rotation / Gatekeeper + helper checks: see `desktop/docs/signing.md`.
 #
 # Application Support layout (runtime, not here) is created by
 # `ensureAppSupportLayout` — see tech-plan on-disk layout.

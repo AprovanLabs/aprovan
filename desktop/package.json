@@ -28,7 +28,7 @@
     "assert:gateway": "bash scripts/assert-gateway.sh",
     "check-types": "tsc -p tsconfig.json --noEmit",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "clean": "rm -rf dist build/bundles build/gateway build/runtime release",
+    "clean": "rm -rf dist build/bundles build/gateway build/runtime build/macos-helper release",
     "dev": "DESKTOP_SKIP_RESOURCES=1 pnpm build:main && electron .",
     "start": "electron .",
     "test": "vitest run",
