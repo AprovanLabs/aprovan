@@ -4,7 +4,7 @@
 Wired `@utdk/stt@0.1.2` into the workspace catalog (existing interface→provider path, no bespoke dispatch branch), registered `stt` for bind-time streaming checks, added a fake-driver e2e session test, and documented the three caller footguns in `docs/stt.md`. Bumped `@aprovan/registry-server` to **^0.2.9**. This completes `stt-contract`.
 
 ## PR
-(filled after create)
+https://github.com/AprovanLabs/aprovan/pull/129
 
 ## Versions
 | Package | Version |
