@@ -2,10 +2,10 @@
 
 > Depends-on: - | Touches: packages/native/src/contain.ts, packages/native/src/host/executor.ts, packages/native/__tests__/contain.test.ts | Verify: `pnpm --filter @aprovan/native test && pnpm check-types`
 
-- [ ] 1.1 Move the existing containment tests to `__tests__/contain.test.ts` and confirm they pass against the current executor before touching anything (D3).
-- [ ] 1.2 Extract `containPath(root, relative)` — the lexical `..`/absolute rejection plus the realpath check — into `packages/native/src/contain.ts` and export it.
-- [ ] 1.3 Rewire `LocalExecutor` to call it; delete the inline implementation. Behavior must be byte-identical.
-- [ ] 1.4 Add adversarial cases: chained `..`, absolute paths, a symlink to the parent directory, and a symlink whose target is created after the lexical check.
+- [x] 1.1 Move the existing containment tests to `__tests__/contain.test.ts` and confirm they pass against the current executor before touching anything (D3).
+- [x] 1.2 Extract `containPath(root, relative)` — the lexical `..`/absolute rejection plus the realpath check — into `packages/native/src/contain.ts` and export it.
+- [x] 1.3 Rewire `LocalExecutor` to call it; delete the inline implementation. Behavior must be byte-identical.
+- [x] 1.4 Add adversarial cases: chained `..`, absolute paths, a symlink to the parent directory, and a symlink whose target is created after the lexical check.
 
 ## 2. Local directory VFS backend
 

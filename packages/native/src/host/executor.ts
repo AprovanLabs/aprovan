@@ -23,12 +23,12 @@ import {
   mkdir,
   readdir,
   readFile,
-  realpath,
   rm,
   stat,
   writeFile,
 } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import { containPath } from "../contain.js";
 
 /** Directories never listed or carried into the workspace. */
 const IGNORED = new Set([".git", "node_modules", ".venv", "__pycache__", ".DS_Store"]);
@@ -133,10 +133,7 @@ export class LocalExecutor {
 
   /**
    * Resolve a sandbox-relative path and prove it stays inside the sandbox.
-   *
-   * The lexical check rejects `..` and absolute escapes; the realpath check
-   * (when the target exists) rejects symlinks pointing out of the tree. Both
-   * are needed — a symlink is lexically innocent.
+   * Delegates to {@link containPath} — the shared containment primitive.
    */
   private contain(id: string, path: string): Promise<string> {
     return this.containIn(this.workdir(id), path);
@@ -144,21 +141,11 @@ export class LocalExecutor {
 
   /** The same check against an explicit base — used before the id exists. */
   private async containIn(base: string, path: string): Promise<string> {
-    if (isAbsolute(path)) throw new ExecutorError(`path must be relative: ${path}`);
-    const target = resolve(base, path);
-    const within = (candidate: string, root: string): boolean =>
-      candidate === root || candidate.startsWith(root + sep);
-    if (!within(target, base)) {
-      throw new ExecutorError(`path escapes the sandbox: ${path}`);
+    try {
+      return await containPath(base, path);
+    } catch (err) {
+      throw new ExecutorError(err instanceof Error ? err.message : String(err));
     }
-    if (existsSync(target)) {
-      const real = await realpath(target);
-      const realBase = await realpath(base);
-      if (!within(real, realBase)) {
-        throw new ExecutorError(`path resolves outside the sandbox: ${path}`);
-      }
-    }
-    return target;
   }
 
   // -------------------------------------------------------------------------
