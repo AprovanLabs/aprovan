@@ -2,6 +2,14 @@ export { FloatingPanelApp } from "./FloatingPanelApp";
 export { PanelWidgetHost } from "./PanelWidgetHost";
 export { getPanelBridge, isPanelSurface } from "./panel-bridge";
 export {
+  appendPanelExchange,
+  attachPanelSession,
+  getRememberedPanelSessionId,
+  panelSessionChatUrl,
+  rememberPanelSessionId,
+  resetPanelSessionMemory,
+} from "./session";
+export {
   buildWidgetMountOptions,
   widgetMountContract,
   WIDGET_IFRAME_SANDBOX,

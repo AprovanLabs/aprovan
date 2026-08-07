@@ -53,10 +53,10 @@
 
 > Depends-on: 5 | Touches: client/web/src/features/panel/session.ts, client/web/src/lib/chat-sessions.ts, server/workspace/src/sessions.ts | Verify: `pnpm --filter @aprovan/patchwork-web test && pnpm --filter @aprovan/workspace test`
 
-- [ ] 6.1 Have the panel open or resume a gateway session and record its id in the workspace's session list (D5).
-- [ ] 6.2 Answer a follow-up in the context of the preceding exchange, across a dismiss and re-summon.
-- [ ] 6.3 Make a panel-originated session openable in the chat surface.
-- [ ] 6.4 Assert no shared state crosses the bridge boundary between the two realms — everything shared goes through the gateway.
+- [x] 6.1 Have the panel open or resume a gateway session and record its id in the workspace's session list (D5).
+- [x] 6.2 Answer a follow-up in the context of the preceding exchange, across a dismiss and re-summon.
+- [x] 6.3 Make a panel-originated session openable in the chat surface.
+- [x] 6.4 Assert no shared state crosses the bridge boundary between the two realms — everything shared goes through the gateway.
 
 ## 7. Documentation
 

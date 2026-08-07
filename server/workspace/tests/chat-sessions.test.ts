@@ -388,3 +388,36 @@ describe("transcript records", () => {
     expect(nonShadow).toEqual([]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Panel ↔ chat continuity (voice D5): panel-originated sessions are ordinary
+// gateway sessions tagged via `tabs.origin`, listable and openable in chat.
+// ---------------------------------------------------------------------------
+
+describe("panel-originated sessions (voice continuity)", () => {
+  it("records panel origin in tabs and lists the session for chat", async () => {
+    const created = await data<SessionPayload>(
+      await call("sessions/create", { title: "Panel" }),
+    );
+    const id = created.session.id;
+    await call("sessions/update", { id, tabs: { origin: "panel" } });
+    await call("sessions/append", {
+      id,
+      messages: [
+        { id: "p-u1", role: "user", parts: [{ type: "text", text: "from panel" }] },
+        { id: "p-a1", role: "assistant", parts: [{ type: "text", text: "ack" }] },
+      ],
+    });
+
+    const listing = await data<{
+      sessions: Array<{ id: string; title: string; tabs?: { origin?: string }; messageCount: number }>;
+    }>(await call("sessions/list", {}));
+    const row = listing.sessions.find((s) => s.id === id);
+    expect(row).toBeDefined();
+    expect(row!.tabs?.origin).toBe("panel");
+    expect(row!.messageCount).toBe(2);
+
+    const got = await data<SessionPayload>(await call("sessions/get", { id }));
+    expect(got.session.tabs).toEqual({ origin: "panel" });
+  });
+});
