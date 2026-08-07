@@ -38,7 +38,7 @@
 
 > Depends-on: 4 | Touches: server/workspace/package.json, server/workspace/src/interfaces.ts, docs/stt.md, docs/index.md | Verify: `pnpm --filter @aprovan/workspace test && pnpm check-types`
 
-- [ ] 5.1 Add `@utdk/stt` to the workspace's dependencies and confirm the interface resolves through the existing interface→provider path with no bespoke branch.
-- [ ] 5.2 End-to-end test against a fake driver: open, push three chunks, receive partials and one final, close, assert the terminal result.
-- [ ] 5.3 Write `docs/stt.md` stating the required encoding, that `final` is per-segment and not end-of-session, and that speaker ids are session-scoped — the three things a caller is most likely to assume wrongly.
-- [ ] 5.4 Link it from `docs/index.md`.
+- [x] 5.1 Add `@utdk/stt` to the workspace's dependencies and confirm the interface resolves through the existing interface→provider path with no bespoke branch.
+- [x] 5.2 End-to-end test against a fake driver: open, push three chunks, receive partials and one final, close, assert the terminal result.
+- [x] 5.3 Write `docs/stt.md` stating the required encoding, that `final` is per-segment and not end-of-session, and that speaker ids are session-scoped — the three things a caller is most likely to assume wrongly.
+- [x] 5.4 Link it from `docs/index.md`.

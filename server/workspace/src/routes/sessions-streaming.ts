@@ -7,8 +7,9 @@
  *   POST /:ns/sessions/:id/push  → 202 empty
  *   POST /:ns/sessions/:id/close → { data: terminal result }
  *
- * Drivers are registered per namespace/operation until a real session contract
- * (e.g. stt) ships and wires its provider module here.
+ * Session contracts (e.g. `stt`) register for bind-time streaming checks here.
+ * Per-provider drivers are registered with {@link registerSessionOperation}
+ * (tests use a fake; production modules wire themselves the same way).
  */
 
 import {
@@ -19,6 +20,7 @@ import {
   type StreamingCapabilities,
   type StreamingSessionDriver,
 } from "@utdk/common/streaming";
+import { REQUIRED_ENCODING } from "@utdk/stt";
 import type { Context, Hono } from "hono";
 import { rateLimitByUserId } from "../middleware/rateLimitMiddleware.js";
 
@@ -124,12 +126,28 @@ export function assertStreamingBindAllowed(interfaceId: string, provider: string
   );
 }
 
-/** Drop manager + registrations (tests). */
+/**
+ * Default session-bearing contracts and provider descriptors for bind-time D4.
+ * Re-applied after {@link resetSessionStreaming} so tests that clear state still
+ * see production defaults unless they override.
+ */
+function wireDefaultSessionContracts(): void {
+  registerSessionInterface("stt");
+  registerProviderStreamingCapabilities("deepgram", {
+    streaming: true,
+    encodings: [REQUIRED_ENCODING],
+  });
+}
+
+wireDefaultSessionContracts();
+
+/** Drop manager + registrations (tests), then re-wire default session contracts. */
 export function resetSessionStreaming(): void {
   manager = null;
   registrations.clear();
   sessionInterfaces.clear();
   providerCapabilities.clear();
+  wireDefaultSessionContracts();
 }
 
 /** Inject a manager (tests: fake clock / mintId). */

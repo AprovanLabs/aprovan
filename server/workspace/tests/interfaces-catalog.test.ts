@@ -42,6 +42,19 @@ describe("compat catalog", () => {
     });
   });
 
+  it("loads stt from @utdk/stt compat with deepgram + unavailable assemblyai", () => {
+    const stt = listInterfaces().find((def) => def.id === "stt");
+    expect(stt).toBeDefined();
+    expect(stt!.defaultsFor).toEqual(["open"]);
+    expect(stt!.compat.find((e) => e.provider === "deepgram")).toMatchObject({
+      provider: "deepgram",
+      module: "deepgram",
+    });
+    expect(stt!.compat.find((e) => e.provider === "assemblyai")?.unavailable).toEqual(
+      expect.stringMatching(/not built/i),
+    );
+  });
+
   it("keeps third-party adapters alongside aprovan defaults", () => {
     const vfs = listInterfaces().find((def) => def.id === "vfs");
     expect(vfs?.compat.some((e) => e.provider === "s3")).toBe(true);

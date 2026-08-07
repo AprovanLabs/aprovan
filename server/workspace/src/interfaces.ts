@@ -147,6 +147,7 @@ const CONTRACT_PACKAGES = [
   "@utdk/events",
   "@utdk/vfs",
   "@utdk/telemetry",
+  "@utdk/stt",
 ] as const;
 
 /**
@@ -193,7 +194,7 @@ function loadWorkspaceCompatDocuments(): Map<string, CompatDocument> {
 }
 
 /** Pre-instance catalog order; contracts beyond it sort alphabetically after. */
-const INTERFACE_ORDER = ["llm", "sql", "sandbox", "vcs", "agent"];
+const INTERFACE_ORDER = ["llm", "sql", "sandbox", "vcs", "agent", "stt"];
 
 /**
  * The compat catalog, loaded once at module init from the contract packages'
