@@ -23,13 +23,13 @@
 
 > Depends-on: 1 | Touches: native/macos-helper/Sources/ChatCompletions/**, registry/packages/registry-server/src/catalog/default.ts, registry/packages/utdk/common/compat.ts | Verify: `pnpm --filter @aprovan/registry-server test && swift test --package-path native/macos-helper`
 
-- [ ] 3.1 Implement `/v1/chat/completions` and `/v1/models` over the on-device model, matching the chat-completion and model-list shapes the `llm` contract declares, including the streaming response form (D2).
-- [ ] 3.2 Report the model's capability as available, unsupported, or disabled via `/availability`, distinguishing an unsupported OS from a user-disabled feature.
-- [ ] 3.3 Add the optional `availabilityProbe` field to the compat schema, restricted to an enumerated set of probe identifiers rather than an open string (D3 risk).
-- [ ] 3.4 Add the provider to `CHAT_PROVIDERS` with a loopback `baseUrl`, `credentialless: true`, and its probe identifier.
-- [ ] 3.5 Reject binding when the probe reports unavailable, surfacing the reported reason.
-- [ ] 3.6 Assert no change to the `llm` contract, its shapes, or its dispatch, satisfying "No contract change for native inference".
-- [ ] 3.7 Cover every scenario in `specs/native-llm-provider/spec.md`.
+- [x] 3.1 Implement `/v1/chat/completions` and `/v1/models` over the on-device model, matching the chat-completion and model-list shapes the `llm` contract declares, including the streaming response form (D2).
+- [x] 3.2 Report the model's capability as available, unsupported, or disabled via `/availability`, distinguishing an unsupported OS from a user-disabled feature.
+- [x] 3.3 Add the optional `availabilityProbe` field to the compat schema, restricted to an enumerated set of probe identifiers rather than an open string (D3 risk).
+- [x] 3.4 Add the provider to `CHAT_PROVIDERS` with a loopback `baseUrl`, `credentialless: true`, and its probe identifier.
+- [x] 3.5 Reject binding when the probe reports unavailable, surfacing the reported reason.
+- [x] 3.6 Assert no change to the `llm` contract, its shapes, or its dispatch, satisfying "No contract change for native inference".
+- [x] 3.7 Cover every scenario in `specs/native-llm-provider/spec.md`.
 
 ## 4. Native notification surface
 

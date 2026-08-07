@@ -60,8 +60,7 @@ public struct AvailabilityReport: Codable, Equatable, Sendable {
     }
 }
 
-/// Builds the availability report for this process. Stream 1 ships probes that
-/// express the three D3 states; later streams replace stubs with real checks.
+/// Builds the availability report for this process.
 public struct AvailabilityReporter: Sendable {
     public var helperVersion: String
     public var capabilities: @Sendable () -> [String: CapabilityState]
@@ -78,8 +77,8 @@ public struct AvailabilityReporter: Sendable {
         AvailabilityReport(helperVersion: helperVersion, capabilities: capabilities())
     }
 
-    /// `llm` remains a stub until stream 3; `esm` is available once the
-    /// fetch-through cache is wired (stream 2).
+    /// `llm` probes on-device model availability (stream 3); `esm` is available
+    /// once the fetch-through cache is wired (stream 2).
     public static nonisolated func defaultCapabilities() -> [String: CapabilityState] {
         [
             "llm": llmCapability(),
@@ -87,26 +86,64 @@ public struct AvailabilityReporter: Sendable {
         ]
     }
 
-    /// On-device model needs a newer OS than the app floor (macOS 14) and a
-    /// user-enabled system feature. Until stream 3 wires the real model, we
-    /// never report available — only unsupported or disabled.
+    /// On-device model needs macOS 26+ and an enabled system feature. Distinguishes
+    /// unsupported OS from user-disabled (tech-plan D3).
     public static nonisolated func llmCapability(
         majorVersion: Int = ProcessInfo.processInfo.operatingSystemVersion.majorVersion
     ) -> CapabilityState {
-        // Apple on-device foundation models require macOS 26+ (as of this change).
         let requiredMajor = 26
         if majorVersion < requiredMajor {
             return .unsupported(
                 reason: "On-device model requires macOS \(requiredMajor) or later"
             )
         }
+        return probeFoundationModels()
+    }
+}
+
+#if canImport(FoundationModels)
+import FoundationModels
+
+private nonisolated func probeFoundationModels() -> CapabilityState {
+    guard #available(macOS 26.0, *) else {
+        return .unsupported(reason: "On-device model requires macOS 26 or later")
+    }
+    switch SystemLanguageModel.default.availability {
+    case .available:
+        return .available
+    case .unavailable(.appleIntelligenceNotEnabled):
         return .disabled(
-            reason: "Apple Intelligence is turned off or the on-device model is unavailable",
+            reason: "Apple Intelligence is turned off",
+            remedy: "Enable Apple Intelligence in System Settings → Apple Intelligence & Siri"
+        )
+    case .unavailable(.deviceNotEligible):
+        return .unsupported(reason: "This Mac is not eligible for the on-device model")
+    case .unavailable(.modelNotReady):
+        return .disabled(
+            reason: "The on-device model is not ready yet",
+            remedy: "Wait for the model download to finish, then try again"
+        )
+    case .unavailable(let other):
+        return .disabled(
+            reason: "On-device model unavailable (\(String(describing: other)))",
+            remedy: "Enable Apple Intelligence in System Settings → Apple Intelligence & Siri"
+        )
+    @unknown default:
+        return .disabled(
+            reason: "On-device model unavailable",
             remedy: "Enable Apple Intelligence in System Settings → Apple Intelligence & Siri"
         )
     }
 }
+#else
+private nonisolated func probeFoundationModels() -> CapabilityState {
+    .disabled(
+        reason: "Apple Intelligence is turned off or the on-device model is unavailable",
+        remedy: "Enable Apple Intelligence in System Settings → Apple Intelligence & Siri"
+    )
+}
+#endif
 
 public enum HelperVersion {
-    public static let current = "0.1.0"
+    public static let current = "0.2.0"
 }

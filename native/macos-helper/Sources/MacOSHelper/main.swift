@@ -2,6 +2,7 @@ import Darwin
 import Foundation
 import EsmCache
 import MacOSHelperLib
+import ChatCompletions
 
 struct CLIOptions {
     var host: String = "127.0.0.1"
@@ -131,10 +132,11 @@ let esmCache = EsmCacheService(
 try esmCache.prepare()
 
 let reporter = AvailabilityReporter()
+let chat = ChatCompletionsService(engine: makeDefaultChatEngine())
 let server = try LoopbackHTTPServer(
     host: options.host,
     port: port,
-    router: makeRouter(reporter: reporter, esmCache: esmCache)
+    router: makeRouter(reporter: reporter, esmCache: esmCache, chat: chat)
 )
 
 try await server.start()

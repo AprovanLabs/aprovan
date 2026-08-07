@@ -1,6 +1,7 @@
 import Foundation
 import Network
 import EsmCache
+import ChatCompletions
 
 public struct HTTPRequest: Sendable {
     public var method: String
@@ -8,11 +9,21 @@ public struct HTTPRequest: Sendable {
     public var path: String
     /// Raw query string without leading `?`, if present.
     public var query: String?
+    public var headers: [String: String]
+    public var body: Data
 
-    public init(method: String, path: String, query: String? = nil) {
+    public init(
+        method: String,
+        path: String,
+        query: String? = nil,
+        headers: [String: String] = [:],
+        body: Data = Data()
+    ) {
         self.method = method
         self.path = path
         self.query = query
+        self.headers = headers
+        self.body = body
     }
 }
 
@@ -45,7 +56,7 @@ public struct HTTPResponse: Sendable {
 
 public typealias HTTPRouter = @Sendable (HTTPRequest) async -> HTTPResponse
 
-/// Minimal loopback-only HTTP/1.1 server for health, availability, and `/esm/*`.
+/// Minimal loopback-only HTTP/1.1 server for health, availability, `/esm/*`, and chat.
 public final class LoopbackHTTPServer: @unchecked Sendable {
     private let listener: NWListener
     private let router: HTTPRouter
@@ -126,7 +137,29 @@ public final class LoopbackHTTPServer: @unchecked Sendable {
             }
             if let range = next.range(of: Data("\r\n\r\n".utf8)) {
                 let headerData = next.subdata(in: next.startIndex..<range.lowerBound)
-                let request = Self.parseRequest(headerData) ?? HTTPRequest(method: "GET", path: "/")
+                let parsed = Self.parseRequest(headerData) ?? HTTPRequest(method: "GET", path: "/")
+                let contentLength = Self.contentLength(from: parsed.headers)
+                let bodyStart = range.upperBound
+                let available = next.count - bodyStart
+                if available < contentLength {
+                    if isComplete {
+                        connection.cancel()
+                        return
+                    }
+                    self.receiveRequest(on: connection, buffer: next)
+                    return
+                }
+                let bodyEnd = bodyStart + contentLength
+                let body = contentLength > 0
+                    ? next.subdata(in: bodyStart..<bodyEnd)
+                    : Data()
+                let request = HTTPRequest(
+                    method: parsed.method,
+                    path: parsed.path,
+                    query: parsed.query,
+                    headers: parsed.headers,
+                    body: body
+                )
                 Task {
                     let response = await self.router(request)
                     self.send(response, on: connection)
@@ -156,7 +189,8 @@ public final class LoopbackHTTPServer: @unchecked Sendable {
 
     static func parseRequest(_ headerData: Data) -> HTTPRequest? {
         guard let text = String(data: headerData, encoding: .utf8) else { return nil }
-        let firstLine = text.split(separator: "\r\n", maxSplits: 1).first ?? Substring()
+        let lines = text.split(separator: "\r\n", omittingEmptySubsequences: false)
+        guard let firstLine = lines.first else { return nil }
         let parts = firstLine.split(separator: " ")
         guard parts.count >= 2 else { return nil }
         let method = String(parts[0])
@@ -164,7 +198,21 @@ public final class LoopbackHTTPServer: @unchecked Sendable {
         let split = rawPath.split(separator: "?", maxSplits: 1).map(String.init)
         let path = split.first ?? rawPath
         let query = split.count > 1 ? split[1] : nil
-        return HTTPRequest(method: method, path: path, query: query)
+        var headers: [String: String] = [:]
+        for line in lines.dropFirst() {
+            guard let idx = line.firstIndex(of: ":") else { continue }
+            let name = String(line[..<idx]).trimmingCharacters(in: .whitespaces).lowercased()
+            let value = String(line[line.index(after: idx)...]).trimmingCharacters(in: .whitespaces)
+            headers[name] = value
+        }
+        return HTTPRequest(method: method, path: path, query: query, headers: headers)
+    }
+
+    static func contentLength(from headers: [String: String]) -> Int {
+        guard let raw = headers["content-length"], let value = Int(raw), value >= 0 else {
+            return 0
+        }
+        return value
     }
 
     static func statusText(_ code: Int) -> String {
@@ -174,6 +222,7 @@ public final class LoopbackHTTPServer: @unchecked Sendable {
         case 404: return "Not Found"
         case 405: return "Method Not Allowed"
         case 502: return "Bad Gateway"
+        case 503: return "Service Unavailable"
         default: return "Error"
         }
     }
@@ -227,6 +276,24 @@ public func makeEsmRouter(cache: EsmCacheService) -> HTTPRouter {
     }
 }
 
+/// Additive `/v1/models` + `/v1/chat/completions` registration (stream 3).
+public func makeChatRouter(chat: ChatCompletionsService) -> HTTPRouter {
+    { request in
+        switch (request.method, request.path) {
+        case ("GET", "/v1/models"):
+            do {
+                return try .json(object: chat.listModels())
+            } catch {
+                return .text(500, "Failed to encode models")
+            }
+        case ("POST", "/v1/chat/completions"):
+            return await handleChatCompletion(chat: chat, request: request)
+        default:
+            return .text(404, "Not Found")
+        }
+    }
+}
+
 /// Compose routers left-to-right; first non-404 wins. Additive registration for later streams.
 public func composeRouters(_ routers: HTTPRouter...) -> HTTPRouter {
     { request in
@@ -240,13 +307,67 @@ public func composeRouters(_ routers: HTTPRouter...) -> HTTPRouter {
     }
 }
 
-/// Stream 1+2 default: health/availability + optional ESM cache.
+/// Stream 1+2+3 default: health/availability + optional ESM cache + optional chat.
 public func makeRouter(
     reporter: AvailabilityReporter,
-    esmCache: EsmCacheService? = nil
+    esmCache: EsmCacheService? = nil,
+    chat: ChatCompletionsService? = nil
 ) -> HTTPRouter {
+    var built: [HTTPRouter] = []
     if let esmCache {
-        return composeRouters(makeEsmRouter(cache: esmCache), makeBaseRouter(reporter: reporter))
+        built.append(makeEsmRouter(cache: esmCache))
     }
-    return makeBaseRouter(reporter: reporter)
+    if let chat {
+        built.append(makeChatRouter(chat: chat))
+    }
+    built.append(makeBaseRouter(reporter: reporter))
+    let routers = built
+    return { request in
+        for router in routers {
+            let response = await router(request)
+            if response.status != 404 {
+                return response
+            }
+        }
+        return .text(404, "Not Found")
+    }
+}
+
+private func handleChatCompletion(chat: ChatCompletionsService, request: HTTPRequest) async -> HTTPResponse {
+    let decoded: ChatCompletionRequest
+    do {
+        decoded = try chat.decodeRequest(request.body)
+    } catch let error as ChatCompletionsError {
+        return chatErrorResponse(error)
+    } catch {
+        return .text(400, "invalid chat completion body")
+    }
+
+    do {
+        if decoded.stream == true {
+            let body = try await chat.streamSSE(decoded)
+            return HTTPResponse(
+                status: 200,
+                contentType: "text/event-stream; charset=utf-8",
+                body: body
+            )
+        }
+        let completion = try await chat.complete(decoded)
+        return try .json(object: completion)
+    } catch let error as ChatCompletionsError {
+        return chatErrorResponse(error)
+    } catch {
+        return chatErrorResponse(.internalError(error.localizedDescription))
+    }
+}
+
+private func chatErrorResponse(_ error: ChatCompletionsError) -> HTTPResponse {
+    switch error {
+    case .badRequest(let message):
+        return .text(400, message)
+    case .unavailable(let message):
+        return .text(503, message)
+    case .internalError(let message):
+        return .text(500, message)
+    }
 }

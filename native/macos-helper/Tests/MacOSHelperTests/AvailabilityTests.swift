@@ -2,6 +2,146 @@ import Darwin
 import Foundation
 import Testing
 @testable import MacOSHelperLib
+import ChatCompletions
+
+@Suite("ChatCompletions")
+struct ChatCompletionsTests {
+    struct StubEngine: OnDeviceChatEngine {
+        var modelIds: [String] = [OnDeviceModelId.default]
+        var reply: String = "hello from on-device"
+
+        func complete(messages: [ChatMessage], model: String) async throws -> String {
+            _ = messages
+            _ = model
+            return reply
+        }
+    }
+
+    @Test("non-streaming completion matches llm chat.completion shape")
+    func nonStreamingShape() async throws {
+        let service = ChatCompletionsService(
+            engine: StubEngine(),
+            now: { Date(timeIntervalSince1970: 1_700_000_000) },
+            makeId: { "chatcmpl-test" }
+        )
+        let request = ChatCompletionRequest(
+            model: OnDeviceModelId.default,
+            messages: [ChatMessage(role: "user", content: "hi")]
+        )
+        let response = try await service.complete(request)
+        #expect(response.object == "chat.completion")
+        #expect(response.id == "chatcmpl-test")
+        #expect(response.model == OnDeviceModelId.default)
+        #expect(response.choices.count == 1)
+        #expect(response.choices[0].message.role == "assistant")
+        #expect(response.choices[0].message.content == "hello from on-device")
+        #expect(response.choices[0].finish_reason == "stop")
+    }
+
+    @Test("streaming SSE emits chunk objects and [DONE]")
+    func streamingForm() async throws {
+        let service = ChatCompletionsService(
+            engine: StubEngine(reply: "abcdef"),
+            now: { Date(timeIntervalSince1970: 1_700_000_000) },
+            makeId: { "chatcmpl-stream" }
+        )
+        let request = ChatCompletionRequest(
+            messages: [ChatMessage(role: "user", content: "hi")],
+            stream: true
+        )
+        let data = try await service.streamSSE(request)
+        let text = String(data: data, encoding: .utf8) ?? ""
+        #expect(text.contains("\"object\":\"chat.completion.chunk\""))
+        #expect(text.contains("data: [DONE]"))
+        #expect(text.contains("abcdef") || text.contains("ab"))
+    }
+
+    @Test("model list returns the on-device model id")
+    func modelList() {
+        let service = ChatCompletionsService(engine: StubEngine())
+        let list = service.listModels()
+        #expect(list.object == "list")
+        #expect(list.data.map(\.id) == [OnDeviceModelId.default])
+    }
+
+    @Test("HTTP /v1/chat/completions and /v1/models over loopback")
+    func httpEndpoints() async throws {
+        let port = try ephemeralPort()
+        let chat = ChatCompletionsService(
+            engine: StubEngine(reply: "pong"),
+            now: { Date(timeIntervalSince1970: 42) },
+            makeId: { "chatcmpl-http" }
+        )
+        let reporter = AvailabilityReporter(
+            helperVersion: "test",
+            capabilities: { ["llm": .available, "esm": .unsupported(reason: "n/a")] }
+        )
+        let server = try LoopbackHTTPServer(
+            host: "127.0.0.1",
+            port: port,
+            router: makeRouter(reporter: reporter, chat: chat)
+        )
+        try await server.start()
+        defer { server.stop() }
+
+        let models = try await get("http://127.0.0.1:\(port)/v1/models")
+        #expect(models.status == 200)
+        let list = try JSONDecoder().decode(ModelListResponse.self, from: models.body)
+        #expect(list.data.first?.id == OnDeviceModelId.default)
+
+        let body = try JSONEncoder().encode(
+            ChatCompletionRequest(messages: [ChatMessage(role: "user", content: "hi")])
+        )
+        let completion = try await post(
+            "http://127.0.0.1:\(port)/v1/chat/completions",
+            body: body
+        )
+        #expect(completion.status == 200)
+        let parsed = try JSONDecoder().decode(ChatCompletionResponse.self, from: completion.body)
+        #expect(parsed.object == "chat.completion")
+        #expect(parsed.choices[0].message.content == "pong")
+
+        let streamBody = try JSONEncoder().encode(
+            ChatCompletionRequest(
+                messages: [ChatMessage(role: "user", content: "hi")],
+                stream: true
+            )
+        )
+        let streamed = try await post(
+            "http://127.0.0.1:\(port)/v1/chat/completions",
+            body: streamBody
+        )
+        #expect(streamed.status == 200)
+        let sse = String(data: streamed.body, encoding: .utf8) ?? ""
+        #expect(sse.contains("chat.completion.chunk"))
+        #expect(sse.contains("[DONE]"))
+    }
+
+    @Test("unavailable engine returns 503 rather than a fake completion")
+    func unavailableEngine() async throws {
+        let port = try ephemeralPort()
+        let chat = ChatCompletionsService(
+            engine: UnavailableChatEngine(reason: "On-device model requires macOS 26 or later")
+        )
+        let server = try LoopbackHTTPServer(
+            host: "127.0.0.1",
+            port: port,
+            router: makeRouter(reporter: AvailabilityReporter(), chat: chat)
+        )
+        try await server.start()
+        defer { server.stop() }
+
+        let body = try JSONEncoder().encode(
+            ChatCompletionRequest(messages: [ChatMessage(role: "user", content: "hi")])
+        )
+        let response = try await post(
+            "http://127.0.0.1:\(port)/v1/chat/completions",
+            body: body
+        )
+        #expect(response.status == 503)
+        #expect(String(data: response.body, encoding: .utf8)?.contains("macOS 26") == true)
+    }
+}
 
 @Suite("AvailabilityReport")
 struct AvailabilityReportTests {
@@ -44,12 +184,16 @@ struct AvailabilityReportTests {
     @Test("llm is disabled (with remedy) when OS is new enough but feature is off")
     func llmDisabledWhenFeatureOff() {
         let state = AvailabilityReporter.llmCapability(majorVersion: 26)
-        guard case .disabled(let reason, let remedy) = state else {
-            Issue.record("expected disabled, got \(state)")
-            return
+        switch state {
+        case .available:
+            // Real FoundationModels linked and enabled on this machine.
+            break
+        case .disabled(let reason, let remedy):
+            #expect(!reason.isEmpty)
+            #expect(!remedy.isEmpty)
+        case .unsupported(let reason):
+            Issue.record("expected disabled or available on macOS 26+, got unsupported: \(reason)")
         }
-        #expect(!reason.isEmpty)
-        #expect(!remedy.isEmpty)
     }
 
     @Test("default report exposes llm and esm with reasons an operator can read")
@@ -152,6 +296,17 @@ private func ephemeralPort() throws -> UInt16 {
 private func get(_ urlString: String) async throws -> HTTPResult {
     let url = URL(string: urlString)!
     let (data, response) = try await URLSession.shared.data(from: url)
+    let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+    return HTTPResult(status: status, body: data)
+}
+
+private func post(_ urlString: String, body: Data) async throws -> HTTPResult {
+    let url = URL(string: urlString)!
+    var request = URLRequest(url: url)
+    request.httpMethod = "POST"
+    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    request.httpBody = body
+    let (data, response) = try await URLSession.shared.data(for: request)
     let status = (response as? HTTPURLResponse)?.statusCode ?? 0
     return HTTPResult(status: status, body: data)
 }

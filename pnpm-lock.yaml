@@ -674,8 +674,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/compiler
       '@aprovan/registry-server':
-        specifier: ^0.2.9
-        version: 0.2.9(zod@3.25.76)
+        specifier: ^0.2.10
+        version: 0.2.10(zod@3.25.76)
       '@aws-sdk/client-cognito-identity-provider':
         specifier: ^3.1077.0
         version: 3.1101.0
@@ -851,12 +851,12 @@ packages:
     peerDependencies:
       ajv: '>=8'
 
-  '@aprovan/registry-server@0.2.7':
-    resolution: {integrity: sha512-UlB67aQzxjLnFMPzsoJcom9GxlSvY22X8FEKiwiZYxQJvOTA/biOhe4/pNGMQeDW1d+mq82zPxrnDJ7tcdNlhA==}
+  '@aprovan/registry-server@0.2.10':
+    resolution: {integrity: sha512-W3OxRqzdHHKOSJYul/+dFOf7MNzDRgyNct+MQxJzspd4/TelVllrLl0iEPGWrczVg+XHib0Nbc8U7JDOfdyFcQ==}
     engines: {node: '>=20.0.0'}
 
-  '@aprovan/registry-server@0.2.9':
-    resolution: {integrity: sha512-JsYcJzFFIN2hxDC8rVf0YcMg7V/fg4ThvstNeSBcwrNNYOdXmfDOqXbbvQ0juc7U1I/wCusEHdBw48QhkO+XlQ==}
+  '@aprovan/registry-server@0.2.7':
+    resolution: {integrity: sha512-UlB67aQzxjLnFMPzsoJcom9GxlSvY22X8FEKiwiZYxQJvOTA/biOhe4/pNGMQeDW1d+mq82zPxrnDJ7tcdNlhA==}
     engines: {node: '>=20.0.0'}
 
   '@asamuzakjp/css-color@6.0.5':
@@ -4837,6 +4837,14 @@ packages:
 
   '@utdk/common@0.1.2':
     resolution: {integrity: sha512-9wNdjlpZULIsIIA0e1vEIh1qiL4SmUE2VHk/z8mWM4oG9czMFOSYElUsqeTEqqkkSOKgVb6S7fZxMkZgHvIVCw==}
+    peerDependencies:
+      '@opentelemetry/api': ^1.0.0
+    peerDependenciesMeta:
+      '@opentelemetry/api':
+        optional: true
+
+  '@utdk/common@0.1.3':
+    resolution: {integrity: sha512-m4qaa4abOIftVR5DhEEt1HR83FOrZPBrCg7l/aoSXMr1CK2z7msizSOpzbB45cz10ZAvKgCpQblX5pPddYhzeA==}
     peerDependencies:
       '@opentelemetry/api': ^1.0.0
     peerDependenciesMeta:
@@ -9038,6 +9046,37 @@ snapshots:
       jsonpointer: 5.0.1
       leven: 3.1.0
 
+  '@aprovan/registry-server@0.2.10(zod@3.25.76)':
+    dependencies:
+      '@hono/node-server': 1.19.17(hono@4.12.33)
+      '@jitl/quickjs-wasmfile-debug-asyncify': 0.32.0
+      '@modelcontextprotocol/sdk': 1.30.0(zod@3.25.76)
+      '@opentelemetry/api': 1.9.0
+      '@opentelemetry/exporter-trace-otlp-http': 0.57.2(@opentelemetry/api@1.9.0)
+      '@opentelemetry/resources': 1.30.1(@opentelemetry/api@1.9.0)
+      '@opentelemetry/sdk-trace-base': 1.30.1(@opentelemetry/api@1.9.0)
+      '@opentelemetry/sdk-trace-node': 1.30.1(@opentelemetry/api@1.9.0)
+      '@utdk/agent': 0.2.0
+      '@utdk/clients': 0.1.2(@opentelemetry/api@1.9.0)
+      '@utdk/common': 0.1.3(@opentelemetry/api@1.9.0)
+      '@utdk/llm': 0.2.0
+      '@utdk/mcp-core': 0.1.2(@opentelemetry/api@1.9.0)
+      '@utdk/stt': 0.1.2(@opentelemetry/api@1.9.0)
+      better-sqlite3: 12.11.1
+      hono: 4.12.33
+      jose: 5.10.0
+      quickjs-emscripten-core: 0.32.0
+    optionalDependencies:
+      '@aws-sdk/client-kms': 3.1101.0
+    transitivePeerDependencies:
+      - '@cfworker/json-schema'
+      - bufferutil
+      - debug
+      - pg-native
+      - supports-color
+      - utf-8-validate
+      - zod
+
   '@aprovan/registry-server@0.2.7(zod@3.25.76)':
     dependencies:
       '@hono/node-server': 1.19.17(hono@4.12.33)
@@ -9064,37 +9103,6 @@ snapshots:
       - debug
       - pg-native
       - supports-color
-      - zod
-
-  '@aprovan/registry-server@0.2.9(zod@3.25.76)':
-    dependencies:
-      '@hono/node-server': 1.19.17(hono@4.12.33)
-      '@jitl/quickjs-wasmfile-debug-asyncify': 0.32.0
-      '@modelcontextprotocol/sdk': 1.30.0(zod@3.25.76)
-      '@opentelemetry/api': 1.9.0
-      '@opentelemetry/exporter-trace-otlp-http': 0.57.2(@opentelemetry/api@1.9.0)
-      '@opentelemetry/resources': 1.30.1(@opentelemetry/api@1.9.0)
-      '@opentelemetry/sdk-trace-base': 1.30.1(@opentelemetry/api@1.9.0)
-      '@opentelemetry/sdk-trace-node': 1.30.1(@opentelemetry/api@1.9.0)
-      '@utdk/agent': 0.2.0
-      '@utdk/clients': 0.1.2(@opentelemetry/api@1.9.0)
-      '@utdk/common': 0.1.2(@opentelemetry/api@1.9.0)
-      '@utdk/llm': 0.2.0
-      '@utdk/mcp-core': 0.1.2(@opentelemetry/api@1.9.0)
-      '@utdk/stt': 0.1.2(@opentelemetry/api@1.9.0)
-      better-sqlite3: 12.11.1
-      hono: 4.12.33
-      jose: 5.10.0
-      quickjs-emscripten-core: 0.32.0
-    optionalDependencies:
-      '@aws-sdk/client-kms': 3.1101.0
-    transitivePeerDependencies:
-      - '@cfworker/json-schema'
-      - bufferutil
-      - debug
-      - pg-native
-      - supports-color
-      - utf-8-validate
       - zod
 
   '@asamuzakjp/css-color@6.0.5':
@@ -14181,6 +14189,10 @@ snapshots:
     optionalDependencies:
       '@opentelemetry/api': 1.9.0
 
+  '@utdk/common@0.1.3(@opentelemetry/api@1.9.0)':
+    optionalDependencies:
+      '@opentelemetry/api': 1.9.0
+
   '@utdk/events@0.2.0': {}
 
   '@utdk/events@0.2.1':
@@ -14311,6 +14323,14 @@ snapshots:
       '@vitest/utils': 3.2.7
       chai: 5.3.3
       tinyrainbow: 2.0.0
+
+  '@vitest/mocker@2.1.5(vite@5.4.21(@types/node@22.19.11)(lightningcss@1.32.0)(terser@5.49.0))':
+    dependencies:
+      '@vitest/spy': 2.1.5
+      estree-walker: 3.0.3
+      magic-string: 0.30.21
+    optionalDependencies:
+      vite: 5.4.21(@types/node@22.19.11)(lightningcss@1.32.0)(terser@5.49.0)
 
   '@vitest/mocker@2.1.5(vite@5.4.21(@types/node@25.9.5)(lightningcss@1.32.0)(terser@5.49.0))':
     dependencies:
@@ -18672,7 +18692,7 @@ snapshots:
   vitest@2.1.5(@types/node@22.19.11)(happy-dom@20.11.1)(jsdom@30.0.1(@noble/hashes@2.3.0))(lightningcss@1.32.0)(terser@5.49.0):
     dependencies:
       '@vitest/expect': 2.1.5
-      '@vitest/mocker': 2.1.5(vite@5.4.21(@types/node@25.9.5)(lightningcss@1.32.0)(terser@5.49.0))
+      '@vitest/mocker': 2.1.5(vite@5.4.21(@types/node@22.19.11)(lightningcss@1.32.0)(terser@5.49.0))
       '@vitest/pretty-format': 2.1.9
       '@vitest/runner': 2.1.5
       '@vitest/snapshot': 2.1.5
