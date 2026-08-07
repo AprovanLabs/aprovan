@@ -55,7 +55,7 @@
 
 > Depends-on: 5 | Touches: docs/native-providers.md, docs/native-surfaces.md, docs/index.md | Verify: `pnpm lint`
 
-- [ ] 6.1 Write `docs/native-providers.md`: the loopback pattern, why the gateway stays portable, how to add the next native provider, and the three availability states.
-- [ ] 6.2 Record that the on-device model needed one catalog entry and no contract change — the evidence for the pattern's central claim.
-- [ ] 6.3 Note in `docs/native-surfaces.md` that system notifications are a presentation of the existing feed, not a delivery interface.
-- [ ] 6.4 Link from `docs/index.md`.
+- [x] 6.1 Write `docs/native-providers.md`: the loopback pattern, why the gateway stays portable, how to add the next native provider, and the three availability states.
+- [x] 6.2 Record that the on-device model needed one catalog entry and no contract change — the evidence for the pattern's central claim.
+- [x] 6.3 Note in `docs/native-surfaces.md` that system notifications are a presentation of the existing feed, not a delivery interface.
+- [x] 6.4 Link from `docs/index.md`.
