@@ -16,6 +16,7 @@ import {
   SessionManager,
   type OpenSessionResult,
   type SessionEvent,
+  type StreamingCapabilities,
   type StreamingSessionDriver,
 } from "@utdk/common/streaming";
 import type { Context, Hono } from "hono";
@@ -32,6 +33,12 @@ interface SessionOpRegistration {
 }
 
 const registrations = new Map<SessionOpKey, SessionOpRegistration>();
+
+/** Interfaces whose contract declares at least one session-mode operation. */
+const sessionInterfaces = new Set<string>();
+
+/** Per-provider streaming descriptors for bind-time checks (D4). */
+const providerCapabilities = new Map<string, StreamingCapabilities>();
 
 let manager: SessionManager | null = null;
 
@@ -60,6 +67,7 @@ export function getSessionDriver(
 /**
  * Register a session-mode operation. Tests and future contract wiring use this
  * seam; discovery still comes from each tool entry's `streaming: "session"`.
+ * Also marks the namespace as requiring streaming at bind time.
  */
 export function registerSessionOperation(
   namespace: string,
@@ -67,12 +75,61 @@ export function registerSessionOperation(
   driver: StreamingSessionDriver,
 ): void {
   registrations.set(opKey(namespace, operation), { driver });
+  sessionInterfaces.add(namespace);
+}
+
+/**
+ * Declare that a contract exposes session operations (bind-time D4) without
+ * registering a driver yet — used when discovery knows the mode before a
+ * provider module is wired.
+ */
+export function registerSessionInterface(interfaceId: string): void {
+  sessionInterfaces.add(interfaceId);
+}
+
+/** Record a provider's streaming capability descriptor for bind-time checks. */
+export function registerProviderStreamingCapabilities(
+  provider: string,
+  capabilities: StreamingCapabilities,
+): void {
+  providerCapabilities.set(provider, capabilities);
+}
+
+export function getProviderStreamingCapabilities(
+  provider: string,
+): StreamingCapabilities | undefined {
+  return providerCapabilities.get(provider);
+}
+
+/** True when the interface/contract declares any session-mode operation. */
+export function interfaceRequiresStreaming(interfaceId: string): boolean {
+  if (sessionInterfaces.has(interfaceId)) return true;
+  for (const key of registrations.keys()) {
+    if (key.startsWith(`${interfaceId}/`)) return true;
+  }
+  return false;
+}
+
+/**
+ * Bind-time D4: reject a provider that does not advertise streaming when the
+ * target contract declares session operations. Fail here, not at call time.
+ */
+export function assertStreamingBindAllowed(interfaceId: string, provider: string): void {
+  if (!interfaceRequiresStreaming(interfaceId)) return;
+  const capabilities = getProviderStreamingCapabilities(provider);
+  if (capabilities?.streaming === true) return;
+  throw new SessionError(
+    "streaming-unsupported",
+    `${provider} does not support "streaming"`,
+  );
 }
 
 /** Drop manager + registrations (tests). */
 export function resetSessionStreaming(): void {
   manager = null;
   registrations.clear();
+  sessionInterfaces.clear();
+  providerCapabilities.clear();
 }
 
 /** Inject a manager (tests: fake clock / mintId). */

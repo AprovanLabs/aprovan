@@ -25,8 +25,11 @@ import { getFsStore } from "./fs-store.js";
 import { getCredentialStore } from "./credentials.js";
 import { listLlmProviders } from "./llm.js";
 import { getRegistryStorage } from "./registry-storage.js";
+import { assertStreamingBindAllowed } from "./routes/sessions-streaming.js";
 import { ServiceError } from "./service-kernel.js";
 import { assertProviderBindingAllowed } from "./workspaces.js";
+
+export { assertStreamingBindAllowed } from "./routes/sessions-streaming.js";
 
 const BINDINGS_PATH = ".services/bindings.json";
 
@@ -429,6 +432,9 @@ export async function writeBinding(
 ): Promise<void> {
   if (binding) {
     await assertProviderBindingAllowed(workspaceId, binding.provider);
+    // Bind-time D4: session contracts require a streaming-capable provider.
+    const { interfaceId } = splitInstance(instance);
+    assertStreamingBindAllowed(binding.interface ?? interfaceId, binding.provider);
   }
   await writeProfileBinding(workspaceId, instance, binding, updatedBy);
 }

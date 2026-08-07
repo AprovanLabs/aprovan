@@ -3,12 +3,19 @@
  *
  * Binding/unbinding moved to `profiles.set` / `profiles.remove`. `interfaces.list`
  * remains as genuine discovery (compat catalog + which providers are connected).
+ *
+ * Bind-time streaming enforcement (D4) runs on those write paths via
+ * {@link assertStreamingBindAllowed}: a provider whose descriptor lacks
+ * `streaming` is rejected with code `streaming-unsupported` when the target
+ * contract declares any session operation.
  */
 
 import { getCredentialStore } from "./credentials.js";
-import { listInterfaces } from "./interfaces.js";
+import { assertStreamingBindAllowed, listInterfaces } from "./interfaces.js";
 import { listProfiles } from "./profiles/store.js";
 import { ServiceError, type CoreService } from "./service-kernel.js";
+
+export { assertStreamingBindAllowed };
 
 export const interfacesService: CoreService = {
   meta: {
@@ -21,7 +28,7 @@ export const interfacesService: CoreService = {
       name: "interfaces.list",
       operation: "list",
       description:
-        "List generic interfaces (llm, sql, sandbox): compatible providers, which are connected, and configured profiles. Configure implementations with profiles.set { namespace, name?, provider, credential?, options? }.",
+        "List generic interfaces (llm, sql, sandbox): compatible providers, which are connected, and configured profiles. Configure implementations with profiles.set { namespace, name?, provider, credential?, options? }. Binding a non-streaming provider to a session-bearing interface fails with streaming-unsupported.",
       inputSchema: { type: "object", properties: {} },
     },
   ],

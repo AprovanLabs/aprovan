@@ -16,6 +16,7 @@
 
 import { getRegistryStorage } from "../registry-storage.js";
 import { isInterface } from "../interfaces.js";
+import { assertStreamingBindAllowed } from "../routes/sessions-streaming.js";
 import { ServiceError } from "../service-kernel.js";
 import { assertProviderBindingAllowed } from "../workspaces.js";
 import {
@@ -94,6 +95,12 @@ export async function setProfile(
   }
 
   await assertProviderBindingAllowed(workspaceId, input.provider);
+
+  // Bind-time D4: when binding a provider to a session-bearing interface,
+  // reject non-streaming providers before persisting the profile.
+  if (hasNamespace && input.provider) {
+    assertStreamingBindAllowed(input.namespace!, input.provider);
+  }
 
   const storage = await ensureTenant(workspaceId);
   const createdBy = input.createdBy ?? "workspace";
