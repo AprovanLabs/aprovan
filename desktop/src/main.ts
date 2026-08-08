@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { app, BrowserWindow, dialog, net, protocol } from "electron";
+import { app, BrowserWindow, dialog, nativeImage, net, protocol } from "electron";
 import { ensureAppSupportLayout } from "./app-support.js";
 import {
   createInitialBridgeState,
@@ -37,6 +37,7 @@ import { registerPanelHandlers } from "./panel-handlers.js";
 import { evaluatePlatformFloor } from "./platform.js";
 import {
   resolveActiveBundleDirWithSupport,
+  resolveAppIconPath,
   resolveBundledNodeBinary,
   resolveEsmSeedDir,
   resolveGatewayVendorDir,
@@ -81,6 +82,13 @@ function shellVersion(): string {
   }
 }
 
+function applyDockIcon(): void {
+  if (process.platform !== "darwin" || !app.dock) return;
+  const iconPath = resolveAppIconPath();
+  if (!fs.existsSync(iconPath)) return;
+  app.dock.setIcon(nativeImage.createFromPath(iconPath));
+}
+
 async function refuseAndQuit(message: string): Promise<void> {
   if (app.isReady()) {
     dialog.showErrorBox("Unsupported Mac", message);
@@ -123,6 +131,7 @@ export async function startDesktopApp(): Promise<void> {
   app.setName("Aprovan");
 
   await app.whenReady();
+  applyDockIcon();
 
   // Tech-plan layout: bundles/ + gateway-data/ under Application Support.
   const layout = ensureAppSupportLayout(app.getPath("userData"));

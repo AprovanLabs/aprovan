@@ -6,7 +6,9 @@
  * BundleManager's OTA renderer manifests — Chromium/engine patches ship here.
  */
 import { dialog } from "electron";
-import { autoUpdater, type AppUpdater } from "electron-updater";
+// electron-updater is CJS — named ESM imports fail at runtime under Node/Electron.
+import electronUpdater from "electron-updater";
+import type { AppUpdater } from "electron-updater";
 
 /** Default human-facing download page (minShell messaging / manual fallback). */
 export const DEFAULT_SHELL_UPDATE_PATH = "https://aprovan.com/download";
@@ -51,7 +53,8 @@ export function startShellUpdater(deps: ShellUpdaterDeps = {}): AppUpdater | nul
   const enabled = deps.enabled ?? isPackaged;
   if (!enabled) return null;
 
-  const updater = deps.updater ?? autoUpdater;
+  // Access autoUpdater lazily — constructing it at import time requires Electron.
+  const updater = deps.updater ?? electronUpdater.autoUpdater;
   const log =
     deps.log ??
     ((message: string, err?: unknown) => {
