@@ -1,14 +1,22 @@
 import {
   BrowserWindow,
   type BrowserWindowConstructorOptions,
+  nativeImage,
 } from "electron";
-import { resolvePreloadPath } from "./paths.js";
+import fs from "node:fs";
+import { resolveAppIconPath, resolvePreloadPath } from "./paths.js";
 import {
   MAIN_WINDOW_PREFERENCES,
   mainWindowWebPreferences,
 } from "./window-prefs.js";
 
 export { MAIN_WINDOW_PREFERENCES, mainWindowWebPreferences };
+
+function windowIcon(): BrowserWindowConstructorOptions["icon"] {
+  const iconPath = resolveAppIconPath();
+  if (!fs.existsSync(iconPath)) return undefined;
+  return nativeImage.createFromPath(iconPath);
+}
 
 export function createMainWindow(
   // Shared client ships under /chat/ (same Vite base as the website).
@@ -20,6 +28,7 @@ export function createMainWindow(
     width: 1280,
     height: 800,
     show: true,
+    icon: windowIcon(),
     ...overrides,
     webPreferences: {
       ...mainWindowWebPreferences(preload),

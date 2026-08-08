@@ -19,7 +19,7 @@ export default defineConfig([
     sourcemap: true,
     dts: true,
     clean: true,
-    external: ["electron"],
+    external: ["electron", "electron-updater"],
   },
   {
     entry: {
@@ -32,7 +32,7 @@ export default defineConfig([
     sourcemap: true,
     dts: false,
     clean: false,
-    external: ["electron"],
+    external: ["electron", "electron-updater"],
     outExtension() {
       return { js: ".cjs" };
     },

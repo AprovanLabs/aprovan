@@ -66,23 +66,14 @@ export function resolveBundledNodeBinary(): string {
 
 /**
  * Native macOS helper binary (macos-native-providers stream 1 / 5).
- * Unpackaged: SwiftPM debug build under native/macos-helper/.build.
+ * Unpackaged: release binary under desktop/build/macos-helper (prepare-resources).
  * Packaged: Resources/macos-helper/macos-helper (extraResources + Hardened Runtime).
  */
 export function resolveHelperBinary(): string {
   if (app.isPackaged) {
     return path.join(process.resourcesPath, "macos-helper", "macos-helper");
   }
-  return path.resolve(
-    here,
-    "..",
-    "..",
-    "native",
-    "macos-helper",
-    ".build",
-    "debug",
-    "macos-helper",
-  );
+  return path.resolve(here, "..", "build", "macos-helper", "macos-helper");
 }
 
 /**
@@ -106,4 +97,12 @@ export function resolveSttModelsDir(): string {
     return path.join(process.resourcesPath, "models");
   }
   return path.resolve(here, "..", "build", "models");
+}
+
+/**
+ * App icon (Dock / window). Unpackaged: resources/icon.png.
+ * Packaged: electron-builder embeds it in the .app; Dock uses the bundle icon.
+ */
+export function resolveAppIconPath(): string {
+  return path.resolve(here, "..", "resources", "icon.png");
 }
