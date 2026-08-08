@@ -2,7 +2,91 @@
 
 macOS application that pairs the shared web client with a supervised local
 gateway. Package: `@aprovan/desktop`. Companion to
-[local-first.md](./local-first.md) (locus, VFS root, credential envelope).
+[local-first.md](./local-first.md) (locus, VFS root, credential envelope),
+[native-providers.md](./native-providers.md) (Swift helper), and
+[voice.md](./voice.md) (capture, on-device STT, floating panel).
+
+## Install and work with the app
+
+### Requirements
+
+- **macOS 14+** on **Apple Silicon** (Intel and older OS versions refuse at launch)
+- **Node ≥ 20** with **pnpm 9.15.9** via corepack (`corepack enable`)
+- **Xcode** (or Command Line Tools + a Swift toolchain) to build `native/macos-helper`
+- Optional: Apple Developer ID + notarization secrets for a signed release build
+  (see [desktop/docs/signing.md](../desktop/docs/signing.md))
+
+There is no Mac App Store build. Day-to-day use is either a local Electron run
+from this repo or a Developer ID `.dmg` / `.zip` from the release channel.
+
+### First-time setup (from the monorepo)
+
+From the **aprovan** repo root (dependencies already installed with `pnpm i`):
+
+```bash
+# Workspace gateway the shell will vendor
+pnpm turbo run build --filter=@aprovan/workspace
+
+# Full desktop build: main/preload + renderer seed + gateway vendor +
+# Swift helper + ESM seed + STT default model fetch
+pnpm --filter @aprovan/desktop build
+
+pnpm --filter @aprovan/desktop start
+```
+
+`build` runs `scripts/prepare-resources.sh`, which:
+
+1. Bundles the web client into the seed renderer
+2. Vendors the gateway deploy + stock Node runtime
+3. Builds `macos-helper` into `Resources`
+4. Seeds the widget ESM cache and downloads the pinned `whisper-tiny.en` weights
+
+On first launch the window opens against `app://`, the gateway binds an
+**ephemeral** loopback port (not fixed `:4000`), and the helper does the same
+for native capabilities. Application Support lands at
+`~/Library/Application Support/Aprovan/`.
+
+### Day-to-day development
+
+| Goal | Command |
+| --- | --- |
+| Iterate on Electron main only (resources already built) | `pnpm --filter @aprovan/desktop dev` |
+| Pick up a new `@aprovan/workspace` build | `pnpm --filter @aprovan/desktop vendor:gateway` then restart |
+| Refresh the seed renderer only | `pnpm --filter @aprovan/desktop bundle:renderer` then restart |
+| Full resource rebuild | `pnpm --filter @aprovan/desktop build` |
+| Unsigned local `.app` tree | `pnpm --filter @aprovan/desktop dist:dir` |
+| Signed arm64 dmg/zip (needs `CSC_*`) | `pnpm --filter @aprovan/desktop dist` |
+
+`dev` sets `DESKTOP_SKIP_RESOURCES=1` and only recompiles main — it will not
+pick up a fresh gateway, helper, or renderer. Keep a separate
+`pnpm --filter @aprovan/workspace dev` on `:4000` for browser-only work; the
+desktop window always talks to **its own** supervised child, not that process.
+
+### What you get when it runs
+
+- **Chat / workspaces** — same client as the website, served from `app://`
+- **Local workspace creation** — native directory picker; default root under
+  `~/Documents/Aprovan` (never `$HOME`); credentials sealed via Keychain
+- **Native helper** — loopback HTTP for ESM cache, on-device chat (when the OS
+  model is available), STT models, and availability probes
+- **Voice** — mic control in the composer; optional global hotkey + floating
+  panel; default STT model is local (`whisper-tiny.en`)
+- **System notifications** — mirror of the in-app feed (actions dispatch through
+  the gateway)
+
+Gateway status, helper URL, and bundle info surface through the small
+`window.desktop` bridge. Product APIs stay on the gateway.
+
+### Packaged install (release)
+
+CI builds arm64 macOS artifacts when Apple signing secrets are present
+(`.github/workflows/desktop.yml`). Install from the signed feed at
+`https://releases.aprovan.com/desktop` (shell auto-updater) or a stapled
+`.dmg` / `.zip`. First-run Gatekeeper should accept a notarized build without a
+manual override; the verification checklist is in
+[desktop/docs/signing.md](../desktop/docs/signing.md).
+
+Shell updates and renderer OTA bundles are **separate channels** — see below.
 
 ## Architecture
 
@@ -125,4 +209,7 @@ Notes:
 ## Related
 
 - [local-first.md](./local-first.md) — locus, VFS root, offline
+- [native-providers.md](./native-providers.md) — Swift helper, availability, ESM cache
+- [voice.md](./voice.md) — capture, models, panel ↔ chat continuity
 - [desktop/docs/signing.md](../desktop/docs/signing.md) — codesign, notarization, key rotation
+- [stt.md](./stt.md) — STT session contract wire details
