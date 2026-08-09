@@ -16,6 +16,7 @@
  */
 
 import { ACTIVE_WORKSPACE_KEY } from "@/features/tabs/useTabs";
+import { isDesktopBridgeAvailable } from "@/features/workspaces/desktop";
 import { getAccessTokenSync } from "./auth";
 
 /** Header carrying the Cognito bearer token. */
@@ -24,11 +25,17 @@ export const GATEWAY_AUTH_HEADER = "Authorization";
 /** Header pinning the active workspace (matches gateway `requireAuth`). */
 export const GATEWAY_WORKSPACE_HEADER = "X-Aprovan-Workspace";
 
+function resolveToken(): string | undefined {
+  // Local desktop gateway uses auth=none; never forward a stale Cognito token.
+  if (isDesktopBridgeAvailable()) return undefined;
+  return getAccessTokenSync() ?? undefined;
+}
+
 /** `fetch` with the workspace bearer token + active workspace applied. */
 export const gatewayFetch: typeof fetch = async (input, init) => {
   const headers = new Headers(init?.headers);
 
-  const token = getAccessTokenSync();
+  const token = resolveToken();
   if (token && !headers.has(GATEWAY_AUTH_HEADER)) {
     headers.set(GATEWAY_AUTH_HEADER, `Bearer ${token}`);
   }

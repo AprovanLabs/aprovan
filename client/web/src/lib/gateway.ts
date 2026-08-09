@@ -4,6 +4,9 @@
  * Gateway base URL resolves at runtime from the active workspace via
  * {@link GatewayResolver}. Build-time `VITE_GATEWAY_URL` remains the fallback
  * when a workspace carries no explicit URL, so the deployed website is unchanged.
+ * Inside the desktop shell, {@link bindDesktopGateway} replaces that fallback
+ * with the supervised loopback gateway (ephemeral port) and wins over any
+ * cloud endpoint records left in localStorage.
  */
 
 import { GatewayClient as RegistryGatewayClient } from "@aprovan/registry-main";
@@ -15,15 +18,35 @@ import {
 } from "@aprovan/ui/gateway";
 import { ACTIVE_WORKSPACE_KEY } from "@/features/tabs/useTabs";
 import { listWorkspaceEndpointRecords } from "@/features/tabs/workspace-endpoints";
+import { isDesktopBridgeAvailable } from "@/features/workspaces/desktop";
 import { getAccessTokenSync } from "./auth";
+import { getDesktopGatewayApiBase } from "./desktop-gateway";
 
-const FALLBACK_GATEWAY_BASE =
+const BUILD_FALLBACK_GATEWAY_BASE =
   (import.meta.env["VITE_GATEWAY_URL"] as string | undefined)?.replace(/\/$/, "") ||
   (import.meta.env.DEV ? "/gateway" : "https://aprovan.com/api/gateway");
 
 const FALLBACK_MCP_URL =
   (import.meta.env["VITE_MCP_URL"] as string | undefined) ||
   (import.meta.env.DEV ? "/gateway/mcp" : "https://aprovan.com/api/mcp");
+
+/** True when the renderer is hosted by the desktop shell. */
+function onDesktop(): boolean {
+  return isDesktopBridgeAvailable();
+}
+
+/**
+ * Default API base. On desktop the supervised loopback gateway always wins —
+ * never the website Cognito gateway, even if workspace endpoint records point
+ * at aprovan.com.
+ */
+function resolveDefaultGatewayBase(): string {
+  const desktop = getDesktopGatewayApiBase();
+  if (desktop) return desktop;
+  // Desktop without a ready origin: prefer failing closed over cloud auth.
+  if (onDesktop()) return "http://127.0.0.1/desktop-gateway-not-ready";
+  return BUILD_FALLBACK_GATEWAY_BASE;
+}
 
 /**
  * Derive an MCP URL from a gateway base URL.
@@ -38,31 +61,55 @@ export function mcpUrlFromGatewayBase(base: string): string {
   return `${trimmed}/mcp`;
 }
 
-export const gatewayResolver: GatewayResolver = createGatewayResolver({
-  defaultBaseUrl: FALLBACK_GATEWAY_BASE,
-  getActiveWorkspaceId: () => localStorage.getItem(ACTIVE_WORKSPACE_KEY),
-  getSources: () =>
-    listWorkspaceEndpointRecords().map((r) => ({
+/** Token for gateway calls — never forward Cognito on the local desktop gateway. */
+export function resolveGatewayToken(): string | undefined {
+  if (onDesktop()) return undefined;
+  return getAccessTokenSync() ?? undefined;
+}
+
+function desktopAwareSources() {
+  const desktop = getDesktopGatewayApiBase();
+  return listWorkspaceEndpointRecords().map((r) => {
+    // Desktop shell: every workspace talks to the supervised local gateway.
+    // Cloud-locus rows still go through the local proxy, not aprovan.com.
+    if (desktop) {
+      return {
+        workspaceId: r.workspaceId,
+        locus: r.locus ?? "local",
+        baseUrl: desktop,
+      };
+    }
+    return {
       workspaceId: r.workspaceId,
       locus: r.locus,
       baseUrl: r.baseUrl,
-    })),
-  getToken: () => getAccessTokenSync() ?? undefined,
+    };
+  });
+}
+
+export const gatewayResolver: GatewayResolver = createGatewayResolver({
+  defaultBaseUrl: resolveDefaultGatewayBase,
+  getActiveWorkspaceId: () => localStorage.getItem(ACTIVE_WORKSPACE_KEY),
+  getSources: desktopAwareSources,
+  getToken: resolveGatewayToken,
 });
 
 /** Resolve the gateway base URL for the active workspace (build-time fallback). */
 export function getGatewayBase(): string {
-  return gatewayResolver.active()?.baseUrl ?? FALLBACK_GATEWAY_BASE;
+  const desktop = getDesktopGatewayApiBase();
+  if (desktop) return desktop;
+  return gatewayResolver.active()?.baseUrl ?? resolveDefaultGatewayBase();
 }
 
 /** Resolve the MCP URL for the active workspace (build-time fallback). */
 export function getMcpUrl(): string {
+  const desktop = getDesktopGatewayApiBase();
+  if (desktop) return mcpUrlFromGatewayBase(desktop);
   const active = gatewayResolver.active();
   if (!active) return FALLBACK_MCP_URL;
   const record = listWorkspaceEndpointRecords().find(
     (r) => r.workspaceId === active.workspaceId,
   );
-  // Only derive MCP from the gateway when the workspace carries an explicit URL.
   if (!record?.baseUrl) return FALLBACK_MCP_URL;
   return mcpUrlFromGatewayBase(active.baseUrl);
 }
@@ -99,7 +146,7 @@ export const gateway: GatewayClient = createGatewayClient({
   get baseUrl() {
     return getGatewayBase();
   },
-  getToken: () => getAccessTokenSync() ?? undefined,
+  getToken: resolveGatewayToken,
   getWorkspaceId: () => localStorage.getItem(ACTIVE_WORKSPACE_KEY) ?? undefined,
 });
 
@@ -109,7 +156,7 @@ export function createRegistryGatewayClient(): RegistryGatewayClient {
     get baseUrl() {
       return getGatewayBase();
     },
-    getToken: () => getAccessTokenSync() ?? undefined,
+    getToken: resolveGatewayToken,
     getWorkspaceId: () => localStorage.getItem(ACTIVE_WORKSPACE_KEY) ?? undefined,
   });
 }

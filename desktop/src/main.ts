@@ -282,12 +282,12 @@ export async function startDesktopApp(): Promise<void> {
     );
   });
 
-  createMainWindow();
-
-  // Window stays open regardless of gateway status (crash → restarting/failed).
+  // Start supervision before the window so the renderer is less likely to
+  // race a still-idle gateway on first paint.
   void supervisor.start();
-  // Helper start never blocks the shell; absence degrades cleanly.
   void helperSupervisor.start();
+
+  createMainWindow();
 
   // Shell channel is independent of BundleManager's OTA renderer feed (D6).
   startShellUpdater({ isPackaged: app.isPackaged });

@@ -16,6 +16,9 @@ vi.stubEnv("DEV", true);
 beforeEach(() => {
   localStorage.clear();
   vi.resetModules();
+  delete (globalThis as { __aprovanDesktopGatewayOrigin?: string | null })
+    .__aprovanDesktopGatewayOrigin;
+  delete (window as unknown as { desktop?: unknown }).desktop;
 });
 
 afterEach(() => {
@@ -136,5 +139,37 @@ describe("runtime gateway resolution (patchwork-web)", () => {
     expect(mcpUrlFromGatewayBase("https://aprovan.com/api/gateway")).toBe(
       "https://aprovan.com/api/mcp",
     );
+  });
+
+  it("uses the desktop loopback gateway as the default when bound", async () => {
+    (window as unknown as { desktop: Record<string, unknown> }).desktop = {
+      pickDirectory: async () => undefined,
+      gatewayUrl: async () => "http://127.0.0.1:4242",
+      gatewayStatus: async () => ({ state: "ready", url: "http://127.0.0.1:4242" }),
+      onGatewayStatus: () => () => {},
+    };
+
+    const { bindDesktopGateway, getDesktopGatewayApiBase } = await import(
+      "../desktop-gateway"
+    );
+    await bindDesktopGateway();
+    expect(getDesktopGatewayApiBase()).toBe("http://127.0.0.1:4242/api/gateway");
+
+    // Cloud endpoint records must not win over the supervised local gateway.
+    localStorage.setItem(
+      WORKSPACE_ENDPOINTS_KEY,
+      JSON.stringify([
+        {
+          workspaceId: "cloud-1",
+          locus: "cloud",
+          baseUrl: "https://aprovan.com/api/gateway",
+        },
+      ]),
+    );
+    localStorage.setItem(ACTIVE_WORKSPACE_KEY, "cloud-1");
+
+    const { getGatewayBase, getMcpUrl } = await loadGateway();
+    expect(getGatewayBase()).toBe("http://127.0.0.1:4242/api/gateway");
+    expect(getMcpUrl()).toBe("http://127.0.0.1:4242/api/mcp");
   });
 });

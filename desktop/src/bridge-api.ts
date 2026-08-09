@@ -12,7 +12,8 @@ export const IPC = {
   helperUrl: "desktop:helperUrl",
   /** Renderer readiness — not part of the public DesktopBridge surface. */
   rendererReady: "desktop:rendererReady",
-  gatewayStatusEvent: "desktop:gatewayStatus",
+  /** Push channel for gateway supervision updates (distinct from the invoke). */
+  gatewayStatusEvent: "desktop:gatewayStatusEvent",
 } as const;
 
 /**

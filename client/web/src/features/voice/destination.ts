@@ -41,13 +41,16 @@ export function destinationForProvider(
  * — the capture path itself stays provider-agnostic either way.
  */
 export async function resolveSttDestination(): Promise<CaptureDestination> {
-  const namespaces = await fetchNamespaces();
-  const stt = namespaces?.find((n) => n.id === "stt");
-  const provider = stt?.binding?.provider;
-  if (provider) {
-    const compatLabel = stt?.compat?.find((c) => c.provider === provider)?.label;
-    return destinationForProvider(provider, compatLabel);
+  try {
+    const namespaces = await fetchNamespaces();
+    const stt = namespaces?.find((n) => n.id === "stt");
+    const provider = stt?.binding?.provider;
+    if (provider) {
+      const compatLabel = stt?.compat?.find((c) => c.provider === provider)?.label;
+      return destinationForProvider(provider, compatLabel);
+    }
+  } catch {
+    // Catalog unreachable — still open capture; disclose as local when on desktop.
   }
-  // No binding advertised — still one capture path; disclose as unbound remote.
   return destinationForProvider("stt", "bound speech provider");
 }

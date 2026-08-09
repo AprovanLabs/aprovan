@@ -4,8 +4,11 @@ export {
 } from "./defaults";
 export {
   getDesktopBridge,
+  getDesktopGatewayBridge,
   isDesktopBridgeAvailable,
   type DesktopDirectoryPicker,
+  type DesktopGatewayBridge,
+  type DesktopGatewayStatus,
 } from "./desktop";
 export { DirectoryField, type DirectoryFieldProps } from "./DirectoryField";
 export {

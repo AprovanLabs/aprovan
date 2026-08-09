@@ -102,7 +102,7 @@ describe("DesktopBridge surface", () => {
     const seen: GatewayStatus[] = [];
     const stop = bridge.onGatewayStatus((s) => seen.push(s));
 
-    ipc.emit("desktop:gatewayStatus", {
+    ipc.emit("desktop:gatewayStatusEvent", {
       state: "ready",
       url: "http://127.0.0.1:52431",
     });
@@ -111,7 +111,7 @@ describe("DesktopBridge surface", () => {
     ]);
 
     stop();
-    ipc.emit("desktop:gatewayStatus", { state: "failed", error: "boom" });
+    ipc.emit("desktop:gatewayStatusEvent", { state: "failed", error: "boom" });
     expect(seen).toHaveLength(1);
   });
 });

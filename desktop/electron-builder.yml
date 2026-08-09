@@ -24,8 +24,8 @@ extraResources:
     to: bundle
   - from: resources/esm-seed
     to: esm-seed
-  - from: build/gateway
-    to: gateway
+  # Gateway (incl. node_modules) is copied in afterPack — electron-builder
+  # strips node_modules from extraResources, which broke packaged startups.
   - from: build/runtime/node
     to: runtime/node
   # Swift helper (macos-native-providers). Signed with entitlementsInherit
@@ -40,6 +40,8 @@ extraResources:
       - "!**/*.partial"
 asar: true
 
+afterPack: scripts/copy-gateway-modules.cjs
+
 # Shell update feed — independent of the OTA renderer bundle channel (D6).
 # electron-updater reads latest-mac.yml from this URL; artifacts are
 # Developer ID–signed (and notarized) so Gatekeeper verifies the update.
@@ -51,6 +53,9 @@ publish:
 mac:
   category: public.app-category.developer-tools
   icon: icon.png
+  extendInfo:
+    CFBundleName: Aprovan
+    CFBundleDisplayName: Aprovan
   # Apple Silicon only (desktop platform floor).
   target:
     - target: dmg
@@ -64,7 +69,8 @@ mac:
   gatekeeperAssess: false
   entitlements: build/entitlements.plist
   entitlementsInherit: build/entitlements.plist
-  # Built-in @electron/notarize + staple when APPLE_* credentials are set.
+  # Notarize when the build is signed (CI with APPLE_*). Unsigned local
+  # `dist:dir` skips notarization because there is nothing to staple.
   notarize: true
   minimumSystemVersion: "14.0"
   artifactName: "${productName}-${version}-${arch}.${ext}"

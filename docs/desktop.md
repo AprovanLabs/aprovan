@@ -54,8 +54,19 @@ for native capabilities. Application Support lands at
 | Pick up a new `@aprovan/workspace` build | `pnpm --filter @aprovan/desktop vendor:gateway` then restart |
 | Refresh the seed renderer only | `pnpm --filter @aprovan/desktop bundle:renderer` then restart |
 | Full resource rebuild | `pnpm --filter @aprovan/desktop build` |
-| Unsigned local `.app` tree | `pnpm --filter @aprovan/desktop dist:dir` |
+| Unsigned local `.app` (Dock name **Aprovan**) | `pnpm --filter @aprovan/desktop package:local` then `open:app` |
 | Signed arm64 dmg/zip (needs `CSC_*`) | `pnpm --filter @aprovan/desktop dist` |
+
+`pnpm start` / `electron .` is a **dev host**: the Dock label stays “Electron”
+because it launches Electron’s own `.app`. For a real Mac app (correct name,
+icon, double-clickable), package locally:
+
+```bash
+pnpm --filter @aprovan/desktop package:local
+pnpm --filter @aprovan/desktop open:app
+# or: open desktop/release/mac-arm64/Aprovan.app
+# optional: drag Aprovan.app into /Applications
+```
 
 `dev` sets `DESKTOP_SKIP_RESOURCES=1` and only recompiles main — it will not
 pick up a fresh gateway, helper, or renderer. Keep a separate
@@ -64,7 +75,11 @@ desktop window always talks to **its own** supervised child, not that process.
 
 ### What you get when it runs
 
-- **Chat / workspaces** — same client as the website, served from `app://`
+- **Chat / workspaces** — same client as the website, served from `app://`.
+  Credentials and provider connect stay in-chat; the Registry website link is
+  hidden in the desktop header (no outbound hop that strands you on the web).
+- **Local gateway** — the renderer waits for the supervised loopback gateway and
+  uses it as the API base (never the cloud Cognito gateway).
 - **Local workspace creation** — native directory picker; default root under
   `~/Documents/Aprovan` (never `$HOME`); credentials sealed via Keychain
 - **Native helper** — loopback HTTP for ESM cache, on-device chat (when the OS

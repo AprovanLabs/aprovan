@@ -28,6 +28,7 @@ export function createMainWindow(
     width: 1280,
     height: 800,
     show: true,
+    title: "Aprovan",
     icon: windowIcon(),
     ...overrides,
     webPreferences: {
@@ -39,6 +40,7 @@ export function createMainWindow(
     },
   });
 
+  win.setTitle("Aprovan");
   void win.loadURL(loadUrl);
   return win;
 }

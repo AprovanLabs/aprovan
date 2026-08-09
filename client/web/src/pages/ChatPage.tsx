@@ -26,6 +26,7 @@ import { TabContent } from "@/features/tabs/TabContent";
 import { TabStrip } from "@/features/tabs/TabStrip";
 import { isVirtualTabPath } from "@/features/tabs/tab-routing";
 import { useTabs } from "@/features/tabs/useTabs";
+import { isDesktopBridgeAvailable } from "@/features/workspaces/desktop";
 import { loadWorkflowScript, workflowCustomPreview } from "@/features/widgets/ChatWorkflowPreview";
 import { NotificationPathWidget } from "@/features/widgets/NotificationPathWidget";
 import { useCompilerBootstrap } from "@/features/widgets/useCompilerBootstrap";
@@ -252,7 +253,8 @@ export default function ChatPage() {
         <div className="flex flex-col h-dvh overflow-hidden bg-background">
           <AppHeader
             className="static shrink-0 border-b bg-transparent backdrop-blur-none"
-            homeHref="https://aprovan.com/chat"
+            name="Aprovan"
+            homeHref={isDesktopBridgeAvailable() ? "#" : "https://aprovan.com/chat"}
             leading={
               <button
                 onClick={() => setSidebarOpen((open) => !open)}
@@ -262,11 +264,15 @@ export default function ChatPage() {
                 <PanelLeft className="h-4 w-4" />
               </button>
             }
-            // The nav carries destinations, not the places you already are:
-            // no aprovan Home, no patchwork self-link — Apps and Registry only.
-            links={aprovanApps("Chat").filter(
-              (link) => link.label === "Apps" || link.label === "Registry"
-            )}
+            // Destinations you are not already on. Desktop keeps credentials
+            // and catalog in-chat — no outbound Registry / web links.
+            links={
+              isDesktopBridgeAvailable()
+                ? []
+                : aprovanApps("Chat").filter(
+                    (link) => link.label === "Apps" || link.label === "Registry",
+                  )
+            }
             logo={<img src={APROVAN_LOGO} alt="Aprovan" className="h-7 w-7 rounded-full" />}
           >
             <NotificationsBell

@@ -30,7 +30,11 @@ import type { GatewayConfig } from "./contract.js";
 function isLocalDevOrigin(origin: string): boolean {
   try {
     const url = new URL(origin);
-    return ["localhost", "127.0.0.1", "0.0.0.0"].includes(url.hostname);
+    if (["localhost", "127.0.0.1", "0.0.0.0"].includes(url.hostname)) {
+      return true;
+    }
+    // Electron desktop renderer (app://bundle/…).
+    return url.protocol === "app:";
   } catch {
     return false;
   }

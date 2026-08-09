@@ -149,4 +149,17 @@ describe("createGatewayClient runtime baseUrl", () => {
       globalThis.fetch = originalFetch;
     }
   });
+
+  it("re-resolves defaultBaseUrl when it is a getter", () => {
+    let fallback = "https://aprovan.com/api/gateway";
+    const resolver = createGatewayResolver({
+      defaultBaseUrl: () => fallback,
+      getActiveWorkspaceId: () => "ws-1",
+      getSources: () => [{ workspaceId: "ws-1" }],
+    });
+
+    expect(resolver.active()?.baseUrl).toBe("https://aprovan.com/api/gateway");
+    fallback = "http://127.0.0.1:4242/api/gateway";
+    expect(resolver.active()?.baseUrl).toBe("http://127.0.0.1:4242/api/gateway");
+  });
 });

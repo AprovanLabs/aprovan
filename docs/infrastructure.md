@@ -51,7 +51,7 @@ Do not include the AWS service name in the resource name.
 
 #### Secrets
 
-Secrets use `/` instead of `-`:
+Secrets use `/` instead of `-` to separate groups:
 
 ```
 <service>/<env>/<region-short-code>/<resource-name>

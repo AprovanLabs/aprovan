@@ -181,6 +181,10 @@ public final class LoopbackHTTPServer: @unchecked Sendable {
         var message = "HTTP/1.1 \(response.status) \(reason)\r\n"
         message += "Content-Type: \(response.contentType)\r\n"
         message += "Content-Length: \(response.body.count)\r\n"
+        // Electron renderer is app:// — allow browser fetches to the helper.
+        message += "Access-Control-Allow-Origin: *\r\n"
+        message += "Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS\r\n"
+        message += "Access-Control-Allow-Headers: Content-Type, Authorization\r\n"
         message += "Connection: close\r\n\r\n"
         var payload = Data(message.utf8)
         payload.append(response.body)
@@ -220,6 +224,7 @@ public final class LoopbackHTTPServer: @unchecked Sendable {
     static func statusText(_ code: Int) -> String {
         switch code {
         case 200: return "OK"
+        case 204: return "No Content"
         case 400: return "Bad Request"
         case 403: return "Forbidden"
         case 404: return "Not Found"
@@ -424,6 +429,9 @@ public func makeRouter(
     built.append(makeBaseRouter(reporter: reporter))
     let routers = built
     return { request in
+        if request.method == "OPTIONS" {
+            return HTTPResponse(status: 204, contentType: "text/plain", body: Data())
+        }
         for router in routers {
             let response = await router(request)
             if response.status != 404 {

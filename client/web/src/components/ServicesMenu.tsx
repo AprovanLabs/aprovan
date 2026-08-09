@@ -34,6 +34,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { isDesktopBridgeAvailable } from "@/features/workspaces/desktop";
 import {
   fetchNamespaces,
   groupNamespaces,
@@ -155,6 +156,7 @@ export function ServicesMenu({
   services: ServiceInfo[];
   onOpenCredentials?: (provider?: string) => void;
 }) {
+  const desktop = isDesktopBridgeAvailable();
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState("");
   const [debouncedFilter, setDebouncedFilter] = useState("");
@@ -423,16 +425,18 @@ export function ServicesMenu({
                       </>
                     }
                     action={
-                      <a
-                        href={providerUrl(provider)}
-                        target="_blank"
-                        rel="noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="p-0.5 rounded text-muted-foreground hover:text-foreground"
-                        title="Open in registry"
-                      >
-                        <ExternalLink className="h-3 w-3" />
-                      </a>
+                      desktop ? undefined : (
+                        <a
+                          href={providerUrl(provider)}
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="p-0.5 rounded text-muted-foreground hover:text-foreground"
+                          title="Open in registry"
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      )
                     }
                     tools={tools}
                   />
@@ -449,7 +453,7 @@ export function ServicesMenu({
           {/* The rest of the catalog: one click from connected */}
           <section className="space-y-1.5">
             <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Available in the registry
+              {desktop ? "Available providers" : "Available in the registry"}
             </h3>
             <Input
               value={filter}
@@ -471,14 +475,20 @@ export function ServicesMenu({
                       className="flex items-center gap-2.5 rounded-sm px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted/50"
                     >
                       <ProviderMark provider={provider.id} catalog={catalogById} />
-                      <a
-                        href={providerUrl(provider.id)}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="truncate font-medium text-foreground/80 hover:underline"
-                      >
-                        {provider.title}
-                      </a>
+                      {desktop ? (
+                        <span className="truncate font-medium text-foreground/80">
+                          {provider.title}
+                        </span>
+                      ) : (
+                        <a
+                          href={providerUrl(provider.id)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="truncate font-medium text-foreground/80 hover:underline"
+                        >
+                          {provider.title}
+                        </a>
+                      )}
                       {provider.description && (
                         <span className="hidden sm:inline truncate opacity-70">
                           {provider.description}
@@ -525,16 +535,18 @@ export function ServicesMenu({
                     : "Catalog unavailable."}
               </p>
             )}
-            <a
-              href={registryUrl("/providers/")}
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-            >
-              <Wrench className="h-3 w-3" />
-              Browse the full registry
-              <ExternalLink className="h-3 w-3" />
-            </a>
+            {!desktop && (
+              <a
+                href={registryUrl("/providers/")}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+              >
+                <Wrench className="h-3 w-3" />
+                Browse the full registry
+                <ExternalLink className="h-3 w-3" />
+              </a>
+            )}
           </section>
         </DialogContent>
       </Dialog>

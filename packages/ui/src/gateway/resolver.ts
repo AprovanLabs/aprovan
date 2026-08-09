@@ -26,8 +26,12 @@ export interface WorkspaceEndpointSource {
 }
 
 export interface CreateGatewayResolverOptions {
-  /** Build-time fallback when a workspace carries no explicit URL. */
-  defaultBaseUrl: string;
+  /**
+   * Fallback when a workspace carries no explicit URL. May be a string or a
+   * getter so hosts (e.g. the desktop shell) can point at a loopback gateway
+   * that is only known after supervision starts.
+   */
+  defaultBaseUrl: string | (() => string);
   getActiveWorkspaceId: () => string | null | undefined;
   /** Known workspace endpoint sources. */
   getSources: () => WorkspaceEndpointSource[];
@@ -42,14 +46,19 @@ function normalizeBase(url: string): string {
 export function createGatewayResolver(
   options: CreateGatewayResolverOptions,
 ): GatewayResolver {
-  const fallback = normalizeBase(options.defaultBaseUrl);
+  const resolveFallback = (): string =>
+    normalizeBase(
+      typeof options.defaultBaseUrl === "function"
+        ? options.defaultBaseUrl()
+        : options.defaultBaseUrl,
+    );
 
   function toEndpoint(source: WorkspaceEndpointSource): WorkspaceEndpoint {
     const explicit = source.baseUrl?.trim();
     return {
       workspaceId: source.workspaceId,
       locus: source.locus ?? "cloud",
-      baseUrl: explicit ? normalizeBase(explicit) : fallback,
+      baseUrl: explicit ? normalizeBase(explicit) : resolveFallback(),
       getToken: () => source.getToken?.() ?? options.getToken?.() ?? undefined,
     };
   }

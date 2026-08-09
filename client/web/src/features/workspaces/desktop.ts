@@ -11,14 +11,32 @@ export type DesktopHelperBridge = {
   helperUrl(): Promise<string | null>;
 };
 
-type WindowWithDesktop = Window & {
-  desktop?: DesktopDirectoryPicker & Partial<DesktopHelperBridge>;
+export type DesktopGatewayStatus =
+  | { state: "starting" }
+  | { state: "ready"; url: string }
+  | { state: "restarting"; attempt: number; lastError: string }
+  | { state: "failed"; error: string };
+
+export type DesktopGatewayBridge = {
+  gatewayUrl(): Promise<string>;
+  gatewayStatus(): Promise<DesktopGatewayStatus>;
+  onGatewayStatus(cb: (s: DesktopGatewayStatus) => void): () => void;
 };
+
+type WindowWithDesktop = Window & {
+  desktop?: DesktopDirectoryPicker &
+    Partial<DesktopHelperBridge> &
+    Partial<DesktopGatewayBridge>;
+};
+
+function windowDesktop(): WindowWithDesktop["desktop"] {
+  if (typeof window === "undefined") return undefined;
+  return (window as WindowWithDesktop).desktop;
+}
 
 /** The bridge when the renderer is hosted by the desktop shell; else undefined. */
 export function getDesktopBridge(): DesktopDirectoryPicker | undefined {
-  if (typeof window === "undefined") return undefined;
-  const bridge = (window as WindowWithDesktop).desktop;
+  const bridge = windowDesktop();
   if (!bridge || typeof bridge.pickDirectory !== "function") return undefined;
   return bridge;
 }
@@ -27,10 +45,23 @@ export function isDesktopBridgeAvailable(): boolean {
   return getDesktopBridge() !== undefined;
 }
 
+/** Full gateway supervision surface when the shell exposes it. */
+export function getDesktopGatewayBridge(): DesktopGatewayBridge | undefined {
+  const bridge = windowDesktop();
+  if (
+    !bridge ||
+    typeof bridge.gatewayStatus !== "function" ||
+    typeof bridge.onGatewayStatus !== "function" ||
+    typeof bridge.gatewayUrl !== "function"
+  ) {
+    return undefined;
+  }
+  return bridge as DesktopGatewayBridge;
+}
+
 /** Helper loopback origin when the macOS helper is ready; else null/undefined. */
 export async function getDesktopHelperUrl(): Promise<string | null | undefined> {
-  if (typeof window === "undefined") return undefined;
-  const bridge = (window as WindowWithDesktop).desktop;
+  const bridge = windowDesktop();
   if (!bridge || typeof bridge.helperUrl !== "function") return undefined;
   return bridge.helperUrl();
 }
