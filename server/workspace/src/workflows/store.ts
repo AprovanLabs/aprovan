@@ -205,8 +205,11 @@ export async function exportedByIndex(
 }
 
 /**
- * Unbundled workflows are creator-private; exporting from any app flips them
- * visible to every workspace member.
+ * Listing convenience only — not an access boundary. Unexported registrations
+ * are hidden from other members' registration *listings* to declutter them;
+ * the underlying script at `scriptPath` is an ordinary workspace path, so any
+ * member can still read it via `vfs.read`/`vfs.list` regardless of this
+ * filter (tech-plan D4). Real per-script privacy is deferred to F2/C.
  */
 export function workflowVisibleTo(
   registration: WorkflowRegistration,
@@ -216,7 +219,11 @@ export function workflowVisibleTo(
   return registration.createdBy === callerSub || exportedBy.length > 0;
 }
 
-/** Registrations the caller may see, each annotated with exporting app ids. */
+/**
+ * Registrations to show in the caller's own listing (a decluttering
+ * convenience, not an access boundary — see {@link workflowVisibleTo}), each
+ * annotated with exporting app ids.
+ */
 export async function listVisibleRegistrations(
   workspaceId: string,
   callerSub: string,

@@ -35,6 +35,8 @@ import {
   dropAlias,
   dropAppLocation,
   indexAppLocation,
+  isAppId,
+  readAlias,
   setAlias,
   type AppId,
 } from "./identity.js";
@@ -154,7 +156,13 @@ export interface AppRequirement {
 export interface WorkspaceShare {
   /** Workspace path prefix being exposed (e.g. "shared/recipes"). */
   prefix: string;
-  /** App names granted access, or "*" for every published app. */
+  /**
+   * App ids granted access, or "*" for every published app. Keyed on the
+   * durable `appId`, not the mutable `name`, so renaming an app never
+   * invalidates a share (tech-plan D5). Entries written before D5 may still
+   * hold a name — {@link readWorkspaceConfig} resolves those transparently
+   * through the name→appId alias index at read time.
+   */
   apps: string[] | "*";
   /** "read" (default) or "readwrite". */
   mode?: "read" | "readwrite";
@@ -456,7 +464,45 @@ export async function readWorkspaceConfig(workspaceId: string): Promise<Workspac
     WORKSPACE_SCOPE,
     WORKSPACE_CONFIG_KEY,
   ).catch(() => undefined);
-  return config && typeof config === "object" ? config : {};
+  return resolveLegacyShareApps(workspaceId, config && typeof config === "object" ? config : {});
+}
+
+/**
+ * D5 read-time bridge: rewrite (in memory only) any `WorkspaceShare.apps`
+ * entry that isn't already a live `appId` by resolving it through the
+ * existing name→appId alias index, so a share written before D5 (which
+ * keyed `apps` on the app's name at grant time) keeps granting access
+ * without a workspace admin re-saving it. Entries that don't resolve to a
+ * current alias (e.g. the name was later reused by an unrelated app, or the
+ * original app was deleted) are left as-is — they simply match nothing,
+ * never something unintended.
+ *
+ * This bridge is intentionally not rename-proof on its own: it re-resolves
+ * from the *stored* record on every read, so an entry only keeps working
+ * while its stored name is still the app's current alias. Once the app is
+ * renamed again, the stored name goes stale exactly like the bug this
+ * replaces — `scripts/migrate-shares-to-appid.ts` closes that gap for good
+ * by rewriting the stored record from name to `appId`.
+ */
+async function resolveLegacyShareApps(
+  workspaceId: string,
+  config: WorkspaceConfig,
+): Promise<WorkspaceConfig> {
+  if (!config.shares?.length) return config;
+  const shares = await Promise.all(
+    config.shares.map(async (share) => {
+      if (share.apps === "*") return share;
+      const apps = await Promise.all(
+        share.apps.map(async (entry) => {
+          if (isAppId(entry)) return entry;
+          const alias = await readAlias(workspaceId, entry);
+          return alias?.appId ?? entry;
+        }),
+      );
+      return { ...share, apps };
+    }),
+  );
+  return { ...config, shares };
 }
 
 export async function writeWorkspaceConfig(
@@ -467,19 +513,21 @@ export async function writeWorkspaceConfig(
 }
 
 /**
- * Is `path` (workspace-relative) shared with `app` at the requested access
- * level by the workspace config?
+ * Is `path` (workspace-relative) shared with app `appId` at the requested
+ * access level by the workspace config? `WorkspaceShare.apps` is keyed on
+ * durable `appId` (tech-plan D5) — callers pass an app's `appId`, never its
+ * mutable `name`.
  */
 export function shareAllows(
   config: WorkspaceConfig,
-  app: string,
+  appId: string,
   path: string,
   write: boolean,
 ): boolean {
   for (const share of config.shares ?? []) {
     const prefix = share.prefix.replace(/^\/+|\/+$/g, "");
     if (path !== prefix && !path.startsWith(`${prefix}/`)) continue;
-    if (share.apps !== "*" && !share.apps.includes(app)) continue;
+    if (share.apps !== "*" && !share.apps.includes(appId)) continue;
     if (write && (share.mode ?? "read") !== "readwrite") continue;
     return true;
   }
@@ -489,6 +537,10 @@ export function shareAllows(
 /**
  * May an app session touch this workspace path? Its declared prefixes are
  * its own turf (read and write); everything else must be shared explicitly.
+ * Shares are matched by durable `appId` — `WorkspaceConfig.shares` entries
+ * written before D5 (keyed on the app's name) are already normalized to
+ * `appId` by {@link readWorkspaceConfig}'s read-time fallback, so `config`
+ * here is always appId-keyed by the time it reaches this check.
  */
 export function appFsAllowed(
   app: AppPaths,
@@ -496,7 +548,7 @@ export function appFsAllowed(
   path: string,
   write: boolean,
 ): boolean {
-  return appPathAllowed(app, path) || shareAllows(config, app.name, path, write);
+  return appPathAllowed(app, path) || shareAllows(config, app.id, path, write);
 }
 
 /** Does the allow-list permit `namespace.procedure`? */

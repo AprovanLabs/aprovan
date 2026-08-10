@@ -36,6 +36,8 @@ export interface CommitDetail {
   };
   entries: Array<{ path: string }>;
   mounts?: MountLineageEntry[];
+  /** Passed through from the gateway's `vcs.show`; shape owned by F1. */
+  changes?: unknown;
 }
 
 export async function fetchCommitDetail(commit: string): Promise<CommitDetail> {
@@ -52,6 +54,7 @@ export async function fetchCommitDetail(commit: string): Promise<CommitDetail> {
       raw.entries ??
       (raw.files ?? []).map((path) => ({ path })),
     ...(raw.mounts ? { mounts: raw.mounts } : {}),
+    ...(raw.changes !== undefined ? { changes: raw.changes } : {}),
   };
 }
 
