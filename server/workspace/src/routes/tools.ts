@@ -279,7 +279,14 @@ function nativeVcsDiscoveryEntries(namespace: string): ToolEntry[] {
     {
       operation: "commit",
       description: "Snapshot the current workspace tree as a commit on main.",
-      inputSchema: { type: "object", properties: { message: { type: "string" } } },
+      inputSchema: {
+        type: "object",
+        properties: {
+          message: { type: "string" },
+          prefix: { type: "string" },
+          ref: { type: "string" },
+        },
+      },
       outputSchema: {
         type: "object",
         properties: {
@@ -294,7 +301,7 @@ function nativeVcsDiscoveryEntries(namespace: string): ToolEntry[] {
       description: "Commit history, newest first.",
       inputSchema: {
         type: "object",
-        properties: { limit: { type: "number" } },
+        properties: { limit: { type: "number" }, ref: { type: "string" } },
       },
       outputSchema: {
         type: "object",
@@ -315,7 +322,36 @@ function nativeVcsDiscoveryEntries(namespace: string): ToolEntry[] {
         properties: {
           commit: { type: "object" },
           files: { type: "array", items: { type: "string" } },
-          changes: { type: "object" },
+          changes: {
+            type: "object",
+            properties: {
+              added: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: { path: { type: "string" }, hash: { type: "string" } },
+                },
+              },
+              modified: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    path: { type: "string" },
+                    from: { type: "string" },
+                    to: { type: "string" },
+                  },
+                },
+              },
+              removed: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: { path: { type: "string" }, hash: { type: "string" } },
+                },
+              },
+            },
+          },
         },
         required: ["commit", "files", "changes"],
       },
@@ -325,7 +361,11 @@ function nativeVcsDiscoveryEntries(namespace: string): ToolEntry[] {
       description: "Added/modified/removed paths between two commits.",
       inputSchema: {
         type: "object",
-        properties: { from: { type: "string" }, to: { type: "string" } },
+        properties: {
+          from: { type: "string" },
+          to: { type: "string" },
+          prefix: { type: "string" },
+        },
         required: ["from", "to"],
       },
       outputSchema: {
@@ -333,9 +373,31 @@ function nativeVcsDiscoveryEntries(namespace: string): ToolEntry[] {
         properties: {
           from: { type: "string" },
           to: { type: "string" },
-          added: { type: "array", items: { type: "string" } },
-          modified: { type: "array", items: { type: "string" } },
-          removed: { type: "array", items: { type: "string" } },
+          added: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: { path: { type: "string" }, hash: { type: "string" } },
+            },
+          },
+          modified: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                path: { type: "string" },
+                from: { type: "string" },
+                to: { type: "string" },
+              },
+            },
+          },
+          removed: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: { path: { type: "string" }, hash: { type: "string" } },
+            },
+          },
         },
         required: ["from", "to", "added", "modified", "removed"],
       },

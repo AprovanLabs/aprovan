@@ -59,21 +59,21 @@
 
 > Depends-on: 1, 2 | Repo: aprovan | Touches: aprovan/server/workspace/src/native-dispatch.ts, aprovan/server/workspace/src/routes/tools.ts | Verify: pnpm turbo run build --filter=@aprovan/workspace && ! grep -n '"main"' server/workspace/src/native-dispatch.ts | grep -q readRef
 
-- [ ] 3.1 `vcsBackend.commit` (native-dispatch.ts:279) forwards
+- [x] 3.1 `vcsBackend.commit` (native-dispatch.ts:279) forwards
       `prefix`/`ref` to `commitTree`; `log` (:296) resolves
       `refName(args.ref)` via `readRef` — unknown ref returns
       `{commits: []}` (spec vcs-ref-enumeration "Unknown ref yields an empty
       history"); no `"main"` literal remains in either.
-- [ ] 3.2 `vcsBackend.branches` (:356) returns `listRefs(workspaceId)` mapped
+- [x] 3.2 `vcsBackend.branches` (:356) returns `listRefs(workspaceId)` mapped
       to `{name, commit}` — wires the currently-dead `listRefs`
       (store.ts:315) and drops the hardcoded singleton (spec scenario "All
       refs are returned").
-- [ ] 3.3 `vcsBackend.diff` (:339) stops mapping entries to path strings:
+- [x] 3.3 `vcsBackend.diff` (:339) stops mapping entries to path strings:
       return `diffSnapshots` output as-is, filtered by optional `prefix`
       using restore's containment rule (tech-plan D4); `show` (:311) passes
       `changes` through unmapped (spec vcs-diff-wire-fidelity, both
       requirements).
-- [ ] 3.4 Update `nativeVcsDiscoveryEntries` (routes/tools.ts:271): `commit`
+- [x] 3.4 Update `nativeVcsDiscoveryEntries` (routes/tools.ts:271): `commit`
       input schema gains `prefix`/`ref`, `log` gains `ref`, `diff` gains
       `prefix` (copy `restore`'s property style at :361-380); `diff` and
       `show` output schemas describe the object-shaped
