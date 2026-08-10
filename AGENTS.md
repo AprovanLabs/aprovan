@@ -69,3 +69,13 @@ startup update script, so it is not repeated here.
 ### Other
 - `cicadas` (root README) is a separate external Python CLI installed via `uv`;
   it is unrelated to the Node build and not required for the product.
+
+### Refactor rule
+- Delete replaced code in the same change that replaces it — no "keep the old
+  one just in case."
+- Definition of done for any "delete X" task: `grep X` returns nothing in
+  **both** this repo and the sibling `registry` repo, not just the one being
+  edited.
+- Husk test: a workspace-glob directory with zero git-tracked files
+  (`git ls-files <dir> | wc -l` = 0) is build residue, not a package — delete
+  it, don't deprecate it.
