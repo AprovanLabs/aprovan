@@ -9,7 +9,9 @@ one, and every tasks.md uses the machine-parsed format with
 
 ## Inventory
 
-**12 changes · 104 work streams · 453 tasks.**
+**12 changes · 105 work streams · 463 tasks** (D grew by one stream and ten
+tasks when CF-5 was assigned to it and the time-gated deletion task was
+rewritten as an evidence gate).
 
 | Change | Streams | Tasks | Repo(s) | External deps (from tasks.md) |
 |---|---|---|---|---|
@@ -21,7 +23,7 @@ one, and every tasks.md uses the machine-parsed format with
 | iw9-f6-cleanup-rename | 12 | 51 | both (no publish) | — (all 12 streams `Depends-on: -`) |
 | iw9-a-vcs-consolidation | 7 | 29 | aprovan | F1, F6 |
 | iw9-b-app-model | 11 | 48 | aprovan | F2, F4 |
-| iw9-d-agent-loop-server | 9 | 55 | aprovan | — |
+| iw9-d-agent-loop-server | 10 | 65 | aprovan | — (owns CF-5; consumes F4's landed `apps/manifest.ts`) |
 | iw9-c-capability-approval | 14 | 60 | **both** (publish) | F3, F4, B, D, A(routes) |
 | iw9-chat-flagship | 12 | 55 | aprovan | F2, F5, B, D |
 | iw9-doc-markdown | 12 | 48 | aprovan | A, B, D, F5, Chat harness |
@@ -59,7 +61,7 @@ Default **Sonnet** for every stream; escalate/downgrade only these:
 
 | Tier | Streams | Why |
 |---|---|---|
-| **Opus** | D streams 1–3 (stream protocol, runner event emission, reattach/replay); C's review surface + derived-authority streams; B's install-as-copy migration stream; Doc's agent-reconciliation streams | genuinely novel logic; failure modes are silent-data or security-shaped |
+| **Opus** | D streams 1–3 (stream protocol, runner event emission, reattach/replay) **and D stream 10 (CF-5 app-scoped profiles)**; C's review surface + derived-authority streams; B's install-as-copy migration stream; Doc's agent-reconciliation streams | genuinely novel logic; failure modes are silent-data or security-shaped |
 | **Sonnet** (default) | everything else | contracts are frozen in tech-plans; work is elaboration against fixed interfaces |
 | **Haiku** | F6 husk deletion, AGENTS.md edits, stale-doc archival; pure grep-gate close-out streams | mechanical, exhaustively specified, verifiable by command |
 
@@ -74,12 +76,22 @@ These are places where reality differed from the plan; each is recorded in
 the owning change's tech-plan, listed here so the orchestrator isn't
 surprised:
 
-1. **CF-5 / UNASSIGNED, blocks both flagship agent profiles:**
+1. **CF-5 — ASSIGNED to `iw9-d-agent-loop-server` stream 10** (was
+   UNASSIGNED; the recommendation below was accepted by the owner on
+   2026-08-09 and folded into D's planning artifacts before implementation).
    `agents/service.ts:642-660` 403s any app-scoped agent-profile call, which
    blocks `chat/summarize` and `doc/fix-typos` identically. Neither flagship
-   may fix core code (their rule), and it predates C. **Recommendation:
-   fold the fix into iw9-d's scope as a deviation** (it owns the agents
-   service) — decide before Chat stream 5 starts.
+   may fix core code (their rule), and it predates C. iw9-d owns the agents
+   service and the loop that executes the profile, so it takes the **whole**
+   seam — `app.yaml` `agents:` grammar (one additive edit to iw9-f4's
+   `apps/manifest.ts`, which no iw9-b stream touches), manifest-derived
+   resolution (declaration *is* registration — no snapshot, invariant 3),
+   and the narrowed `ctx.appScope` gate — so neither flagship is left
+   half-unblocked. Artifacts: D's `specs/app-scoped-agent-profiles/spec.md`,
+   tech-plan D7, tasks.md stream 10 (`Depends-on: 5`, serialized against
+   stream 5 because both edit `agents/service.ts`). Gate references updated
+   in `iw9-chat-flagship/tasks.md` 5.1 and `iw9-doc-markdown/tasks.md` 10.0.
+   Tier: **Opus** (authorization boundary).
 2. `packages/native/src/dispatch.ts:69-83` arg-allowlist silently drops
    unthreaded scope args — F1 threads it; anyone adding tool args later must
    know it exists.

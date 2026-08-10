@@ -45,6 +45,9 @@ Cross-repo rule (IW-9 "Cross-repo coordination"): stream D is
   patterns only.
 - Self-heal turns traced and cost-ceilinged server-side.
 - `llm-jobs.ts` deleted, grep-gated in both repos.
+- App-scoped agent profiles unblocked end to end (CF-5): declaration
+  grammar, manifest-derived resolution, and a narrowed `ctx.appScope` gate,
+  so `chat/summarize` and `doc/fix-typos` have a surface to land on.
 
 **Non-Goals:**
 
@@ -205,6 +208,51 @@ Components, one responsibility each:
   still poll jobs; in-flight mobile clients hold job ids across deploys).
 - **Revisit if**: telemetry shows zero `GET /llm/jobs/:id` hits earlier —
   delete earlier.
+- **Amendment (execution-time)**: the "one-release deprecation" step is
+  replaced by an evidence gate with the same safety intent — no in-repo
+  callers in either checkout, parity/E2E green without the job path, and a
+  written compatibility assessment for clients holding a job id across the
+  deploy. A calendar window cannot be executed or honestly checked inside
+  this change; the evidence can. Failing evidence produces a recorded
+  blocker and no deletion (tasks.md 9.3-9.5).
+
+### D7: App-scoped agent profiles are manifest-declared and runtime-derived (CF-5)
+
+- **Choice**: this change owns the whole app-profile seam. (1) *Declaration*:
+  an optional `agents` block in `app.yaml`, added additively to iw9-f4's
+  `AppYamlSchema` (`apps/manifest.ts`), whose per-agent `tools` patterns must
+  fall inside the app's own declared capability ceiling. (2) *Registration*:
+  there is none — the declaration **is** the registration. A new
+  `agents/app-profiles.ts` renders an in-memory `AgentProfile` from the app's
+  last-reconciled manifest snapshot (F4's `AppRecord.declared`) on each
+  resolve. (3) *Execution*: the `ctx.appScope` gate in `agents/service.ts`
+  narrows so `run` is permitted for `<own-slug>/<agent>` resolving through
+  (2), while every other `run` and all `create`/`update`/`delete` keep their
+  existing 403. Effective authority is the declared patterns ∩ app grants ∩
+  invoker grants, computed at run render; the runner's dispatch re-check is
+  untouched.
+- **Why here**: CF-5 was recorded UNASSIGNED in
+  `IW-9-EXECUTION-OVERVIEW.md` (finding 1) with the recommendation to fold it
+  into iw9-d, which owns the agents service and the loop. Both flagships
+  (`chat/summarize`, `doc/fix-typos`) hard-block on it with no interim, and
+  neither may fix core code.
+- **Alternatives**:
+  - *Persist a registered profile record at install time*: rejected —
+    violates invariant 3 (authority derived at run time, never snapshotted)
+    and would need a write path inside iw9-b's install code, splitting the
+    seam across two changes and leaving both flagships waiting on the slower
+    half.
+  - *Let apps call `agents.create` for their own namespace*: rejected —
+    invariant 11 (agents propose; people instantiate) and the original
+    comment's reasoning (an app could otherwise mint itself a wide grant).
+  - *Leave the grammar to iw9-b*: rejected — no iw9-b stream mentions agents
+    or profiles, so "B owns the manifest half" is unowned in practice; the
+    file itself (`apps/manifest.ts`) is iw9-f4's, Wave 0, landed, and touched
+    by no B stream, so a single additive edit from here is the coherent
+    assignment.
+- **Revisit if**: a second, non-manifest declaration source appears (e.g.
+  profiles shipped by a registry package) — then the resolver grows a source
+  dimension, not the gate.
 
 ## Interfaces & Data
 
@@ -238,6 +286,14 @@ type RunEvent =
 Rules: `seq` starts at 0, gapless, per run. Unknown types MUST be skipped by
 consumers (forward compatibility — this is what lets iw9-c add
 `pending_action` producers without a client flag day).
+
+Persistence is a property of the runner, not of a caller: **every** native
+run appends its events to its record, whatever started it (`agents.run`,
+the chat-turn route, self-heal, a test). The injected `emit` is an
+additional live sink, overridable in tests; it never decides whether events
+are recorded. Otherwise an `origin: "api"` run would answer replay
+differently from a chat run, which the agent-run-stream spec does not
+permit.
 
 ### Run record extension (`StoredAgentRun`, agents/runner.ts)
 
@@ -276,6 +332,39 @@ GET /agents/runs/:id/stream?from=<seq>     (SSE)
 
 `agents.get/cancel/runs` are unchanged (runner.ts dispatch, agents.cancel is
 the only cancellation path).
+
+The mount prefix and both paths are **frozen contract**, not an
+implementation choice: `@aprovan/agent-protocol` exports
+`AGENTS_ROUTE_PREFIX = "/agents"`, `chatTurnPath()` and
+`runStreamPath(runId, from)`; the gateway mounts the router at that prefix
+and the `streamUrl` returned by `POST /agents/chat-turn` is
+`runStreamPath(runId, 0)`. Server and client build every URL from those
+helpers so the two sides cannot drift. (The `agents.*` tools namespace is
+served under `/tools`, so `/agents` does not collide.)
+
+### App agent declaration (`app.yaml`, additive to iw9-f4's `AppYamlSchema`)
+
+```yaml
+agents:
+  - name: summarize            # slug rules; addressed as <app-slug>/<name>
+    description: ...
+    prompt: ...                # or a manifest-relative path, per app conventions
+    llm: { interface: llm, profile: fast }   # optional pin
+    tools: ["chat.messages.*"] # MUST be inside the app's capability ceiling
+```
+
+```ts
+// server/workspace/src/agents/app-profiles.ts (new)
+resolveAppProfile(workspaceId, appId, name): Promise<AgentProfile | undefined>
+// rendered from AppRecord.declared each call — no stored profile record.
+
+// AgentProfile gains provenance, set only by the resolver:
+app?: { appId: string; slug: string }
+```
+
+Effective run authority = declared `tools` ∩ app installed grants ∩ invoker
+grants, computed inside `renderAgentRun`'s existing path. Refusals keep the
+current shape: `ServiceError("Apps cannot manage or run agent profiles", 403)`.
 
 ### Chat session record extension
 
@@ -335,6 +424,17 @@ and sets the session field; no transport change.
 - [iw9-c ships against a protocol that then changes] → `pending_action` is
   in the union from day one and unknown-type tolerance is a spec scenario;
   protocol package is the single source.
+- [Narrowing the app-scope gate widens authority by accident] → the
+  permitted case is exactly "the calling app's own manifest-declared
+  profile"; authority is an intersection computed at render, the runner's
+  dispatch re-check is untouched, and the spec's "Declaration does not widen
+  authority" scenario is the regression test. Reviewed as a security change
+  (Opus tier per the execution overview's escalation criterion).
+- [Two writers of the chat transcript during the flag window] → the
+  server-owned append is idempotent per `(sessionId, messageId)` and the
+  client-side writer is deleted at flip time (tasks 5.2, 8.10), so the
+  overlap cannot double-write and the post-flip state has exactly one
+  writer.
 
 ## Rollout
 
@@ -344,18 +444,22 @@ and sets the session field; no transport change.
 3. Client RunTransport behind a dev flag; parity checklist runs against it.
 4. Flag flips; legacy transport, prompt-pasting, and self-heal client loop
    deleted (grep gates).
-5. Widget-edit path off llm-jobs; one-release deprecation of
-   `GET /llm/jobs/:id`; delete llm-jobs.ts (grep gates, both repos).
+5. Widget-edit path off llm-jobs; deprecation notice on
+   `GET /llm/jobs/:id`; delete llm-jobs.ts once the evidence gate passes
+   (grep gates, both repos) or record the blocker.
+6. App-scoped agent profiles (D7/CF-5), ordered right after step 2 (it
+   shares `agents/service.ts` with the chat-turn route and must not run
+   concurrently with it); independent of steps 3-5, and the exit condition
+   for both flagship gates.
 
 Rollback per step is a revert; the legacy path exists until step 4, and step
 5 starts only after step 4 has soaked one release.
 
 ## Open Questions
 
-None blocking (D14/D15 settled). Implementation-time confirmation, also
-flagged in the PRD: the one-release deprecation window for
-`GET /llm/jobs/:id` (recommended: keep it one release, verify zero hits,
-then delete).
+None blocking (D14/D15 settled). The `GET /llm/jobs/:id` deprecation is no
+longer an open question: D6's amendment above converts it into the
+executable evidence gate in tasks.md 9.4-9.5.
 
 ## Verification addendum (pre-tasks file:line audit)
 
@@ -410,3 +514,30 @@ seedTitle })`, guarded by `pendingCreateRef`). `ChatSessionInfo` (the
 `client/web/src/lib/chat-sessions.ts:25-39` and currently has no
 `activeRunId`-shaped field — confirming the chat-agent-transport spec's
 session-record extension is new, not a rename.
+
+### Second audit (pre-delegation, 2026-08-09)
+
+Re-verified before briefs were cut; full results in `briefs/deviations.md`.
+Two things that change task text rather than just line numbers:
+
+- **A second client lazy-create call site exists**:
+  `client/web/src/features/sessions/useSessionOrchestration.ts:128`
+  (`createChatSession({ mode })`) alongside the cited
+  `useChatSubmit.ts:157`. It is outside the send path and stays client-side;
+  the chat-turn route must accept an already-created `sessionId` from either
+  origin (tasks.md 5.1).
+- **`GET /llm/jobs/:id` has drifted**: the handler is at
+  `routes/llm.ts:841-848`, not `~847-865` (tasks.md 9.3 updated). The
+  `x-llm-job` header at `routes/llm.ts:404` and the job-backed comment at
+  `~L344` are unchanged.
+
+Spot-checked and still exact: `runner.ts:91` (`streaming: false`),
+`runner.ts:102` (`RUNS_MAX_RETAINED`), `runner.ts:105` (`StoredAgentRun`),
+`runner.ts:209` (`callToolSchema`), `runner.ts:436` (`toolGranted`
+re-check), `routes/tools.ts:756` (`describeNamespaces`),
+`vcs/chat-sessions.ts:60`, `lib/chat-sessions.ts:25`,
+`useChatSubmit.ts:149` (read-only gate), `MessageParts.tsx:192`,
+`widget-error-reporter-context.tsx:19` (`MAX_WIDGET_AUTOFIXES = 2`),
+`useWidgetSelfHeal.ts:53-55/63/75`, `chat-transport.ts:16`, and
+`agents/service.ts:648-658` (the CF-5 `ctx.appScope` gate).
+`renderAgentRun` is at `agents/service.ts:394` (cited as ~L391).

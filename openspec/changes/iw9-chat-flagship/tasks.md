@@ -140,11 +140,16 @@ names below are `openspec/changes/iw9-chat-flagship/specs/<capability>/spec.md`.
 
 > Depends-on: 1, 4 | Repo: aprovan | Touches: aprovan/Apps/chat/agents/summarize.ts, aprovan/server/workspace/tests/chat-summarize-agent.test.ts | Verify: pnpm --filter @aprovan/workspace exec vitest run tests/chat-summarize-agent.test.ts
 
-- [ ] 5.1 Before starting: verify iw9-b's manifest supports agent-profile
-      declaration and iw9-d's `agents.run` accepts an app-scoped profile
-      (tech-plan finding CF-5, stated as a hard blocking dependency with no
-      interim). If either is missing, stop and raise against iw9-b/iw9-d —
-      do not build a Chat-local agent loop.
+- [ ] 5.1 Before starting: verify **`iw9-d-agent-loop-server` stream 10
+      ("App-scoped agent profiles (CF-5)") has landed** — it is the assigned
+      owner of finding CF-5 (`IW-9-EXECUTION-OVERVIEW.md` finding 1) and
+      covers the whole seam, so there is no separate iw9-b dependency for
+      this. Concretely: `app.yaml` accepts an `agents:` block (iw9-d task
+      10.1), `resolveAppProfile` renders it (10.2), and `agents.run` from an
+      app session succeeds for the app's own `<slug>/<agent>` while
+      `create`/`update` stay 403 (10.4) — see D's
+      `specs/app-scoped-agent-profiles/spec.md`. If it has not landed, stop
+      and raise against iw9-d — do not build a Chat-local agent loop.
 - [ ] 5.2 Declare `chat/summarize` in `Apps/chat/app.yaml`'s agent list,
       bounded by Chat's capability ceiling (D15, invariant 2 — intersection
       of invoker authority and app grant); tool access limited to

@@ -261,7 +261,7 @@ is independent).
 
 ## 11. Resolve the stale registry docs
 
-> Depends-on: - | Repo: registry | Touches: registry/docs/apps-and-workflows.md, registry/docs/vcs-and-sessions.md | Verify: ! grep -q "STALE" docs/apps-and-workflows.md docs/vcs-and-sessions.md && ! grep -qE "vfs\.(commit|log|diff|show|restore|branches)" docs/vcs-and-sessions.md
+> Depends-on: - | Repo: registry | Touches: registry/docs/apps-and-workflows.md, registry/docs/vcs-and-sessions.md, registry/docs/platform.md | Verify: ! grep -q "STALE" docs/apps-and-workflows.md docs/vcs-and-sessions.md && ! grep -qE "vfs\.(commit|log|diff|show|restore|branches)" docs/vcs-and-sessions.md
 
 - [ ] 11.1 `docs/apps-and-workflows.md`: replace the document body (keep the
       file so `platform.md:110`'s inbound link resolves) with a short stub:

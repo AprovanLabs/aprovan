@@ -69,6 +69,10 @@ Hard serialization (do not parallelize across these):
 - `apps/{store,service,capabilities}.ts`: B lands before C edits them.
 - F6's test repair (`vfs/*`→`vcs/*`) lands before anyone touches the
   legacy VCS suites.
+- `apps/manifest.ts` is F4's to create; D's stream 10 (CF-5) makes the only
+  later edit to it (the additive `agents:` block) — B never touches it.
+- `agents/service.ts`: D's stream 5 lands before D's stream 10; no other
+  change edits it in Wave 1.
 
 ## Execution protocol (per change)
 

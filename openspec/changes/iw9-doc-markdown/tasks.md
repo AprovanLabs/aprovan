@@ -16,12 +16,14 @@
   — `app.yaml` reconcile, install-as-copy, and managed-only host mode are
   iw9-b/iw9-f4 surfaces this change only consumes.
 - **iw9-d-agent-loop-server** MUST land before stream 10 (`agents.run`
-  rendering, `RunEvent` stream) — and stream 10 additionally cannot start
-  until the **CF-5 finding** (tech-plan "Findings") resolves: today
+  rendering, `RunEvent` stream) — and specifically **iw9-d stream 10**, the
+  assigned owner of the **CF-5 finding** (tech-plan "Findings"): today
   `agents/service.ts:642-660` unconditionally 403s any `ctx.appScope` call
   to `agents.create`/`update`/`run`, so app-shipped profiles (D15) have no
-  declaration/registration surface yet. This is the same blocker
-  `iw9-chat-flagship`'s stream 6 (`chat/summarize`) is gated on — raise
+  declaration/registration surface yet. iw9-d stream 10 adds the `app.yaml`
+  `agents:` grammar, manifest-derived resolution, and the narrowed gate.
+  This is the same blocker `iw9-chat-flagship`'s stream 5
+  (`chat/summarize`) is gated on — raise
   against iw9-b/iw9-d before starting stream 10, do not build a local
   workaround (tech-plan Findings: "Interim: none").
 - **iw9-chat-flagship** stream 9 (Playwright harness bootstrap) MUST land
@@ -275,17 +277,21 @@
       Document-scoped case to iw9-b's existing share test suite rather than
       duplicating share tests here.
 
-## 10. App: `doc/fix-typos` bundled agent profile (blocked on CF-5)
+## 10. App: `doc/fix-typos` bundled agent profile (gated on iw9-d stream 10 / CF-5)
 
 > Depends-on: 9 | Repo: aprovan | Touches: aprovan/Apps/document/**, aprovan/server/workspace/tests/doc-fix-typos.test.ts | Verify: pnpm --filter @aprovan/workspace exec vitest run tests/doc-fix-typos.test.ts
 
-- [ ] 10.0 **Do not start until the CF-5 finding (tech-plan "Findings")
-      resolves** — verify `agents/service.ts`'s `ctx.appScope` block no
-      longer 403s a manifest-declared profile before writing any code in
-      this stream (mirrors `iw9-chat-flagship`'s identical stream-6 gate on
-      the same finding).
-- [ ] 10.1 Declare `doc/fix-typos` per whatever mechanism CF-5 lands
-      (manifest-declared or loop-side registration) — grants: `vfs.read`/
+- [ ] 10.0 **Do not start until `iw9-d-agent-loop-server` stream 10
+      ("App-scoped agent profiles (CF-5)") has landed** — that stream is the
+      assigned owner of the CF-5 finding (`IW-9-EXECUTION-OVERVIEW.md`
+      finding 1) and covers declaration, resolution, and execution together.
+      Verify `agents/service.ts`'s `ctx.appScope` block no longer 403s a
+      manifest-declared profile, and that `app.yaml` accepts the `agents:`
+      block, before writing any code in this stream (mirrors
+      `iw9-chat-flagship`'s identical stream-5 gate on the same finding; the
+      contract is D's `specs/app-scoped-agent-profiles/spec.md`).
+- [ ] 10.1 Declare `doc/fix-typos` in `Apps/document/app.yaml`'s `agents:`
+      block per iw9-d task 10.1's grammar — grants: `vfs.read`/
       `vfs.write` scoped to the invoker's accessible paths, no wider ceiling
       (spec document-app "Profile runs within app grants"; invariant 2).
 - [ ] 10.2 Prompt: read the target document via `vfs.read`, propose a

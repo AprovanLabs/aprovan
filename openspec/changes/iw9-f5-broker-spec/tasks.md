@@ -11,7 +11,7 @@ repo root; the stream-4 deletion grep-gate also sweeps the sibling
 
 ## 1. Broker contract and namespace store
 
-> Repo: aprovan | Depends-on: - | Touches: aprovan/server/workspace/src/realtime/broker.ts, aprovan/server/workspace/src/realtime/store.ts, aprovan/server/workspace/tests/realtime-broker.test.ts | Verify: pnpm --filter @aprovan/workspace exec vitest run tests/realtime-broker.test.ts && pnpm --filter @aprovan/workspace typecheck
+> Repo: aprovan | Depends-on: - | Touches: aprovan/server/workspace/src/realtime/broker.ts, aprovan/server/workspace/src/realtime/store.ts, aprovan/server/workspace/src/realtime/presence.ts, aprovan/server/workspace/tests/realtime-broker.test.ts | Verify: pnpm --filter @aprovan/workspace exec vitest run tests/realtime-broker.test.ts tests/presence.test.ts && pnpm --filter @aprovan/workspace typecheck
 
 - [ ] 1.1 Change `NamespaceHandler.onSubscribe` to return
       `Promise<{ body?: unknown }>` and `onPublish`/`onDisconnect` to
@@ -46,10 +46,28 @@ repo root; the stream-4 deletion grep-gate also sweeps the sibling
       dropped with workspace, authorize hook filtering one subscriber while
       others receive, and stale-subscription-confers-nothing (flip authorize
       to reject between publishes).
+- [ ] 1.7 Readiness fix (see `briefs/deviations.md`): `presence.ts`'s
+      `onSubscribe` (presence.ts:172-175) returns a plain object today, which
+      no longer satisfies the `Promise<{ body?: unknown }>` signature from
+      1.1 — leaving it untouched fails this stream's own `typecheck` Verify
+      before Stream 2 ever runs. Wrap the return in `Promise.resolve(...)`
+      only: zero behavior change, no store reads, no state migration. This
+      is the only edit to `presence.ts` in this stream. Stream 2 replaces
+      this shim wholesale with the real store-backed implementation (its
+      tasks 2.1-2.2) — do not build on top of it, and do not add anything
+      here beyond the `Promise.resolve` wrap.
 
 ## 2. Presence migration onto the broker-owned store
 
 > Repo: aprovan | Depends-on: 1 | Touches: aprovan/server/workspace/src/realtime/presence.ts, aprovan/server/workspace/tests/presence.test.ts | Verify: pnpm --filter @aprovan/workspace exec vitest run tests/presence.test.ts && ! grep -n "new Map" server/workspace/src/realtime/presence.ts
+
+_Overlaps Stream 1 on `presence.ts` by design, not by planning error: Stream
+1's task 1.7 lands a minimal compile-preserving shim so Stream 1 is
+independently typecheck- and test-verifiable; task 2.1 below replaces that
+shim wholesale with the real store-backed implementation. Safe because this
+stream is `Depends-on: 1` — it starts only after Stream 1 has merged, never
+in parallel with it, so there is no concurrent edit, only a sequential
+handoff on one file._
 
 - [ ] 2.1 Replace the closure maps `focusByConn`/`members`
       (presence.ts:71-73, types `ConnFocus` presence.ts:30-33 /
@@ -84,9 +102,17 @@ repo root; the stream-4 deletion grep-gate also sweeps the sibling
 - [ ] 3.3 Extend `AttachRealtimeOptions` with `outboundQueueLimit` (256),
       `flushIntervalMs` (25), `sendHighWaterMark` (1 MiB),
       `maxFullBufferFlushes` (3) — defaults as constants, all
-      test-injectable, matching the existing `pingIntervalMs` pattern; update
-      `tests/realtime-socket.test.ts` for the async `handleClientMessage`
-      call site.
+      test-injectable, matching the existing `pingIntervalMs` pattern. After
+      Stream 1, `RealtimeBroker.handleClientMessage` returns `Promise<void>`
+      (tech-plan D1); update the production call site in socket.ts's
+      `ws.on("message", ...)` handler (today, unawaited,
+      `broker.handleClientMessage(conn, parsed);` at socket.ts:266) to `void
+      broker.handleClientMessage(conn, parsed);` — an explicit fire-and-forget,
+      matching D1's stated intent and the spec's permitted event/`subscribed`
+      reordering (clients MUST NOT assume ordering). This stream owns that
+      one-line edit: Stream 1's Touches is limited to broker.ts/store.ts and
+      never opens socket.ts. Update `tests/realtime-socket.test.ts` for the
+      async call site accordingly.
 - [ ] 3.4 New `tests/realtime-backpressure.test.ts`: full queue drops oldest
       and keeps newest; control frame delivered while event queue saturated;
       burst coalesced into batched in-order writes; N consecutive full-buffer

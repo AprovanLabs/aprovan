@@ -36,6 +36,12 @@ does not use it.
 
 ## Goals
 
+0. **Apps can run the profiles they ship**: an app-scoped session runs
+   `<app-slug>/<agent>` when — and only when — its own manifest declares it,
+   bounded by app grants ∩ invoker grants derived at run time; app-driven
+   profile creation, editing, and self-provisioning stay refused. This is
+   CF-5, and its exit condition is that both flagship gates
+   (`iw9-chat-flagship` 5.1, `iw9-doc-markdown` 10.0) open.
 1. **Resumability is structural**: a chat run started before the client
    disconnects reaches its terminal state with zero client involvement; a
    client reattaching by run id replays the complete event history (all
@@ -90,6 +96,15 @@ does not use it.
 - `widget-self-heal-turn`: widget render failures become traced,
   cost-ceilinged server-side run continuations with the existing client-side
   arming bounds.
+- `app-scoped-agent-profiles`: the declaration/registration/execution seam
+  that lets an app run the agent profiles its own manifest declares —
+  `app.yaml` grammar, manifest-derived resolution (declaration *is*
+  registration), app provenance on the profile, and a narrowed `ctx.appScope`
+  gate. Assigned here as finding **CF-5** (`IW-9-EXECUTION-OVERVIEW.md`
+  "Findings", finding 1) because this change owns the agents service and the
+  loop that executes the profile; it unblocks `chat/summarize`
+  (iw9-chat-flagship) and `doc/fix-typos` (iw9-doc-markdown), which are
+  otherwise hard-blocked with no interim.
 
 ### Modified Capabilities
 
@@ -111,7 +126,20 @@ here (see tech-plan D1 for why).
   protocol + run-record shapes land first — they are interfaces iw9-c and
   iw9-chat consume.
 - **Constraint (MIGRATION-DEBT)**: "delete X" tasks are done only when
-  `grep X` is empty in both repos.
+  `grep X` is empty in both repos. Both checkout paths are named literally in
+  tasks.md; an unreadable sibling checkout fails a gate rather than passing
+  it vacuously.
+- **Constraint (CF-5 is a narrowing, not an opening)**: the existing
+  "Apps cannot manage or run agent profiles" 403 is deliberate behavior. The
+  app-profile work permits exactly one new case — running the calling app's
+  own manifest-declared profile — and preserves invariants 2 (grants
+  intersect, never union), 3 (authority derived at run time), 4 (apps are
+  separate principals), and 11 (agents propose, people instantiate).
+- **Constraint (cross-change file ownership)**: the `app.yaml` grammar lives
+  in `apps/manifest.ts`, owned by iw9-f4 (Wave 0, landed before this change)
+  and touched by no iw9-b stream. This change makes one additive edit there
+  — the optional `agents` block — so that no flagship is left waiting on an
+  unassigned manifest change.
 - **Assumption**: single gateway task (current deployment) — in-process live
   event fan-out plus record-backed replay is sufficient; a process restart
   mid-run fails the run (same as today) and the record says so.
@@ -125,7 +153,13 @@ here (see tech-plan D1 for why).
 
 ## Open Questions
 
-None blocking — D14/D15 and the IW-9 grill settled scope. One
-implementation-time confirmation: whether `GET /llm/jobs/:id` needs a
-one-release deprecation window for in-flight mobile clients before deletion
-(recommendation: yes, one release, then grep-gated removal).
+None blocking — D14/D15 and the IW-9 grill settled scope.
+
+The previously open item — whether `GET /llm/jobs/:id` needs a one-release
+deprecation window before deletion — is **resolved into a verifiable gate**
+rather than a calendar wait, because a calendar wait cannot be executed or
+honestly checked off inside this change. Deletion proceeds only on three
+pieces of evidence: no in-repo callers in either checkout, parity/E2E green
+with the job path unused, and a written compatibility assessment for clients
+holding a job id across the deploy. If the evidence does not hold, the store
+stays and the blocker is recorded (tasks.md stream 9, tasks 9.3-9.5).
