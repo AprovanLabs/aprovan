@@ -6,18 +6,29 @@
  * rows, shared blobs), so this module only adds the cheap parts, stored as
  * records (accumulated state — specs/record-store; tech-plan D3):
  *
- *   snapshot  svc#vcs#snapshots / <id>   {path → hash} manifest
+ *   snapshot  svc#vcs#snapshots / <id>   {path → hash} manifest, scoped to
+ *                                        an optional subtree `prefix`
  *   commit    svc#vcs#commits   / <id>   snapshot + parents + message
- *   ref       svc#vcs#refs      / <name> named pointer (main, …)
+ *   ref       svc#vcs#refs      / <name> named pointer (main, session/<id>,
+ *                                        app/<id>, …) — any ref matching
+ *                                        `REF_RE` may be committed to and
+ *                                        advanced independently
  *
  * Identities are sha256 of canonical forms, so snapshots and commits are
- * idempotent to re-write. Large snapshot manifests ride the record store's
- * existing >350KB S3 spill. Snapshots always exclude `.services/**` and the
- * hidden app-data partitions — what a member can see is what gets versioned.
+ * idempotent to re-write. Snapshot identity incorporates the scope prefix
+ * (non-empty prefixes only — see `snapshotId`), so identical subtree content
+ * under different scopes never collides on one snapshot record. Large
+ * snapshot manifests ride the record store's existing >350KB S3 spill.
+ * Snapshots always exclude `.services/**` and the hidden app-data
+ * partitions — what a member can see is what gets versioned, regardless of
+ * scope.
  *
  * Ref advances are read-modify-write without CAS: workspaces are effectively
  * single-writer today, and the worst case is a lost auto-snapshot pointer,
- * never lost content (every version row survives).
+ * never lost content (every version row survives). A commit to a ref with no
+ * existing record becomes a root commit (`parents: []`) rather than
+ * implicitly inheriting another ref's history — seeding a new ref from an
+ * existing commit is the caller's job.
  *
  * Known v1 limitation: `remove()` on the FS deletes all version rows for a
  * path, so a hard delete makes that path's older snapshot entries listable
@@ -141,16 +152,24 @@ export async function visibleEntries(
 
 /**
  * Identity: sha256 over the sorted `<hash> <path>` lines, plus one
- * `mount <configHash> <token> <prefix>` line per mount lineage entry —
+ * `mount <configHash> <token> <prefix>` line per mount lineage entry, plus a
+ * final `prefix <prefix>` line iff the scope prefix is non-empty —
  * deterministic content only, so a moved mount changes snapshot identity
- * (specs/mount-lineage "Upstream movement changes snapshot identity") while
- * a mountless snapshot hashes exactly as before this change.
+ * (specs/mount-lineage "Upstream movement changes snapshot identity"), a
+ * scoped commit never collides with a whole-workspace or differently-scoped
+ * one covering identical content (tech-plan D1), and a mountless,
+ * unscoped snapshot hashes exactly as before this change.
  */
-function snapshotId(entries: SnapshotEntry[], mounts?: MountLineageEntry[]): string {
+function snapshotId(
+  entries: SnapshotEntry[],
+  mounts?: MountLineageEntry[],
+  prefix = "",
+): string {
   const lines = entries.map((entry) => `${entry.hash} ${entry.path}`);
   for (const mount of mounts ?? []) {
     lines.push(`mount ${mount.configHash} ${mount.versionToken ?? "-"} ${mount.prefix}`);
   }
+  if (prefix !== "") lines.push(`prefix ${prefix}`);
   return createHash("sha256").update(lines.join("\n")).digest("hex");
 }
 
@@ -166,7 +185,7 @@ export function buildSnapshot(
     ? [...mounts].sort((a, b) => a.prefix.localeCompare(b.prefix))
     : undefined;
   return {
-    id: snapshotId(sorted, sortedMounts),
+    id: snapshotId(sorted, sortedMounts, prefix),
     prefix,
     entries: sorted,
     ...(sortedMounts ? { mounts: sortedMounts } : {}),
@@ -349,22 +368,34 @@ export async function resolveCommitish(
 // ---------------------------------------------------------------------------
 
 /**
- * Snapshot the current visible tree and advance `main` — unless the head
- * already matches, in which case the existing head comes back untouched.
- * Used both by explicit `vfs.commit` and as the auto-snapshot a session
- * takes at creation, so a session's base is always exactly what the user
- * was looking at.
+ * Snapshot the visible tree at `prefix` (default: whole workspace) and
+ * advance `ref` (default: `main`) — unless the ref's head already matches,
+ * in which case the existing head comes back untouched. Used both by
+ * explicit `vfs.commit` and as the auto-snapshot a session takes at
+ * creation, so a session's base is always exactly what the user was looking
+ * at. A ref with no existing record starts a root commit (`parents: []`)
+ * rather than implicitly inheriting another ref's history.
  */
 export async function commitTree(
   workspaceId: string,
-  options: { message: string; author: string; sessionId?: string },
+  options: {
+    message: string;
+    author: string;
+    sessionId?: string;
+    /** Subtree scope; "" (default) = whole visible workspace. */
+    prefix?: string;
+    /** Ref to read and advance; defaults to "main". Validated via refName(). */
+    ref?: string;
+  },
 ): Promise<{ commit: VcsCommit; created: boolean }> {
+  const prefix = options.prefix ?? "";
+  const refKey = refName(options.ref);
   // Mount lineage rides every snapshot: tokens go INTO the snapshot (and
   // its identity — the unchanged-head comparison below therefore covers
   // "native entries AND mount tokens" for free), provenance onto the commit.
   const lineage = await collectMountLineage(workspaceId);
-  const snapshot = buildSnapshot(await visibleEntries(workspaceId), "", lineage.entries);
-  const ref = await readRef(workspaceId, MAIN_REF);
+  const snapshot = buildSnapshot(await visibleEntries(workspaceId, prefix), prefix, lineage.entries);
+  const ref = await readRef(workspaceId, refKey);
   const head = ref ? await readCommit(workspaceId, ref.commit) : undefined;
   if (head && head.snapshot === snapshot.id) {
     return { commit: head, created: false };
@@ -378,7 +409,7 @@ export async function commitTree(
     sessionId: options.sessionId,
     provenance: lineage.provenance,
   });
-  await writeRef(workspaceId, MAIN_REF, commit.id, options.author);
+  await writeRef(workspaceId, refKey, commit.id, options.author);
   return { commit, created: true };
 }
 
