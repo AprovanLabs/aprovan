@@ -138,14 +138,14 @@ is independent).
 
 > Depends-on: - | Repo: aprovan | Touches: aprovan/AGENTS.md | Verify: grep -n "Refactor rule" AGENTS.md
 
-- [ ] 6.1 Add a `### Refactor rule` section to `AGENTS.md` stating, in this
+- [x] 6.1 Add a `### Refactor rule` section to `AGENTS.md` stating, in this
       repo's existing prose style: delete replaced code in the same change
       that replaces it; a "delete X" task is not done until `grep X` returns
       nothing in **both** `aprovan` and `registry`; a workspace-glob
       directory with zero git-tracked files (`git ls-files <dir> | wc -l` =
       0) is build residue, not a package — delete it, don't deprecate it
       (tech-plan "AGENTS.md refactor-rule section").
-- [ ] 6.2 Grep gate: `grep -n "Refactor rule" AGENTS.md` is non-empty.
+- [x] 6.2 Grep gate: `grep -n "Refactor rule" AGENTS.md` is non-empty.
 
 ## 7. Bug fixes: script privacy claim, share identity, discarded commit changes
 
