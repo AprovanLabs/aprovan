@@ -13,24 +13,24 @@ releases.ts` (owned by iw9-a) or `server/workspace/src/apps/identity.ts`
 
 > Depends-on: - | Repo: aprovan | Touches: aprovan/server/workspace/src/apps/instances.ts, aprovan/server/workspace/tests/app-instances.test.ts | Verify: pnpm -C server/workspace exec vitest run tests/app-instances.test.ts && pnpm -C server/workspace typecheck
 
-- [ ] 1.1 Create `server/workspace/src/apps/instances.ts` with `HostingMode`,
+- [x] 1.1 Create `server/workspace/src/apps/instances.ts` with `HostingMode`,
       `AppInstanceRecord`, `sharedRecordScope`, and `sharedDataDir` exactly as
       stated in tech-plan "Interfaces & Data" (TD1, TD3); instance records
       persist via `svcScope("app-instances")` using the `svc-records.ts`
       helpers (key = instanceId ULID; mint via the existing ULID helper used
       by `apps/identity.ts` — import the util, do not edit identity.ts).
-- [ ] 1.2 Implement `createInstance`, `getInstance`, `listInstances`,
+- [x] 1.2 Implement `createInstance`, `getInstance`, `listInstances`,
       `addParticipant`, `removeParticipant`: participant adds to a
       `managed`-mode install reject non-members of the hosting workspace via
       `memberships.ts` `getMembership` with a 4xx naming the requirement
       (spec `shared-record-partition` / "Managed instances require
       hosting-workspace membership").
-- [ ] 1.3 Implement `assertInstanceAccess` per TD2/TD3: deny-as-404
+- [x] 1.3 Implement `assertInstanceAccess` per TD2/TD3: deny-as-404
       (`ServiceError(..., 404)`) for non-participants, missing instance
       records (orphan scope, fail closed), and — for managed installs —
       listed participants whose hosting-workspace membership is gone
       (invariants 3+5); membership resolved per request, no caching.
-- [ ] 1.4 New test file `server/workspace/tests/app-instances.test.ts`
+- [x] 1.4 New test file `server/workspace/tests/app-instances.test.ts`
       covering every scenario of spec `shared-record-partition` requirements
       "Instance record is the ACL" and "Managed instances require
       hosting-workspace membership" (participant read/write attribution
