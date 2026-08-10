@@ -178,12 +178,12 @@ describe("vcs conformance (workspace commit store)", () => {
 
     const shown = await vcs.show({ commit: commit.id });
     expect(shown.files).toContain("readme.md");
-    expect(shown.changes.added).toContain("readme.md");
+    expect(shown.changes.added).toContainEqual({ path: "readme.md", hash: "hash-a" });
 
     backend.stage?.("readme.md", "hash-b");
     const second = await vcs.commit({ message: "edit" });
     const diff = await vcs.diff({ from: commit.id, to: second.commit.id });
-    expect(diff.modified).toContain("readme.md");
+    expect(diff.modified).toContainEqual({ path: "readme.md", from: "hash-a", to: "hash-b" });
 
     const branches = await vcs.branches();
     expect(branches.branches).toEqual([{ name: "main", commit: second.commit.id }]);

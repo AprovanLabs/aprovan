@@ -33,26 +33,26 @@
 
 > Depends-on: - | Repo: aprovan | Touches: aprovan/packages/native/src/vcs.ts, aprovan/packages/native/src/dispatch.ts, aprovan/packages/native/__tests__/conformance.test.ts | Verify: pnpm --filter @aprovan/native test -- __tests__/conformance.test.ts
 
-- [ ] 2.1 Change `NativeVcsDiff` (packages/native/src/vcs.ts:31) to the
+- [x] 2.1 Change `NativeVcsDiff` (packages/native/src/vcs.ts:31) to the
       hash-bearing shape from the tech-plan Interfaces section
       (`added/removed: {path, hash}[]`, `modified: {path, from, to}[]`)
       — applies to both `diff` and `show.changes` (tech-plan D3; spec
       vcs-diff-wire-fidelity "Hash-bearing diff wire output").
-- [ ] 2.2 Extend `NativeVcsBackend` arg types: `commit` gains
+- [x] 2.2 Extend `NativeVcsBackend` arg types: `commit` gains
       `prefix?`/`ref?`, `log` gains `ref?`, `diff` gains `prefix?` — exact
       shapes in the tech-plan contract block.
-- [ ] 2.3 Thread the new args through the `dispatchNativeOp` vcs allowlist
+- [x] 2.3 Thread the new args through the `dispatchNativeOp` vcs allowlist
       (packages/native/src/dispatch.ts:69-83) using the existing
       typeof-string-guard pattern; unknown args must no longer silently drop
       the scope parameters.
-- [ ] 2.4 Update `createMemoryVcsBackend` (vcs.ts:82): a refs map keyed by
+- [x] 2.4 Update `createMemoryVcsBackend` (vcs.ts:82): a refs map keyed by
       ref name (default `main`), prefix filtering of the staged tree on
       commit, ref-scoped log, all-refs branches, hash-bearing diff/show
       output. Update the two diff/show assertions in
       `packages/native/__tests__/conformance.test.ts` (:181, :185) to the new
       object shape — permitted: this file is not among the F6-owned failing
       server suites (tech-plan D3 containment argument).
-- [ ] 2.5 Grep gate for unseen consumers of the old shape:
+- [x] 2.5 Grep gate for unseen consumers of the old shape:
       `! grep -rn 'changes.added).toContain\|diff.modified).toContain' --include='*.ts' --include='*.tsx' client packages server | grep -v conformance` returns nothing.
 
 ## 3. Backend + tool discovery surface

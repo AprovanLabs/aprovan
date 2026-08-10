@@ -29,22 +29,27 @@ export interface NativeVcsCommit {
 }
 
 export interface NativeVcsDiff {
-  added: string[];
-  modified: string[];
-  removed: string[];
+  added: Array<{ path: string; hash: string }>;
+  modified: Array<{ path: string; from: string; to: string }>;
+  removed: Array<{ path: string; hash: string }>;
 }
 
 export interface NativeVcsBackend {
   /** Stage a working-tree write (tests / gateway wiring). */
   stage?(path: string, contentHash: string): void;
-  commit(args: { message?: string; author?: string }): Promise<{ commit: NativeVcsCommit; created: boolean }>;
-  log(args: { limit?: number }): Promise<{ commits: NativeVcsCommit[] }>;
+  commit(args: {
+    message?: string;
+    author?: string;
+    prefix?: string;
+    ref?: string;
+  }): Promise<{ commit: NativeVcsCommit; created: boolean }>;
+  log(args: { limit?: number; ref?: string }): Promise<{ commits: NativeVcsCommit[] }>;
   show(args: { commit: string }): Promise<{
     commit: NativeVcsCommit;
     files: string[];
     changes: NativeVcsDiff;
   }>;
-  diff(args: { from: string; to: string }): Promise<NativeVcsDiff & { from: string; to: string }>;
+  diff(args: { from: string; to: string; prefix?: string }): Promise<NativeVcsDiff & { from: string; to: string }>;
   branches(): Promise<{ branches: Array<{ name: string; commit: string }> }>;
   restore(args: {
     commit: string;
@@ -82,38 +87,63 @@ export function createNativeVcs(options: NativeVcsOptions): NativeVcsClient {
 export function createMemoryVcsBackend(): NativeVcsBackend {
   const commits: NativeVcsCommit[] = [];
   const snapshots = new Map<string, Map<string, string>>();
-  let head: string | undefined;
+  /** Ref name -> head commit id. Default ref is "main". */
+  const refs = new Map<string, string>();
   const tree = new Map<string, string>();
 
   const snapshotId = (): string => `snap-${crypto.randomUUID().slice(0, 8)}`;
   const commitId = (): string => `cmt-${crypto.randomUUID().slice(0, 12)}`;
 
   const resolve = (commitish: string): NativeVcsCommit => {
-    if (commitish === "main" || commitish === "HEAD") {
-      if (!head) throw Object.assign(new Error("no commits yet"), { status: 404 });
-      return commits.find((c) => c.id === head)!;
-    }
+    const refTarget = commitish === "HEAD" ? refs.get("main") : refs.get(commitish);
+    if (refTarget !== undefined) return commits.find((c) => c.id === refTarget)!;
     const hit = commits.find((c) => c.id === commitish || c.id.startsWith(commitish));
-    if (!hit) throw Object.assign(new Error(`unknown commit: ${commitish}`), { status: 404 });
+    if (!hit) {
+      if (commitish === "main" || commitish === "HEAD") {
+        throw Object.assign(new Error("no commits yet"), { status: 404 });
+      }
+      throw Object.assign(new Error(`unknown commit: ${commitish}`), { status: 404 });
+    }
     return hit;
   };
 
+  const inPrefix = (path: string, prefix: string): boolean => path === prefix || path.startsWith(`${prefix}/`);
+
+  const filterByPrefix = (map: Map<string, string>, prefix?: string): Map<string, string> => {
+    if (!prefix) return map;
+    const out = new Map<string, string>();
+    for (const [path, hash] of map) {
+      if (inPrefix(path, prefix)) out.set(path, hash);
+    }
+    return out;
+  };
+
   const diffMaps = (from: Map<string, string>, to: Map<string, string>): NativeVcsDiff => {
-    const added: string[] = [];
-    const modified: string[] = [];
-    const removed: string[] = [];
+    const added: Array<{ path: string; hash: string }> = [];
+    const modified: Array<{ path: string; from: string; to: string }> = [];
+    const removed: Array<{ path: string; hash: string }> = [];
     for (const [path, hash] of to) {
       const before = from.get(path);
-      if (before === undefined) added.push(path);
-      else if (before !== hash) modified.push(path);
+      if (before === undefined) added.push({ path, hash });
+      else if (before !== hash) modified.push({ path, from: before, to: hash });
     }
-    for (const path of from.keys()) {
-      if (!to.has(path)) removed.push(path);
+    for (const [path, hash] of from) {
+      if (!to.has(path)) removed.push({ path, hash });
     }
-    added.sort();
-    modified.sort();
-    removed.sort();
+    const byPath = (a: { path: string }, b: { path: string }): number => a.path.localeCompare(b.path);
+    added.sort(byPath);
+    modified.sort(byPath);
+    removed.sort(byPath);
     return { added, modified, removed };
+  };
+
+  const filterDiff = (diff: NativeVcsDiff, prefix?: string): NativeVcsDiff => {
+    if (!prefix) return diff;
+    return {
+      added: diff.added.filter((e) => inPrefix(e.path, prefix)),
+      modified: diff.modified.filter((e) => inPrefix(e.path, prefix)),
+      removed: diff.removed.filter((e) => inPrefix(e.path, prefix)),
+    };
   };
 
   return {
@@ -121,29 +151,42 @@ export function createMemoryVcsBackend(): NativeVcsBackend {
       tree.set(path, contentHash);
     },
 
-    async commit({ message, author }) {
-      const parent = head ? snapshots.get(resolve(head).snapshot)! : new Map();
-      const changes = diffMaps(parent, tree);
-      if (changes.added.length + changes.modified.length + changes.removed.length === 0 && head) {
-        return { commit: resolve(head), created: false };
+    async commit({ message, author, prefix, ref }) {
+      const refName = ref ?? "main";
+      const headId = refs.get(refName);
+      const parentSnap = headId ? snapshots.get(resolve(headId).snapshot)! : new Map();
+      const scopedTree = filterByPrefix(tree, prefix);
+      const changes = diffMaps(parentSnap, scopedTree);
+      if (changes.added.length + changes.modified.length + changes.removed.length === 0 && headId) {
+        return { commit: resolve(headId), created: false };
       }
       const snap = snapshotId();
-      snapshots.set(snap, new Map(tree));
+      snapshots.set(snap, new Map(scopedTree));
       const commit: NativeVcsCommit = {
         id: commitId(),
         ...(message !== undefined ? { message } : {}),
         createdAt: new Date().toISOString(),
-        parents: head ? [head] : [],
+        parents: headId ? [headId] : [],
         snapshot: snap,
         ...(author !== undefined ? { author } : {}),
       };
       commits.unshift(commit);
-      head = commit.id;
+      refs.set(refName, commit.id);
       return { commit, created: true };
     },
 
-    async log({ limit = 50 } = {}) {
-      return { commits: commits.slice(0, limit) };
+    async log({ limit = 50, ref } = {}) {
+      const headId = refs.get(ref ?? "main");
+      if (!headId) return { commits: [] };
+      const history: NativeVcsCommit[] = [];
+      let cursor: string | undefined = headId;
+      while (cursor && history.length < limit) {
+        const found: NativeVcsCommit | undefined = commits.find((c) => c.id === cursor);
+        if (!found) break;
+        history.push(found);
+        cursor = found.parents[0];
+      }
+      return { commits: history };
     },
 
     async show({ commit: commitish }) {
@@ -160,17 +203,19 @@ export function createMemoryVcsBackend(): NativeVcsBackend {
       };
     },
 
-    async diff({ from, to }) {
+    async diff({ from, to, prefix }) {
       const a = resolve(from);
       const b = resolve(to);
       const fromSnap = snapshots.get(a.snapshot) ?? new Map();
       const toSnap = snapshots.get(b.snapshot) ?? new Map();
-      return { from: a.id, to: b.id, ...diffMaps(fromSnap, toSnap) };
+      return { from: a.id, to: b.id, ...filterDiff(diffMaps(fromSnap, toSnap), prefix) };
     },
 
     async branches() {
       return {
-        branches: head ? [{ name: "main", commit: head }] : [],
+        branches: [...refs.entries()]
+          .map(([name, commit]) => ({ name, commit }))
+          .sort((a, b) => a.name.localeCompare(b.name)),
       };
     },
 
