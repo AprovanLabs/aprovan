@@ -171,7 +171,12 @@ export function createPresenceHandler(broker: RealtimeBroker): NamespaceHandler 
 
     onSubscribe(conn, topic) {
       const path = pathFromTopic(topic);
-      return { body: { peers: roster(conn.workspaceId, path) } };
+      // Readiness shim (Stream 1 task 1.7): wraps the still-synchronous
+      // presence logic to satisfy the broker's async onSubscribe contract.
+      // Zero behavior change, no store reads. Stream 2 (tasks 2.1-2.2)
+      // replaces this wholesale with the real store-backed implementation —
+      // do not build on top of it.
+      return Promise.resolve({ body: { peers: roster(conn.workspaceId, path) } });
     },
 
     onPublish(conn, topic, body) {

@@ -13,7 +13,7 @@ repo root; the stream-4 deletion grep-gate also sweeps the sibling
 
 > Repo: aprovan | Depends-on: - | Touches: aprovan/server/workspace/src/realtime/broker.ts, aprovan/server/workspace/src/realtime/store.ts, aprovan/server/workspace/src/realtime/presence.ts, aprovan/server/workspace/tests/realtime-broker.test.ts | Verify: pnpm --filter @aprovan/workspace exec vitest run tests/realtime-broker.test.ts tests/presence.test.ts && pnpm --filter @aprovan/workspace typecheck
 
-- [ ] 1.1 Change `NamespaceHandler.onSubscribe` to return
+- [x] 1.1 Change `NamespaceHandler.onSubscribe` to return
       `Promise<{ body?: unknown }>` and `onPublish`/`onDisconnect` to
       `void | Promise<void>`; broker awaits subscribe (reject → rollback of
       just-created subscription + `{code:"bad-topic"}`, mirroring the current
@@ -21,32 +21,32 @@ repo root; the stream-4 deletion grep-gate also sweeps the sibling
       `{code:"bad-body"}`); disconnect stays fire-and-forget with errors
       swallowed. `handleClientMessage` returns `Promise<void>` (tech-plan D1;
       spec realtime-broker "Asynchronous subscribe contract").
-- [ ] 1.2 Create `server/workspace/src/realtime/store.ts`: `NamespaceStore`
+- [x] 1.2 Create `server/workspace/src/realtime/store.ts`: `NamespaceStore`
       (async `get`/`set`/`delete`/`list`-by-prefix), `NamespaceStoreFactory`
       (`storeFor`, `dropWorkspace`), in-process Map implementation, and
       `createNamespaceStoreFactory()` selecting by locus via
       `resolveLocusDispatch` from `runtime/config.ts` — cloud loci fall back
       to in-process with the D16 deferral documented at the selection site
       (tech-plan D2/D3).
-- [ ] 1.3 Wire the factory into `createBroker(opts?)`: expose
+- [x] 1.3 Wire the factory into `createBroker(opts?)`: expose
       `RealtimeBroker.storeFor(workspaceId, namespace)`; drop a workspace's
       stores from `dropEmptyWorkspace` (broker.ts:68-72); factory injectable
       for tests.
-- [ ] 1.4 Add optional `NamespaceHandler.authorize?(conn, topic): boolean`
+- [x] 1.4 Add optional `NamespaceHandler.authorize?(conn, topic): boolean`
       and evaluate it per candidate connection inside `publishToTopic`'s
       delivery loop (after existing workspace scoping); absent hook = allow
       (tech-plan D4; spec "Topic keys route, they never authorize").
-- [ ] 1.5 Write the delivery-semantics contract into the broker module doc:
+- [x] 1.5 Write the delivery-semantics contract into the broker module doc:
       no cross-topic or cross-publisher ordering, no exactly-once; the
       `subscribed` body is the recovery mechanism (spec "No ordering or
       exactly-once assumptions").
-- [ ] 1.6 New `tests/realtime-broker.test.ts` covering: async subscribe body
+- [x] 1.6 New `tests/realtime-broker.test.ts` covering: async subscribe body
       delivery, reject-rollback (no residual subscription state), publish
       rejection → `bad-body`, `storeFor` scoping across two workspaces, store
       dropped with workspace, authorize hook filtering one subscriber while
       others receive, and stale-subscription-confers-nothing (flip authorize
       to reject between publishes).
-- [ ] 1.7 Readiness fix (see `briefs/deviations.md`): `presence.ts`'s
+- [x] 1.7 Readiness fix (see `briefs/deviations.md`): `presence.ts`'s
       `onSubscribe` (presence.ts:172-175) returns a plain object today, which
       no longer satisfies the `Promise<{ body?: unknown }>` signature from
       1.1 — leaving it untouched fails this stream's own `typecheck` Verify
