@@ -42,7 +42,6 @@ export {
   type AppRequirement,
   type AppRoles,
   type AppSummary,
-  type DataScope,
   // Installations and directory
   installBindingsReady,
   normalizeDirectory,

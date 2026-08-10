@@ -106,7 +106,7 @@ is independent).
 
 > Depends-on: - | Repo: aprovan | Touches: aprovan/packages/ui/src/apps-store/wire.ts, aprovan/packages/ui/src/apps-store/index.ts, aprovan/packages/registry-ui/src/apps/ui.tsx, aprovan/packages/registry-ui/src/apps/app-detail.tsx, aprovan/server/workspace/src/records.ts, aprovan/server/workspace/src/workflows/runner.ts, aprovan/server/workspace/scripts/migrate-app-records.ts | Verify: pnpm --filter @aprovan/ui typecheck && pnpm --filter @aprovan/ui test && pnpm --filter @aprovan/registry-ui typecheck && pnpm --filter @aprovan/registry-ui build && pnpm --filter @aprovan/registry-ui test
 
-- [ ] 5.1 `packages/ui/src/apps-store/wire.ts`: delete the `DataScope` type
+- [x] 5.1 `packages/ui/src/apps-store/wire.ts`: delete the `DataScope` type
       (line 370), the `dataScope?: DataScope` field on `AppSummary`
       (lines 412-413) and its parse block (lines 519-520), the
       `dataScope: DataScope` field on `CapabilityModel` (line 859), the
@@ -116,21 +116,21 @@ is independent).
       wording), and the `dataScope` merge block in `mergeCapabilities`
       (lines 1050-1051). Do not leave a `scope === "workspace"` branch that
       can no longer be reached (tech-plan D10).
-- [ ] 5.2 `packages/registry-ui/src/apps/ui.tsx`: delete `DataScopeBadge`
+- [x] 5.2 `packages/registry-ui/src/apps/ui.tsx`: delete `DataScopeBadge`
       (its only purpose was rendering the now-removed field).
-- [ ] 5.3 `packages/registry-ui/src/apps/app-detail.tsx`: remove the
+- [x] 5.3 `packages/registry-ui/src/apps/app-detail.tsx`: remove the
       `<DataScopeBadge app={app} />` render call (line 195) and its now-dead
       import; collapse `dataLocationPath`/`DataLocationCallout`'s
       `model.dataScope === "workspace"` branches to the single remaining
       explanation (owner-hosted), keeping the tooltip/title wording
       substantively intact.
-- [ ] 5.4 Fix the stale comments (no functional change): `records.ts:20`
+- [x] 5.4 Fix the stale comments (no functional change): `records.ts:20`
       ("an app's `dataScope`" → describe tenancy resolution without the
       retired term), `workflows/runner.ts:73-77`'s `scriptWorkspaceId` doc
       comment, `scripts/migrate-app-records.ts:26-32`'s caveat block —
       reword each to describe current behavior without asserting a
       `dataScope` concept exists.
-- [ ] 5.5 Grep gate, both repos: `grep -rni "dataScope" --include='*.ts' --include='*.tsx' packages server client` (aprovan)
+- [x] 5.5 Grep gate, both repos: `grep -rni "dataScope" --include='*.ts' --include='*.tsx' packages server client` (aprovan)
       and `grep -rni "dataScope" --include='*.ts' --include='*.tsx' packages apps` (registry)
       both return nothing.
 

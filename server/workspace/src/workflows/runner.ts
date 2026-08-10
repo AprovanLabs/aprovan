@@ -72,8 +72,8 @@ export interface RunWorkflowOptions {
   appScope?: ServiceContext["appScope"];
   /**
    * Where the script SOURCE is read from, when that differs from the
-   * workspace the run executes in — a `dataScope: "workspace"` app publishes
-   * its code from the owner workspace but runs against the caller's.
+   * workspace the run executes in — e.g. an app that publishes its code from
+   * the owner workspace but runs against the caller's.
    */
   scriptWorkspaceId?: string;
   /** Trace this run belongs to (a new trace is started when absent). */

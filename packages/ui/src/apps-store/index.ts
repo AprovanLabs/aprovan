@@ -49,7 +49,6 @@ export {
   type AppRoles,
   type AppSummary,
   type AppPin,
-  type DataScope,
   // Installations and directory
   installBindingsReady,
   normalizeDirectory,

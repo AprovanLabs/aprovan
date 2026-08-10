@@ -24,7 +24,6 @@ import {
   ConfirmDeleteButton,
   CopyChip,
   CreateWorkflowEmpty,
-  DataScopeBadge,
   DatabaseIcon,
   Empty,
   ErrorLine,
@@ -192,7 +191,6 @@ function Overview({
         ) : (
           <VisibilityBadge app={app} />
         )}
-        <DataScopeBadge app={app} />
         {!install && <ReleaseChip app={app} />}
         {install && (
           <span className={`${BADGE} border-border font-mono text-muted-foreground`}>
@@ -344,16 +342,14 @@ function dataLocationPath(model: CapabilityModel, app: AppSummary): string {
     return model.dataLocation;
   }
   const root = app.paths?.[0] ?? (app.entry ? app.entry.replace(/\/[^/]*$/, "") : app.name);
-  return model.dataScope === "workspace" ? "<install prefix>/data" : `${root}/data/<app user>`;
+  return `${root}/data/<app user>`;
 }
 
 /** Icon + monospace path + a tone chip, on one line — the fuller explanation
  *  moves to the title tooltip instead of a permanent paragraph. */
 function DataLocationCallout({ model, app }: { model: CapabilityModel; app: AppSummary }) {
   const explanation =
-    model.dataScope === "workspace"
-      ? "Self-hosted — data lives in each caller's own workspace; the publisher stores nothing and lends no credentials."
-      : "Owner-hosted — one private partition per app user, stored in the publishing workspace.";
+    "Owner-hosted — one private partition per app user, stored in the publishing workspace.";
   const title = model.fromGateway
     ? explanation
     : `${explanation} Derived from the manifest — this gateway doesn't report capabilities yet.`;
@@ -367,7 +363,7 @@ function DataLocationCallout({ model, app }: { model: CapabilityModel; app: AppS
         {dataLocationPath(model, app)}
       </code>
       <span className="ml-auto shrink-0 text-[0.65rem] text-muted-foreground">
-        {model.dataScope === "workspace" ? "self-hosted" : "owner-hosted"}
+        owner-hosted
       </span>
     </div>
   );
