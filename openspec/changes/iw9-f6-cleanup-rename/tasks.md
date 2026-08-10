@@ -90,16 +90,16 @@ is independent).
 
 > Depends-on: - | Repo: aprovan | Touches: aprovan/infra/aws/aws/** | Verify: pnpm --filter @aprovan/infra typecheck && pnpm --filter @aprovan/infra synth
 
-- [ ] 4.1 Confirm zero references before deleting:
+- [x] 4.1 Confirm zero references before deleting:
       `grep -rn "aws/aws" infra/aws/cdk.json infra/aws/Makefile infra/aws/package.json infra/aws/tsconfig.json`
       returns nothing, and no `.ts` file under `infra/aws/src` imports from
       `./aws/...` (tech-plan D6, already verified 2026-08-09; re-verify at
       implementation time in case it drifted).
-- [ ] 4.2 `git rm -r infra/aws/aws` (a normal tracked deletion — not a husk
+- [x] 4.2 `git rm -r infra/aws/aws` (a normal tracked deletion — not a husk
       scan; it produces a real diff).
-- [ ] 4.3 Verify the CDK app still typechecks and synthesizes cleanly with
+- [x] 4.3 Verify the CDK app still typechecks and synthesizes cleanly with
       the directory gone (Verify command above).
-- [ ] 4.4 Grep gate in both repos: `grep -rn "infra/aws/aws" .` (excluding
+- [x] 4.4 Grep gate in both repos: `grep -rn "infra/aws/aws" .` (excluding
       `.git`) returns nothing in either `aprovan` or `registry`.
 
 ## 5. Purge dataScope residue
