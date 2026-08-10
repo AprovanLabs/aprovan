@@ -78,7 +78,7 @@ describe("chat sessions", () => {
     expect(created.session.base).toMatch(/^[0-9a-f]{64}$/);
 
     // The base commit is on main.
-    const log = await data<{ commits: Array<{ id: string }> }>(await call("vfs/log", {}));
+    const log = await data<{ commits: Array<{ id: string }> }>(await call("vcs/log", {}));
     expect(log.commits[0]!.id).toBe(created.session.base);
   });
 
@@ -174,7 +174,7 @@ describe("chat sessions", () => {
 
     // And the merge commit is main's head.
     const log = await data<{ commits: Array<{ id: string; message: string }> }>(
-      await call("vfs/log", { limit: 1 }),
+      await call("vcs/log", { limit: 1 }),
     );
     expect(log.commits[0]!.message).toBe("Ship the board");
 

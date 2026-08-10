@@ -51,45 +51,45 @@ describe("vfs commits", () => {
     await putFile("notes/a.md", "alpha");
     await putFile("notes/b.md", "beta");
 
-    const first = await data<CommitPayload>(await call("vfs/commit", { message: "first" }));
+    const first = await data<CommitPayload>(await call("vcs/commit", { message: "first" }));
     expect(first.created).toBe(true);
     expect(first.commit.message).toBe("first");
     expect(first.commit.parents).toEqual([]);
     expect(first.commit.stats["added"]).toBeGreaterThanOrEqual(2);
 
     // Nothing changed — the same head comes back, no new commit.
-    const again = await data<CommitPayload>(await call("vfs/commit", { message: "noop" }));
+    const again = await data<CommitPayload>(await call("vcs/commit", { message: "noop" }));
     expect(again.created).toBe(false);
     expect(again.commit.id).toBe(first.commit.id);
   });
 
   it("chains commits and reports stats vs the parent", async () => {
     await putFile("notes/a.md", "alpha v2");
-    const second = await data<CommitPayload>(await call("vfs/commit", { message: "edit a" }));
+    const second = await data<CommitPayload>(await call("vcs/commit", { message: "edit a" }));
     expect(second.created).toBe(true);
     expect(second.commit.parents).toHaveLength(1);
     expect(second.commit.stats).toMatchObject({ modified: 1, removed: 0 });
 
     const log = await data<{ commits: Array<{ message: string }> }>(
-      await call("vfs/log", {}),
+      await call("vcs/log", {}),
     );
     expect(log.commits.map((c) => c.message)).toEqual(["edit a", "first"]);
   });
 
   it("never snapshots service state or hidden partitions", async () => {
     const show = await data<{ entries: Array<{ path: string }> }>(
-      await call("vfs/show", { commit: "main" }),
+      await call("vcs/show", { commit: "main" }),
     );
     expect(show.entries.some((e) => e.path.startsWith(".services/"))).toBe(false);
   });
 
   it("diffs two commits and pins reads to a commit", async () => {
-    const log = await data<{ commits: Array<{ id: string }> }>(await call("vfs/log", {}));
+    const log = await data<{ commits: Array<{ id: string }> }>(await call("vcs/log", {}));
     const [head, root] = log.commits;
 
     const diff = await data<{
       modified: Array<{ path: string; from: string; to: string }>;
-    }>(await call("vfs/diff", { from: root!.id, to: head!.id }));
+    }>(await call("vcs/diff", { from: root!.id, to: head!.id }));
     expect(diff.modified.map((m) => m.path)).toContain("notes/a.md");
 
     // Read the old side by commit.
@@ -113,11 +113,11 @@ describe("vfs commits", () => {
   });
 
   it("restores an old commit non-destructively", async () => {
-    const log = await data<{ commits: Array<{ id: string }> }>(await call("vfs/log", {}));
+    const log = await data<{ commits: Array<{ id: string }> }>(await call("vcs/log", {}));
     const root = log.commits.at(-1)!;
 
     const restore = await data<{ restored: string[] }>(
-      await call("vfs/restore", { commit: root.id, path: "notes/a.md" }),
+      await call("vcs/restore", { commit: root.id, path: "notes/a.md" }),
     );
     expect(restore.restored).toEqual(["notes/a.md"]);
 
@@ -127,19 +127,19 @@ describe("vfs commits", () => {
     expect(current.content).toBe("alpha");
 
     // Restore appended a version — history above it is intact.
-    const commits = await data<CommitPayload>(await call("vfs/commit", { message: "restored" }));
+    const commits = await data<CommitPayload>(await call("vcs/commit", { message: "restored" }));
     expect(commits.created).toBe(true);
     expect(commits.commit.stats).toMatchObject({ modified: 1 });
   });
 
   it("lists main in branches with its head", async () => {
     const branches = await data<{ refs: Array<{ name: string; commit: string }> }>(
-      await call("vfs/branches", {}),
+      await call("vcs/branches", {}),
     );
     const main = branches.refs.find((ref) => ref.name === "main");
     expect(main).toBeTruthy();
 
-    const log = await data<{ commits: Array<{ id: string }> }>(await call("vfs/log", {}));
+    const log = await data<{ commits: Array<{ id: string }> }>(await call("vcs/log", {}));
     expect(main!.commit).toBe(log.commits[0]!.id);
   });
 });
