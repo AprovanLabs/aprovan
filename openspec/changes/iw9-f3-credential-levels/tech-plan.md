@@ -185,6 +185,100 @@ point in either repo).
 - **Revisit if**: credential transfer/re-assignment between users becomes
   a feature (then owner must be mutable independently of provenance).
 
+### D3a: Uniqueness is a DB constraint, never check-then-insert
+
+Verified in source: every backend already has a race-safe idiom for
+"create, tolerate the concurrent duplicate" — registry's `SqlClient.run()`
+(`storage/sql-client.ts:55-68`) wraps every driver's unique-violation error
+into `UniqueConstraintError` *before* the caller sees it (sqlite/libsql
+regex on `UNIQUE constraint failed`, postgres/dsql on `duplicate key value
+violates unique constraint`); `SqlTenantStore.ensure` and
+`SqlGrantStore.grant` (`storage/sql-storage.ts:62-70`, `:397-405`) already
+catch it. Dynamo's equivalent is a conditional `Put` on a synthetic
+pointer item inside a `TransactWriteCommand`, caught via
+`isConditionalFailure` (`storage/dynamo-storage.ts:507-514`) —
+`DynamoProfileStore.create` (`:183-207`) and `provisionDefaultProfile`
+(`:617-637`) both already write 2-3 such conditional items atomically.
+D3's "enforced at create" is underspecified without naming which of these
+two idioms applies where — this closes that gap per storage layer:
+
+- **Choice — registry SQL (dsql/sqlite/libsql, `storage/schema.ts`)**: add
+  a partial unique index, portable across both dialects (SQLite and
+  Postgres both support `CREATE UNIQUE INDEX ... WHERE`):
+  `CREATE UNIQUE INDEX IF NOT EXISTS credentials_user_oauth_owner ON credentials(tenant_id, provider, created_by) WHERE level = 'user-oauth';`.
+  `SqlCredentialStore.create`'s existing `db.run(INSERT ...)` already
+  raises `UniqueConstraintError` on violation with zero new code in
+  `sql-storage.ts` beyond adding `level` to the column list (task 1.2).
+  `CredentialService.create` (`credentials/service.ts`) catches
+  `UniqueConstraintError` (import from `../storage/index.js`, alongside
+  its existing `OAuthClientResolutionError` catch at :93-98) and rethrows
+  a `CredentialResolutionError` naming the provider and "already
+  connected" — no re-query needed; the caller already has `input.provider`
+  and `createdBy` in scope.
+- **Choice — aprovan sqlite (`credentials.ts`, `CredentialStoreSqlite`)**:
+  same partial-unique-index shape, added next to the existing
+  `created_by` `ALTER` (constructor, :402-408 today):
+  `CREATE UNIQUE INDEX IF NOT EXISTS credentials_user_oauth_owner ON credentials(workspace_id, provider, created_by) WHERE level = 'user-oauth';`
+  (idempotent `IF NOT EXISTS`, no try/catch needed for the index itself).
+  `create()` catches better-sqlite3's `SqliteError` with
+  `code === "SQLITE_CONSTRAINT_UNIQUE"` and rethrows the same friendly
+  duplicate-connection error used on the registry SQL path.
+- **Choice — aprovan Dynamo (`credentials.ts`, `CredentialStoreDynamodb`)**:
+  `create()` currently issues the `CRED#<provider>#<id>` record and the
+  `CREDID#<id>` pointer as two *sequential* `PutCommand`s (:184-200).
+  When `input.level === "user-oauth"` (which requires `createdBy` per the
+  level/type matrix), combine all writes into **one**
+  `TransactWriteCommand` with a third conditional item —
+  `SK: USEROAUTH#<provider>#<createdBy>`,
+  `ConditionExpression: "attribute_not_exists(PK)"` — mirroring
+  `DynamoProfileStore.create`'s two-conditional-item transact exactly.
+  Catch `ConditionalCheckFailedException` with the same
+  `isConditionalFailure`-shaped check already precedented in
+  `dynamo-storage.ts:507-514` (add the helper locally; aprovan's
+  `credentials.ts` does not yet have it) and rethrow the friendly
+  duplicate-connection error. `delete()` removes the `USEROAUTH#...`
+  pointer symmetrically (in the same `TransactWriteCommand` as the record
+  + `CREDID#` deletes) so a disconnected user can reconnect.
+- **Choice — aprovan dsql backend (`CredentialStoreRegistry`)**: gets the
+  registry SQL enforcement above **for free, once it stops bypassing it**
+  — see the `CredentialStoreRegistry.create` finding under D3b.
+- **Alternatives**: App-level "list existing rows, then insert" in
+  `CredentialService.create`/`ICredentialStore.create` (tasks 1.3/5.2's
+  literal wording) — a TOCTOU race between two concurrent connects from
+  the same user; the DB already has the tools to make this atomic, per
+  above. Rejected.
+- **Revisit if**: never — this is strictly a correctness fix over the
+  original wording, not a new decision axis.
+
+### D3b: `CredentialStoreRegistry.create` must route through `CredentialService`
+
+Verified in source: aprovan's dsql-backend credential creation has **two
+parallel paths** today. `routes/profiles.ts:97` constructs
+`new CredentialService(storage.credentials, storage.provisionCredential)`
+and creates through it (so it already gets `provisionCredential`'s
+grant-enforcement transaction). `credentials.ts`'s
+`CredentialStoreRegistry.create` (:612-623) instead calls
+`storage.credentials.create(...)` **directly** — the raw storage
+primitive, bypassing `CredentialService` (and therefore every level
+validation/default-derivation/uniqueness rule task 1.3 adds to it)
+entirely. Task 5.2's assumption that "creation-time validation ... applies
+identically on the sqlite/dynamo backends" implicitly requires the dsql
+backend to already get it from stream 1 — false as the code stands today.
+
+- **Choice**: `CredentialStoreRegistry.create` constructs a
+  `CredentialService` the same way `routes/profiles.ts:97` already does
+  (`new CredentialService(storage.credentials, storage.provisionCredential)`,
+  memoized alongside the existing `store()` accessor) and creates through
+  it instead of calling `storage.credentials.create` directly. This is the
+  minimal fix: one already-precedented construction, no new abstraction,
+  and the dsql backend inherits stream 1's validation without duplicating
+  it — matching what task 5.2 assumed.
+- **Alternatives**: Duplicate the matrix/default/uniqueness checks a third
+  time inside `credentials.ts` for the dsql path specifically — the exact
+  "behavior depends on `storeBackend()`" drift task 5.2 already exists to
+  prevent. Rejected.
+- **Revisit if**: never — this is a correctness fix, not a new decision.
+
 ### D4: Resolution order — pin, then invoker's own, then workspace
 
 - **Choice**: Normative order: (1) explicit `credentialId` pin resolves
@@ -203,6 +297,44 @@ point in either repo).
 - **Revisit if**: iw9-c introduces per-profile level policy ("this profile
   is always the bot") — that composes as a pin, not an order change.
 
+### D4a: `resolveProfile`'s three `firstForProvider` call sites need an invoker-aware sibling method
+
+Verified in source: `deps.credentials.firstForProvider(tenantId, provider)`
+(`CredentialService`/`CredentialStore`) takes no invoker parameter — it is
+purely "first row for this provider, creation order" (`storage/types.ts`
+docstring). `resolveProfile` calls it three times
+(`profiles/resolve.ts:263, :350, :378`) and task 2.2 requires all three
+sites to implement D4's order ("invoker's own `user-oauth` row first, then
+workspace-level rows"), which is not expressible through a method that
+never sees the invoker. Widening `firstForProvider` itself would be a
+breaking behavior change for every existing caller of the "additive/
+widening only" minor bump (D1 of the Repo split section).
+
+- **Choice**: Add `CredentialService.resolveForInvoker(tenantId, provider, invoker): Promise<ResolvedCredential | undefined>`
+  — additive, sits beside `firstForProvider` rather than replacing it.
+  Implements D4's order by following the exact `list()`-then-filter idiom
+  `resolveProfile`'s own step-5 fallback already uses at
+  `profiles/resolve.ts:323-325` (`deps.credentials.list(tenantId)`, then a
+  filter pass) rather than inventing a new storage-layer query shape: list
+  the tenant's credentials for `provider`, prefer the row where
+  `effectiveLevel(...) === "user-oauth" && row.createdBy === invoker.sub`,
+  else fall back to the first `workspace-token`/`workspace-oauth` row in
+  creation order (delegating the tie-break to the existing
+  `firstForProvider` primitive is fine internally — only the *selection*
+  logic is new). All three call sites in `resolveProfile` (:263 stored-row
+  no-pin default, :350 and :378 ungoverned-mode fallback) switch to this
+  method; `firstForProvider` remains on the interface for any caller that
+  is genuinely invoker-agnostic by contract (there are none left after
+  this change, but removing it is a breaking change the minor bump must
+  not make).
+- **Alternatives**: Add an optional `invoker?` parameter to
+  `firstForProvider` itself — same method, same name, different meaning
+  depending on whether the caller remembered to pass it; exactly the
+  "invoker-less call site typechecks" hole D6 rejects for
+  `resolveCredentialRecord`. Rejected for the same reason.
+- **Revisit if**: never — this is required to make task 2.2 as literally
+  written implementable, not a new decision axis.
+
 ### D5: Fail-closed error is a typed, coded error
 
 - **Choice**: `CredentialNotConnectedError` exported from
@@ -217,15 +349,53 @@ point in either repo).
 
 ### D6: System paths get a workspace-only resolver
 
-- **Choice**: Add `resolveWorkspaceCredential(workspaceId, provider)`
-  beside `resolveCredentialRecord`; it filters to workspace levels and is
-  the only resolver invoker-less code may call. `vcs/mounts.ts:207` moves
-  to it. `resolveCredentialRecord` makes `invoker` **required**.
+- **Choice**: Add
+  `resolveWorkspaceCredential(workspaceId: string, provider: string): Promise<ResolvedCredential | undefined>`
+  beside `resolveCredentialRecord` — same return shape (`ResolvedCredential`:
+  `{ id, level, owner?, payload }`) as the invoker-aware resolver, so
+  callers get level/id for free without a type-shaped tell that "this path
+  is somehow lesser." The **guarantee**, not just the happy-path behavior:
+  the row selection itself is restricted to candidates whose
+  `effectiveLevel(type, storedLevel)` is `"workspace-token"` or
+  `"workspace-oauth"` — a `user-oauth` row is filtered out of consideration
+  before ranking, never merely "not the one picked." `owner` is therefore
+  always `undefined` on its result by construction, not by convention.
+  It is the only resolver invoker-less code may call; `vcs/mounts.ts:207`
+  moves to it. `resolveCredentialRecord` makes `invoker` **required**.
+  `credential-store-adapter.ts`'s `firstForProvider` (:42-51) — currently
+  the one other invoker-less call to the raw `resolveRecordForProvider`
+  primitive, and currently dead code with zero call sites anywhere in
+  `server/workspace/src` (verified) — migrates to
+  `resolveWorkspaceCredential` in the same stream that defines it (moved
+  from stream 5 to stream 6; see task 6.2/6.5 and D6a below), closing the
+  gap before anything ever wires the adapter up live.
 - **Alternatives**: Optional invoker on one function — every future call
   site silently compiles without attribution, recreating today's hole.
   Rejected; the type system should force the choice.
 - **Revisit if**: a system path legitimately needs user identity (it then
   has an owner by definition — invariant 3 — and uses the main resolver).
+
+### D6a: The invoker grep-gate scans by exclusion, not by directory allowlist
+
+Task 6.5's original verify command (`! grep -rn "resolveRecordForProvider" server/workspace/src/routes server/workspace/src/workflows server/workspace/src/vcs`) allowlists three directories — it does not cover `credential-store-adapter.ts` (lives directly under `server/workspace/src/`), which calls the same invoker-less primitive at line 43. It is not exempt by design; it is dead code today (zero call sites, verified) that the D6 migration above brings into compliance preemptively, and the gate is widened so a *future* re-wiring of the adapter (or any new file) cannot silently regress past it.
+
+- **Choice**: `! grep -rln "resolveRecordForProvider" server/workspace/src --include="*.ts" | grep -v "^server/workspace/src/credentials\.ts$"` —
+  scan everything under `src`, exclude only `credentials.ts` (the file
+  that legitimately implements the primitive), rather than allowlisting
+  the three directories that happened to be dispatch call sites. This
+  automatically covers `credential-store-adapter.ts`, the existing three
+  directories, and any file added later. Registry's mirrored gate (`no
+  resolution entry point in registry/packages/registry-server/src that
+  reaches a user-oauth row without ctx.principal`) is likewise made
+  concrete: `! grep -n "deps\.credentials\.firstForProvider" packages/registry-server/src/profiles/resolve.ts`
+  — after D4a, `resolve.ts` must have zero direct `firstForProvider` calls
+  left; all three route through `resolveForInvoker`.
+- **Alternatives**: Keep the directory allowlist and add
+  `credential-store-adapter.ts` as a fourth explicit path — works today,
+  silently stops working the next time a file moves or a new invoker-less
+  call site appears elsewhere in `src`. Rejected; exclusion-based scanning
+  degrades safely (a new violation anywhere is caught by default).
+- **Revisit if**: never — this is a gate-accuracy fix, not a new decision.
 
 ### D7: Audit attribution is additive nullable columns
 
@@ -276,20 +446,54 @@ export class CredentialNotConnectedError extends Error {
   readonly provider: string;
   readonly requiredLevel: "user-oauth";
 }
+
+/** D4a — additive sibling of `firstForProvider`; the only invoker-aware
+ *  selection primitive `resolveProfile` may call after this change. */
+declare class CredentialService {
+  resolveForInvoker(
+    tenantId: string,
+    provider: string,
+    invoker: CredentialInvoker,
+  ): Promise<ResolvedCredential | undefined>;
+}
+
+/** D6 — workspace-only sibling of `resolveCredentialRecord`; the only
+ *  resolver invoker-less aprovan code may call. Never returns a
+ *  `user-oauth` row: filtered out of selection, not merely unpicked. */
+declare function resolveWorkspaceCredential(
+  workspaceId: string,
+  provider: string,
+): Promise<ResolvedCredential | undefined>; // owner always undefined
 ```
 
 Row/schema deltas:
 
 - registry `credentials` table: `level TEXT` (nullable);
-  `CredentialRow.level?: CredentialLevel`. Create-time validation matrix
-  (level ⟷ payload type) and `(tenant, provider, created_by)` uniqueness
-  for `user-oauth` live in `CredentialService.create`.
+  `CredentialRow.level?: CredentialLevel`. `CredentialProvisionInput`
+  (`storage/types.ts`) and `CredentialStore.create()`'s input both gain
+  `level?: CredentialLevel` — threaded through `provisionCredential()` in
+  BOTH `sql-storage.ts` (:591-597 `credentialStore.create()` call) and
+  `dynamo-storage.ts` (:664-670 `credentials.create()` call); without this
+  the level a `CredentialService.create` computed never reaches the row.
+  Create-time validation matrix (level ⟷ payload type),
+  `(tenant, provider, created_by)` uniqueness for `user-oauth` (D3a: a DB
+  constraint, caught and rethrown — not a check-then-insert), and default
+  derivation live in `CredentialService.create`.
 - aprovan `CredentialRecord.level?: CredentialLevel` (+ sqlite column via
-  try/catch ALTER; Dynamo item attribute; dsql backend inherits the
-  registry table). `credential-store-adapter.ts` maps it both ways.
+  try/catch ALTER, plus the D3a partial unique index; Dynamo item
+  attribute, plus the D3a `USEROAUTH#` conditional pointer; dsql backend
+  inherits the registry table **and now actually reaches
+  `CredentialService.create`**, per D3b — `CredentialStoreRegistry.create`
+  no longer calls `storage.credentials.create()` directly).
+  `credential-store-adapter.ts` maps `level` both ways for
+  `get`/`list`/`getWithPayload`, and its `firstForProvider` (:42-51)
+  resolves through `resolveWorkspaceCredential` (D6) instead of the raw
+  `resolveRecordForProvider` primitive.
 - `resolveProfile` step 4c/5 and workspace `resolveCredentialRecord`
   return `ResolvedCredential` (superset of today's `{ id, payload }`), so
-  audit appends can read `level`/`owner` without a second fetch.
+  audit appends can read `level`/`owner` without a second fetch. Step 4c/5
+  select through the new `CredentialService.resolveForInvoker` (D4a), not
+  `firstForProvider` directly.
 - `AuditEntry` delta: six optional fields per D7; `recent()` returns them
   on sqlite and dsql.
 
@@ -324,6 +528,26 @@ prompt. Nothing else in this change encodes approval behavior.
 - [Audit fire-and-forget writes must not start failing on old schemas] →
   additive nullable columns + the existing try/catch append contract;
   tested per backend.
+- [`CredentialStoreRegistry.create` bypassed `CredentialService` before
+  this change (D3b) — level validation would silently not apply on the
+  dsql backend] → fixed by routing it through the same
+  `CredentialService` construction `routes/profiles.ts:97` already uses;
+  verified via a dsql-backend case in
+  `server/workspace/tests/credential-levels.test.ts` (stream 5) alongside
+  the sqlite cases.
+- [`credential-store-adapter.ts`'s `firstForProvider` is dead code today
+  (zero call sites) but implements the invoker-less primitive directly] →
+  migrated to `resolveWorkspaceCredential` in stream 6 (D6/D6a) before any
+  future caller can wire it up unsafely; the widened grep-gate
+  (exclusion-based, not directory-allowlisted) catches a regression here
+  or anywhere else in `src`.
+- [Registry's `resolveProfile` calls `firstForProvider` directly at three
+  sites, which has no invoker parameter — task 2.2's D4 order is not
+  expressible through it] → D4a adds the additive
+  `CredentialService.resolveForInvoker`; `firstForProvider` itself is
+  untouched (no breaking change to the minor bump) but `resolve.ts` stops
+  calling it directly, gated by
+  `! grep -n "deps\.credentials\.firstForProvider" profiles/resolve.ts`.
 
 ## Rollout
 
@@ -344,5 +568,9 @@ prompt. Nothing else in this change encodes approval behavior.
 
 ## Open Questions
 
-None. PRD assumptions A1–A3 are decided above (D2, D3); the orchestrator
-may veto at review.
+None. PRD assumptions A1–A3 are **confirmed** (D2, D3) — the instruction to
+elaborate this change per its recommended defaults is the orchestrator
+decision; implementers treat A1–A3 as settled, not as pending review.
+D3a/D3b/D4a/D6a (added 2026-08-09, delegation-readiness pass) are
+correctness/gap fixes over the original text, not new open questions —
+see `briefs/deviations.md` for why they were needed and what they change.

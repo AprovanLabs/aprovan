@@ -351,9 +351,22 @@ export function deleteInstance(workspaceId: string, instanceId: string,
   actor: string): Promise<void>;
 ```
 
-Host = hosting-workspace admin, or `createdBy` when the hosting workspace is
-the creator's personal space (IW-9 D1/D22). Host-gating lives in the
-`apps.instance*` procedures, not in this module.
+Host = hosting-workspace admin: `(await getMembership(hostWorkspaceId,
+callerSub))?.role === "admin"`. This single check also satisfies "or creator
+when hosting in their personal space" (IW-9 D1/D22) with no separate branch —
+**resolved by source inspection, 2026-08-09**: the only workspace+membership
+creation path in this codebase is the Cognito post-confirmation trigger
+(`infra/aws/src/lambdas/post-confirmation/index.ts:59-85`, live-wired at
+`infra/aws/src/stacks/main.ts:122-124`). For an uninvited signup it mints a
+solo workspace (`name: \`${email}'s workspace\``, line 65) and writes that
+same user's membership row with
+`role: typeof invite?.["role"] === "string" ? invite["role"] : "admin"`
+(lines 80-81) — i.e. `"admin"` whenever there is no invite. A personal-space
+creator is therefore always that workspace's admin already; there is no
+`createdBy`-vs-membership-role split to implement, and no "is this a personal
+workspace" detection to invent (none exists in `identity/types.ts` /
+`workspaces.ts` — checked). Host-gating lives in the `apps.instance*`
+procedures, not in this module.
 
 ### `services.ts` — record-surface addressing (the iw9-b seam)
 

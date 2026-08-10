@@ -83,9 +83,11 @@ Responsibilities: `manifest.ts` parses+validates only (no IO beyond the given by
 - **Revisit if**: identity ever moves off ULIDs (would be a new IW-level decision).
 
 ### T5: New `/a` + `/w` routers; legacy `/apps` handlers become 302 shims
-- **Choice**: New `routes/app-urls.ts` mounted at domain root beside the existing mounts (`server.ts`), owning resolution (ULID → id path, else slug path via global claims / workspace alias) and the live surface (page, `__project__`, `__sdk__.*`, static) by delegating to the existing handlers' internals. `routes/live-apps.ts` routes are rewritten as resolve-then-302 shims; `buildAppShell` config bases switch to canonical prefixes (`/a/<appId>`, `/w/<wsId>/a/<installId>`), removing the workspace id from public shells.
-- **Alternatives**: CloudFront/edge rewrite rules — resolution needs the slug indexes, which live behind svc-records, not at the edge; mutating live-apps.ts in place to speak both grammars — leaves the leaking URL grammar alive and grep-unverifiable.
-- **Revisit if**: D21's edge ws→region lookup lands and wants resolution at the edge.
+- **Choice**: New `routes/app-urls.ts` mounted at domain root beside the existing mounts (`server.ts`), owning resolution (ULID → id path, else slug path via global claims / workspace alias) and the live surface (page, `__project__`, `__sdk__.*`, static). This is a **move**, not an import-and-reuse: today's serving logic (`resolveLiveApp`, `viewerSub`, `requireViewer`, `resolvePin`, `readPinned`, `servableTargets`, `handleLive*`, `buildAppShell` — `live-apps.ts:79-538`) relocates into `app-urls.ts` verbatim (port, don't reimplement, per task 5.5); `routes/live-apps.ts` ends the change containing **only** resolve-then-302 shims, per the architecture diagram's "`live-apps.ts` retains only redirect shims." A shim resolves the legacy segment to a canonical path and returns `c.redirect(canonical, 302)` — it does not call into `app-urls.ts`'s handlers at all.
+- **`/w/<wsRef>/a/<ref>` resolution at F4 stage (no over-building of iw9-b's install-as-copy model)**: `<ref>` is resolved by porting `resolveLiveApp`'s existing two-branch logic unchanged (`live-apps.ts:103-155`), which already disambiguates by trying an install first: (1) if `isAppId(ref)`, try `readInstall(wsId, ref)` (`apps/install.ts`, existing pre-IW9 origin-pinned install record — **not** D8's install-as-copy, which iw9-b has not built yet); a hit serves the origin's pinned release (or the local fork when `editing`), exactly as today. (2) On a miss (no install with that id) or when `ref` is not a ULID, fall through to `resolveAppRef(wsId, ref)` — ULID passthrough (the workspace's own app by appId) or alias lookup (the workspace's own app by slug/name). This means `/w/<wsId>/a/<installId>` and `/w/<wsId>/a/<slug-or-own-appId>` are the **same route handler** with the same dual resolution `resolveLiveApp` already performs — F4 does not add a new install concept, it only moves the existing one under the canonical prefix. `<wsRef>` resolves via `resolveWorkspaceSlug` (Stream 2) when not a raw workspace id, else passthrough.
+- **`/w/<wsSlug>/a/<slug>` never resolves an install**: installs have no name/slug field anywhere in `apps/install.ts` (verified by grep — installs are addressed by `installId` only, everywhere in `apps/service.ts`). The vanity form can therefore only ever resolve a workspace's own directly-authored app via `resolveAppRef`'s alias branch; document this explicitly so the implementer doesn't invent install aliasing that has no backing data model.
+- **Alternatives**: CloudFront/edge rewrite rules — resolution needs the slug indexes, which live behind svc-records, not at the edge; mutating live-apps.ts in place to speak both grammars — leaves the leaking URL grammar alive and grep-unverifiable; keeping `live-apps.ts` as the server-logic owner and having `app-urls.ts` import its internals — rejected because the architecture's end state (`live-apps.ts` = shims only) requires the logic to not still live in the file the shims live in, and dead exports left behind fail the MIGRATION-DEBT grep-gate the same way an un-deleted duplicate would.
+- **Revisit if**: D21's edge ws→region lookup lands and wants resolution at the edge; iw9-b's real install-as-copy model changes what `readInstall` returns (F4 only moves the existing lookup, it does not change its contract).
 
 ### T6: Global slug claims and workspace-slug resolution as deployment-tenant scopes
 - **Choice**: `svc#slugs/<globalSlug>` → `{ appId, workspaceId, claimedAt }` and `svc#wsSlugs/<wsSlug>` → `{ workspaceId }`, both under the existing reserved `DEPLOYMENT_TENANT` (pattern of `svc#apps/byId` and `svc#directory`). Claim/release wired to publish/unpublish/remove; `wsSlugs` gets a resolver only (population is out of F4's scope — vanity `/w/<wsSlug>` 404s until a later change writes entries).
@@ -93,9 +95,14 @@ Responsibilities: `manifest.ts` parses+validates only (no IO beyond the given by
 - **Revisit if**: global claims need contention semantics svc-records cannot give (compare-and-swap across regions).
 
 ### T7: Icon fallback = first grapheme + FNV-1a(slug) over a fixed 12-color palette
-- **Choice**: `appIconFallback(slug)` → `{ letter, color }`: letter = first grapheme of the slug, uppercased; color = `PALETTE[fnv1a32(utf8(slug)) % 12]` with the palette values fixed in the shared module. Canonical implementation in `packages/ui/src/apps/app-icon.ts` (dependency-free leaf module); the algorithm is normative so any second implementation is test-verifiable against fixtures. Hash input is the **slug** (D6), so rename re-colors — accepted, matches D6's wording.
+- **Choice**: `appIconFallback(slug)` → `{ letter, color }`: letter = first grapheme of the slug, uppercased; color = `PALETTE[fnv1a32(utf8(slug)) % 12]` with the palette values fixed in the shared module. Canonical implementation in `packages/ui/src/apps/app-icon.ts` (dependency-free leaf module); the algorithm is normative so any second implementation is test-verifiable against fixtures. Hash input is the **slug** (D6), so rename re-colors — accepted, matches D6's wording. **Pinned FNV-1a-32 constants** (standard, non-negotiable so two implementations can't drift): offset basis `0x811c9dc5`, prime `0x01000193`, computed over the UTF-8 bytes of the slug, 32-bit unsigned arithmetic throughout (`>>> 0` after each multiply in JS). Slugs are `NAME_RE`-constrained to `[a-z0-9-]`, i.e. ASCII-only, so "first grapheme" reduces to `slug[0]` — no Unicode grapheme-cluster segmentation is required or expected.
 - **Alternatives**: hash the appId — stable across rename, but D6 says slug and pre-reconcile surfaces (create dialogs) have no appId yet; persist a random color on the record — not pure, breaks "same slug, same color, everywhere".
 - **Revisit if**: user feedback shows rename re-coloring is disorienting (would need a D6 amendment).
+
+### T8: `root → appId` binding is a new workspace-scoped svc-record index, not a list scan
+- **Choice**: Reconcile's "resolve existing binding by `root`" (T3) needs a forward lookup that does not exist in `apps/identity.ts` today (verified by reading the file: `ALIAS_SCOPE` is keyed by name/slug, `BY_ID_SCOPE` is keyed by appId — neither is keyed by `root`). Add one more scope in `identity.ts`, following the exact shape of the existing `AppLocationRecord`/`indexAppLocation`/`dropAppLocation` trio (unconditional overwrite, no self-check — the caller, `reconcileApp`, owns all guard logic before calling): `ROOT_SCOPE = svcScope("apps", "root")`, workspace-scoped (a `root` path is only meaningful inside the workspace that owns it, same tenancy as `ALIAS_SCOPE`). `AppRootBinding = { appId: AppId }`. Three functions: `readRootBinding(workspaceId, root)`, `bindRoot(workspaceId, root, appId)`, `dropRootBinding(workspaceId, root)` — see Interfaces & Data. The reverse direction (given an `appId`, which `root` is it bound to, needed for the foreign/duplicate-id guard) does **not** need a second new index: `resolveAppLocation(appId)` (existing, deployment-wide) gives the owning `workspaceId`, and the `AppRecord` itself carries `root` (T3) — one `readApp` after `resolveAppLocation` answers "what root does this appId already own" with two point reads, both already existing primitives.
+- **Alternatives**: scan `listApps(workspaceId)` and match `root` client-side — explicitly rejected per the instruction that produced this decision: a list scan over every app in a workspace on every reconcile call is both slower and racier (two concurrent reconciles of different new roots could both see "no match" and both mint) than a single keyed read; a dedicated index makes "no binding at this root" a single point-read with the same consistency guarantees every other identity lookup in this file already relies on. A second deployment-wide reverse index (`appId → root`) was also considered and rejected as redundant — `AppRecord.root` already carries that fact, so a second index would be a second source of truth for information the record already owns.
+- **Revisit if**: iw9-b's tree model needs cross-workspace root uniqueness (a root binding readable across workspaces) — out of scope here; `root` bindings are per-workspace, same as `ALIAS_SCOPE`.
 
 ## Interfaces & Data
 
@@ -109,7 +116,15 @@ const AppYamlSchema = z.object({
   title: z.string().min(1).optional(),
   description: z.string().optional(),
   icon: z.string().optional(),        // named icon OR app-root-relative path; traversal rejected
-  capabilities: z.array(z.string()).optional(), // ceiling, grammar of allowedTools: "ns.proc" | "ns.*" (enforced by iw9-c)
+                                       // by STRING PATTERN ONLY (reject a leading "/" and any ".."
+                                       // path segment) — manifest.ts has no filesystem access (no IO
+                                       // beyond the given bytes, per Architecture); this is not a
+                                       // real path resolution against the app root.
+  capabilities: z.array(z.string()).optional(), // ceiling; F4 accepts ANY string array and does not
+                                       // validate the "ns.proc" | "ns.*" grammar — that grammar is
+                                       // iw9-c's enforcement concern (Wave 2). Do not add a regex
+                                       // for it here; a stricter check now could conflict with
+                                       // iw9-c's eventual design.
   requires: z.array(z.object({        // existing AppRequirement shape (store.ts:142-146)
     contract: z.string(),
     profileName: z.string().optional(),
@@ -130,15 +145,28 @@ export function loadAppYaml(content: string):
 ```ts
 interface AppRecord {           // successor shape of AppManifest for identity fields
   appId: AppId;                 // ULID, minted by reconcile only
-  slug: string;                 // current binding; alias index stays authoritative for resolution
-  root: string;                 // app-root workspace path — the reconcile binding key (T3)
+  name: string;                 // EXISTING field (AppManifest.name); reconcile sets this equal
+                                 // to `slug` so every name-keyed caller that iw9-b hasn't
+                                 // migrated yet (aliasing, live-apps resolution, allowedTools
+                                 // namespace-derivation) keeps working unchanged.
+  slug?: string;                // current binding; present on every record reconcileApp writes,
+                                 // ABSENT on records still written by the pre-F4 saveApp() fan-out
+                                 // (apps/service.ts's create/publish flow is not rewired to
+                                 // reconcileApp by F4 — PRD non-goal "no app tree layout" — so
+                                 // both record shapes coexist until iw9-b migrates callers).
+                                 // Optional, not required: T3/task 3.1 is additive-only.
+  root?: string;                // app-root workspace path — the reconcile binding key (T3);
+                                 // same optionality rule as `slug` (undefined for pre-F4 records).
   originAppId?: AppId;
-  declared: AppYaml;            // last-reconciled authored snapshot (projection, not authority)
+  declared?: AppYaml;           // last-reconciled authored snapshot (projection, not authority);
+                                 // undefined for pre-F4 records, same rule as `slug`/`root`.
   createdBy: string; createdAt: string; updatedAt: string;
   // existing operational fields (entry/paths/allowedTools/roles/rateLimit/visibility/
   // workflows/channels) remain until iw9-b migrates them; F4 does not delete them.
 }
 ```
+
+**`name` vs `slug` projection (resolves the ambiguity in the original draft, which showed `slug` as required)**: `AppManifest.name` is the pre-existing mutable-alias field every current caller reads/writes; `slug` is F4's new field with the same *meaning* (D4's vanity slug) but a narrower *writer* (only `reconcileApp`, never hand-written, never written by the legacy `saveApp` path). Reconcile always keeps `name === slug` on the records it writes — there is exactly one value, exposed under two field names during the migration window. Consumers added by F4 (the directory projection, the URL routers) read `manifest.slug ?? manifest.name` so they work identically whether a record went through `reconcileApp` or the legacy path; nothing in F4 reads `slug` without this fallback. `iw9-b` retiring the `name` field (already called out below, "renaming the `name` field is deferred to B") is the point at which the fallback is deleted.
 
 ### Reconcile contract (`server/workspace/src/apps/reconcile.ts`)
 
@@ -152,12 +180,52 @@ interface ReconcileInput {
 }
 interface ReconcileResult { appId: AppId; created: boolean; changed: boolean; }
 function reconcileApp(input: ReconcileInput): Promise<ReconcileResult>;
-// Guarantees: first-sight (no record with this root) => mint ULID + create record
-//   + alias + location index + directory row (one entry point; subsumes
-//   saveApp's fan-out at store.ts:371-377).
+// Algorithm (uses the T8 root-binding index — readRootBinding/bindRoot/dropRootBinding
+// in apps/identity.ts — plus existing resolveAppLocation/readApp/setAlias/dropAlias):
+//
+// 1. binding = readRootBinding(workspaceId, root)
+// 2. IF binding is undefined (no record bound to this root):
+//    a. IF expectedAppId is set: this is a RENAME/MOVE, not a fresh app. Resolve
+//       loc = resolveAppLocation(expectedAppId) (throws 404 -> becomes 400 foreign id
+//       if unknown); require loc.workspaceId === input.workspaceId (cross-workspace
+//       moves are out of scope for F4 -> 400 foreign id, names root + id). Read the
+//       existing record at (workspaceId, expectedAppId); its stored `root` is the OLD
+//       root. Rebind: bindRoot(workspaceId, newRoot, appId), dropRootBinding(workspaceId,
+//       oldRoot), setAlias(workspaceId, newSlug, appId), dropAlias(workspaceId, oldSlug)
+//       — appId/createdAt unchanged, updatedAt bumped, declared/slug/root updated to the
+//       new values. Result: { appId, created: false, changed: true }.
+//    b. ELSE (no expectedAppId): first-sight. mintAppId() + create record (with slug/root/
+//       declared populated, name = slug) + setAlias + indexAppLocation + bindRoot +
+//       syncDirectoryEntry. Result: { appId, created: true, changed: true }.
+// 3. IF binding exists (appId = binding.appId):
+//    a. expectedAppId set and !== appId -> 400 foreign-or-duplicate id, no writes.
+//    b. yaml.slug present and !== basename(root) -> 400 slug/basename mismatch (T2).
+//    c. assertValidSlug(basename(root)) fails -> 400 ULID-shaped or malformed slug.
+//    d. new slug (=basename(root)) held by a different appId in this workspace
+//       (setAlias's existing 409) -> 409 slug collision, names holder, no writes to
+//       either app's binding.
+//    e. declared yaml deep-equals the stored record's `declared` AND slug unchanged ->
+//       { appId, created: false, changed: false }, zero writes (idempotence).
+//    f. otherwise (an authored-field edit, same root/slug) -> update record.declared
+//       (+ any projected fields: title/icon/etc.), bump updatedAt, re-sync directory
+//       row -> { appId, created: false, changed: true }.
+//
 // Errors: 400 yaml-identity-claim | 400 foreign-or-duplicate id (names root + id)
 //   | 400 slug/basename mismatch | 400 ULID-shaped slug | 409 slug held by other
 //   appId in workspace (names holder). Idempotent: unchanged input => changed=false, no writes.
+```
+
+### Root binding index (`server/workspace/src/apps/identity.ts`, addition — T8)
+
+```ts
+// Workspace-scoped, following the AppLocationRecord/indexAppLocation/dropAppLocation
+// pattern exactly: unconditional read/write/delete, no self-guard — reconcile.ts is
+// the sole caller and performs all guard checks (foreign id, slug collision, etc.)
+// before calling these. Not exported for use outside apps/reconcile.ts.
+export interface AppRootBinding { appId: AppId; }
+export async function readRootBinding(workspaceId: string, root: string): Promise<AppRootBinding | undefined>;
+export async function bindRoot(workspaceId: string, root: string, appId: AppId): Promise<void>;
+export async function dropRootBinding(workspaceId: string, root: string): Promise<void>;
 ```
 
 ### Slug + claims (`server/workspace/src/apps/slugs.ts`)
@@ -187,10 +255,15 @@ No region segment anywhere. Public shell config (`buildAppShell`) emits only can
 ```ts
 const APP_ICON_PALETTE: readonly string[]; // 12 fixed hex values, normative
 function appIconFallback(slug: string): { letter: string; color: string };
-// letter = first grapheme uppercased; color = PALETTE[fnv1a32(utf8(slug)) % 12]
+// letter = slug[0].toUpperCase() (slugs are NAME_RE-constrained to [a-z0-9-], ASCII-only,
+//   so no grapheme-cluster segmentation is needed — see T7);
+// color = PALETTE[fnv1a32(utf8(slug)) % 12];
+// fnv1a32: 32-bit FNV-1a, offset basis 0x811c9dc5, prime 0x01000193, over UTF-8 bytes,
+//   unsigned 32-bit arithmetic throughout (pinned in T7 so a second implementation
+//   cannot silently drift on constant choice).
 ```
 
-Directory rows (`DirectoryEntry`, `apps/directory.ts:24-33`) gain `icon?: string` and always carry `slug` (renaming the `name` field is deferred to B; F4 adds fields, removes none).
+Directory rows (`DirectoryEntry`, `apps/directory.ts:24-33`) gain `icon?: string`; the existing `name` field is retained (rename deferred to B) and the projection always populates a usable slug via `slug: manifest.slug ?? manifest.name` (see the AppRecord `name`/`slug` note above) — so every directory row carries a slug value whether or not its source record went through `reconcileApp`, and `icon: manifest.declared?.icon` is `undefined` (fallback renders) for every pre-F4 record.
 
 ## Risks / Trade-offs
 
@@ -202,11 +275,25 @@ Directory rows (`DirectoryEntry`, `apps/directory.ts:24-33`) gain `icon?: string
 
 ## Rollout
 
-1. Land `manifest.ts`, `slugs.ts`, `reconcile.ts`, record-shape additions (additive; no behavior change for existing callers).
+1. Land `manifest.ts`, `slugs.ts`, `reconcile.ts`, the `identity.ts` root-binding index (T8), record-shape additions (additive; no behavior change for existing callers).
 2. Land `/a` + `/w` routers serving beside legacy routes (both grammars valid for one deploy).
 3. Flip legacy `/apps/*` handlers to 302 shims; switch shell config bases to canonical. Rollback = revert step 3 only; steps 1-2 are additive.
 4. Grep gates (definition of done, MIGRATION-DEBT rule): no route emits `/apps/<workspaceId>/` links; `liveBase`/`appBase` contain no workspace id for public apps.
 
 ## Open Questions
 
-None requiring user input — D3-D6 settle the product surface; T1-T7 above are implementation-level with revisit conditions.
+None requiring user input — D3-D6 settle the product surface; T1-T8 above are implementation-level with revisit conditions.
+
+## Planning repairs (pre-dispatch pass)
+
+This tech-plan was amended once, before any stream was dispatched, to close gaps found while writing standalone delegation briefs (see `briefs/deviations.md` for the full rationale and the source inspection that grounded each fix):
+
+1. Added **T8** and the **Root binding index** — the original draft's reconcile contract said "resolve existing binding by `root`" but named no storage for it; `apps/identity.ts` has no `root`-keyed scope. Fixed with one new workspace-scoped svc-record index, not a list scan.
+2. Made `AppRecord.slug`/`root`/`declared` **optional** (were shown as required) and added the `name`/`slug` projection rule — the original shape was inconsistent with "F4 adds, never removes" and "no rewiring of existing callers," since the pre-F4 `saveApp` path keeps writing records with no `slug`/`root`/`declared`.
+3. Spelled out the reconcile **rename/move algorithm** concretely (task 3.5 said "rebinds the alias" but not how a rename is distinguished from a fresh root at the same call site).
+4. Pinned the **FNV-1a-32 constants** (offset basis, prime) so a second implementation can't drift on an unstated detail, and noted slugs are ASCII-only (no grapheme segmentation needed).
+5. Clarified the **icon traversal check is string-pattern-only** (`manifest.ts` has no filesystem access) and that **`capabilities` grammar validation is fully deferred to iw9-c** (F4 accepts any string array).
+6. Pinned the **`/w/<wsRef>/a/<ref>` resolution algorithm** to the existing `resolveLiveApp` install-then-alias dual lookup (`apps/install.ts` + `apps/identity.ts`), explicitly the pre-IW9 origin-pinned install model — not D8's install-as-copy, which iw9-b has not built. Noted the vanity form can never address an install (installs have no name/slug anywhere in the codebase).
+7. Resolved the `live-apps.ts` extraction as a **move** (logic relocates into `app-urls.ts`; `live-apps.ts` ends the change containing only 302 shims), matching the architecture diagram's stated end state, not a copy-and-keep-both.
+
+No product decision (D1-D24, invariants, or any WHEN/THEN spec scenario) changed — every repair is implementation-level, at the same altitude as the existing T1-T7 decisions.

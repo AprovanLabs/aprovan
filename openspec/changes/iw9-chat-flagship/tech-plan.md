@@ -102,11 +102,14 @@ core endpoints silently.
   edge by CF-3; the invariant-7 E2E gate tests guests). *Owner:* F2
   extension ("prefix-scoped participant sub-lists") — proposed shape
   recorded here for its owner; Chat migrates when it lands.
-- **CF-5 — App-shipped agent profiles.** D15 says apps may ship
-  `<app>/<agent>` profiles bounded by app grants; if iw9-b's manifest or
-  iw9-d's loop lands without profile declaration/registration, that gap
-  blocks `chat/summarize`. *Interim:* none — this is a hard dependency;
-  raise against iw9-b/iw9-d before Chat's stream 6 starts.
+- **CF-5 — App-shipped agent profiles. RESOLVED BY ASSIGNMENT (2026-08-09):
+  owner is `iw9-d-agent-loop-server` stream 10.** D15 says apps may ship
+  `<app>/<agent>` profiles bounded by app grants; the declaration,
+  registration, and execution halves are now owned together by iw9-d (its
+  tech-plan D7, `specs/app-scoped-agent-profiles/spec.md`), so there is no
+  residual iw9-b dependency for Chat. *Interim:* none — still a hard
+  dependency; Chat's stream 5 gate (tasks.md 5.1) now names iw9-d stream 10
+  as the thing to verify has landed.
 
 (Playwright harness absence is an infra gap, not a platform primitive; Chat
 bootstraps it — see T6.)

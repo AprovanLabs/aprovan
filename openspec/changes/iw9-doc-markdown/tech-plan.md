@@ -199,11 +199,15 @@ primitive that does not exist yet. Document needs exactly one, and it is
   app-provenance field and no declaration surface in `app.yaml`. This
   blocks `doc/fix-typos` identically to how it blocks `chat/summarize`
   (`iw9-chat-flagship/tech-plan.md` CF-5). *Interim:* none — hard
-  dependency, not worked around locally. *Owner:* iw9-b (manifest-declared
-  profile) or iw9-d (loop-side registration/execution) — whichever lands
-  the mechanism first; this change's app-profile work (tasks stream, see
-  tasks.md) does not start until it exists. *Exit:* `doc/fix-typos` is
-  declared and run through whatever surface CF-5 resolves to.
+  dependency, not worked around locally. *Owner:* **assigned 2026-08-09 to
+  `iw9-d-agent-loop-server` stream 10**, which takes declaration
+  (`app.yaml` `agents:` grammar), registration (manifest-derived resolution
+  — declaration *is* registration), and execution (narrowed `ctx.appScope`
+  gate) as one seam, so neither flagship waits on a split owner; this
+  change's app-profile stream does not start until that stream lands.
+  *Exit:* `doc/fix-typos` is declared in `Apps/document/app.yaml`'s
+  `agents:` block and runs through `agents.run`, per iw9-d's
+  `specs/app-scoped-agent-profiles/spec.md`.
 
 No other new core primitive is needed: the `doc` realtime namespace was
 reserved specifically for this (`protocol.ts:15,24-27`) and the async

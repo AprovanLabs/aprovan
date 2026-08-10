@@ -135,6 +135,8 @@ Assumptions (flagged, not user-confirmed):
 
 ## Open Questions
 
-None. A1–A3 above are recommended defaults the orchestrator may veto at
-review; they do not block elaboration (per IW-9 "Open Questions
-near-empty").
+None. A1–A3 above are **confirmed** — the delegation directive to proceed
+with this change's elaborated recommendations settles them; they are
+adopted decisions, not proposals pending veto. Implementers and delegated
+briefs should treat A1–A3 exactly as they treat D1–D24 in
+`IW-9-APP-FIRST.md`: settled, cited, not re-litigated.

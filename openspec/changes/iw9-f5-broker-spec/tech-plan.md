@@ -100,7 +100,10 @@ no state, no sockets.
   throw path at broker.ts:182-193), awaits publish (reject → `bad-body`),
   and fire-and-forgets disconnect with a swallow (current behavior,
   broker.ts:133-139). `handleClientMessage` becomes `Promise<void>`;
-  `socket.ts` invokes it with `void`.
+  `socket.ts` invokes it with `void` (that call-site edit lands in Stream 3 —
+  the only stream whose Touches include socket.ts; Stream 1 owns only
+  broker.ts/store.ts and never opens socket.ts, so it cannot make this edit
+  itself).
 - **Alternatives**: (a) Async `onSubscribe` only, keep `onPublish` sync —
   rejected: Chat's publish path persists a message before fan-out; freezing a
   sync `onPublish` now guarantees a Wave-2 contract break, violating this
@@ -145,6 +148,18 @@ no state, no sockets.
   workspace locus correctly (config.ts:271-287); duplicating the logic drifts.
 - **Revisit if**: the Wave-2 scoped-topic bus lands and cloud loci get a real
   distributed backend.
+- **Clarification (sync seam, no live async dispatch)**: `resolveLocusDispatch`
+  takes an already-known `WorkspaceLocusKind`; turning a `workspaceId` into
+  one is an async read (`workspaces.ts`'s `getWorkspace` → `resolveLocus`).
+  `NamespaceStoreFactory.storeFor(workspaceId, namespace)` is synchronous by
+  contract (D2) and SHALL NOT perform that async lookup. Because every locus
+  resolves to the same in-process backend today (D16), the factory
+  constructs the in-process store unconditionally — there is nothing to
+  branch on yet. The "selection seam" is a documented comment at the site a
+  real per-workspace dispatch would go, not a live `if (locus === ...)`
+  reading from a workspace record. Do not add an async workspace lookup to
+  make `storeFor` "really" locus-aware; that is deferred with the rest of
+  D16 and revisited together with it.
 
 ### D4: Fan-out authorization = optional sync `authorize` on the handler, evaluated per delivery
 
@@ -256,7 +271,14 @@ export interface NamespaceStoreFactory {
   dropWorkspace(workspaceId: string): void;
 }
 
-/** Locus-selected (runtime/config.ts resolveLocusDispatch); in-process only for now (D16). */
+/**
+ * Selection seam only, not a live per-workspace dispatch: always constructs
+ * the in-process backend (D16). `resolveLocusDispatch` (runtime/config.ts)
+ * needs a `WorkspaceLocusKind`, and turning a `workspaceId` into one is an
+ * async `getWorkspace` read — this factory is synchronous and SHALL NOT
+ * perform that lookup. Real per-locus dispatch is deferred to whichever
+ * change adds a distributed backend (D3).
+ */
 export function createNamespaceStoreFactory(): NamespaceStoreFactory;
 
 // realtime/socket.ts ---------------------------------------------------------
@@ -307,7 +329,11 @@ is an ordinary task replacement; all realtime state is rebuilt by clients
 reconnecting. No migration. Rollback = redeploy previous image (clients
 resubscribe, same recovery path). Land order inside the change: broker
 contract + store → presence migration → backpressure → docs/spec sync
-(tasks.md streams 1-4).
+(tasks.md streams 1-4). Stream 1 lands a compile-preserving shim in
+`presence.ts` (task 1.7) so it is independently verifiable before Stream 2
+starts; Stream 2 replaces it in the same file — the one intentional
+sequential file overlap in this plan, safe because Stream 2 depends on
+Stream 1 merging first (see tasks.md §2 note).
 
 ## Open Questions
 
