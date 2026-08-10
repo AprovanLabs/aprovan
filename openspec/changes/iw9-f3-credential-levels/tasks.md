@@ -15,13 +15,13 @@ External dependencies:
 
 > Depends-on: - | Repo: registry | Touches: registry/packages/registry-server/src/credentials/**, registry/packages/registry-server/src/storage/**, registry/packages/registry-server/src/credentials/__tests__/credential-levels.test.ts | Verify: cd /Users/jacob/Documents/Code/AprovanLabs/registry && pnpm --filter @aprovan/registry-server test && grep -n "level" packages/registry-server/src/storage/schema.ts
 
-- [ ] 1.1 Add `CredentialLevel` union and `effectiveLevel(type, stored?)`
+- [x] 1.1 Add `CredentialLevel` union and `effectiveLevel(type, stored?)`
       backfill function to `credentials/types.ts` (tech-plan D1/D2:
       `bearer_token`/`api_key` → `workspace-token`; `oauth2_client`/
       `oauth2_authcode` → `workspace-oauth`; never `user-oauth` from
       backfill). Spec: credential-levels "Legacy rows backfill to
       workspace levels".
-- [ ] 1.2 Add nullable `level TEXT` to the `credentials` table
+- [x] 1.2 Add nullable `level TEXT` to the `credentials` table
       (`storage/schema.ts`) plus the D3a partial unique index
       (`CREATE UNIQUE INDEX IF NOT EXISTS credentials_user_oauth_owner ON credentials(tenant_id, provider, created_by) WHERE level = 'user-oauth';`
       — portable across sqlite/libsql/postgres); `level?: CredentialLevel`
@@ -33,7 +33,7 @@ External dependencies:
       `credentials.create()` call inside `provisionCredential()` at
       :664-670) — the column alone is not enough if the provisioning path
       drops the field on the way to storage.
-- [ ] 1.3 `CredentialService.create`: validate the level/payload-type
+- [x] 1.3 `CredentialService.create`: validate the level/payload-type
       matrix, derive the default level from payload type when absent,
       require `createdBy` for `user-oauth`, and rely on the D3a partial
       unique index for one `user-oauth` row per (tenant, provider,
@@ -45,7 +45,7 @@ External dependencies:
       check-then-insert race — see tech-plan D3a) (tech-plan D3/D3a; spec:
       credential-levels "Level and payload-type compatibility",
       "User-level credentials have an owner").
-- [ ] 1.4 New test file
+- [x] 1.4 New test file
       `credentials/__tests__/credential-levels.test.ts` covering: level
       round-trip on list/get, unknown level rejected, type-mismatch
       rejected, authcode-as-workspace-oauth accepted, ownerless
