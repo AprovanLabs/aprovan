@@ -10,22 +10,22 @@
 
 > Depends-on: - | Repo: aprovan | Touches: aprovan/server/workspace/src/vcs/store.ts | Verify: pnpm turbo run build --filter=@aprovan/workspace && ! grep -n 'MAIN_REF' server/workspace/src/vcs/store.ts | grep -v 'export const MAIN_REF' | grep -v 'fallback = MAIN_REF' | grep -q 'commitTree' 
 
-- [ ] 1.1 Add `prefix?: string` and `ref?: string` to `commitTree`'s options
+- [x] 1.1 Add `prefix?: string` and `ref?: string` to `commitTree`'s options
       (store.ts:358) per the tech-plan contract signature; thread `prefix`
       into the existing `visibleEntries(workspaceId, prefix)` and
       `buildSnapshot(entries, prefix, lineage.entries)` params; validate the
       ref via `refName(options.ref)` and read/advance that ref instead of the
       `MAIN_REF` literal (spec vcs-scoped-commits "Scoped commit creation").
-- [ ] 1.2 Missing ref → root commit: when the named ref has no record, create
+- [x] 1.2 Missing ref → root commit: when the named ref has no record, create
       the commit with `parents: []` and write the ref (tech-plan D2; spec
       scenario "First commit on a new ref has no parents"). Keep the
       unchanged-head short-circuit keyed on `snapshot.id`.
-- [ ] 1.3 Make `snapshotId` prefix-aware (store.ts:149): accept the prefix
+- [x] 1.3 Make `snapshotId` prefix-aware (store.ts:149): accept the prefix
       and append a final `prefix <prefix>` canonical line iff non-empty
       (tech-plan D1); pass the prefix from `buildSnapshot`. Empty-prefix ids
       must remain byte-identical (spec scenario "Whole-workspace ids are
       unchanged").
-- [ ] 1.4 Leave `collectMountLineage` unfiltered on scoped commits (tech-plan
+- [x] 1.4 Leave `collectMountLineage` unfiltered on scoped commits (tech-plan
       D5) and `listRefs` untouched; update the module doc comment
       (store.ts:1-25) to describe scoped snapshots/refs.
 
