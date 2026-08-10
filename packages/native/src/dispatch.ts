@@ -70,15 +70,22 @@ export async function dispatchNativeOp(
           return vcs.commit({
             ...(typeof args["message"] === "string" ? { message: args["message"] } : {}),
             ...(typeof args["author"] === "string" ? { author: args["author"] } : {}),
+            ...(typeof args["prefix"] === "string" ? { prefix: args["prefix"] } : {}),
+            ...(typeof args["ref"] === "string" ? { ref: args["ref"] } : {}),
           });
         case "log":
           return vcs.log({
             ...(typeof args["limit"] === "number" ? { limit: args["limit"] } : {}),
+            ...(typeof args["ref"] === "string" ? { ref: args["ref"] } : {}),
           });
         case "show":
           return vcs.show({ commit: String(args["commit"] ?? "") });
         case "diff":
-          return vcs.diff({ from: String(args["from"] ?? ""), to: String(args["to"] ?? "") });
+          return vcs.diff({
+            from: String(args["from"] ?? ""),
+            to: String(args["to"] ?? ""),
+            ...(typeof args["prefix"] === "string" ? { prefix: args["prefix"] } : {}),
+          });
         case "branches":
           return vcs.branches();
         case "restore":
