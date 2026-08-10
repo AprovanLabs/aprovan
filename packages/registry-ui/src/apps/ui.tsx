@@ -246,27 +246,6 @@ export function VisibilityBadge({ app }: { app: AppSummary }) {
   );
 }
 
-/** Where this app's users' data physically lands — the spec's `dataScope`. */
-export function DataScopeBadge({ app }: { app: AppSummary }) {
-  const scope = app.dataScope ?? "owner";
-  return (
-    <span
-      className={`${BADGE} ${
-        scope === "workspace"
-          ? "border-amber-300 text-amber-700 dark:border-amber-900 dark:text-amber-400"
-          : "border-border text-muted-foreground"
-      }`}
-      title={
-        scope === "workspace"
-          ? "Self-hosted: user data lives in the caller's own workspace, on the caller's credentials"
-          : "Owner-hosted: user data lives in the publishing workspace, on the publisher's credentials"
-      }
-    >
-      {scope === "workspace" ? "self-hosted" : "owner-hosted"}
-    </span>
-  );
-}
-
 /** The release/channel pin the live page is serving, when the gateway says. */
 export function ReleaseChip({ app }: { app: AppSummary }) {
   const channel = app.channel ?? app.release?.channel;

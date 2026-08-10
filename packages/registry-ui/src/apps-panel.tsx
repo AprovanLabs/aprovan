@@ -54,7 +54,6 @@ export type {
   AppSummary,
   CapabilityModel,
   CapabilityReach,
-  DataScope,
   DirectoryEntry,
   FileVersion,
   InstallSummary,

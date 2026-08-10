@@ -367,8 +367,6 @@ export interface AppRateLimit {
   daily?: number;
 }
 
-export type DataScope = "owner" | "workspace";
-
 /** One declared interface dependency on an app manifest. */
 export interface AppRequirement {
   contract: string;
@@ -409,8 +407,6 @@ export interface AppSummary {
   allowedTools?: string[];
   roles?: AppRoles;
   rateLimit?: AppRateLimit;
-  /** Where an app user's data physically lands. Absent once dataScope is gone. */
-  dataScope?: DataScope;
   /** Channel the caller is looking at, when the gateway pins one. */
   channel?: string;
   /** Release currently serving the live channel, when known. */
@@ -516,8 +512,6 @@ export function normalizeApp(raw: unknown): AppSummary | null {
     app.rateLimit = rateLimit;
   }
 
-  const dataScope = pick(record, "dataScope", "data_scope");
-  if (dataScope === "owner" || dataScope === "workspace") app.dataScope = dataScope;
   const channel = asString(pick(record, "channel"));
   if (channel) app.channel = channel;
   const release = normalizeRelease(pick(record, "release"));
@@ -856,7 +850,6 @@ export interface AppDependencyStatus {
 }
 
 export interface CapabilityModel {
-  dataScope: DataScope;
   /** Human-readable answer to "where does this app's data live?". */
   dataLocation: string;
   native: CapabilityReach[];
@@ -950,12 +943,8 @@ export function deriveCapabilities(
   app: AppSummary,
   workflows: WorkflowSummary[] = [],
 ): CapabilityModel {
-  const dataScope: DataScope = app.dataScope === "workspace" ? "workspace" : "owner";
   const root = app.paths?.[0] ?? (app.entry ? app.entry.replace(/\/[^/]*$/, "") : app.name);
-  const dataLocation =
-    dataScope === "workspace"
-      ? "Each caller's own workspace, under <install prefix>/data — the publisher stores nothing and lends no credentials."
-      : `The publishing workspace, under ${root}/data/<app user> — one private partition per app user, travelling with the app folder.`;
+  const dataLocation = `The publishing workspace, under ${root}/data/<app user> — one private partition per app user, travelling with the app folder.`;
 
   const allowed = app.allowedTools ?? [];
   const exported = new Set(app.workflows ?? []);
@@ -989,9 +978,7 @@ export function deriveCapabilities(
       location:
         namespace === "events"
           ? "Nothing stored — events are delivered, not retained."
-          : dataScope === "workspace"
-            ? "<install prefix>/data in the caller's workspace"
-            : `${root}/data/<app user>`,
+          : `${root}/data/<app user>`,
       entries,
     };
   });
@@ -1022,7 +1009,6 @@ export function deriveCapabilities(
   }));
 
   return {
-    dataScope,
     dataLocation,
     native,
     workflows: workflowReaches,
@@ -1047,8 +1033,6 @@ export function mergeCapabilities(base: CapabilityModel, raw: unknown): Capabili
   if (!record) return base;
   const merged: CapabilityModel = { ...base, fromGateway: true };
 
-  const dataScope = pick(record, "dataScope", "data_scope");
-  if (dataScope === "owner" || dataScope === "workspace") merged.dataScope = dataScope;
   const dataLocation = asString(
     pick(record, "dataLocation", "data_location", "dataRoot", "data_root", "storagePath"),
   );

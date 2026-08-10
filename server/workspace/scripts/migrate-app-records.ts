@@ -23,19 +23,20 @@
  * store. Dry-run by default: prints what it *would* do without touching
  * anything; pass --execute to actually write/delete.
  *
- * CAVEAT — `dataScope: "workspace"` installs: the old FS layout stored an
+ * CAVEAT — legacy shared-install FS layout: the old FS layout stored an
  * installed app's data in one shared file per key (`<prefix>/data/<key>`,
  * no per-user folder — "the workspace is the user"), because the old
  * `keyvalue` implementation's `appDataDir` collapsed to the install prefix
- * itself for `dataScope: "workspace"`. The record store's scope is always
- * `app#<name>#u#<callingUserSub>` regardless of `dataScope` (see
- * docs/app-data.md — only the *tenant* varies with `dataScope`, never the
- * scope shape), so there is no way to recover which member's calls produced
- * that shared file. This script migrates it into a placeholder scope keyed
- * by the workspace id itself (`app#<name>#u#<workspaceId>`) so the value
- * isn't lost, but a fresh call from a real user afterwards will land in
- * THEIR OWN scope, not this placeholder — the old cross-member sharing
- * within one install does not carry forward. Flagged loudly in the log.
+ * itself for self-hosted installs. The record store's scope is always
+ * `app#<name>#u#<callingUserSub>` regardless of tenancy (see
+ * docs/app-data.md — only the *tenant* varies with tenancy resolution, never
+ * the scope shape), so there is no way to recover which member's calls
+ * produced that shared file. This script migrates it into a placeholder
+ * scope keyed by the workspace id itself (`app#<name>#u#<workspaceId>`) so
+ * the value isn't lost, but a fresh call from a real user afterwards will
+ * land in THEIR OWN scope, not this placeholder — the old cross-member
+ * sharing within one install does not carry forward. Flagged loudly in the
+ * log.
  *
  * Usage (from the repo root):
  *   pnpm -C apps/workspace exec tsx scripts/migrate-app-records.ts                 # dry run (default)

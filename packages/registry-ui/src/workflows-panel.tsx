@@ -28,7 +28,6 @@ export type {
   AppsSelection,
   CapabilityModel,
   CapabilityReach,
-  DataScope,
   FileVersion,
   RunStatus,
   TraceRunNode,

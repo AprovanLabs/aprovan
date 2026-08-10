@@ -17,13 +17,14 @@
  *     scope for a workspace caller:  "ws"                     (shared workspace KV)
  *     scope for an app session:      "app#<name>#u#<userSub>" (per-app-user, always)
  *
- * `tenantWorkspaceId` is the only thing an app's `dataScope` decides (owner's
- * workspace vs. the caller's own) — the scope suffix is identical either way,
- * because a session only ever addresses its own `app#<name>#u#<self>`
- * partition regardless of whose tenancy stores the rows. That tenancy
- * resolution already happens upstream (see routes/apps.ts `resolveAppSession`
- * — `ServiceContext.workspaceId` IS the execution/tenant workspace by the
- * time it reaches here), so this module just takes `tenant` as given.
+ * `tenantWorkspaceId` is the only thing that varies with tenancy resolution
+ * (owner's workspace vs. the caller's own) — the scope suffix is identical
+ * either way, because a session only ever addresses its own
+ * `app#<name>#u#<self>` partition regardless of whose tenancy stores the
+ * rows. That tenancy resolution already happens upstream (see
+ * routes/apps.ts `resolveAppSession` — `ServiceContext.workspaceId` IS the
+ * execution/tenant workspace by the time it reaches here), so this module
+ * just takes `tenant` as given.
  *
  * Two backends behind {@link IRecordStore}, selected the same way as the FS
  * and credential stores (see runtime/config.ts, `WORKSPACE_MODE`):
