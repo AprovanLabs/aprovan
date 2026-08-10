@@ -790,6 +790,9 @@ importers:
       ws:
         specifier: ^8.18.0
         version: 8.21.1
+      yaml:
+        specifier: ^2.9.0
+        version: 2.9.0
       zod:
         specifier: 3.25.76
         version: 3.25.76
@@ -19116,8 +19119,7 @@ snapshots:
 
   yaml@2.3.1: {}
 
-  yaml@2.9.0:
-    optional: true
+  yaml@2.9.0: {}
 
   yargs-parser@21.1.1: {}
 
