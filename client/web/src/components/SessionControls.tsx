@@ -7,18 +7,25 @@
  * gateway session. Keeps the `onLoad`/`onSwitch` contract `ChatPage` uses to
  * reset workspace-scoped state.
  *
- * Desktop (local gateway, Cognito unconfigured) always shows a Local profile
- * with Credentials in the menu — never a standalone Credentials CTA, and never
- * Hosted UI sign-in / cloud identity bleed.
+ * Desktop (local gateway, Cognito unconfigured) shows a Local profile with
+ * Credentials and a link-account affordance that opens aprovan.com in the
+ * system browser. In-app Cognito PKCE still needs an Electron redirect URI
+ * registered on the Cognito app client.
  */
 
 import { useAuth } from "@aprovan/ui/auth";
 import { useGatewaySession } from "@aprovan/ui/gateway";
 import { SessionArea, type SessionAreaStatus } from "@aprovan/ui/shell";
 import { useEffect, useRef, useState } from "react";
-import { isDesktopBridgeAvailable } from "@/features/workspaces/desktop";
+import {
+  isDesktopBridgeAvailable,
+  openDesktopExternal,
+} from "@/features/workspaces/desktop";
 import { gateway } from "../lib/gateway";
 import { chatDeepLinkUrl } from "../lib/registry";
+
+/** Public hosted chat — used for desktop link-account until in-app PKCE lands. */
+const APROVAN_SITE_CHAT = "https://aprovan.com/chat/";
 
 interface SessionControlsProps {
   /** Called once with the server's active workspace id (null if unknown). */
@@ -70,11 +77,29 @@ export default function SessionControls({
     onClick: onOpenCredentials,
   };
 
+  async function openAprovanSite() {
+    const opened = await openDesktopExternal(APROVAN_SITE_CHAT);
+    if (!opened) {
+      window.open(APROVAN_SITE_CHAT, "_blank", "noopener,noreferrer");
+    }
+  }
+
   // Desktop local mode: stable Local avatar + workspace switcher. Credentials
-  // live in the profile menu only (no Cognito, no standalone CTA).
+  // and a link-account entry live in the profile menu (no blocking Hosted UI).
   if (desktop && auth.status === "unconfigured") {
     const sessionLoading =
       session.status === "loading" || session.status === "idle";
+
+    const links = [
+      ...(onOpenCredentials ? [credentialsLink] : []),
+      {
+        label: "Sign in to Aprovan…",
+        href: APROVAN_SITE_CHAT,
+        onClick: () => {
+          void openAprovanSite();
+        },
+      },
+    ];
 
     return (
       <SessionArea
@@ -84,7 +109,7 @@ export default function SessionControls({
         activeWorkspaceId={session.workspaceId}
         onSelectWorkspace={(id) => void handleSelect(id)}
         switching={switching}
-        links={onOpenCredentials ? [credentialsLink] : []}
+        links={links}
       />
     );
   }

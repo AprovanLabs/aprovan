@@ -4,6 +4,14 @@
 
 See [core-beliefs](./design-docs/core-beliefs.md) for fundamental instructions.
 
+## Direction
+
+- [IW-9 App-First Platform](../openspec/changes/IW-9-APP-FIRST.md) — the
+  current orchestrator: mission, platform invariants, decisions D1–D24, wave
+  plan. Per-stream changes live under `openspec/changes/iw9-*`.
+- [decisions/](./decisions/README.md) — ADRs. 0002 (app-first platform
+  invariants), 0003 (Yjs), 0004 (server-side agent loop) bind all IW-9 work.
+
 ## References
 
 - [tech-stack.md](./tech-stack.md) Preferred languages, frameworks, and tools

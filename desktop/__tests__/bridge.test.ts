@@ -54,6 +54,7 @@ describe("DesktopBridge surface", () => {
         "gatewayUrl",
         "helperUrl",
         "onGatewayStatus",
+        "openExternal",
         "pickDirectory",
       ].sort(),
     );
@@ -66,6 +67,7 @@ describe("DesktopBridge surface", () => {
       "desktop:pickDirectory": () => undefined,
       "desktop:bundleInfo": () => scaffoldBundleInfo(),
       "desktop:helperUrl": () => null,
+      "desktop:openExternal": () => undefined,
     });
 
     const bridge = createPreloadBridgeApi(ipc);

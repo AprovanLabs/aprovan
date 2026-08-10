@@ -36,6 +36,7 @@
     "dist": "electron-builder --config electron-builder.yml --mac --arm64",
     "dist:dir": "CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --config electron-builder.yml --mac --arm64 --dir",
     "package:local": "pnpm build && pnpm dist:dir",
+    "install:local": "pnpm package:local && bash scripts/install-local.sh",
     "open:app": "open \"release/mac-arm64/Aprovan.app\""
   },
   "dependencies": {

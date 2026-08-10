@@ -55,6 +55,7 @@ for native capabilities. Application Support lands at
 | Refresh the seed renderer only | `pnpm --filter @aprovan/desktop bundle:renderer` then restart |
 | Full resource rebuild | `pnpm --filter @aprovan/desktop build` |
 | Unsigned local `.app` (Dock name **Aprovan**) | `pnpm --filter @aprovan/desktop package:local` then `open:app` |
+| Install that `.app` into `/Applications` | `pnpm --filter @aprovan/desktop install:local` |
 | Signed arm64 dmg/zip (needs `CSC_*`) | `pnpm --filter @aprovan/desktop dist` |
 
 `pnpm start` / `electron .` is a **dev host**: the Dock label stays “Electron”
@@ -64,9 +65,14 @@ icon, double-clickable), package locally:
 ```bash
 pnpm --filter @aprovan/desktop package:local
 pnpm --filter @aprovan/desktop open:app
-# or: open desktop/release/mac-arm64/Aprovan.app
-# optional: drag Aprovan.app into /Applications
+# or sync into /Applications (quits a running copy first):
+pnpm --filter @aprovan/desktop install:local
 ```
+
+`dev` / `start` never update `/Applications`. OTA bundle updates refresh the
+**renderer** under Application Support for an existing install; they do not
+replace the shell, helper, or vendored gateway from source — use
+`install:local` (or `package:local` + drag) after those change.
 
 `dev` sets `DESKTOP_SKIP_RESOURCES=1` and only recompiles main — it will not
 pick up a fresh gateway, helper, or renderer. Keep a separate
@@ -84,8 +90,9 @@ desktop window always talks to **its own** supervised child, not that process.
   `~/Documents/Aprovan` (never `$HOME`); credentials sealed via Keychain
 - **Native helper** — loopback HTTP for ESM cache, on-device chat (when the OS
   model is available), STT models, and availability probes
-- **Voice** — mic control in the composer; optional global hotkey + floating
-  panel; default STT model is local (`whisper-tiny.en`)
+- **Voice** — mic control in the composer; global hotkey **⌥Space** (Alt+Space)
+  summons the floating panel; default STT model is local (`whisper-tiny.en`).
+  Bind `stt` → `local` in Credentials / profiles for on-device capture.
 - **System notifications** — mirror of the in-app feed (actions dispatch through
   the gateway)
 

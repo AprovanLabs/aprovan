@@ -1,6 +1,7 @@
 import {
   BrowserWindow,
   ipcMain,
+  shell,
   type IpcMain,
   type IpcMainInvokeEvent,
 } from "electron";
@@ -91,6 +92,13 @@ export function registerBridgeHandlers(
   });
 
   ipc.handle(IPC.helperUrl, async () => state.helperUrl);
+
+  ipc.handle(IPC.openExternal, async (_event, url: unknown) => {
+    if (typeof url !== "string" || !/^https?:\/\//i.test(url)) {
+      throw new Error("openExternal requires an http(s) URL");
+    }
+    await shell.openExternal(url);
+  });
 
   ipc.handle(IPC.rendererReady, async () => {
     state.bundles?.reportRendererReady();

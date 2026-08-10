@@ -52,6 +52,7 @@ import {
 import type { ToolCallRequest } from "../contract.js";
 import type { CredentialPayload } from "../credentials.js";
 import {
+  ensureLocalSttDriver,
   isSessionOperation,
   mountSessionRoutes,
   openStreamingSession,
@@ -1065,6 +1066,15 @@ toolsRouter.post("/:provider/:operation{.*}", rateLimitByUserId, async (c) => {
   // Session-mode operations: mint a session via SessionManager instead of
   // one-shot isolate dispatch. Registration is the gate until a session
   // contract (e.g. stt) wires its driver; other modes stay on the path below.
+  if (requestNamespace === "stt" && operation === "open") {
+    try {
+      await ensureLocalSttDriver();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      recordDispatch(500, Date.now() - startTime, message);
+      return c.json({ error: message, code: "stt-driver-unavailable" }, 500);
+    }
+  }
   if (requestNamespace && isSessionOperation(requestNamespace, operation)) {
     try {
       const opened = await openStreamingSession(

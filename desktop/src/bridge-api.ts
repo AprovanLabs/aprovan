@@ -10,6 +10,7 @@ export const IPC = {
   pickDirectory: "desktop:pickDirectory",
   bundleInfo: "desktop:bundleInfo",
   helperUrl: "desktop:helperUrl",
+  openExternal: "desktop:openExternal",
   /** Renderer readiness — not part of the public DesktopBridge surface. */
   rendererReady: "desktop:rendererReady",
   /** Push channel for gateway supervision updates (distinct from the invoke). */
@@ -46,5 +47,7 @@ export function createPreloadBridgeApi(ipc: {
       ipc.invoke(IPC.pickDirectory, purpose) as Promise<string | undefined>,
     bundleInfo: () => ipc.invoke(IPC.bundleInfo) as Promise<BundleInfo>,
     helperUrl: () => ipc.invoke(IPC.helperUrl) as Promise<string | null>,
+    openExternal: (url) =>
+      ipc.invoke(IPC.openExternal, url) as Promise<void>,
   };
 }

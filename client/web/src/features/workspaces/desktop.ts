@@ -23,10 +23,15 @@ export type DesktopGatewayBridge = {
   onGatewayStatus(cb: (s: DesktopGatewayStatus) => void): () => void;
 };
 
+export type DesktopExternalBridge = {
+  openExternal(url: string): Promise<void>;
+};
+
 type WindowWithDesktop = Window & {
   desktop?: DesktopDirectoryPicker &
     Partial<DesktopHelperBridge> &
-    Partial<DesktopGatewayBridge>;
+    Partial<DesktopGatewayBridge> &
+    Partial<DesktopExternalBridge>;
 };
 
 function windowDesktop(): WindowWithDesktop["desktop"] {
@@ -64,4 +69,12 @@ export async function getDesktopHelperUrl(): Promise<string | null | undefined> 
   const bridge = windowDesktop();
   if (!bridge || typeof bridge.helperUrl !== "function") return undefined;
   return bridge.helperUrl();
+}
+
+/** Open a URL in the system browser when the shell exposes `openExternal`. */
+export async function openDesktopExternal(url: string): Promise<boolean> {
+  const bridge = windowDesktop();
+  if (!bridge || typeof bridge.openExternal !== "function") return false;
+  await bridge.openExternal(url);
+  return true;
 }

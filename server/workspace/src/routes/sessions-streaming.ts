@@ -137,16 +137,53 @@ function wireDefaultSessionContracts(): void {
     streaming: true,
     encodings: [REQUIRED_ENCODING],
   });
+  registerProviderStreamingCapabilities("local", {
+    streaming: true,
+    encodings: [REQUIRED_ENCODING],
+  });
+}
+
+let localSttDriverReady: Promise<void> | null = null;
+/** Bumped on {@link resetSessionStreaming} so in-flight driver loads do not clobber tests. */
+let sessionWireGeneration = 0;
+
+/**
+ * Register the credentialless on-device STT driver for `POST /tools/stt/open`.
+ * Without this, discovery still advertises session mode while the executor
+ * looks for a non-existent `client.open` and fails with
+ * `Operation "open" is not a function on provider "local"`.
+ */
+export function ensureLocalSttDriver(): Promise<void> {
+  if (isSessionOperation("stt", "open")) return Promise.resolve();
+  const generation = sessionWireGeneration;
+  localSttDriverReady ??= (async () => {
+    const { createLocalClient } = await import("@aprovan/native/stt");
+    if (generation !== sessionWireGeneration) return;
+    if (isSessionOperation("stt", "open")) return;
+    const driver = await createLocalClient();
+    if (generation !== sessionWireGeneration) return;
+    if (isSessionOperation("stt", "open")) return;
+    registerSessionOperation("stt", "open", driver);
+  })().catch((err) => {
+    localSttDriverReady = null;
+    throw err;
+  });
+  return localSttDriverReady;
 }
 
 wireDefaultSessionContracts();
+void ensureLocalSttDriver().catch((err) => {
+  console.error("[workspace] failed to register local stt session driver", err);
+});
 
 /** Drop manager + registrations (tests), then re-wire default session contracts. */
 export function resetSessionStreaming(): void {
+  sessionWireGeneration += 1;
   manager = null;
   registrations.clear();
   sessionInterfaces.clear();
   providerCapabilities.clear();
+  localSttDriverReady = null;
   wireDefaultSessionContracts();
 }
 

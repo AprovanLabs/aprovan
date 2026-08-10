@@ -16,6 +16,8 @@ export interface DesktopBridge {
    * else null. Used by the renderer to point `setCdnBaseUrl` at `/esm`.
    */
   helperUrl(): Promise<string | null>;
+  /** Open a URL in the system browser (e.g. aprovan.com sign-in). */
+  openExternal(url: string): Promise<void>;
 }
 
 export type GatewayStatus =
@@ -38,6 +40,7 @@ export const DESKTOP_BRIDGE_METHODS = [
   "pickDirectory",
   "bundleInfo",
   "helperUrl",
+  "openExternal",
 ] as const satisfies ReadonlyArray<keyof DesktopBridge>;
 
 export type DesktopBridgeMethod = (typeof DESKTOP_BRIDGE_METHODS)[number];

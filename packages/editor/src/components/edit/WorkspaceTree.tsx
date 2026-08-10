@@ -297,11 +297,20 @@ function NewFileRow({
 
   // Autofocus with the caret after the seeded directory prefix (if any) so
   // the user can just start typing the file name.
+  //
+  // Also stop native keydown here: @pierre/trees listens inside the shadow
+  // root (Preact). React's onKeyDown stopPropagation runs too late across
+  // that boundary, so letter keys still open the tree Search… field.
   useEffect(() => {
     const el = inputRef.current;
     if (!el) return;
     el.focus();
     el.setSelectionRange(el.value.length, el.value.length);
+    const stopTreeSearch = (e: KeyboardEvent) => {
+      e.stopPropagation();
+    };
+    el.addEventListener('keydown', stopTreeSearch);
+    return () => el.removeEventListener('keydown', stopTreeSearch);
   }, []);
 
   const submit = () => {
@@ -325,9 +334,6 @@ function NewFileRow({
             if (error) setError(null);
           }}
           onKeyDown={(e) => {
-            // Keep @pierre/trees typeahead from treating letter/number keys as
-            // "open search" while this header input is focused.
-            e.stopPropagation();
             if (e.key === 'Enter') {
               e.preventDefault();
               submit();
