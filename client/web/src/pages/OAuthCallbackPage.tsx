@@ -66,7 +66,7 @@ export function OAuthCallbackPage() {
           },
         });
         clearOAuthPending();
-        window.history.replaceState({}, "", "/chat/account/oauth-callback");
+        window.history.replaceState({}, "", "/workspace/account/oauth-callback");
         setStatus("success");
       } catch (err) {
         clearOAuthPending();
@@ -100,7 +100,7 @@ export function OAuthCallbackPage() {
           </CardHeader>
           <CardContent>
             <Button asChild>
-              <a href="/chat">Back to workspace</a>
+              <a href="/workspace">Back to workspace</a>
             </Button>
           </CardContent>
         </Card>
@@ -116,7 +116,7 @@ export function OAuthCallbackPage() {
           </CardHeader>
           <CardContent>
             <Button asChild variant="outline">
-              <a href="/chat">Back to workspace</a>
+              <a href="/workspace">Back to workspace</a>
             </Button>
           </CardContent>
         </Card>

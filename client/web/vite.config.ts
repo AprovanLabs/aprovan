@@ -11,7 +11,7 @@ export default defineConfig(async () => {
   const GATEWAY_URL = process.env.GATEWAY_URL ?? "http://localhost:4000";
 
   return {
-    base: "/chat/",
+    base: "/workspace/",
     plugins: [
       tailwindcss(),
       react(),
@@ -29,8 +29,8 @@ export default defineConfig(async () => {
           name: "Patchwork Chat",
           short_name: "Patchwork",
           description: "Chat with Patchwork widgets and workflows.",
-          start_url: "/chat/",
-          scope: "/chat/",
+          start_url: "/workspace/",
+          scope: "/workspace/",
           display: "standalone",
           // Matches the app's dark theme tokens (--background / --foreground
           // in @aprovan/ui/theme.css, oklch(0.145 0 0) → #0a0a0a).
@@ -60,12 +60,12 @@ export default defineConfig(async () => {
           // skip precaching it, which defeats the point of offline support.
           maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
           // SPA fallback for client-side routing, but scoped tightly to
-          // `/chat/` — this bucket also serves the marketing site and the
+          // `/workspace/` — this bucket also serves the marketing site and the
           // registry app from sibling prefixes, and a stray fallback match
           // there would serve the chat shell instead of their content.
-          navigateFallback: "/chat/index.html",
-          navigateFallbackAllowlist: [/^\/chat\//],
-          navigateFallbackDenylist: [/^\/api\//, /^\/chat\/api\//],
+          navigateFallback: "/workspace/index.html",
+          navigateFallbackAllowlist: [/^\/workspace\//],
+          navigateFallbackDenylist: [/^\/api\//, /^\/workspace\/api\//],
           // Never let Workbox intercept the gateway API: streaming SSE
           // completions and authenticated calls must always hit the network
           // directly, never be served from — or written into — the cache.
