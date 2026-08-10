@@ -21,10 +21,10 @@ External dependencies (declare before any stream starts):
 
 > Depends-on: - | Repo: aprovan | Touches: aprovan/server/workspace/src/apps/slugs.ts, aprovan/server/workspace/tests/app-slugs.test.ts | Verify: pnpm --filter @aprovan/workspace test -- tests/app-slugs.test.ts && pnpm --filter @aprovan/workspace typecheck
 
-- [ ] 2.1 Create `server/workspace/src/apps/slugs.ts` with `assertValidSlug`: existing `NAME_RE` shape (`apps/store.ts:167`) AND NOT `isAppId(slug)` from `apps/identity.ts:36-38` — one ULID definition, no second regex (tech-plan T4; spec app-slug "ULID-shaped slug rejected", "26-char non-base32 slug accepted").
-- [ ] 2.2 Implement the global slug claim registry on `svc#slugs/<globalSlug>` under `DEPLOYMENT_TENANT` (pattern of `svc#apps/byId`, `identity.ts:90-91`): `claimGlobalSlug` (409 naming the holder when taken), `releaseGlobalSlug` (holder-only), `resolveGlobalSlug` (tech-plan T6; spec app-slug "claim granted once").
-- [ ] 2.3 Implement `resolveWorkspaceSlug(wsSlug)` reading `svc#wsSlugs/<wsSlug>` under `DEPLOYMENT_TENANT`; resolver only — nothing in F4 writes entries, unresolved returns undefined (tech-plan T6; PRD assumption: no ws-slug exists today).
-- [ ] 2.4 New test file `tests/app-slugs.test.ts`: shape rules incl. ULID-shape fixtures (a real `ulid()` output rejected; 26-char strings with `u`/`i`/`l`/`o`/hyphen accepted), claim/409/release lifecycle, holder-only release, unresolved wsSlug.
+- [x] 2.1 Create `server/workspace/src/apps/slugs.ts` with `assertValidSlug`: existing `NAME_RE` shape (`apps/store.ts:167`) AND NOT `isAppId(slug)` from `apps/identity.ts:36-38` — one ULID definition, no second regex (tech-plan T4; spec app-slug "ULID-shaped slug rejected", "26-char non-base32 slug accepted").
+- [x] 2.2 Implement the global slug claim registry on `svc#slugs/<globalSlug>` under `DEPLOYMENT_TENANT` (pattern of `svc#apps/byId`, `identity.ts:90-91`): `claimGlobalSlug` (409 naming the holder when taken), `releaseGlobalSlug` (holder-only), `resolveGlobalSlug` (tech-plan T6; spec app-slug "claim granted once").
+- [x] 2.3 Implement `resolveWorkspaceSlug(wsSlug)` reading `svc#wsSlugs/<wsSlug>` under `DEPLOYMENT_TENANT`; resolver only — nothing in F4 writes entries, unresolved returns undefined (tech-plan T6; PRD assumption: no ws-slug exists today).
+- [x] 2.4 New test file `tests/app-slugs.test.ts`: shape rules incl. ULID-shape fixtures (a real `ulid()` output rejected; 26-char strings with `u`/`i`/`l`/`o`/hyphen accepted), claim/409/release lifecycle, holder-only release, unresolved wsSlug.
 
 ## 3. Reconcile entry point and record projection
 
