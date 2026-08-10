@@ -15,7 +15,7 @@ function Root() {
   if (isCallback) {
     return (
       <AuthCallback
-        fallbackPath="/chat/"
+        fallbackPath="/workspace/"
         loading={
           <div className="flex min-h-screen items-center justify-center">
             <Loader2 className="size-6 animate-spin text-muted-foreground" />

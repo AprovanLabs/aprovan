@@ -192,18 +192,18 @@ is independent).
 
 > Depends-on: - | Repo: aprovan | Touches: aprovan/client/web/vite.config.ts, aprovan/client/web/index.html, aprovan/client/web/src/main.tsx, aprovan/client/web/src/lib/auth.ts, aprovan/client/web/src/components/panels/CredentialsPanel.tsx, aprovan/client/web/src/pages/OAuthCallbackPage.tsx | Verify: pnpm --filter @aprovan/patchwork-web build && ! grep -q '"/chat' client/web/dist/index.html
 
-- [ ] 8.1 `client/web/vite.config.ts`: `base: "/chat/"` → `"/workspace/"`;
+- [x] 8.1 `client/web/vite.config.ts`: `base: "/chat/"` → `"/workspace/"`;
       PWA `manifest.start_url`/`scope` → `"/workspace/"`; `workbox.navigateFallback`
       → `"/workspace/index.html"`.
-- [ ] 8.2 `client/web/index.html`: `apple-touch-icon` href → `/workspace/apple-touch-icon.png`.
-- [ ] 8.3 `client/web/src/main.tsx`: `fallbackPath="/chat/"` → `"/workspace/"`.
-- [ ] 8.4 `client/web/src/lib/auth.ts`: `basePath: "/chat"` → `"/workspace"`.
-- [ ] 8.5 `client/web/src/components/panels/CredentialsPanel.tsx`:
+- [x] 8.2 `client/web/index.html`: `apple-touch-icon` href → `/workspace/apple-touch-icon.png`.
+- [x] 8.3 `client/web/src/main.tsx`: `fallbackPath="/chat/"` → `"/workspace/"`.
+- [x] 8.4 `client/web/src/lib/auth.ts`: `basePath: "/chat"` → `"/workspace"`.
+- [x] 8.5 `client/web/src/components/panels/CredentialsPanel.tsx`:
       `OAUTH_REDIRECT_PATH = "/chat/account/oauth-callback"` → `"/workspace/account/oauth-callback"`.
-- [ ] 8.6 `client/web/src/pages/OAuthCallbackPage.tsx`: the
+- [x] 8.6 `client/web/src/pages/OAuthCallbackPage.tsx`: the
       `window.history.replaceState` path (line 69) and both `<a href="/chat">`
       links (lines 103, 119) → `/workspace` equivalents.
-- [ ] 8.7 Grep gate: `grep -rn '"/chat\|'"'"'/chat\|/chat/'"'"'' client/web/src client/web/index.html client/web/vite.config.ts`
+- [x] 8.7 Grep gate: `grep -rn '"/chat\|'"'"'/chat\|/chat/'"'"'' client/web/src client/web/index.html client/web/vite.config.ts`
       returns nothing; build output (`dist/index.html`) contains no `/chat`
       asset reference.
 

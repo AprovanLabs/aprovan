@@ -16,7 +16,7 @@ import { configureAuth, resolveAuthConfig } from "@aprovan/ui/auth";
 export const AUTH_TOKEN_KEY = "patchwork:authToken";
 
 const config = resolveAuthConfig(import.meta.env, {
-  basePath: "/chat",
+  basePath: "/workspace",
   redirectPath: "/auth/callback",
   tokenStorageKey: AUTH_TOKEN_KEY,
 });

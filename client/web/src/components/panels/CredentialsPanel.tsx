@@ -9,7 +9,7 @@ import { readCredentialsPrefill } from "@/lib/credentials";
 import { createRegistryGatewayClient } from "@/lib/gateway";
 import { fetchCatalogProviders } from "@/lib/registry";
 
-const OAUTH_REDIRECT_PATH = "/chat/account/oauth-callback";
+const OAUTH_REDIRECT_PATH = "/workspace/account/oauth-callback";
 
 type TabId = "credentials" | "profiles";
 
