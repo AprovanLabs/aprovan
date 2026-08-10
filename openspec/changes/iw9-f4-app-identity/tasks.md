@@ -44,8 +44,8 @@ External dependencies (declare before any stream starts):
 
 > Depends-on: - | Repo: aprovan | Touches: aprovan/packages/ui/src/apps/app-icon.ts, aprovan/packages/ui/src/apps/__tests__/app-icon.test.ts | Verify: pnpm --filter @aprovan/ui test -- app-icon && pnpm --filter @aprovan/ui typecheck
 
-- [ ] 4.1 Create `packages/ui/src/apps/app-icon.ts` as a dependency-free leaf module: `APP_ICON_PALETTE` (12 fixed hex values) and `appIconFallback(slug)` → `{ letter, color }` with letter = `slug[0].toUpperCase()` (slugs are `NAME_RE`-constrained to `[a-z0-9-]`, ASCII-only — no grapheme-cluster segmentation needed), color = `PALETTE[fnv1a32(utf8(slug)) % 12]` using the PINNED standard FNV-1a-32 constants (offset basis `0x811c9dc5`, prime `0x01000193`, unsigned 32-bit arithmetic throughout) — do not choose different constants (tech-plan T7; D6).
-- [ ] 4.2 New test file with golden fixtures: determinism (same slug twice → identical output), distinct slugs map per the normative algorithm (hand-computed FNV-1a fixtures so a second implementation is verifiable against them), rename re-derivation (`recipes` → `cookbook` changes letter and color per spec app-icon "rename changes fallback").
+- [x] 4.1 Create `packages/ui/src/apps/app-icon.ts` as a dependency-free leaf module: `APP_ICON_PALETTE` (12 fixed hex values) and `appIconFallback(slug)` → `{ letter, color }` with letter = `slug[0].toUpperCase()` (slugs are `NAME_RE`-constrained to `[a-z0-9-]`, ASCII-only — no grapheme-cluster segmentation needed), color = `PALETTE[fnv1a32(utf8(slug)) % 12]` using the PINNED standard FNV-1a-32 constants (offset basis `0x811c9dc5`, prime `0x01000193`, unsigned 32-bit arithmetic throughout) — do not choose different constants (tech-plan T7; D6).
+- [x] 4.2 New test file with golden fixtures: determinism (same slug twice → identical output), distinct slugs map per the normative algorithm (hand-computed FNV-1a fixtures so a second implementation is verifiable against them), rename re-derivation (`recipes` → `cookbook` changes letter and color per spec app-icon "rename changes fallback").
 
 ## 5. URL scheme — canonical, vanity, 302 convenience
 
