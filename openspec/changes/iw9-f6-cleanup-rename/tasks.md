@@ -25,7 +25,7 @@ is independent).
 
 > Depends-on: - | Repo: aprovan | Touches: aprovan/server/workspace/tests/vcs-mount-lineage.test.ts, aprovan/server/workspace/tests/vfs-mounts.test.ts | Verify: pnpm --filter @aprovan/workspace test -- tests/vcs-mount-lineage.test.ts tests/vfs-mounts.test.ts
 
-- [ ] 2.1 In `tests/vcs-mount-lineage.test.ts`, replace the `call("vfs/mount", {...})`
+- [x] 2.1 In `tests/vcs-mount-lineage.test.ts`, replace the `call("vfs/mount", {...})`
       and `call("vfs/unmount", {...})` fixture-setup calls (lines 140, 208,
       and any `unmount` call) with direct calls to `addMount(workspaceId,
       ...)` / `removeMount(workspaceId, ...)`, imported from
@@ -34,12 +34,12 @@ is independent).
       every other call in the file. Match `addMount`'s current parameter
       order/shape exactly (tech-plan D2; this is a fixture-setup change
       only, no assertions on commit/snapshot output move).
-- [ ] 2.2 Confirm every remaining assertion in `vcs-mount-lineage.test.ts`
+- [x] 2.2 Confirm every remaining assertion in `vcs-mount-lineage.test.ts`
       (git SHA + provenance recording, forced-new-snapshot-on-upstream-
       movement, short-circuit-when-nothing-moved, pre-lineage JSON parsing)
       passes unmodified — they exercise `collectMountLineage`/`commitTree`
       directly and don't depend on the tool-call rename.
-- [ ] 2.3 In `tests/vfs-mounts.test.ts`, wrap the top-level
+- [x] 2.3 In `tests/vfs-mounts.test.ts`, wrap the top-level
       `describe("vfs mounts", ...)` in `describe.skip(...)` and add a
       comment immediately above naming the un-skip condition verbatim:
       "Quarantined — no tool-level mount CRUD surface exists
@@ -48,7 +48,7 @@ is independent).
       `iw9-b-app-model`'s mounts revival (D19) lands." Do not delete the
       file or rewrite its assertions — it is a ready-made spec for that
       stream (tech-plan D2).
-- [ ] 2.4 Grep gate: `grep -n 'describe.skip' server/workspace/tests/vfs-mounts.test.ts`
+- [x] 2.4 Grep gate: `grep -n 'describe.skip' server/workspace/tests/vfs-mounts.test.ts`
       is non-empty; `pnpm --filter @aprovan/workspace test -- tests/vfs-mounts.test.ts`
       reports 0 failed (all skipped, none red).
 

@@ -41,7 +41,11 @@ async function data<T>(res: Response): Promise<T> {
   return body.data;
 }
 
-describe("vfs mounts", () => {
+// Quarantined — no tool-level mount CRUD surface exists
+// (`addMount`/`removeMount` have zero non-test callers). Un-skip and
+// rename `vfs/mount|mounts|unmount` to whatever verb
+// `iw9-b-app-model`'s mounts revival (D19) lands.
+describe.skip("vfs mounts", () => {
   it("registers a git mount and lists it", async () => {
     const mounted = await data<{ mount: { prefix: string; type: string; mode: string } }>(
       await call("vfs/mount", {

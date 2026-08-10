@@ -18,8 +18,19 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/app.js";
 import { readSvcRecord, svcScope, writeSvcRecord } from "../src/svc-records.js";
-import { collectMountLineage, resetMountsCache } from "../src/vcs/mounts.js";
-import { readCommit, readSnapshot, type VcsCommit, type VcsSnapshot } from "../src/vcs/store.js";
+import {
+  addMount,
+  collectMountLineage,
+  removeMount,
+  resetMountsCache,
+} from "../src/vcs/mounts.js";
+import {
+  commitTree,
+  readCommit,
+  readSnapshot,
+  type VcsCommit,
+  type VcsSnapshot,
+} from "../src/vcs/store.js";
 
 // ---------------------------------------------------------------------------
 // S3 SDK mock — a fixed two-object bucket listing, deliberately unsorted.
@@ -107,13 +118,6 @@ afterAll(async () => {
   rmSync(dataDir, { recursive: true, force: true });
 });
 
-const call = (path: string, args: Record<string, unknown> = {}) =>
-  createApp().request(`/tools/${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ args }),
-  });
-
 const putFile = (path: string, content: string) =>
   createApp().request(`/fs/${path}`, {
     method: "PUT",
@@ -121,35 +125,34 @@ const putFile = (path: string, content: string) =>
     body: JSON.stringify({ content }),
   });
 
-async function data<T>(res: Response): Promise<T> {
-  const body = (await res.json()) as { data?: T; error?: string };
-  if (body.error) throw new Error(body.error);
-  return body.data as T;
-}
-
-interface ShowResult {
+/** Store-backed stand-in for the retired vfs/show shape this file asserts on. */
+async function showCommit(commitId: string): Promise<{
   commit: VcsCommit;
   entries: Array<{ path: string }>;
   mounts?: Array<{ prefix: string; type: string; configHash: string; versionToken: string | null }>;
+}> {
+  const commit = (await readCommit("local", commitId)) as VcsCommit;
+  const snapshot = (await readSnapshot("local", commit.snapshot)) as VcsSnapshot;
+  return {
+    commit,
+    entries: snapshot.entries,
+    mounts: snapshot.mounts,
+  };
 }
 
 describe("mount lineage on commits", () => {
   it("records the git SHA + provenance, forces a new snapshot on upstream movement, and short-circuits when nothing moved", async () => {
     await putFile("src/main.ts", "export {};");
-    await data(
-      await call("vfs/mount", {
-        prefix: "vendor/charts",
-        type: "git",
-        config: { repo: "org/charts", ref: "main" },
-      }),
-    );
+    await addMount("local", "user1", {
+      prefix: "vendor/charts",
+      type: "git",
+      config: { repo: "org/charts", ref: "main" },
+    });
 
     // Commit 1: token = the SHA `main` resolves to right now.
-    const first = await data<{ commit: VcsCommit; created: boolean }>(
-      await call("vfs/commit", { message: "first" }),
-    );
+    const first = await commitTree("local", { message: "first", author: "user1" });
     expect(first.created).toBe(true);
-    const firstShow = await data<ShowResult>(await call("vfs/show", { commit: first.commit.id }));
+    const firstShow = await showCommit(first.commit.id);
     const firstMount = firstShow.mounts?.find((m) => m.prefix === "vendor/charts");
     expect(firstMount).toMatchObject({ type: "git", versionToken: currentSha });
     expect(firstMount?.configHash).toMatch(/^[0-9a-f]{64}$/u);
@@ -162,21 +165,17 @@ describe("mount lineage on commits", () => {
     expect(Date.parse(provenance!.retrievedAt)).not.toBeNaN();
 
     // No native change, no upstream change: the head short-circuits.
-    const unchanged = await data<{ commit: VcsCommit; created: boolean }>(
-      await call("vfs/commit", { message: "no-op" }),
-    );
+    const unchanged = await commitTree("local", { message: "no-op", author: "user1" });
     expect(unchanged.created).toBe(false);
     expect(unchanged.commit.id).toBe(first.commit.id);
 
     // Upstream moves; still no native change → a NEW snapshot + commit whose
     // mount entry carries the new SHA (mount tokens are snapshot identity).
     currentSha = "2222222222222222222222222222222222222222";
-    const second = await data<{ commit: VcsCommit; created: boolean }>(
-      await call("vfs/commit", { message: "upstream moved" }),
-    );
+    const second = await commitTree("local", { message: "upstream moved", author: "user1" });
     expect(second.created).toBe(true);
     expect(second.commit.snapshot).not.toBe(first.commit.snapshot);
-    const secondShow = await data<ShowResult>(await call("vfs/show", { commit: second.commit.id }));
+    const secondShow = await showCommit(second.commit.id);
     expect(secondShow.mounts?.find((m) => m.prefix === "vendor/charts")?.versionToken).toBe(
       "2222222222222222222222222222222222222222",
     );
@@ -189,11 +188,9 @@ describe("mount lineage on commits", () => {
   it("degrades to a null token (provenance still recorded) when resolution fails", async () => {
     commitsEndpointBroken = true;
     try {
-      const res = await data<{ commit: VcsCommit; created: boolean }>(
-        await call("vfs/commit", { message: "github down" }),
-      );
+      const res = await commitTree("local", { message: "github down", author: "user1" });
       expect(res.created).toBe(true);
-      const show = await data<ShowResult>(await call("vfs/show", { commit: res.commit.id }));
+      const show = await showCommit(res.commit.id);
       expect(show.mounts?.find((m) => m.prefix === "vendor/charts")?.versionToken).toBeNull();
       const prov = res.commit.provenance?.find((p) => p.prefix === "vendor/charts");
       expect(prov?.source).toMatchObject({ type: "git", repo: "org/charts" });
@@ -204,13 +201,11 @@ describe("mount lineage on commits", () => {
   });
 
   it("computes a deterministic s3 manifest hash over sorted '<etag> <path>' lines", async () => {
-    await data(
-      await call("vfs/mount", {
-        prefix: "media",
-        type: "s3",
-        config: { bucket: "assets-bucket", prefix: "assets", region: "eu-west-1" },
-      }),
-    );
+    await addMount("local", "user1", {
+      prefix: "media",
+      type: "s3",
+      config: { bucket: "assets-bucket", prefix: "assets", region: "eu-west-1" },
+    });
 
     const lineage = await collectMountLineage("local");
     const s3Entry = lineage.entries.find((entry) => entry.prefix === "media");
@@ -233,7 +228,7 @@ describe("mount lineage on commits", () => {
       originDomain: "assets-bucket.s3.eu-west-1.amazonaws.com",
     });
 
-    await data(await call("vfs/unmount", { prefix: "media" }));
+    await removeMount("local", "media");
   });
 
   it("parses pre-lineage commit/snapshot JSON (no mounts, no provenance) without error", async () => {
@@ -260,7 +255,7 @@ describe("mount lineage on commits", () => {
     const commit = (await readCommit("local", "legacy-commit")) as VcsCommit;
     expect(commit.provenance).toBeUndefined();
 
-    const show = await data<ShowResult>(await call("vfs/show", { commit: "legacy-commit" }));
+    const show = await showCommit("legacy-commit");
     expect(show.mounts).toBeUndefined();
     expect(show.commit.provenance).toBeUndefined();
     expect(show.entries.map((entry) => entry.path)).toEqual(["old.txt"]);
