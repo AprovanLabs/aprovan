@@ -294,8 +294,8 @@ is independent).
 
 > Depends-on: - | Repo: registry | Touches: registry/AGENTS.md | Verify: grep -n "Refactor rule" AGENTS.md
 
-- [ ] 12.1 Add a `### Refactor rule` section to `AGENTS.md`, same three
+- [x] 12.1 Add a `### Refactor rule` section to `AGENTS.md`, same three
       points as stream 6 (delete-in-same-change; grep-gate-in-both-repos
       done-definition; husk test), phrased in this repo's existing prose
       style (tech-plan "AGENTS.md refactor-rule section").
-- [ ] 12.2 Grep gate: `grep -n "Refactor rule" AGENTS.md` is non-empty.
+- [x] 12.2 Grep gate: `grep -n "Refactor rule" AGENTS.md` is non-empty.
