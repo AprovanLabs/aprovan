@@ -34,12 +34,29 @@ import { ServiceError, type ServiceContext } from "./service-kernel.js";
 import {
   commitTree,
   diffSnapshots,
+  listRefs,
   logCommits,
   readRef,
   readSnapshot,
+  refName,
   resolveCommitish,
   restoreCommit,
+  type VcsDiff,
 } from "./vcs/store.js";
+
+/** Same containment rule as `restoreCommit`'s prefix filter (tech-plan D4). */
+function pathUnderPrefix(path: string, prefix: string): boolean {
+  return path === prefix || path.startsWith(`${prefix}/`);
+}
+
+function filterDiffByPrefix(diff: VcsDiff, prefix?: string): VcsDiff {
+  if (!prefix) return diff;
+  return {
+    added: diff.added.filter((e) => pathUnderPrefix(e.path, prefix)),
+    modified: diff.modified.filter((e) => pathUnderPrefix(e.path, prefix)),
+    removed: diff.removed.filter((e) => pathUnderPrefix(e.path, prefix)),
+  };
+}
 
 export { NATIVE_PROVIDER_ID, isNativeInterface };
 
@@ -276,10 +293,12 @@ function eventsBackend(ctx: ServiceContext, records: IRecordStore) {
 
 function vcsBackend(workspaceId: string, userId: string): NativeVcsBackend {
   return {
-    async commit({ message }) {
+    async commit({ message, prefix, ref }) {
       const { commit, created } = await commitTree(workspaceId, {
         message: message ?? "commit",
         author: userId,
+        ...(prefix !== undefined ? { prefix } : {}),
+        ...(ref !== undefined ? { ref } : {}),
       });
       return {
         commit: {
@@ -293,10 +312,10 @@ function vcsBackend(workspaceId: string, userId: string): NativeVcsBackend {
         created,
       };
     },
-    async log({ limit = 50 } = {}) {
-      const ref = await readRef(workspaceId, "main");
-      if (!ref) return { commits: [] };
-      const commits = await logCommits(workspaceId, ref.commit, limit);
+    async log({ limit = 50, ref } = {}) {
+      const head = await readRef(workspaceId, refName(ref));
+      if (!head) return { commits: [] };
+      const commits = await logCommits(workspaceId, head.commit, limit);
       return {
         commits: commits.map((c) => ({
           id: c.id,
@@ -329,14 +348,10 @@ function vcsBackend(workspaceId: string, userId: string): NativeVcsBackend {
           author: commit.author,
         },
         files: snapshot.entries.map((e) => e.path).sort(),
-        changes: {
-          added: changes.added.map((e) => e.path),
-          modified: changes.modified.map((e) => e.path),
-          removed: changes.removed.map((e) => e.path),
-        },
+        changes,
       };
     },
-    async diff({ from, to }) {
+    async diff({ from, to, prefix }) {
       const a = await resolveCommitish(workspaceId, from);
       const b = await resolveCommitish(workspaceId, to);
       const fromSnapshot = await readSnapshot(workspaceId, a.snapshot);
@@ -344,19 +359,17 @@ function vcsBackend(workspaceId: string, userId: string): NativeVcsBackend {
       if (!fromSnapshot || !toSnapshot) {
         throw new ServiceError("Snapshot missing for a diff side", 404);
       }
-      const changes = diffSnapshots(fromSnapshot, toSnapshot);
+      const changes = filterDiffByPrefix(diffSnapshots(fromSnapshot, toSnapshot), prefix);
       return {
         from: a.id,
         to: b.id,
-        added: changes.added.map((e) => e.path),
-        modified: changes.modified.map((e) => e.path),
-        removed: changes.removed.map((e) => e.path),
+        ...changes,
       };
     },
     async branches() {
-      const ref = await readRef(workspaceId, "main");
+      const refs = await listRefs(workspaceId);
       return {
-        branches: ref ? [{ name: "main", commit: ref.commit }] : [],
+        branches: refs.map((r) => ({ name: r.name, commit: r.commit })),
       };
     },
     async restore({ commit: commitish, path, prefix }) {
