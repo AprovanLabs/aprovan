@@ -248,13 +248,13 @@ is independent).
 
 > Depends-on: - | Repo: registry | Touches: registry/packages/utdk/infra/** | Verify: n=$(git ls-files packages/utdk/infra | wc -l | tr -d ' '); [ "$n" = 0 ] && rm -rf packages/utdk/infra && git status --short
 
-- [ ] 10.1 Confirm the husk test: `git ls-files packages/utdk/infra | wc -l`
+- [x] 10.1 Confirm the husk test: `git ls-files packages/utdk/infra | wc -l`
       is 0 (all that's on disk is `cdk.out/bundling-temp-*/node_modules/`
       build residue).
-- [ ] 10.2 `rm -rf packages/utdk/infra` — untracked, so this produces no git
+- [x] 10.2 `rm -rf packages/utdk/infra` — untracked, so this produces no git
       diff (MIGRATION-DEBT "Husks are untracked" caveat); record the
       before/after scan output in the PR description since `git show` can't.
-- [ ] 10.3 Re-run the husk scan repo-wide:
+- [x] 10.3 Re-run the husk scan repo-wide:
       `for d in packages/*/ apps/*/; do [ -d "$d" ] || continue; n=$(git ls-files "$d" | wc -l | tr -d ' '); [ "$n" = 0 ] && echo "HUSK: $d"; done`
       returns nothing; `git status --short` shows no unexpected changes
       (deleting an untracked dir produces none).
@@ -263,14 +263,14 @@ is independent).
 
 > Depends-on: - | Repo: registry | Touches: registry/docs/apps-and-workflows.md, registry/docs/vcs-and-sessions.md, registry/docs/platform.md | Verify: ! grep -q "STALE" docs/apps-and-workflows.md docs/vcs-and-sessions.md && ! grep -qE "vfs\.(commit|log|diff|show|restore|branches)" docs/vcs-and-sessions.md
 
-- [ ] 11.1 `docs/apps-and-workflows.md`: replace the document body (keep the
+- [x] 11.1 `docs/apps-and-workflows.md`: replace the document body (keep the
       file so `platform.md:110`'s inbound link resolves) with a short stub:
       state the normative model now lives in `aprovan/docs/app-data.md` and
       `aprovan/docs/native-surfaces.md` (current truth) and
       `aprovan/openspec/changes/IW-9-APP-FIRST.md` (forward direction);
       remove the STALE banner (it's now simply not the content anymore, not
       stale content) (tech-plan D7).
-- [ ] 11.2 `docs/vcs-and-sessions.md`: rewrite the "Surface" section
+- [x] 11.2 `docs/vcs-and-sessions.md`: rewrite the "Surface" section
       (lines 113-161) to current reality — the verb table lives under
       `vcs.*`, not `vfs.*`; storage is the record store, not
       `.services/vcs/*.json`; there are no `mount`/`unmount`/`mounts`
@@ -280,11 +280,11 @@ is independent).
       (accurate, not stale) — resolve the file's banner once this section is
       fixed, since the banner says only this section was wrong (tech-plan
       D7). Leave every other section as-is.
-- [ ] 11.3 Update `platform.md:110,114`'s link text only if the surrounding
+- [x] 11.3 Update `platform.md:110,114`'s link text only if the surrounding
       sentence no longer reads correctly after 11.1/11.2 (e.g. if it still
       says "the naming decision, the app SDK contract, `dataScope`..." for a
       file that's now a stub) — keep the links, fix only what would mislead.
-- [ ] 11.4 Grep gate: neither doc's body (excluding a removed-banner's own
+- [x] 11.4 Grep gate: neither doc's body (excluding a removed-banner's own
       historical mention, if kept) asserts `vfs.commit`/`vfs.mount`-style
       verbs or `dataScope` as current; `grep -rn "STALE" docs/apps-and-workflows.md docs/vcs-and-sessions.md`
       finds no unresolved banner (both banners are either removed or
