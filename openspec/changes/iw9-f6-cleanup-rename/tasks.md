@@ -11,14 +11,14 @@ is independent).
 
 > Depends-on: - | Repo: aprovan | Touches: aprovan/server/workspace/tests/vcs.test.ts, aprovan/server/workspace/tests/chat-sessions.test.ts | Verify: pnpm --filter @aprovan/workspace test -- tests/vcs.test.ts tests/chat-sessions.test.ts
 
-- [ ] 1.1 In `tests/vcs.test.ts`, rename every `call("vfs/commit"|"vfs/log"|"vfs/diff"|"vfs/show"|"vfs/restore"|"vfs/branches", ...)`
+- [x] 1.1 In `tests/vcs.test.ts`, rename every `call("vfs/commit"|"vfs/log"|"vfs/diff"|"vfs/show"|"vfs/restore"|"vfs/branches", ...)`
       to the `vcs/` equivalent (tech-plan D1). Leave `call("vfs/read", ...)`
       and `call("vfs/list", ...)` untouched — those are genuine `vfs`
       operations and already pass.
-- [ ] 1.2 In `tests/chat-sessions.test.ts`, rename the two `call("vfs/log", ...)`
+- [x] 1.2 In `tests/chat-sessions.test.ts`, rename the two `call("vfs/log", ...)`
       calls (lines 81, 177) to `call("vcs/log", ...)`. Leave the
       `call("vfs/list", ...)` call untouched.
-- [ ] 1.3 Grep gate: `grep -nE 'call\("vfs/(commit|log|diff|show|restore|branches)"' server/workspace/tests/vcs.test.ts server/workspace/tests/chat-sessions.test.ts`
+- [x] 1.3 Grep gate: `grep -nE 'call\("vfs/(commit|log|diff|show|restore|branches)"' server/workspace/tests/vcs.test.ts server/workspace/tests/chat-sessions.test.ts`
       returns nothing.
 
 ## 2. Repair mount-lineage fixtures; quarantine the mount-CRUD test
