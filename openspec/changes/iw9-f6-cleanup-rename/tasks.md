@@ -211,23 +211,23 @@ is independent).
 
 > Depends-on: - | Repo: aprovan | Touches: aprovan/scripts/deploy-web.sh, aprovan/.github/workflows/web.yml, aprovan/infra/aws/src/stacks/main.ts, aprovan/infra/aws/src/stacks/web.ts | Verify: pnpm --filter @aprovan/infra typecheck && pnpm --filter @aprovan/infra synth && bash -n scripts/deploy-web.sh
 
-- [ ] 9.1 `scripts/deploy-web.sh`: replace every `chat/` S3 key prefix (the
+- [x] 9.1 `scripts/deploy-web.sh`: replace every `chat/` S3 key prefix (the
       four `s3 sync` calls, the `s3 cp` SPA-shell publish, and its
       surrounding comment) and the `/chat/*` CloudFront invalidation path
       with `workspace/`/`/workspace/*`; update the header comment and the
       final `log "Done. https://aprovan.com/chat/ ..."` line to
       `.../workspace/`.
-- [ ] 9.2 `.github/workflows/web.yml`: update the header comment
+- [x] 9.2 `.github/workflows/web.yml`: update the header comment
       ("...automated deployment to aprovan.com/chat on main...") to say
       `/workspace`. No functional change — the workflow delegates entirely
       to `deploy-web.sh`.
-- [ ] 9.3 `infra/aws/src/stacks/web.ts`: add a new `cloudfront.Function`
+- [x] 9.3 `infra/aws/src/stacks/web.ts`: add a new `cloudfront.Function`
       (viewer-request, JS_2_0) implementing the `/chat` → `/workspace`
       permanent-redirect contract in tech-plan D8/"Interfaces & Data"; add
       it to `defaultBehavior.functionAssociations` **before** the existing
       `rewrite` (`StaticRewrite`) function, so the redirect short-circuits
       ahead of the extension/index.html rewrite.
-- [ ] 9.4 `infra/aws/src/stacks/main.ts`: add
+- [x] 9.4 `infra/aws/src/stacks/main.ts`: add
       `"https://aprovan.com/workspace/auth/callback"` and
       `"http://localhost:5173/workspace/auth/callback"` to `callbackUrls`
       (lines ~166-168), and `"https://aprovan.com/workspace"` /
@@ -239,7 +239,9 @@ is independent).
       `/chat/deep/path?x=1` to the correct `/workspace` equivalents,
       preserving query strings, before calling this stream done (tech-plan
       Risks — no automated CDK test exists in this repo to assert it).
-- [ ] 9.6 Grep gate: `grep -rn '"chat/\|/chat/\*\|aprovan.com/chat' scripts/deploy-web.sh .github/workflows/web.yml`
+      _(Phase 1 synth/typecheck/bash -n/grep passed in this PR; Phase 2 live
+      curl gate left open until CDK is deployed to the live distribution.)_
+- [x] 9.6 Grep gate: `grep -rn '"chat/\|/chat/\*\|aprovan.com/chat' scripts/deploy-web.sh .github/workflows/web.yml`
       returns nothing (the `/chat/auth/callback` and `/chat` literals in
       `main.ts`'s Cognito lists are expected to remain per D9 — this gate
       does not apply to that file).

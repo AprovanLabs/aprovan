@@ -166,6 +166,8 @@ export class MainStack extends Stack {
       "http://localhost:5173/chat/auth/callback",
       "https://patchwork.com/chat/auth/callback",
       "https://aprovan.com/chat/auth/callback",
+      "http://localhost:5173/workspace/auth/callback",
+      "https://aprovan.com/workspace/auth/callback",
       // Registry
       "http://localhost:4321/auth/callback",
       "https://aprovan.com/registry/auth/callback",
@@ -191,6 +193,8 @@ export class MainStack extends Stack {
           "https://aprovan.com/chat",
           "http://localhost",
           "http://localhost:5173/chat",
+          "https://aprovan.com/workspace",
+          "http://localhost:5173/workspace",
         ],
       },
       supportedIdentityProviders: [
