@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 #
-# Build the patchwork web app and publish it to aprovan.com/chat.
+# Build the patchwork web app and publish it to aprovan.com/workspace.
 #
-# Builds @aprovan/patchwork-web (Vite base /chat/ — set in vite.config.ts),
-# syncs the static output into the chat/ prefix of the shared aprovan.com S3
+# Builds @aprovan/patchwork-web (Vite base /workspace/ — set in vite.config.ts),
+# syncs the static output into the workspace/ prefix of the shared aprovan.com S3
 # bucket (owned by core's WebStack), and invalidates the CloudFront cache for
-# /chat/*.
+# /workspace/*.
 #
 # Cognito / gateway config is baked into the build by client/web/scripts/
 # load-env.ts, which reads the shared identity bundle from SSM
@@ -44,7 +44,7 @@ fi
 log "Gateway MCP URL: $VITE_MCP_URL (REST: $VITE_GATEWAY_URL)"
 
 if [[ "${SKIP_BUILD:-}" != "1" ]]; then
-  log "Building @aprovan/patchwork-web (base /chat, env $ENVIRONMENT)"
+  log "Building @aprovan/patchwork-web (base /workspace, env $ENVIRONMENT)"
   (
     cd "$REPO_ROOT"
     APROVAN_ENV="$ENVIRONMENT" \
@@ -58,7 +58,7 @@ fi
 [[ -f "$DIST_DIR/index.html" ]] ||
   die "$DIST_DIR/index.html missing — build did not produce output."
 
-log "Syncing $DIST_DIR → s3://$WEB_BUCKET/chat/"
+log "Syncing $DIST_DIR → s3://$WEB_BUCKET/workspace/"
 # Fingerprinted assets: long-cache. HTML, the service worker, its workbox
 # runtime chunk, and the manifest: always revalidate so a deploy — and in
 # particular a service worker update — is visible as soon as the invalidation
@@ -67,43 +67,43 @@ log "Syncing $DIST_DIR → s3://$WEB_BUCKET/chat/"
 # stable URL to poll); long-caching them would pin clients to a stale worker
 # indefinitely, since the SW itself is what's supposed to tell the browser a
 # new version exists.
-awscli "$WEB_REGION" s3 sync "$DIST_DIR" "s3://$WEB_BUCKET/chat/" \
+awscli "$WEB_REGION" s3 sync "$DIST_DIR" "s3://$WEB_BUCKET/workspace/" \
   --delete \
   --exclude "*.html" \
   --exclude "sw.js" \
   --exclude "workbox-*.js" \
   --exclude "manifest.webmanifest" \
   --cache-control "public,max-age=31536000,immutable"
-awscli "$WEB_REGION" s3 sync "$DIST_DIR" "s3://$WEB_BUCKET/chat/" \
+awscli "$WEB_REGION" s3 sync "$DIST_DIR" "s3://$WEB_BUCKET/workspace/" \
   --delete \
   --exclude "*" --include "*.html" \
   --cache-control "public,max-age=0,must-revalidate" \
   --content-type "text/html; charset=utf-8"
-awscli "$WEB_REGION" s3 sync "$DIST_DIR" "s3://$WEB_BUCKET/chat/" \
+awscli "$WEB_REGION" s3 sync "$DIST_DIR" "s3://$WEB_BUCKET/workspace/" \
   --delete \
   --exclude "*" --include "sw.js" --include "workbox-*.js" \
   --cache-control "public,max-age=0,must-revalidate" \
   --content-type "application/javascript; charset=utf-8"
-awscli "$WEB_REGION" s3 sync "$DIST_DIR" "s3://$WEB_BUCKET/chat/" \
+awscli "$WEB_REGION" s3 sync "$DIST_DIR" "s3://$WEB_BUCKET/workspace/" \
   --delete \
   --exclude "*" --include "manifest.webmanifest" \
   --cache-control "public,max-age=0,must-revalidate" \
   --content-type "application/manifest+json"
 
 # The app is a single-page Vite build, but CloudFront's static rewrite maps
-# /chat/auth/callback → chat/auth/callback/index.html. Publish a copy of the
+# /workspace/auth/callback → workspace/auth/callback/index.html. Publish a copy of the
 # SPA shell at that key so the Cognito redirect lands on the app. (Runs after
 # the --delete syncs, which would otherwise remove it.)
-log "Publishing SPA shell at chat/auth/callback/"
+log "Publishing SPA shell at workspace/auth/callback/"
 awscli "$WEB_REGION" s3 cp "$DIST_DIR/index.html" \
-  "s3://$WEB_BUCKET/chat/auth/callback/index.html" \
+  "s3://$WEB_BUCKET/workspace/auth/callback/index.html" \
   --cache-control "public,max-age=0,must-revalidate" \
   --content-type "text/html; charset=utf-8"
 
-log "Invalidating CloudFront $CLOUDFRONT_DISTRIBUTION_ID (/chat/*)"
+log "Invalidating CloudFront $CLOUDFRONT_DISTRIBUTION_ID (/workspace/*)"
 INVALIDATION_ID="$(awscli "$WEB_REGION" cloudfront create-invalidation \
   --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" \
-  --paths "/chat/*" \
+  --paths "/workspace/*" \
   --query 'Invalidation.Id' --output text)"
 
-log "Done. https://aprovan.com/chat/ (invalidation $INVALIDATION_ID)"
+log "Done. https://aprovan.com/workspace/ (invalidation $INVALIDATION_ID)"

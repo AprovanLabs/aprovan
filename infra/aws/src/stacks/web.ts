@@ -47,11 +47,47 @@ export class WebStack extends Stack {
       autoDeleteObjects: true,
     });
 
+    // NOTE (deviation from tech-plan D8's literal "add it to
+    // functionAssociations before StaticRewrite" phrasing): CloudFront allows
+    // only one edge-function association per event type per cache behavior
+    // (https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/edge-function-restrictions-all.html
+    // — "Each event type ... can have only one edge function association").
+    // `cdk synth` does not validate this (it's enforced by the CloudFront API
+    // at deploy time), so two separate viewer-request `cloudfront.Function`s
+    // on `defaultBehavior` would synthesize cleanly but fail — or silently
+    // drop one association — on actual deploy. The redirect check (D8's
+    // pseudocode, unchanged) is therefore inlined ahead of the existing
+    // rewrite logic in the same function, preserving the "redirect
+    // short-circuits ahead of the extension/index.html rewrite" contract
+    // (the `return` inside the `if` exits before the rewrite code runs) while
+    // staying a single viewer-request association.
     const rewrite = new cloudfront.Function(this, "StaticRewrite", {
       runtime: cloudfront.FunctionRuntime.JS_2_0,
       code: cloudfront.FunctionCode.fromInline(`
 function handler(event) {
   var request = event.request;
+  var uri = request.uri;
+  if (uri === "/chat" || uri.startsWith("/chat/")) {
+    var newUri = "/workspace" + uri.slice("/chat".length);
+    var qs = request.querystring;
+    var pairs = [];
+    for (var key in qs) {
+      var param = qs[key];
+      var values = param.multiValue
+        ? param.multiValue.map(function (v) { return v.value; })
+        : [param.value];
+      for (var i = 0; i < values.length; i++) {
+        pairs.push(encodeURIComponent(key) + "=" + encodeURIComponent(values[i]));
+      }
+    }
+    return {
+      statusCode: 301,
+      statusDescription: "Moved Permanently",
+      headers: {
+        location: { value: newUri + (pairs.length ? "?" + pairs.join("&") : "") },
+      },
+    };
+  }
   if (!request.uri.includes(".") && !request.uri.endsWith("/")) request.uri += "/";
   if (request.uri.endsWith("/")) request.uri += "index.html";
   return request;

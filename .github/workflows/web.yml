@@ -1,7 +1,7 @@
 name: Web
 
-# Build verification on PRs, and automated deployment to aprovan.com/chat on
-# main — using the exact same script you can run locally
+# Build verification on PRs, and automated deployment to aprovan.com/workspace
+# on main — using the exact same script you can run locally
 # (scripts/deploy-web.sh). CI only supplies AWS credentials via OIDC; bucket /
 # distribution / Cognito config is discovered from SSM parameters published by
 # the core infra.
