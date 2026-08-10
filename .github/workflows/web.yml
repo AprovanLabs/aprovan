@@ -23,7 +23,9 @@ permissions:
   id-token: write
 
 concurrency:
-  group: patchwork-web-deploy
+  # Keep production deploys serialized without letting unrelated PR verifies
+  # replace a queued main run in GitHub's single-pending concurrency slot.
+  group: patchwork-web-${{ github.ref == 'refs/heads/main' && 'production' || github.ref }}
   cancel-in-progress: false
 
 jobs:
