@@ -151,12 +151,12 @@ is independent).
 
 > Depends-on: - | Repo: aprovan | Touches: aprovan/server/workspace/src/workflows/store.ts, aprovan/server/workspace/src/apps/store.ts, aprovan/server/workspace/scripts/migrate-shares-to-appid.ts, aprovan/server/workspace/tests/app-share-identity.test.ts, aprovan/client/web/src/lib/vfs-commits.ts, aprovan/client/web/src/lib/__tests__/vfs-commits.test.ts | Verify: pnpm --filter @aprovan/workspace test -- tests/app-share-identity.test.ts && pnpm --filter @aprovan/patchwork-web test -- src/lib/__tests__/vfs-commits.test.ts
 
-- [ ] 7.1 `server/workspace/src/workflows/store.ts`: rewrite
+- [x] 7.1 `server/workspace/src/workflows/store.ts`: rewrite
       `workflowVisibleTo`'s doc comment (lines 207-211) and
       `listVisibleRegistrations`' doc comment to state the filter is a
       listing convenience only — never claim "creator-private" — per
       tech-plan D4. No behavior change to the filtering logic itself.
-- [ ] 7.2 `server/workspace/src/apps/store.ts`: change `shareAllows`'s
+- [x] 7.2 `server/workspace/src/apps/store.ts`: change `shareAllows`'s
       `app` parameter to take an `appId` and match against it; change
       `appFsAllowed`'s call site (line ~499) to pass `app.id` instead of
       `app.name`; add a read-time fallback that resolves any
@@ -164,27 +164,27 @@ is independent).
       existing name→appId alias index before comparing (tech-plan D5).
       Update the `WorkspaceShare.apps` doc comment to say "app ids," not
       "app names."
-- [ ] 7.3 New script `server/workspace/scripts/migrate-shares-to-appid.ts`
+- [x] 7.3 New script `server/workspace/scripts/migrate-shares-to-appid.ts`
       (model on `migrate-app-records.ts`'s structure): for every workspace's
       `WorkspaceConfig`, rewrite each `shares[].apps` entry from name to
       `appId` via the alias index; supports a dry-run flag that logs
       intended rewrites without writing (tech-plan D5, Risks).
-- [ ] 7.4 New test `server/workspace/tests/app-share-identity.test.ts`:
+- [x] 7.4 New test `server/workspace/tests/app-share-identity.test.ts`:
       grant a share to an app, rename the app, assert `appFsAllowed`/
       `shareAllows` still allow the same path for the same app after the
       rename (spec `app-share-identity`, scenario "Renaming an app does not
       change what its shares allow"); also assert a pre-existing name-keyed
       `WorkspaceConfig.shares` entry still resolves via the fallback (spec
       scenario "An existing share keeps working after upgrade").
-- [ ] 7.5 `client/web/src/lib/vfs-commits.ts`: add `changes?: unknown` to
+- [x] 7.5 `client/web/src/lib/vfs-commits.ts`: add `changes?: unknown` to
       the `CommitDetail` interface and include `raw.changes` in
       `fetchCommitDetail`'s return object (tech-plan "Interfaces & Data").
-- [ ] 7.6 New test `client/web/src/lib/__tests__/vfs-commits.test.ts`:
+- [x] 7.6 New test `client/web/src/lib/__tests__/vfs-commits.test.ts`:
       mock `invokeNamespaceTool` to return a `show` response with a
       `changes` payload; assert `fetchCommitDetail` includes it in the
       resolved `CommitDetail` (spec `commit-detail-fidelity`, both
       scenarios — with and without a `changes` payload present).
-- [ ] 7.7 Grep gate: `grep -n "creator-private" server/workspace/src/workflows/store.ts`
+- [x] 7.7 Grep gate: `grep -n "creator-private" server/workspace/src/workflows/store.ts`
       returns nothing; `grep -n "app.name" server/workspace/src/apps/store.ts | grep shareAllows`
       returns nothing.
 
