@@ -157,7 +157,7 @@ Ordering mirrors tech-plan.md's Rollout: server model (1) → domain modules
 
 > Depends-on: 1 | Repo: aprovan | Touches: aprovan/server/workspace/src/vcs/mounts-procedures.ts, aprovan/server/workspace/tests/vcs-mounts-procedures.test.ts | Verify: pnpm --filter @aprovan/workspace test -- vcs-mounts-procedures.test.ts
 
-- [ ] 5.1 Create `vcs/mounts-procedures.ts` calling the existing
+- [x] 5.1 Create `vcs/mounts-procedures.ts` calling the existing
       `readMounts`/`addMount`/`removeMount` (`vcs/mounts.ts`, unmodified per
       tech-plan D7) with procedure-side validation added: prefix shape,
       overlap against app roots (reuse `assertRootAvailable` from stream 1
@@ -165,11 +165,11 @@ Ordering mirrors tech-plan.md's Rollout: server model (1) → domain modules
       mounts, reject `crdt` backend (engine-reserved), reject a target that
       is another app's root (`vfs-mounts` — "App-root targets are
       rejected").
-- [ ] 5.2 Support app-scoped mounts: a mount whose prefix lies under an app's
+- [x] 5.2 Support app-scoped mounts: a mount whose prefix lies under an app's
       root is recognized as app-scoped (no second mount store — tech-plan
       D7); confirm such mounts are readable through the app's ordinary path
       authorization (stream 1's narrowed `appPathAllowed`).
-- [ ] 5.3 Add `tests/vcs-mounts-procedures.test.ts`: add-then-read-through;
+- [x] 5.3 Add `tests/vcs-mounts-procedures.test.ts`: add-then-read-through;
       overlapping mount (vs. app root, vs. another mount) rejected 409;
       `crdt` backend rejected; app-root-as-mount-target rejected 400;
       app-scoped mount reads succeed via the app's own path authorization.
