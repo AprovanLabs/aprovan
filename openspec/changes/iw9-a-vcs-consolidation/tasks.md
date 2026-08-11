@@ -95,15 +95,15 @@
 
 > Repo: aprovan | Depends-on: - | Touches: aprovan/packages/editor/package.json, aprovan/packages/editor/src/components/DiffViewer.tsx, aprovan/packages/editor/src/components/SaveAffordance.tsx, aprovan/client/web/src/components/ChangeList.tsx | Verify: cd aprovan/packages/editor && pnpm typecheck && pnpm test && cd ../../client/web && pnpm typecheck
 
-- [ ] 4.1 Add `@codemirror/merge` to `packages/editor` (NOT currently
+- [x] 4.1 Add `@codemirror/merge` to `packages/editor` (NOT currently
       installed; CM6 stack verified present) and build `DiffViewer`:
       props per tech-plan Interfaces; split/unified modes; added/removed/
       binary/oversize/error-per-side states per ux.md "Diff view".
-- [ ] 4.2 Build shared `ChangeList` in `client/web/src/components/` with the
+- [x] 4.2 Build shared `ChangeList` in `client/web/src/components/` with the
       new/edited/removed word-chip vocabulary (no `+/~/−` glyphs), tooltip,
       collapse-behind-"Show all N", host-provided `onOpen` (ux.md
       "ChangeList").
-- [ ] 4.3 Convert `SaveAffordance.tsx:301-307` to accept change rows via
+- [x] 4.3 Convert `SaveAffordance.tsx:301-307` to accept change rows via
       render prop/slot (packages/editor must not import client/web;
       tech-plan D5).
 

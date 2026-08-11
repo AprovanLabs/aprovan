@@ -26,6 +26,7 @@
     "@aprovan/patchwork": "workspace:*",
     "@codemirror/autocomplete": "^6.20.3",
     "@codemirror/lang-javascript": "^6.2.5",
+    "@codemirror/merge": "^6",
     "@codemirror/state": "^6.7.1",
     "@codemirror/view": "^6.43.6",
     "@pierre/trees": "1.0.0-beta.5",

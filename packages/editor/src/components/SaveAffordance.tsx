@@ -23,6 +23,22 @@ export type DraftAffordanceState =
     }
   | { kind: "error"; message: string; retry: () => void };
 
+/** Change bag shape shared with client ChangeList (editor must not import it). */
+export type SaveAffordanceChanges = {
+  added: string[];
+  modified: string[];
+  removed: string[];
+};
+
+/**
+ * Host injects the shared ChangeList (or any rows UI) so packages/editor
+ * never imports client/web (tech-plan D5).
+ */
+export type RenderChangeList = (args: {
+  changes: SaveAffordanceChanges;
+  onOpen?: (path: string) => void;
+}) => ReactNode;
+
 export type SaveAffordanceState =
   | { kind: "readonly"; reason?: string }
   | {
@@ -40,6 +56,8 @@ export type SaveAffordanceState =
       onApply?: () => Promise<void>;
       onDiscard?: () => Promise<void>;
       onOpenFile?: (path: string) => void;
+      /** Render prop / slot for change rows (prefer client `ChangeList`). */
+      renderChangeList?: RenderChangeList;
     };
 
 export interface SaveConfirmDialogProps {
@@ -90,6 +108,7 @@ export function SaveAffordance({ state }: { state: SaveAffordanceState }) {
       onApply={state.onApply}
       onDiscard={state.onDiscard}
       onOpenFile={state.onOpenFile}
+      renderChangeList={state.renderChangeList}
     />
   );
 }
@@ -201,11 +220,13 @@ function StagedChip({
   onApply,
   onDiscard,
   onOpenFile,
+  renderChangeList,
 }: {
   draft: DraftAffordanceState;
   onApply?: () => Promise<void>;
   onDiscard?: () => Promise<void>;
   onOpenFile?: (path: string) => void;
+  renderChangeList?: RenderChangeList;
 }) {
   const [reviewOpen, setReviewOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -275,6 +296,7 @@ function StagedChip({
             }
           }}
           onOpenFile={onOpenFile}
+          renderChangeList={renderChangeList}
         />
       )}
     </>
@@ -289,22 +311,20 @@ function DraftReviewDialog({
   onApply,
   onDiscard,
   onOpenFile,
+  renderChangeList,
 }: {
   title: string;
-  changes?: { added: string[]; modified: string[]; removed: string[] };
+  changes?: SaveAffordanceChanges;
   busy: boolean;
   onClose: () => void;
   onApply: () => Promise<void>;
   onDiscard: () => Promise<void>;
   onOpenFile?: (path: string) => void;
+  renderChangeList?: RenderChangeList;
 }) {
-  const changeRows = changes
-    ? [
-        ...changes.added.map((path) => ({ path, label: "new" as const })),
-        ...changes.modified.map((path) => ({ path, label: "edited" as const })),
-        ...changes.removed.map((path) => ({ path, label: "removed" as const })),
-      ].sort((a, b) => a.path.localeCompare(b.path))
-    : [];
+  const hasChanges =
+    !!changes &&
+    changes.added.length + changes.modified.length + changes.removed.length > 0;
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80">
@@ -316,29 +336,29 @@ function DraftReviewDialog({
           <p className="text-sm text-muted-foreground">
             “{title}” holds drafted changes. Apply them to your workspace or discard.
           </p>
-          {changeRows.length > 0 ? (
-            <div className="max-h-40 overflow-y-auto rounded border">
-              {changeRows.map((row) => (
-                <button
-                  key={row.path}
-                  type="button"
-                  onClick={() => onOpenFile?.(row.path)}
-                  className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-xs hover:bg-muted"
-                >
-                  <span
-                    className={`w-14 shrink-0 text-[10px] uppercase tracking-wide ${
-                      row.label === "new"
-                        ? "text-emerald-600 dark:text-emerald-400"
-                        : row.label === "edited"
-                          ? "text-amber-600 dark:text-amber-400"
-                          : "text-red-600 dark:text-red-400"
-                    }`}
-                  >
-                    {row.label}
-                  </span>
-                  <span className="truncate font-mono">{row.path}</span>
-                </button>
-              ))}
+          {hasChanges && changes ? (
+            <div className="max-h-40 overflow-y-auto rounded border p-1">
+              {renderChangeList ? (
+                renderChangeList({ changes, onOpen: onOpenFile })
+              ) : (
+                // Path-only fallback until the host injects ChangeList (stream 6).
+                <ul className="space-y-0.5">
+                  {[...changes.added, ...changes.modified, ...changes.removed]
+                    .sort((a, b) => a.localeCompare(b))
+                    .map((path) => (
+                      <li key={path}>
+                        <button
+                          type="button"
+                          onClick={() => onOpenFile?.(path)}
+                          className="flex w-full items-center px-2 py-1.5 text-left text-xs hover:bg-muted"
+                          title={path}
+                        >
+                          <span className="truncate font-mono">{path}</span>
+                        </button>
+                      </li>
+                    ))}
+                </ul>
+              )}
             </div>
           ) : (
             <p className="text-xs text-muted-foreground">No listed file changes yet.</p>
