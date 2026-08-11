@@ -92,10 +92,13 @@ import {
   type AppRelease,
 } from "./releases.js";
 import { generateAppSdk } from "./sdk.js";
+import { loadAppYaml } from "./manifest.js";
+import { assertRootAvailable } from "./roots.js";
 import {
   ENTRY_CANDIDATES,
   appDataDir,
   appName,
+  hydrateAppRecord,
   listApps,
   listEntryVersions,
   pathDir,
@@ -302,10 +305,14 @@ async function describeApp(
     title: manifest.title,
     description: manifest.description,
     visibility: manifest.visibility ?? "private",
-    /** UI entrypoint, as a workspace path. */
+    /** Single app-root workspace path (authoritative binding). */
+    root: manifest.root ?? manifest.paths[0],
+    /** UI entrypoint under the root (derived). */
     entry: manifest.entry,
-    /** Workspace prefixes this app publishes (paths[0] is its root). */
+    /** Derived `[root]` projection — never a multi-prefix binding. */
     paths: manifest.paths,
+    /** Last reconcile outcome for authors (`app.yaml` validation). */
+    reconcile: manifest.reconcile,
     /** Live page URL (aprovan.com/apps/<workspace>/<name>). */
     url: livePath(workspaceId, manifest.name),
     /** Durable id permalink that survives renames. */
@@ -459,36 +466,104 @@ function summarizeRelease(release: AppRelease) {
 }
 
 /**
- * Resolve the manifest's path binding from the publish arguments. `entry`
- * (a file, or a folder to resolve within) is the explicit form; `dir` is
- * sugar for the same thing. With neither, an update keeps its binding and a
- * fresh publish claims `apps/<name>/index.tsx` — the UI is often authored
- * after the app is registered, so that default is not required to exist yet.
+ * Resolve the single app root for a publish. `entry`/`dir` name a file or
+ * folder under the root; with neither, an update keeps its root and a fresh
+ * publish claims `apps/<name>`. Extra `paths[]` prefixes are rejected — use
+ * mounts instead (see {@link rejectExtraPaths}).
  *
- * `paths` always leads with the entry's folder — the primary prefix carries
- * the app's data partition and its app-relative vfs paths, so it is derived,
- * never declared. Extra prefixes survive an update unless `paths` is given
- * (pass `[]` to drop them).
+ * Identity/derived-state writes go through {@link saveApp} after loading
+ * `app.yaml`. When F4's `reconcileApp` lands, this call site swaps to it
+ * (same root + yaml + actor inputs) — it is not stubbed here.
  */
-async function resolveBinding(
+async function resolvePublishRoot(
   workspaceId: string,
   name: string,
   args: Record<string, unknown>,
   existing: AppManifest | undefined,
-): Promise<{ entry: string; paths: string[] }> {
+): Promise<{ root: string; entry: string }> {
   const target = args["entry"] ?? args["dir"];
-  const entry =
-    target !== undefined
-      ? await resolveAppEntry(workspaceId, target)
-      : (existing?.entry ?? `apps/${name}/${ENTRY_CANDIDATES[0]}`);
+  if (target !== undefined) {
+    const path = workspacePath(target, "entry");
+    const store = getFsStore();
+    const asFile = await store.read(workspaceId, path).catch(() => undefined);
+    if (asFile) {
+      const root = pathDir(path);
+      return { root, entry: path };
+    }
+    // Folder (or not-yet-authored file path): root is the folder; entry may
+    // resolve via ENTRY_CANDIDATES or fall back to the conventional default.
+    try {
+      const entry = await resolveAppEntry(workspaceId, path);
+      return { root: pathDir(entry), entry };
+    } catch (err) {
+      // Fresh register before UI exists — claim the folder as root.
+      if (!(err instanceof ServiceError)) throw err;
+      const base = path.includes("/") ? path.slice(path.lastIndexOf("/") + 1) : path;
+      const looksLikeFile = base.includes(".");
+      const root = looksLikeFile ? pathDir(path) : path;
+      return { root, entry: `${root}/${ENTRY_CANDIDATES[0]}` };
+    }
+  }
+  const root = existing?.root ?? existing?.paths?.[0] ?? `apps/${name}`;
+  const entry = existing?.entry ?? `${root}/${ENTRY_CANDIDATES[0]}`;
+  return { root, entry };
+}
 
-  const declared = args["paths"] ?? existing?.paths.slice(1) ?? [];
+/** 400 when publish/update still supplies path prefixes beyond the app root. */
+function rejectExtraPaths(root: string, args: Record<string, unknown>): void {
+  if (args["paths"] === undefined) return;
+  const declared = args["paths"];
   if (!Array.isArray(declared)) {
     throw new ServiceError("paths must be an array of workspace prefixes", 400);
   }
-  const extra = declared.map((path) => workspacePath(path, "paths[]"));
+  const extras = declared
+    .map((path) => workspacePath(path, "paths[]"))
+    .filter((path) => path !== root);
+  if (extras.length > 0) {
+    throw new ServiceError(
+      "Extra path prefixes are no longer accepted on publish; share content between apps via mounts under the app root",
+      400,
+    );
+  }
+}
 
-  return { entry, paths: [...new Set([pathDir(entry), ...extra])] };
+/**
+ * Load `app.yaml` at the root and project authored fields onto the record.
+ * Invalid yaml keeps last-good derived state and surfaces issues on
+ * `reconcile` — never thrown at app users (app-roots scenario).
+ *
+ * When F4 `reconcileApp` lands, replace this + the subsequent `saveApp` with
+ * that single entry point; do not reimplement mint/alias/root-index here.
+ */
+async function loadRootYaml(
+  workspaceId: string,
+  root: string,
+  existing: AppManifest | undefined,
+): Promise<{
+  declared?: AppManifest["declared"];
+  title?: string;
+  description?: string;
+  reconcile: NonNullable<AppManifest["reconcile"]>;
+}> {
+  const file = await getFsStore()
+    .read(workspaceId, `${root}/app.yaml`)
+    .catch(() => undefined);
+  const content = file?.content ?? "{}";
+  const loaded = loadAppYaml(content);
+  if (!loaded.ok) {
+    return {
+      declared: existing?.declared,
+      title: existing?.title,
+      description: existing?.description,
+      reconcile: { status: "error", issues: loaded.issues },
+    };
+  }
+  return {
+    declared: loaded.value,
+    title: loaded.value.title ?? existing?.title,
+    description: loaded.value.description ?? existing?.description,
+    reconcile: { status: "ok" },
+  };
 }
 
 export const appsService: CoreService = {
@@ -502,7 +577,7 @@ export const appsService: CoreService = {
       name: "apps.publish",
       operation: "publish",
       description:
-        "Publish (or update) an app by binding workspace paths to a live endpoint: 'entry' is the UI entrypoint path (e.g. apps/liift4/widget.tsx) and 'paths' are the prefixes the app publishes — the same prefixes decide what the live site serves and what the app's sessions may read/write. 'workflows' is the app's export list: each becomes callable as app.<workflow>. 'allowed_tools' may only name the auto-partitioned native namespaces (vfs, keyvalue, events) or the app's own workflows — a provider (github, linear, …) must be reached through an exported workflow. The live app serves at /apps/<workspace>/<name>; identity is a ULID with a mutable name alias.",
+        "Publish (or update) an app bound to a single workspace root (apps/<name>). Pass 'entry' or 'dir' to name the UI under that root; the root is derived (never a multi-prefix paths[] list — extras are rejected; use mounts to share content). 'workflows' is the app's export list: each becomes callable as app.<workflow>. 'allowed_tools' may only name the auto-partitioned native namespaces (vfs, keyvalue, events) or the app's own workflows — a provider (github, linear, …) must be reached through an exported workflow. The live app serves at /apps/<workspace>/<name>; identity is a ULID with a mutable name alias.",
       inputSchema: {
         type: "object",
         properties: {
@@ -512,15 +587,15 @@ export const appsService: CoreService = {
           entry: {
             type: "string",
             description:
-              "Workspace path of the UI entrypoint (e.g. apps/liift4/widget.tsx). A folder resolves to index.tsx, index.ts, widget.tsx, or its only *.tsx",
+              "Workspace path of the UI entrypoint (e.g. apps/liift4/widget.tsx). A folder resolves to index.tsx, index.ts, widget.tsx, or its only *.tsx. The entry's folder becomes the app root.",
           },
           paths: {
             type: "array",
             items: { type: "string" },
             description:
-              "Extra workspace prefixes the app publishes (e.g. ['lib/charts']); the entry's folder is always included and is the app's root",
+              "Rejected when it names prefixes beyond the app root — use mounts to share content between apps",
           },
-          dir: { type: "string", description: "Sugar for entry: a folder whose entrypoint is resolved for you" },
+          dir: { type: "string", description: "Sugar for entry: a folder whose entrypoint is resolved for you (the folder is the app root)" },
           visibility: { type: "string", enum: ["public", "private"], description: "Who can open the live page (default private)" },
           requires: {
             type: "array",
@@ -968,7 +1043,15 @@ export const appsService: CoreService = {
             );
           }
         }
-        const { entry, paths } = await resolveBinding(ctx.workspaceId, name, args, existing);
+        const { root, entry } = await resolvePublishRoot(
+          ctx.workspaceId,
+          name,
+          args,
+          existing,
+        );
+        rejectExtraPaths(root, args);
+        await assertRootAvailable(ctx.workspaceId, root, existing?.appId);
+        const yamlProjection = await loadRootYaml(ctx.workspaceId, root, existing);
         const requires =
           args["requires"] !== undefined
             ? parseRequires(args["requires"])
@@ -981,15 +1064,25 @@ export const appsService: CoreService = {
         await assertGrantCredentials(ctx.workspaceId, grants);
         const now = new Date().toISOString();
         const appId = existing?.appId ?? mintAppId();
-        const manifest: AppManifest = {
+        // Prefer explicit publish args for title/description when provided;
+        // otherwise take last-good / app.yaml projection (invalid yaml keeps
+        // last-good and surfaces issues on reconcile — never throws at users).
+        const titleFromArgs = typeof args["title"] === "string" ? args["title"] : undefined;
+        const descriptionFromArgs =
+          typeof args["description"] === "string" ? args["description"] : undefined;
+        const manifest = hydrateAppRecord({
           appId,
           name,
+          slug: name,
           originAppId: existing?.originAppId,
-          title: typeof args["title"] === "string" ? args["title"] : existing?.title,
+          title: titleFromArgs ?? yamlProjection.title ?? existing?.title,
           description:
-            typeof args["description"] === "string" ? args["description"] : existing?.description,
+            descriptionFromArgs ?? yamlProjection.description ?? existing?.description,
+          root,
           entry,
-          paths,
+          paths: [root],
+          declared: yamlProjection.declared ?? existing?.declared,
+          reconcile: yamlProjection.reconcile,
           visibility: parseVisibility(args["visibility"]) ?? existing?.visibility ?? "private",
           workflows,
           requires,
@@ -1000,7 +1093,9 @@ export const appsService: CoreService = {
           createdBy: existing?.createdBy ?? ctx.userId,
           createdAt: existing?.createdAt ?? now,
           updatedAt: now,
-        };
+        });
+        // F4 reconcileApp (not yet on main) owns mint/alias/root-index writes;
+        // until it lands, saveApp is the identity fan-out. Do not stub reconcile.
         await saveApp(ctx.workspaceId, manifest);
         return describeApp(ctx.workspaceId, manifest, registrations, { withRuns: false });
       }
