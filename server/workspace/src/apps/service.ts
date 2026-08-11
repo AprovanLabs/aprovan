@@ -55,13 +55,14 @@ import {
 } from "./capabilities.js";
 import { assertNotDeploymentTenant, listDirectoryForWorkspace } from "./directory.js";
 import {
+  applyUpdate,
   bindingMissingError,
   findInstallByOrigin,
+  installAsCopy,
   installPrefix,
   isChannelPin,
   listInstalls,
   materializeFork,
-  mintNewInstall,
   parseInstallPin,
   purgeInstallData,
   readInstall,
@@ -70,6 +71,7 @@ import {
   resolveBindings,
   resolvePinRelease,
   saveInstall,
+  updateCheck,
   type AppInstallation,
 } from "./install.js";
 import {
@@ -80,6 +82,7 @@ import {
   resolveAppRef,
   setAlias,
 } from "./identity.js";
+import { promoteApp } from "./personal.js";
 import {
   DEFAULT_CHANNEL,
   channelName,
@@ -358,20 +361,28 @@ async function summarizeInstall(
     config: install.config,
     editing: install.editing,
     prefix: install.prefix,
+    root: install.root ?? install.prefix,
+    hosting: install.hosting ?? "managed",
+    hostingWorkspaceId: install.hostingWorkspaceId,
+    contentFingerprint: install.contentFingerprint,
     installedBy: install.installedBy,
     installedAt: install.installedAt,
     updatedAt: install.updatedAt,
-    name: origin?.name,
-    title: origin?.title,
-    description: origin?.description,
+    name: origin?.name ?? install.manifest?.name,
+    title: origin?.title ?? install.manifest?.title,
+    description: origin?.description ?? install.manifest?.description,
     url: origin ? livePath(install.originWorkspaceId, origin.name) : undefined,
     permalink: `/apps/id/${install.originAppId}`,
     dataPrefix: appDataDir(install.installId, userId),
     available: Boolean(origin),
-    requires: origin?.requires ?? [],
+    requires: origin?.requires ?? install.manifest?.requires ?? [],
   };
 }
 
+/**
+ * Install-as-copy (iw9-b D8). Resolves origin from `app` / `directoryRef`,
+ * copies the archive into `apps/<slug>`, and returns the install record.
+ */
 async function completeInstall(
   ctx: { workspaceId: string; userId: string },
   input: {
@@ -388,8 +399,6 @@ async function completeInstall(
     throw new ServiceError("Not found", 404);
   }
 
-  const pin = parseInstallPin(args["pin"]);
-  const release = await resolvePinRelease(originWorkspaceId, manifest, pin);
   const explicitBindings =
     args["bindings"] && typeof args["bindings"] === "object" && !Array.isArray(args["bindings"])
       ? (args["bindings"] as Record<string, string>)
@@ -416,26 +425,31 @@ async function completeInstall(
     args["config"] && typeof args["config"] === "object" && !Array.isArray(args["config"])
       ? (args["config"] as Record<string, unknown>)
       : {};
-  const prefix =
-    args["prefix"] !== undefined
-      ? installPrefix(args["prefix"], manifest.name)
-      : undefined;
+  const slug = typeof args["slug"] === "string" && args["slug"] ? args["slug"] : undefined;
+  // `mode` is the user-facing hosting pick (managed | hosted); accept `hosting` too.
+  const mode =
+    typeof args["mode"] === "string"
+      ? args["mode"]
+      : typeof args["hosting"] === "string"
+        ? args["hosting"]
+        : undefined;
+  const pin = args["pin"] !== undefined ? parseInstallPin(args["pin"]) : undefined;
 
-  const install = mintNewInstall({
-    originAppId: manifest.appId,
+  const install = await installAsCopy({
     originWorkspaceId,
-    pin,
-    resolvedRelease: release?.id ?? manifest.channels?.[DEFAULT_CHANNEL] ?? null,
+    manifest,
+    installerWorkspaceId: ctx.workspaceId,
+    installedBy: ctx.userId,
+    ...(slug !== undefined ? { slug } : {}),
+    ...(mode !== undefined ? { hosting: mode } : {}),
     bindings: resolved.bindings,
     config,
-    prefix,
-    installedBy: ctx.userId,
+    ...(pin !== undefined ? { pin } : {}),
   });
 
   for (const profileId of Object.values(install.bindings)) {
     await grantProfileToInstall(ctx.workspaceId, profileId, install.installId, ctx.userId);
   }
-  await saveInstall(ctx.workspaceId, install);
   return summarizeInstall(ctx.workspaceId, install, manifest, ctx.userId);
 }
 
@@ -793,16 +807,19 @@ export const appsService: CoreService = {
     {
       name: "apps.promote",
       operation: "promote",
-      description: "Point channel 'to' at whatever channel 'from' currently serves (e.g. preview → live).",
+      description:
+        "Promote a Personal (or any) VFS subtree into a standalone app: {source, slug} → {appId, root}. " +
+        "Also supports channel promote {app, from, to} (e.g. preview → live).",
       inputSchema: {
         type: "object",
         properties: {
-          app: { type: "string" },
+          source: { type: "string", description: "VFS subtree to promote (e.g. apps/personal/budget)" },
+          slug: { type: "string", description: "Vanity slug for the new app root (apps/<slug>)" },
+          app: { type: "string", description: "App alias or ULID (channel promote)" },
           name: { type: "string" },
-          from: { type: "string" },
-          to: { type: "string" },
+          from: { type: "string", description: "Source channel (channel promote)" },
+          to: { type: "string", description: "Target channel (channel promote)" },
         },
-        required: ["from", "to"],
       },
     },
     {
@@ -822,31 +839,94 @@ export const appsService: CoreService = {
       name: "apps.install",
       operation: "install",
       description:
-        "Install a public app (or any app of this workspace) into THIS workspace: mints an installId, pins a release/channel (default live), and binds required interface profiles.",
+        "Install a public app (or any app of this workspace) into THIS workspace as a local copy under apps/<slug>: " +
+        "pins {tag?, commit}, records hosting mode, and binds required interface profiles.",
       inputSchema: {
         type: "object",
         properties: {
           app: { type: "string", description: "App alias or ULID" },
+          directoryRef: {
+            type: "string",
+            description: "Directory entry appId (alias for app when installing from apps.directory)",
+          },
           workspace: {
             type: "string",
             description: "Origin workspace id (defaults to this workspace; required for cross-workspace installs by alias)",
           },
-          pin: { description: "Channel name, {channel}, or {release}" },
+          mode: {
+            type: "string",
+            enum: ["managed", "hosted"],
+            description: "Hosting pick when the app declares multiple buckets",
+          },
+          hosting: {
+            type: "string",
+            enum: ["managed", "hosted"],
+            description: "Alias for mode",
+          },
+          slug: { type: "string", description: "Target slug under apps/<slug> (defaults to origin slug)" },
+          pin: { description: "Channel name, {channel}, {release}, or {tag?, commit}" },
           bindings: {
             type: "object",
             description: "contract → profile id or name overrides",
           },
           config: { type: "object", description: "Per-install config JSON" },
-          prefix: { type: "string", description: "Fork prefix when editing is later enabled (default apps/<name>)" },
         },
-        required: ["app"],
+      },
+    },
+    {
+      name: "apps.updateCheck",
+      operation: "updateCheck",
+      description:
+        "Compare an installation's pin against the origin's current release/commit. Returns {current, available?, originAvailable, message?}.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          install: { type: "string", description: "Install ULID" },
+          installId: { type: "string", description: "Alias for install" },
+        },
+      },
+      outputSchema: {
+        type: "object",
+        properties: {
+          current: { type: "object" },
+          available: { type: "object" },
+          originAvailable: { type: "boolean" },
+          message: { type: "string" },
+        },
+        required: ["current", "originAvailable"],
+      },
+    },
+    {
+      name: "apps.applyUpdate",
+      operation: "applyUpdate",
+      description:
+        "Re-copy the origin archive onto an installation's local root. Pass confirmOverwrite=true when the local copy has edits.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          install: { type: "string", description: "Install ULID" },
+          installId: { type: "string", description: "Alias for install" },
+          confirmOverwrite: {
+            type: "boolean",
+            description: "Required when the local copy has edits since the last fingerprint",
+          },
+        },
+      },
+      outputSchema: {
+        type: "object",
+        properties: {
+          installId: { type: "string" },
+          from: { type: "object" },
+          to: { type: "object" },
+        },
+        required: ["installId"],
       },
     },
     {
       name: "apps.update",
       operation: "update",
       description:
-        "Re-resolve an installation's pin against the origin (channel → current release, or an explicit newer release). Returns {from, to}. Editing forks require force=true to overwrite local source.",
+        "Re-resolve an installation's pin against the origin (channel → current release, or an explicit newer release). Returns {from, to}. Editing forks require force=true to overwrite local source. Prefer apps.applyUpdate for copy-model installs.",
       inputSchema: {
         type: "object",
         properties: {
@@ -1390,10 +1470,28 @@ export const appsService: CoreService = {
         };
       }
       case "promote": {
+        // Personal promote-out (iw9-b): {source, slug} → {appId, root}.
+        const source = typeof args["source"] === "string" ? args["source"] : "";
+        const slug = typeof args["slug"] === "string" ? args["slug"] : "";
+        if (source && slug) {
+          const app = await promoteApp({
+            workspaceId: ctx.workspaceId,
+            source,
+            slug,
+            actor: ctx.userId,
+          });
+          return { appId: app.appId, root: app.root ?? `apps/${app.slug ?? app.name}` };
+        }
+        // Channel promote (legacy): point `to` at whatever `from` currently serves.
         const manifest = await requireApp(ctx.workspaceId, args);
         const from = channelName(args["from"], "");
         const to = channelName(args["to"], "");
-        if (!from || !to) throw new ServiceError("from and to channels are required", 400);
+        if (!from || !to) {
+          throw new ServiceError(
+            "promote requires {source, slug} (Personal promote-out) or {from, to} (channel promote)",
+            400,
+          );
+        }
         const releaseId = manifest.channels?.[from];
         if (!releaseId) throw new ServiceError(`Channel ${from} has no release to promote`, 404);
         const updated = await setChannel(ctx.workspaceId, manifest, to, releaseId);
@@ -1426,8 +1524,13 @@ export const appsService: CoreService = {
       }
       case "install": {
         assertNotDeploymentTenant(ctx.workspaceId);
-        const appRef = typeof args["app"] === "string" ? args["app"] : "";
-        if (!appRef) throw new ServiceError("app (alias or ULID) is required", 400);
+        const appRef =
+          (typeof args["app"] === "string" && args["app"]) ||
+          (typeof args["directoryRef"] === "string" && args["directoryRef"]) ||
+          "";
+        if (!appRef) {
+          throw new ServiceError("app or directoryRef (alias or ULID) is required", 400);
+        }
 
         let originWorkspaceId: string;
         let manifest: AppManifest | undefined;
@@ -1458,6 +1561,33 @@ export const appsService: CoreService = {
         }
         if (!manifest) throw new ServiceError("Not found", 404);
         return completeInstall(ctx, { originWorkspaceId, manifest, args });
+      }
+      case "updateCheck": {
+        const installId =
+          (typeof args["install"] === "string" && args["install"]) ||
+          (typeof args["installId"] === "string" && args["installId"]) ||
+          "";
+        if (!installId) throw new ServiceError("install (or installId) is required", 400);
+        return updateCheck(ctx.workspaceId, installId);
+      }
+      case "applyUpdate": {
+        const installId =
+          (typeof args["install"] === "string" && args["install"]) ||
+          (typeof args["installId"] === "string" && args["installId"]) ||
+          "";
+        if (!installId) throw new ServiceError("install (or installId) is required", 400);
+        const result = await applyUpdate(ctx.workspaceId, installId, {
+          confirmOverwrite: args["confirmOverwrite"] === true,
+        });
+        const originManifest = await readApp(
+          result.install.originWorkspaceId,
+          result.install.originAppId,
+        ).catch(() => undefined);
+        return {
+          ...(await summarizeInstall(ctx.workspaceId, result.install, originManifest, ctx.userId)),
+          from: result.from,
+          to: result.to,
+        };
       }
       case "update": {
         const installId = typeof args["install"] === "string" ? args["install"] : "";
