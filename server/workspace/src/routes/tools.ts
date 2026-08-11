@@ -441,6 +441,55 @@ function nativeVcsDiscoveryEntries(namespace: string): ToolEntry[] {
         required: ["commit", "restored"],
       },
     },
+    // iw9-b mounts procedures (additive — do not edit commit/log/diff schemas above).
+    {
+      operation: "mounts.list",
+      description: "List workspace VFS mounts (prefix → backend).",
+      inputSchema: { type: "object", properties: {} },
+      outputSchema: {
+        type: "object",
+        properties: { mounts: { type: "array", items: { type: "object" } } },
+        required: ["mounts"],
+      },
+    },
+    {
+      operation: "mounts.add",
+      description:
+        "Add a VFS mount: {prefix, type, config, mode?}. Rejects crdt, app-root targets, and overlapping prefixes.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          prefix: { type: "string" },
+          type: { type: "string" },
+          config: { type: "object" },
+          mode: { type: "string" },
+        },
+        required: ["prefix", "type", "config"],
+      },
+      outputSchema: {
+        type: "object",
+        properties: {
+          prefix: { type: "string" },
+          type: { type: "string" },
+          config: { type: "object" },
+        },
+        required: ["prefix", "type"],
+      },
+    },
+    {
+      operation: "mounts.remove",
+      description: "Remove a VFS mount by prefix.",
+      inputSchema: {
+        type: "object",
+        properties: { prefix: { type: "string" } },
+        required: ["prefix"],
+      },
+      outputSchema: {
+        type: "object",
+        properties: { prefix: { type: "string" }, removed: { type: "boolean" } },
+        required: ["prefix", "removed"],
+      },
+    },
   ];
   return ops.map((op) => ({
     provider: namespace,
@@ -449,6 +498,54 @@ function nativeVcsDiscoveryEntries(namespace: string): ToolEntry[] {
     description: op.description,
     inputSchema: op.inputSchema,
     outputSchema: op.outputSchema,
+  }));
+}
+
+/** Person/link artifact shares (iw9-b) — additive on top of the vfs contract. */
+function nativeVfsShareDiscoveryEntries(namespace: string): ToolEntry[] {
+  const ops: Array<{
+    operation: string;
+    description: string;
+    inputSchema: Record<string, unknown>;
+    outputSchema?: Record<string, unknown>;
+  }> = [
+    {
+      operation: "share",
+      description:
+        "Share a workspace path: {path, expiresAt, person?} for a person-share, or {path, expiresAt, link:true} for a link-share (returns {shareId, key} once).",
+      inputSchema: {
+        type: "object",
+        properties: {
+          path: { type: "string" },
+          expiresAt: { type: "string", description: "ISO-8601 expiry" },
+          person: { type: "string", description: "Platform user sub (person-share)" },
+          link: { type: "boolean", description: "Mint an anonymous link-share when true" },
+        },
+        required: ["path", "expiresAt"],
+      },
+    },
+    {
+      operation: "shares.list",
+      description: "List artifact shares created by the caller in this workspace.",
+      inputSchema: { type: "object", properties: {} },
+    },
+    {
+      operation: "shares.revoke",
+      description: "Revoke an artifact share by shareId.",
+      inputSchema: {
+        type: "object",
+        properties: { shareId: { type: "string" } },
+        required: ["shareId"],
+      },
+    },
+  ];
+  return ops.map((op) => ({
+    provider: namespace,
+    name: `${namespace}.${op.operation}`,
+    operation: op.operation,
+    description: op.description,
+    inputSchema: op.inputSchema,
+    ...(op.outputSchema !== undefined ? { outputSchema: op.outputSchema } : {}),
   }));
 }
 
@@ -529,7 +626,11 @@ async function interfaceToolEntries(
     return [...product, ...exportEntries];
   }
   if (parsed.interfaceId === "vfs") {
-    return toContractToolEntries(namespace, vfsDiscoveryEntries(namespace));
+    // Contract driver ops plus iw9-b artifact-share procedures (additive).
+    return [
+      ...toContractToolEntries(namespace, vfsDiscoveryEntries(namespace)),
+      ...nativeVfsShareDiscoveryEntries(namespace),
+    ];
   }
   if (parsed.interfaceId === "keyvalue") {
     return toContractToolEntries(namespace, keyvalueDiscoveryEntries(namespace));

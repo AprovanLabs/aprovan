@@ -178,22 +178,22 @@ Ordering mirrors tech-plan.md's Rollout: server model (1) → domain modules
 
 > Depends-on: 2, 3, 4, 5 | Repo: aprovan | Touches: aprovan/server/workspace/src/apps/service.ts, aprovan/server/workspace/src/routes/tools.ts, aprovan/server/workspace/src/native-dispatch.ts | Verify: pnpm --filter @aprovan/workspace typecheck && pnpm --filter @aprovan/workspace test -- apps-roots apps-personal apps-install-copy vfs-shares vcs-mounts-procedures
 
-- [ ] 6.1 Register `apps.promote {source, slug} → {appId, root}` in
+- [x] 6.1 Register `apps.promote {source, slug} → {appId, root}` in
       `apps/service.ts`, delegating to stream 2's `promoteApp`.
-- [ ] 6.2 Register `apps.install {appId | directoryRef, mode?, slug?,
+- [x] 6.2 Register `apps.install {appId | directoryRef, mode?, slug?,
       bindings?, config?} → AppInstallation`, `apps.updateCheck {installId}`,
       `apps.applyUpdate {installId, confirmOverwrite?}` in `apps/service.ts`,
       delegating to stream 3's install module.
-- [ ] 6.3 Register `vfs.share {path, person? | link?, expiresAt}`,
+- [x] 6.3 Register `vfs.share {path, person? | link?, expiresAt}`,
       `vfs.shares.list`, `vfs.shares.revoke` in `apps/service.ts` (or the vfs
       procedure surface it already extends), delegating to stream 4's
       `vfs/shares.ts`.
-- [ ] 6.4 Register `vcs.mounts.list/add/remove` tool schemas in
+- [x] 6.4 Register `vcs.mounts.list/add/remove` tool schemas in
       `routes/tools.ts` alongside the existing `vcs.*` verbs
       (`nativeVcsDiscoveryEntries`, `routes/tools.ts:272`) and dispatch in
       `native-dispatch.ts`, delegating to stream 5's
       `vcs/mounts-procedures.ts`.
-- [ ] 6.5 Confirm `routes/tools.ts`'s VCS scope-arg schema additions from
+- [x] 6.5 Confirm `routes/tools.ts`'s VCS scope-arg schema additions from
       iw9-a (`vcs.commit/log/diff` scope args) are untouched by this stream's
       edits — additive registration only, no edits inside iw9-a's schema
       blocks (serialization rule: "A's VCS schema changes land before C's

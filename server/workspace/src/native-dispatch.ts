@@ -428,6 +428,14 @@ export async function dispatchAprovanNativeOp(
       const { telemetryService } = await import("./telemetry/service.js");
       return telemetryService.call(ctx, operation, args);
     }
+    // iw9-b artifact shares — product surface over vfs/shares (not in @utdk/vfs).
+    if (interfaceId === "vfs" && (operation === "share" || operation.startsWith("shares."))) {
+      return dispatchVfsShareOp(ctx, operation, args);
+    }
+    // iw9-b mounts procedures — validated wrappers over vcs/mounts-procedures.
+    if (interfaceId === "vcs" && operation.startsWith("mounts.")) {
+      return dispatchVcsMountsOp(ctx, operation, args);
+    }
     // VFS product surface: partitions, service-path hiding, sessions, commit
     // pins, mounts. Adapt delete to the contract's boolean `deleted`.
     if (interfaceId === "vfs") {
@@ -500,5 +508,103 @@ function adaptKeyvalueProductResult(operation: string, result: unknown): unknown
     }
     default:
       return result;
+  }
+}
+
+async function dispatchVfsShareOp(
+  ctx: ServiceContext,
+  operation: string,
+  args: Record<string, unknown>,
+): Promise<unknown> {
+  const {
+    createLinkShare,
+    createPersonShare,
+    listSharesCreatedBy,
+    revokeShare,
+  } = await import("./vfs/shares.js");
+
+  switch (operation) {
+    case "share": {
+      const path = typeof args["path"] === "string" ? args["path"] : "";
+      const expiresAt = typeof args["expiresAt"] === "string" ? args["expiresAt"] : "";
+      if (!path) throw new ServiceError("path is required", 400);
+      if (!expiresAt) throw new ServiceError("expiresAt is required", 400);
+      const person = typeof args["person"] === "string" ? args["person"] : "";
+      const link = args["link"] === true;
+      if (person && link) {
+        throw new ServiceError("provide person or link, not both", 400);
+      }
+      if (!person && !link) {
+        throw new ServiceError("provide person (sub) or link:true", 400);
+      }
+      if (person) {
+        return createPersonShare(ctx.workspaceId, {
+          path,
+          grantee: person,
+          expiresAt,
+          createdBy: ctx.userId,
+        });
+      }
+      const { share, key } = await createLinkShare(ctx.workspaceId, {
+        path,
+        expiresAt,
+        createdBy: ctx.userId,
+      });
+      return { shareId: share.shareId, key, share };
+    }
+    case "shares.list": {
+      const shares = await listSharesCreatedBy(ctx.workspaceId, ctx.userId);
+      return { shares };
+    }
+    case "shares.revoke": {
+      const shareId = typeof args["shareId"] === "string" ? args["shareId"] : "";
+      if (!shareId) throw new ServiceError("shareId is required", 400);
+      return revokeShare(ctx.workspaceId, shareId, ctx.userId);
+    }
+    default:
+      throw new ServiceError(`Unknown vfs operation: ${operation}`, 404);
+  }
+}
+
+async function dispatchVcsMountsOp(
+  ctx: ServiceContext,
+  operation: string,
+  args: Record<string, unknown>,
+): Promise<unknown> {
+  const {
+    addMount,
+    listMounts,
+    removeMount,
+  } = await import("./vcs/mounts-procedures.js");
+
+  switch (operation) {
+    case "mounts.list": {
+      const mounts = await listMounts(ctx.workspaceId);
+      return { mounts };
+    }
+    case "mounts.add": {
+      const prefix = typeof args["prefix"] === "string" ? args["prefix"] : "";
+      const type = typeof args["type"] === "string" ? args["type"] : "";
+      if (!prefix) throw new ServiceError("prefix is required", 400);
+      if (!type) throw new ServiceError("type is required", 400);
+      if (!args["config"] || typeof args["config"] !== "object" || Array.isArray(args["config"])) {
+        throw new ServiceError("config must be an object", 400);
+      }
+      const mode = typeof args["mode"] === "string" ? args["mode"] : undefined;
+      return addMount(ctx.workspaceId, ctx.userId, {
+        prefix,
+        type,
+        config: args["config"] as Record<string, unknown>,
+        ...(mode !== undefined ? { mode } : {}),
+      });
+    }
+    case "mounts.remove": {
+      const prefix = typeof args["prefix"] === "string" ? args["prefix"] : "";
+      if (!prefix) throw new ServiceError("prefix is required", 400);
+      const removed = await removeMount(ctx.workspaceId, prefix);
+      return { prefix, removed };
+    }
+    default:
+      throw new ServiceError(`Unknown vcs operation: ${operation}`, 404);
   }
 }
