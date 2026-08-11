@@ -1,11 +1,15 @@
+/**
+ * Legacy `/apps/…` routes are resolve-then-302 shims only.
+ * Serving coverage lives in `app-urls.test.ts`.
+ */
+
 import { mkdtempSync, rmSync } from "node:fs";
-import { readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
-import { getFsStore } from "../src/fs-store.js";
-import { APP_SHELL_COMPILER_VERSION, liveAppsRouter } from "../src/routes/live-apps.js";
+import { claimGlobalSlug } from "../src/apps/slugs.js";
+import { liveAppsRouter } from "../src/routes/live-apps.js";
 
 let dataDir: string;
 
@@ -33,13 +37,6 @@ const putFile = (path: string, content: string) =>
     body: JSON.stringify({ content }),
   });
 
-const appCall = (user: string, path: string, body: Record<string, unknown> = {}) =>
-  createApp().request(`/apps/local/${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "X-App-User": user },
-    body: JSON.stringify(body),
-  });
-
 async function data<T>(res: Response): Promise<T> {
   const body = (await res.json()) as { data: T };
   return body.data;
@@ -48,7 +45,7 @@ async function data<T>(res: Response): Promise<T> {
 async function publishFolderApp(
   name: string,
   extra: Record<string, unknown> = {},
-): Promise<void> {
+): Promise<{ appId: string }> {
   await putFile(`apps/${name}/index.tsx`, `export default function App() { return null; }`);
   const res = await manage("apps/publish", {
     name,
@@ -57,9 +54,15 @@ async function publishFolderApp(
     ...extra,
   });
   expect(res.status).toBe(200);
+  return data<{ appId: string }>(res);
 }
 
-describe("path binding", () => {
+function expectRedirect(res: Response, location: string) {
+  expect(res.status).toBe(302);
+  expect(res.headers.get("location")).toBe(location);
+}
+
+describe("path binding (publish still works; live paths 302)", () => {
   it("resolves a folder to its entrypoint, preferring the conventional names", async () => {
     await putFile("apps/liift4/widget.tsx", "export default () => null;");
     const published = await data<{ entry: string; paths: string[] }>(
@@ -89,18 +92,20 @@ describe("path binding", () => {
   it("rejects an ambiguous folder with the candidates listed", async () => {
     await putFile("apps/ambiguous/a.tsx", "export default () => null;");
     await putFile("apps/ambiguous/b.tsx", "export default () => null;");
+    // iw9-b resolvePublishRoot now claims the folder with a conventional
+    // default entry when resolution is ambiguous (no longer 400s here).
     const res = await manage("apps/publish", {
       name: "ambiguous",
       dir: "apps/ambiguous",
       allowed_tools: ["keyvalue.*"],
     });
-    expect(res.status).toBe(400);
-    expect(((await res.json()) as { error: string }).error).toContain("a.tsx");
+    expect(res.status).toBe(200);
+    const published = await data<{ entry: string }>(res);
+    expect(published.entry).toBe("apps/ambiguous/index.tsx");
   });
 
   it("ignores name-keyed legacy manifests (nuke-and-reseed; no rebinding)", async () => {
     await putFile("apps/legacy/widget.tsx", "export default () => null;");
-    // A pre-identity name-keyed record is not an alias and is not rebound.
     const { getRecordStore } = await import("../src/records.js");
     await getRecordStore().set(
       "local",
@@ -121,126 +126,122 @@ describe("path binding", () => {
     expect(res.status).toBe(404);
   });
 
-  it("publishes extra prefixes and serves them as one project", async () => {
+  it("publishes a folder app; legacy live path 302s to canonical", async () => {
     await putFile("apps/charted/index.tsx", "export default () => null;");
-    await putFile("lib/charts/bar.ts", "export const bar = 1;");
-    const published = await data<{ paths: string[] }>(
+    await putFile("apps/charted/lib/bar.ts", "export const bar = 1;");
+    const published = await data<{ paths: string[]; appId: string }>(
       await manage("apps/publish", {
         name: "charted",
         dir: "apps/charted",
-        paths: ["lib/charts"],
         visibility: "public",
         allowed_tools: ["vfs.*"],
       }),
     );
-    expect(published.paths).toEqual(["apps/charted", "lib/charts"]);
+    expect(published.paths).toEqual(["apps/charted"]);
 
-    const project = (await (
-      await liveAppsRouter.request("/local/charted/__project__")
-    ).json()) as { entry: string; files: Array<{ path: string }> };
-    expect(project.entry).toBe("apps/charted/index.tsx");
-    expect(project.files.map((f) => f.path).sort()).toEqual([
-      "apps/charted/index.tsx",
-      "lib/charts/bar.ts",
-    ]);
-
-    // Static serving accepts either addressing: app-root-relative or the
-    // workspace path the project payload hands out.
-    expect((await liveAppsRouter.request("/local/charted/lib/charts/bar.ts")).status).toBe(200);
-
-    // The same prefixes authorize the app session's FS access — no share needed.
-    const read = await appCall("alice", "charted/tools/vfs/read", {
-      args: { path: "~/lib/charts/bar.ts" },
-    });
-    expect(read.status).toBe(200);
-
-    // ...and nothing outside them.
-    await putFile("lib/secret.ts", "export const s = 1;");
-    const denied = await appCall("alice", "charted/tools/vfs/read", {
-      args: { path: "~/lib/secret.ts" },
-    });
-    expect(denied.status).toBe(403);
-
-    // Extra prefixes survive an update that doesn't mention them.
-    const updated = await data<{ paths: string[] }>(
-      await manage("apps/publish", {
-        name: "charted",
-        dir: "apps/charted",
-        allowed_tools: ["vfs.*"],
-      }),
+    expectRedirect(
+      await liveAppsRouter.request("/local/charted/__project__"),
+      `/a/${published.appId}/__project__`,
     );
-    expect(updated.paths).toEqual(["apps/charted", "lib/charts"]);
+    expectRedirect(
+      await liveAppsRouter.request("/local/charted/lib/bar.ts"),
+      `/a/${published.appId}/lib/bar.ts`,
+    );
   });
 });
 
-describe("live app pages", () => {
-  it("serves the page shell and the source project", async () => {
-    await publishFolderApp("site", { visibility: "public" });
+describe("legacy live paths redirect to canonical", () => {
+  it("redirects the page and __project__ for a published app", async () => {
+    const { appId } = await publishFolderApp("site", { visibility: "public" });
     await putFile("apps/site/lib.ts", "export const n = 1;");
 
-    const page = await liveAppsRouter.request("/local/site");
-    expect(page.status).toBe(200);
-    expect(page.headers.get("content-type")).toContain("text/html");
-    expect(await page.text()).toContain("__project__");
-
-    const project = await liveAppsRouter.request("/local/site/__project__");
-    expect(project.status).toBe(200);
-    const body = (await project.json()) as { entry: string; files: Array<{ path: string }> };
-    // Entry and files are workspace paths — the shell never guesses.
-    expect(body.entry).toBe("apps/site/index.tsx");
-    expect(body.files.map((f) => f.path).sort()).toEqual([
-      "apps/site/index.tsx",
-      "apps/site/lib.ts",
-    ]);
+    expectRedirect(await liveAppsRouter.request("/local/site"), `/a/${appId}`);
+    expectRedirect(
+      await liveAppsRouter.request("/local/site/__project__"),
+      `/a/${appId}/__project__`,
+    );
   });
 
-  it("refuses to publish a folder app without its entrypoint", async () => {
+  it("allows publish that claims a hollow folder (entry materialises later)", async () => {
+    // iw9-b: missing entrypoint no longer blocks publish — folder is claimed.
     const res = await manage("apps/publish", {
       name: "hollow",
       dir: "apps/hollow",
       allowed_tools: ["keyvalue.*"],
     });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(200);
   });
 
-  it("serves static files but never the data partition, with SPA fallback", async () => {
-    await publishFolderApp("assets", { visibility: "public" });
+  it("redirects static and SPA paths (never serves content)", async () => {
+    const { appId } = await publishFolderApp("assets", { visibility: "public" });
     await putFile("apps/assets/style.css", "body { margin: 0 }");
     await putFile("apps/assets/data/alice/secret", "hunter2");
 
-    const css = await liveAppsRouter.request("/local/assets/style.css");
-    expect(css.status).toBe(200);
-    expect(await css.text()).toContain("margin: 0");
-
-    // data/ is invisible: falls back to the page shell instead of the file.
-    const secret = await liveAppsRouter.request("/local/assets/data/alice/secret");
-    expect(secret.headers.get("content-type")).toContain("text/html");
-    expect(await secret.text()).not.toContain("hunter2");
-
-    // Unknown paths (client-side routes) fall back to the shell too.
-    const spa = await liveAppsRouter.request("/local/assets/some/client/route");
-    expect(spa.headers.get("content-type")).toContain("text/html");
+    expectRedirect(
+      await liveAppsRouter.request("/local/assets/style.css"),
+      `/a/${appId}/style.css`,
+    );
+    expectRedirect(
+      await liveAppsRouter.request("/local/assets/data/alice/secret"),
+      `/a/${appId}/data/alice/secret`,
+    );
+    expectRedirect(
+      await liveAppsRouter.request("/local/assets/some/client/route"),
+      `/a/${appId}/some/client/route`,
+    );
   });
 
-  it("gates private apps by the role model", async () => {
-    await publishFolderApp("members-only", {
+  it("redirects private-app project paths (gating happens on canonical)", async () => {
+    const { appId } = await publishFolderApp("members-only", {
       visibility: "private",
       roles: { access: "listed", users: ["alice"] },
     });
 
-    const alice = await liveAppsRouter.request("/local/members-only/__project__", {
-      headers: { "X-App-User": "alice" },
-    });
-    expect(alice.status).toBe(200);
+    expectRedirect(
+      await liveAppsRouter.request("/local/members-only/__project__", {
+        headers: { "X-App-User": "alice" },
+      }),
+      `/a/${appId}/__project__`,
+    );
+    expectRedirect(
+      await liveAppsRouter.request("/local/members-only/__project__", {
+        headers: { "X-App-User": "mallory" },
+      }),
+      `/a/${appId}/__project__`,
+    );
+  });
 
-    const mallory = await liveAppsRouter.request("/local/members-only/__project__", {
-      headers: { "X-App-User": "mallory" },
-    });
-    expect(mallory.status).toBe(403);
+  it("redirects /apps/id/:appId permalink to /a/:appId", async () => {
+    const { appId } = await publishFolderApp("perma", { visibility: "public" });
+    expectRedirect(await liveAppsRouter.request(`/id/${appId}`), `/a/${appId}`);
+    expectRedirect(
+      await liveAppsRouter.request(`/id/${appId}/__project__`),
+      `/a/${appId}/__project__`,
+    );
+  });
+
+  it("redirects /apps/:slug convenience to /a/:appId when claimed", async () => {
+    const { appId } = await publishFolderApp("vanity-src", { visibility: "public" });
+    await claimGlobalSlug("vanity-src", appId, "local");
+    expectRedirect(await liveAppsRouter.request("/vanity-src"), `/a/${appId}`);
+  });
+
+  it("legacy /apps/<ws>/<name> Location never contains the workspace id", async () => {
+    const { appId } = await publishFolderApp("noleak", { visibility: "public" });
+    const res = await liveAppsRouter.request("/local/noleak");
+    expectRedirect(res, `/a/${appId}`);
+    expect(res.headers.get("location")).not.toContain("local");
   });
 });
 
 describe("co-located app data", () => {
+  const appCall = (user: string, path: string, body: Record<string, unknown> = {}) =>
+    createApp().request(`/apps/local/${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-App-User": user },
+      body: JSON.stringify(body),
+    });
+
   it("partitions keyvalue per app user in the record store, invisible to vfs", async () => {
     await publishFolderApp("tracker");
 
@@ -248,9 +249,6 @@ describe("co-located app data", () => {
       args: { key: "state", value: { weeks: 3 } },
     });
 
-    // keyvalue is record-store-backed (see docs/app-data.md): round-trips
-    // through the tool, not a workspace file — nothing appears on the vfs
-    // at the old apps/tracker/data/alice/state path.
     const got = await data<{ value: { weeks: number } }>(
       await appCall("alice", "tracker/tools/keyvalue/get", { args: { key: "state" } }),
     );
@@ -272,7 +270,6 @@ describe("co-located app data", () => {
     );
     expect(owner.content).toBe("# hi");
 
-    // Listing is scoped to the app folder.
     const listing = await data<{ entries: Array<{ path: string }> }>(
       await appCall("alice", "notes/tools/vfs/list", { args: {} }).then((r) => r),
     );
@@ -283,14 +280,11 @@ describe("co-located app data", () => {
     await publishFolderApp("reader");
     await putFile("shared/recipes.json", JSON.stringify(["soup"]));
 
-    // Not shared → denied.
     const denied = await appCall("alice", "reader/tools/vfs/read", {
       args: { path: "~/shared/recipes.json" },
     });
     expect(denied.status).toBe(403);
 
-    // Share read access with every app (service state itself is not
-    // reachable through /fs — shares are managed via the apps tools).
     const shared = await manage("apps/share", { prefix: "shared", apps: "*", mode: "read" });
     expect(shared.status).toBe(200);
 
@@ -299,7 +293,6 @@ describe("co-located app data", () => {
     });
     expect(allowed.status).toBe(200);
 
-    // Read-only share → writes still denied.
     const write = await appCall("alice", "reader/tools/vfs/write", {
       args: { path: "~/shared/recipes.json", content: "[]" },
     });
@@ -308,6 +301,13 @@ describe("co-located app data", () => {
 });
 
 describe("daily call limits", () => {
+  const appCall = (user: string, path: string, body: Record<string, unknown> = {}) =>
+    createApp().request(`/apps/local/${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-App-User": user },
+      body: JSON.stringify(body),
+    });
+
   it("meters per-(app, user) calls per day and rejects past the budget", async () => {
     await publishFolderApp("metered", {
       rate_limit: { rps: 100, burst: 100, daily: 3 },
@@ -328,42 +328,9 @@ describe("daily call limits", () => {
     expect(body.error).toBe("daily_limit_exceeded");
     expect(body.limit).toBe(3);
 
-    // A different user has their own budget.
     const other = await appCall("someone-else", "metered/tools/keyvalue/set", {
       args: { key: "k", value: 1 },
     });
     expect(other.status).toBe(200);
-  });
-});
-
-describe("app shell compiler pin", () => {
-  it("loads the same compiler major.minor.patch this package depends on", async () => {
-    // Drift between APP_SHELL_COMPILER_VERSION and the workspace dependency
-    // means published app shells load a different compiler than dev — silent
-    // and hard to bisect. The dependency range is the source of truth; the
-    // shell string follows it.
-    const pkg = JSON.parse(
-      await readFile(new URL("../package.json", import.meta.url), "utf8"),
-    ) as { dependencies: Record<string, string> };
-    const declared = pkg.dependencies["@aprovan/patchwork"];
-    expect(declared).toBeDefined();
-    let expected = declared!.replace(/^[\^~]/, "");
-    if (expected === "workspace:*") {
-      const compilerPkg = JSON.parse(
-        await readFile(new URL("../../../packages/compiler/package.json", import.meta.url), "utf8"),
-      ) as { version: string };
-      expected = compilerPkg.version;
-    }
-    expect(APP_SHELL_COMPILER_VERSION).toBe(expected);
-  });
-
-  it("emits that version into the page, interpolated rather than literal", async () => {
-    await publishFolderApp("pinned", { visibility: "public" });
-    const html = await (await liveAppsRouter.request("/local/pinned")).text();
-
-    expect(html).toContain(
-      `https://esm.sh/@aprovan/patchwork@${APP_SHELL_COMPILER_VERSION}?external=esbuild-wasm`,
-    );
-    expect(html).not.toContain("${APP_SHELL_COMPILER_VERSION}");
   });
 });
