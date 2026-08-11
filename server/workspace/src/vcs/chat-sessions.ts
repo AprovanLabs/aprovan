@@ -38,9 +38,14 @@ import {
   writeSvcRecord,
 } from "../svc-records.js";
 import {
+  buildSnapshot,
   commitTree,
+  diffSnapshots,
+  MAIN_REF,
   readCommit,
+  readRef,
   readSnapshot,
+  visibleEntries,
   type VcsCommit,
   type VcsSnapshot,
 } from "./store.js";
@@ -66,6 +71,12 @@ export interface ChatSessionRecord {
   base: string;
   /** Staged edits: path → shadow content hash, null = deleted. */
   overlay: Record<string, string | null>;
+  /**
+   * Paths an `auto` session wrote (or deleted) on the live tree — used by
+   * `changeSummary` to filter `diff(base, main)` (tech-plan D4). Absent on
+   * legacy records; changeSummary then falls back to the full diff.
+   */
+  touchedPaths?: string[];
   /** Opaque client layout state (open tabs, active path). */
   tabs?: unknown;
   messageCount: number;
@@ -80,6 +91,11 @@ export interface SessionChangeSummary {
   added: string[];
   modified: string[];
   removed: string[];
+  /**
+   * True when an auto session had no touched-path set and the summary is the
+   * full `diff(base, main)` (may include concurrent foreign edits).
+   */
+  includesOtherActivity?: boolean;
 }
 
 function shadowPath(id: string, path: string): string {
@@ -135,6 +151,7 @@ export async function createSession(
     mode,
     base: commit.id,
     overlay: {},
+    ...(mode === "auto" ? { touchedPaths: [] } : {}),
     messageCount: 0,
     createdBy: userId,
     createdAt: now,
@@ -352,6 +369,28 @@ export async function sessionWrite(
   return { ...meta, path };
 }
 
+/**
+ * Record that an `auto` session touched a live-tree path (write or delete).
+ * Callers on the FS/tool write path should invoke this after a successful
+ * mutation when `?session=` names an open auto session (tech-plan D4).
+ */
+export async function recordSessionTouch(
+  workspaceId: string,
+  sessionId: string,
+  path: string,
+): Promise<void> {
+  const session = await requireSession(workspaceId, sessionId);
+  if (session.status !== "open" || session.mode !== "auto") return;
+  const normalized = normalizeFsPath(path);
+  if (!normalized) return;
+  const touched = new Set(session.touchedPaths ?? []);
+  if (touched.has(normalized)) return;
+  touched.add(normalized);
+  session.touchedPaths = [...touched].sort();
+  session.updatedAt = new Date().toISOString();
+  await save(workspaceId, session);
+}
+
 /** Staged delete: overlay tombstones for the path (or subtree). */
 export async function sessionDelete(
   workspaceId: string,
@@ -424,6 +463,12 @@ export async function changeSummary(
   workspaceId: string,
   session: ChatSessionRecord,
 ): Promise<SessionChangeSummary> {
+  // Staged: overlay walk (unchanged). Auto: diff(base, main) filtered to
+  // session-touched paths, with full-diff fallback when the set is absent
+  // (tech-plan D4).
+  if (session.mode === "auto") {
+    return autoChangeSummary(workspaceId, session);
+  }
   const snapshot = await baseSnapshot(workspaceId, session).catch(() => undefined);
   const baseHashes = new Map(
     (snapshot?.entries ?? []).map((entry) => [entry.path, entry.hash]),
@@ -440,6 +485,30 @@ export async function changeSummary(
   summary.modified.sort();
   summary.removed.sort();
   return summary;
+}
+
+async function autoChangeSummary(
+  workspaceId: string,
+  session: ChatSessionRecord,
+): Promise<SessionChangeSummary> {
+  const baseCommit = await readCommit(workspaceId, session.base);
+  const baseSnap = baseCommit
+    ? await readSnapshot(workspaceId, baseCommit.snapshot)
+    : undefined;
+  // Ephemeral live-tree snapshot — do not advance main just to answer
+  // "what changed" (tech-plan D4).
+  const live = buildSnapshot(await visibleEntries(workspaceId));
+  const diff = diffSnapshots(baseSnap, live);
+  const touched = session.touchedPaths;
+  const includesOtherActivity = touched === undefined;
+  const allow = (path: string): boolean =>
+    includesOtherActivity || (touched?.includes(path) ?? false);
+  return {
+    added: diff.added.map((e) => e.path).filter(allow).sort(),
+    modified: diff.modified.map((e) => e.path).filter(allow).sort(),
+    removed: diff.removed.map((e) => e.path).filter(allow).sort(),
+    ...(includesOtherActivity ? { includesOtherActivity: true } : {}),
+  };
 }
 
 export interface SessionConflict {
@@ -525,8 +594,10 @@ export async function resolveSessionMerge(
 
 /**
  * Close a session. `stage: true` applies the overlay to the live tree and
- * commits main (the merge node, carrying `sessionId`); otherwise the session
- * is archived untouched — the overlay stays readable for peeking.
+ * commits main as a merge node (parents `[mainHead, sessionHead]` when the
+ * session has its own line; single parent otherwise — tech-plan D2);
+ * otherwise the session is archived untouched — the overlay stays readable
+ * for peeking.
  */
 export async function closeSession(
   workspaceId: string,
@@ -545,6 +616,7 @@ export async function closeSession(
   }
 
   const store = getFsStore();
+  const hadOverlay = Object.keys(session.overlay).length > 0;
   for (const [path, staged] of Object.entries(session.overlay)) {
     const normalized = normalizeFsPath(path);
     if (!normalized) continue;
@@ -557,10 +629,30 @@ export async function closeSession(
     await store.write(workspaceId, normalized, shadow.content, shadow.mimeType);
   }
 
+  const mainBefore = await readRef(workspaceId, MAIN_REF);
+  const mainHead = mainBefore?.commit;
+
+  // Build the session line when the overlay contributed anything: a commit
+  // on `session/<id>` parented at the session base, then a two-parent merge
+  // onto main. Empty overlay → single-parent main commit (no session commits).
+  let parents: string[] | undefined;
+  if (hadOverlay) {
+    const sessionRef = `session/${session.id}`;
+    const { commit: sessionCommit } = await commitTree(workspaceId, {
+      message: `Session: ${session.title}`,
+      author: userId,
+      sessionId: session.id,
+      ref: sessionRef,
+      parents: [session.base],
+    });
+    parents = mainHead ? [mainHead, sessionCommit.id] : [sessionCommit.id];
+  }
+
   const { commit } = await commitTree(workspaceId, {
     message: options.message?.trim() || `Merge session: ${session.title}`,
     author: userId,
     sessionId: session.id,
+    ...(parents ? { parents } : {}),
   });
   session.status = "merged";
   session.mergeCommit = commit.id;

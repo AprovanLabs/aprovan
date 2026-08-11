@@ -20,30 +20,30 @@
 
 > Repo: aprovan | Depends-on: - | Touches: aprovan/server/workspace/src/vcs/**, aprovan/server/workspace/src/native-dispatch.ts, aprovan/server/workspace/tests/vcs*.test.ts, aprovan/server/workspace/tests/chat-sessions.test.ts | Verify: cd aprovan/server/workspace && pnpm typecheck && pnpm vitest run tests/vcs.test.ts tests/vcs-interface.test.ts tests/vcs-mount-lineage.test.ts tests/chat-sessions.test.ts
 
-- [ ] 1.1 (F1-gated) Add app-scope mapping in `native-dispatch.ts`'s
+- [x] 1.1 (F1-gated) Add app-scope mapping in `native-dispatch.ts`'s
       `vcsBackend`: a `scope: { app }` argument on all six verbs resolves to
       `prefix = <app root>`, `ref = app/<appId>`, threaded into F1's
       `commitTree`/`logCommits`/`listRefs` params (spec app-scoped-commits
       "Commits scope to an app root", "All six vcs verbs accept scope").
-- [ ] 1.2 Filter mount lineage/provenance to the commit's prefix in the
+- [x] 1.2 Filter mount lineage/provenance to the commit's prefix in the
       scoped-commit path (`collectMountLineage` results filtered before
       `buildSnapshot`), workspace commits unchanged; test with one in-scope
       and one out-of-scope mount (scenario "Foreign mounts excluded").
-- [ ] 1.3 Add `writeTag`/`moveChannel` over the existing ref machinery in
+- [x] 1.3 Add `writeTag`/`moveChannel` over the existing ref machinery in
       `vcs/store.ts` with names `tag/app/<appId>/<releaseId>` and
       `channel/app/<appId>/<channel>`; `listRefs` prefix-filters them
       (tech-plan D1, Interfaces).
-- [ ] 1.4 `commitTree` options gain `parents?: string[]` override (default
+- [x] 1.4 `commitTree` options gain `parents?: string[]` override (default
       remains `[head]`); `closeSession` in `vcs/chat-sessions.ts` passes
       `[mainHead, sessionHead]`, single parent when the session has no
       commits; first parent stays `mainHead` so first-parent log walks are
       unchanged (tech-plan D2; scenario "Two-parent merge commit").
-- [ ] 1.5 `changeSummary` branches on mode: staged → overlay walk (as
+- [x] 1.5 `changeSummary` branches on mode: staged → overlay walk (as
       today), auto → `diff(baseCommit, mainHead)` filtered to
       session-touched paths, with full-diff fallback + flag when the touched
       set is absent (tech-plan D4; scenarios under "Auto sessions answer
       'what changed?'"). Record touched paths on auto-session writes.
-- [ ] 1.6 Tests: scoped commit lands on `app/<id>` and leaves `main`
+- [x] 1.6 Tests: scoped commit lands on `app/<id>` and leaves `main`
       untouched; identical subtrees in two scopes → distinct snapshot ids;
       scoped restore cannot write outside the app root; branches lists app
       refs; two-parent merge; auto changeSummary excludes a concurrent

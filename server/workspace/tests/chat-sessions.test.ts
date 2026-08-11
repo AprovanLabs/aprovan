@@ -172,11 +172,13 @@ describe("chat sessions", () => {
     expect(live.content).toBe("export const v = 2;");
     expect((await getFile("widgets/new.tsx")).status).toBe(200);
 
-    // And the merge commit is main's head.
-    const log = await data<{ commits: Array<{ id: string; message: string }> }>(
+    // And the merge commit is main's head with two parents (tech-plan D2).
+    const log = await data<{ commits: Array<{ id: string; message: string; parents: string[] }> }>(
       await call("vcs/log", { limit: 1 }),
     );
     expect(log.commits[0]!.message).toBe("Ship the board");
+    expect(log.commits[0]!.parents).toHaveLength(2);
+    expect(closed.commit?.id).toBe(log.commits[0]!.id);
 
     // Writes to a merged session are rejected; peeking still works.
     expect((await putFile("widgets/board.tsx", "post-close", stagedId)).status).toBe(400);
@@ -200,6 +202,60 @@ describe("chat sessions", () => {
     expect(created.session.mode).toBe("auto");
     await putFile("notes/auto.md", "direct", created.session.id);
     expect((await getFile("notes/auto.md")).status).toBe(200);
+  });
+
+  it("auto changeSummary filters to touched paths and excludes foreign edits", async () => {
+    const { recordSessionTouch, changeSummary, requireSession } = await import(
+      "../src/vcs/chat-sessions.js"
+    );
+    const { getFsStore } = await import("../src/fs-store.js");
+
+    const created = await data<SessionPayload>(
+      await call("sessions/create", { title: "Auto answerable" }),
+    );
+    const id = created.session.id;
+
+    // Session-touched writes (recorded explicitly — fs.ts wiring is outside
+    // this stream's Touches; see briefs/01-report.md).
+    await getFsStore().write("local", "auto/touched.md", "mine", "text/plain");
+    await recordSessionTouch("local", id, "auto/touched.md");
+    await getFsStore().write("local", "auto/also.md", "also", "text/plain");
+    await recordSessionTouch("local", id, "auto/also.md");
+
+    // Concurrent foreign edit — not recorded as a session touch.
+    await getFsStore().write("local", "auto/foreign.md", "other", "text/plain");
+
+    const session = await requireSession("local", id);
+    const summary = await changeSummary("local", session);
+    expect(summary.added.sort()).toEqual(["auto/also.md", "auto/touched.md"]);
+    expect(summary.added).not.toContain("auto/foreign.md");
+    expect(summary.includesOtherActivity).toBeUndefined();
+
+    const got = await data<SessionPayload>(await call("sessions/get", { id }));
+    expect(got.session.changes?.added.sort()).toEqual(["auto/also.md", "auto/touched.md"]);
+  });
+
+  it("two-parent merge records [mainHead, sessionHead] in that order", async () => {
+    const { readCommit, readRef } = await import("../src/vcs/store.js");
+    await putFile("merge/line.md", "base");
+    const created = await data<SessionPayload>(
+      await call("sessions/create", { title: "Two parents", mode: "staged" }),
+    );
+    const mainBefore = await readRef("local", "main");
+    await putFile("merge/line.md", "session edit", created.session.id);
+    const closed = await data<SessionPayload>(
+      await call("sessions/close", {
+        id: created.session.id,
+        stage: true,
+        message: "Apply two-parent",
+      }),
+    );
+    const merge = await readCommit("local", closed.commit!.id);
+    expect(merge?.parents).toHaveLength(2);
+    expect(merge?.parents[0]).toBe(mainBefore?.commit);
+    expect(merge?.sessionId).toBe(created.session.id);
+    const sessionRef = await readRef("local", `session/${created.session.id}`);
+    expect(merge?.parents[1]).toBe(sessionRef?.commit);
   });
 
   it("discards staged changes per path (keep-the-workspace resolution)", async () => {

@@ -268,4 +268,45 @@ describe("mount lineage on commits", () => {
     );
     expect(raw && "provenance" in raw).toBe(false);
   });
+
+  it("excludes foreign mounts from an app-scoped commit's lineage", async () => {
+    // Prior cases may leave mounts; clear known leftovers first.
+    await removeMount("local", "vendor/charts").catch(() => undefined);
+    await removeMount("local", "media").catch(() => undefined);
+
+    await putFile("apps/scoped/index.tsx", "export default () => null;");
+    await putFile("other/file.ts", "x");
+    await addMount("local", "user1", {
+      prefix: "apps/scoped/vendor",
+      type: "git",
+      config: { repo: "org/charts", ref: "main" },
+    });
+    await addMount("local", "user1", {
+      prefix: "other/vendor",
+      type: "git",
+      config: { repo: "org/charts", ref: "main" },
+    });
+
+    const { commit } = await commitTree("local", {
+      message: "app scoped",
+      author: "user1",
+      prefix: "apps/scoped",
+      ref: "app/01SCOPEDAPP000000000000000",
+    });
+    const show = await showCommit(commit.id);
+    const prefixes = (show.mounts ?? []).map((m) => m.prefix).sort();
+    expect(prefixes).toEqual(["apps/scoped/vendor"]);
+    expect(show.commit.provenance?.map((p) => p.prefix).sort()).toEqual(["apps/scoped/vendor"]);
+
+    // Workspace commit keeps both in-scope mounts from this case.
+    const whole = await commitTree("local", { message: "whole", author: "user1" });
+    const wholeShow = await showCommit(whole.commit.id);
+    expect((wholeShow.mounts ?? []).map((m) => m.prefix).sort()).toEqual([
+      "apps/scoped/vendor",
+      "other/vendor",
+    ]);
+
+    await removeMount("local", "apps/scoped/vendor");
+    await removeMount("local", "other/vendor");
+  });
 });
