@@ -1,0 +1,48 @@
+{
+  "name": "@aprovan/agent-protocol",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Typed run-event protocol and chat-turn HTTP helpers shared by the workspace gateway and web client",
+  "keywords": [
+    "aprovan",
+    "agent",
+    "protocol",
+    "sse",
+    "run-event"
+  ],
+  "license": "MIT",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check-types": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "clean": "rm -rf dist",
+    "test": "vitest run"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@utdk/agent": "^0.2.0",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "typescript": "^5.7.3",
+    "vitest": "2.1.5"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

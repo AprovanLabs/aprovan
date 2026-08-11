@@ -36,6 +36,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@aprovan/agent-protocol": "workspace:*",
     "@aprovan/native": "workspace:*",
     "@aprovan/node": "workspace:*",
     "@aprovan/patchwork": "workspace:*",
