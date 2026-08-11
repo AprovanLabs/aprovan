@@ -328,6 +328,18 @@ export default function ChatPage() {
                 }
                 activeSurfaceId={tabs.activeSurfaceId}
                 openNativeTab={tabs.openNativeTab}
+                activeAppKey={
+                  tabs.activeAppsSelection?.kind === "app"
+                    ? (tabs.activeAppsSelection.appId ?? tabs.activeAppsSelection.name)
+                    : null
+                }
+                openAppTab={(app) =>
+                  tabs.openAppsTab({
+                    kind: "app",
+                    name: app.name,
+                    ...(app.appId ? { appId: app.appId } : {}),
+                  })
+                }
               />
 
               <div ref={splitRowRef} className="flex-1 min-w-0 min-h-0 flex relative">

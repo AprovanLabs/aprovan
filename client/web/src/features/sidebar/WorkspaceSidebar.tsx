@@ -10,18 +10,21 @@ import {
   PRIVATE_SECTION_LABEL,
 } from "@/lib/private-partition";
 import { NATIVE_SURFACES } from "@/lib/native-surfaces";
-
+import { AppsLauncher } from "./AppsLauncher";
+import type { LauncherApp } from "./useAppsLauncher";
 
 const WORKSPACE_PANE_KEY = "patchwork:workspace-pane";
 
 function loadWorkspacePaneLayout(): { collapsed: boolean } {
   try {
     const raw = localStorage.getItem(WORKSPACE_PANE_KEY);
-    if (!raw) return { collapsed: false };
+    // Default collapsed: Files + Apps stay front-door; native surfaces sit
+    // behind the secondary Workspace affordance (iw9-b ux Open Question 3).
+    if (!raw) return { collapsed: true };
     const parsed = JSON.parse(raw) as { collapsed?: unknown };
     return { collapsed: parsed.collapsed === true };
   } catch {
-    return { collapsed: false };
+    return { collapsed: true };
   }
 }
 
@@ -34,10 +37,9 @@ function saveWorkspacePaneLayout(layout: { collapsed: boolean }): void {
 }
 
 /**
- * The workspace explorer column: file tree + plain Workspace surface rows,
- * wrapped in the same off-canvas drawer recipe the full-view editor's file
- * tree uses — hidden by default behind the header's toggle below md, a static
- * column at md+.
+ * The workspace explorer column: Files tree, Apps launcher, then demoted
+ * native surfaces behind a collapsed Workspace section — wrapped in the same
+ * off-canvas drawer recipe the full-view editor's file tree uses.
  *
  * The caller's own private space (`.users/<self>` — the gateway only ever
  * lists the caller's own; see lib/private-partition.ts) renders as a
@@ -64,6 +66,8 @@ export function WorkspaceSidebar({
   expandWorkspaceDirectory,
   activeSurfaceId,
   openNativeTab,
+  activeAppKey,
+  openAppTab,
 }: {
   sidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
@@ -82,6 +86,10 @@ export function WorkspaceSidebar({
   expandWorkspaceDirectory?: (path: string) => void;
   activeSurfaceId: string | null;
   openNativeTab: (surfaceId: string) => void;
+  /** Active `app://` tab key (`appId ?? name`) for launcher highlight. */
+  activeAppKey: string | null;
+  /** Open an app pane/tab — never the apps management surface. */
+  openAppTab: (app: { name: string; appId?: string }) => void;
 }) {
   // Feature-detected: null on gateways that never list the space — the
   // Private section then simply doesn't exist and no path is rewritten.
@@ -111,6 +119,13 @@ export function WorkspaceSidebar({
     }
     return mapped;
   }, [rawPresenceTitles, privateRoot]);
+
+  const handleOpenApp = useCallback(
+    (app: LauncherApp) => {
+      openAppTab({ name: app.name, ...(app.appId ? { appId: app.appId } : {}) });
+    },
+    [openAppTab],
+  );
 
   return (
     <MobileDrawer
@@ -153,15 +168,23 @@ export function WorkspaceSidebar({
           )}
         </>
       )}
+      <AppsLauncher
+        activeAppKey={activeAppKey}
+        onOpenApp={handleOpenApp}
+        onOpenManagement={() => openNativeTab("apps")}
+      />
       <WorkspaceSurfaces activeSurfaceId={activeSurfaceId} onSelect={openNativeTab} />
     </MobileDrawer>
   );
 }
 
 /**
- * Workspace section: one row per native surface (Apps, Data, Agents, …),
- * each opening a `native://` content tab. Collapsible to its header; the
- * collapsed flag persists across reloads.
+ * Secondary Workspace section: one row per native surface (Apps, Data,
+ * Agents, …), each opening a `native://` content tab. Collapsed by default
+ * so Files + Apps stay the front door; the collapsed flag persists.
+ *
+ * Placement only — the {@link NATIVE_SURFACES} registry entries are unchanged;
+ * this is where the sidebar renders them (iw9-b app-launcher demotion).
  */
 function WorkspaceSurfaces({
   activeSurfaceId,
