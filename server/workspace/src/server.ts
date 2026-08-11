@@ -12,7 +12,8 @@
  *   /api/gateway/*   REST API (credentials, fs, llm, apps, workflows, …)
  *   /api/mcp         public MCP endpoint
  *   /.well-known/*   RFC 9728 OAuth resource metadata, resolved at the root
- *   /apps/*          live app pages (aprovan.com/apps/<workspace>/<name>)
+ *   /a/... , /w/.../a/...   canonical + vanity live app pages (IW-9 D5)
+ *   /apps/...               legacy/convenience 302 shims to canonical URLs
  *   /health          liveness, for container/load-balancer probes
  */
 
@@ -22,6 +23,7 @@ import { Hono } from "hono";
 import { createApp } from "./app.js";
 import { getAuthMode, initAuth } from "./middleware/auth.js";
 import { attachRealtime, type RealtimeHandle } from "./realtime/socket.js";
+import { appUrlsRouter } from "./routes/app-urls.js";
 import { liveAppsRouter } from "./routes/live-apps.js";
 import { mcpRouter } from "./routes/mcp.js";
 import { wellKnownRouter } from "./routes/well-known.js";
@@ -41,6 +43,7 @@ export function createWorkspaceApp(): Hono {
   app.route("/api/gateway", createApp());
   app.route("/api/mcp", mcpRouter);
   app.route("/.well-known", wellKnownRouter);
+  app.route("/", appUrlsRouter);
   app.route("/apps", liveAppsRouter);
 
   return app;
