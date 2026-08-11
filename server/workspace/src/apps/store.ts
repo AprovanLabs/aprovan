@@ -2,13 +2,17 @@
  * App manifests — published bundles of workflows, a UI, a tool allow-list,
  * roles, and rate limits, owned by a workspace.
  *
- * An app binds *explicit workspace paths* to a deployed endpoint rather than
- * relying on a folder convention: `entry` is the workspace VFS path of the UI
- * entrypoint (e.g. `apps/liift4/widget.tsx`) and `paths` are the workspace
- * prefixes the app publishes (default `[dirname(entry)]`, plus any shared
- * library prefixes). Those prefixes are the single source of truth for BOTH
- * what the live site serves AND what an app session may read/write — one
- * prefix rule, two consumers (see {@link appPathAllowed}).
+ * An app occupies exactly one root under `apps/<slug>` ({@link AppManifest.root}
+ * / F4 `AppRecord.root`). Serving entrypoint and session path authz are both
+ * derived from that single prefix (see {@link appPathAllowed}) — one prefix
+ * rule, two consumers. Extra path prefixes are rejected at publish; share
+ * content via mounts instead.
+ *
+ * `entry` and `paths` remain on the in-memory record as derived projections
+ * (`paths` is always `[root]`; `entry` is resolved under the root) so iw9-a
+ * releases and live-apps callers keep typechecking until those modules
+ * migrate. They are not an authored binding and are never accepted as
+ * multi-prefix input.
  *
  * Per-user app data lives under `.apps/<appId>/data/<user>` ({@link appDataDir});
  * each member's private space is `.users/<user>` ({@link userSpaceDir}). Both
@@ -19,7 +23,7 @@
  * The UI `entry` is an ordinary FS file, so its content is version history for
  * free (the FS store content-versions every write). The helpers at the bottom
  * of this file surface that history for the `apps.versions/version/restore`
- * ops — the versioned artifact is the manifest's `entry`.
+ * ops — the versioned artifact is the derived `entry` under the app root.
  */
 
 import { getFsStore, listAll, normalizeFsPath, type FsEntry, type FsFile } from "../fs-store.js";
@@ -40,6 +44,7 @@ import {
   setAlias,
   type AppId,
 } from "./identity.js";
+import type { AppYaml, AppYamlIssue } from "./manifest.js";
 
 const APPS_SCOPE = svcScope("apps");
 const WORKSPACE_SCOPE = svcScope("workspace");
@@ -86,20 +91,43 @@ export interface AppManifest {
   appId: AppId;
   /** Current mutable alias (display / live URL); the alias index is authoritative. */
   name: string;
+  /**
+   * F4 vanity slug. Present on records written through reconcile; otherwise
+   * callers use `slug ?? name` (see F4 name/slug projection).
+   */
+  slug?: string;
   /** Set when this app was forked from another. */
   originAppId?: AppId;
   title?: string;
   description?: string;
   /**
-   * Workspace VFS path of the UI entrypoint (e.g. "apps/liift4/widget.tsx").
-   * Absolute within the workspace — not relative to a folder.
+   * Single app-root workspace path (`apps/<slug>`). The authoritative path
+   * binding — authz, serving, and publish overlap checks all use this.
+   * Optional only for pre-migration records that still carry `paths[0]`;
+   * {@link hydrateAppRecord} fills it on read/save. Publish always writes it.
+   */
+  root?: string;
+  /**
+   * Derived UI entrypoint under {@link root} (e.g. `apps/liift4/widget.tsx`).
+   * Not an authored binding — resolved at publish/reconcile for releases and
+   * version helpers until iw9-a retires them.
    */
   entry: string;
   /**
-   * Workspace path prefixes this app publishes. Authored source only — data
-   * partitions hang off {@link APP_DATA_ROOT}, not these paths.
+   * Derived projection of the root as a one-element prefix list. Always
+   * `[root]` after hydration — never a multi-prefix authored binding.
    */
   paths: string[];
+  /**
+   * Last-reconciled authored snapshot from `app.yaml` (F4). Undefined for
+   * pre-reconcile records.
+   */
+  declared?: AppYaml;
+  /**
+   * Last reconcile outcome. Invalid `app.yaml` sets `status: "error"` while
+   * retaining last-good derived state — never thrown at app users.
+   */
+  reconcile?: { status: "ok" | "error"; issues?: AppYamlIssue[] };
   /**
    * Who can open the live app page (aprovan.com/apps/<workspace>/<name>):
    * "public" — anyone, no Aprovan account needed to view the page;
@@ -139,6 +167,12 @@ export interface AppManifest {
   createdAt: string;
   updatedAt: string;
 }
+
+/**
+ * F4 platform-owned record shape. Today identical to {@link AppManifest};
+ * streams 2/3/5 import this name for the root-binding contract.
+ */
+export type AppRecord = AppManifest;
 
 /** One interface-contract requirement declared on a manifest. */
 export interface AppRequirement {
@@ -209,19 +243,26 @@ export function pathDir(path: string, label = "entry"): string {
 /**
  * The path binding of a published app — a manifest, or the app-session scope
  * derived from one (see ServiceContext.appScope). Everything path-related is
- * decided from these fields alone. `id` is the ULID used for partition roots
- * (appId for origin-hosted use, installId once installs mint their own).
+ * decided from {@link root} alone (`paths` is a legacy projection of the same
+ * prefix). `id` is the ULID used for partition roots (appId for origin-hosted
+ * use, installId once installs mint their own).
  */
 export interface AppPaths {
   id: string;
   name: string;
+  /** Single app root. Prefer this over `paths[0]`. */
+  root?: string;
+  /**
+   * Legacy prefix list. Callers that have not migrated still pass
+   * `paths: [root]`; {@link appPathAllowed} reads `root ?? paths[0]`.
+   */
   paths: string[];
 }
 
 /** The app's primary authored-source prefix. */
 export function appRoot(app: AppPaths): string {
-  const root = app.paths?.[0];
-  if (!root) throw new ServiceError(`App ${app.name} has no published paths`, 400);
+  const root = app.root ?? app.paths?.[0];
+  if (!root) throw new ServiceError(`App ${app.name} has no published root`, 400);
   return root;
 }
 
@@ -332,13 +373,15 @@ export function resolveAppPath(app: AppPaths, relative: string): string {
  * Does `path` belong to this app? The one place prefix authz is decided —
  * used by the live site (what it may serve) and by app sessions (what their
  * vfs/keyvalue calls may touch). Anything outside needs a workspace share.
+ * Authz is against the single {@link appRoot}, not a multi-prefix list.
  */
 export function appPathAllowed(app: AppPaths, path: string): boolean {
-  return (app.paths ?? []).some((prefix) => underPrefix(path, prefix));
+  const root = app.root ?? app.paths?.[0];
+  return Boolean(root && underPrefix(path, root));
 }
 
 /**
- * Is `path` publishable over HTTP? Declared prefixes minus the ID-keyed data
+ * Is `path` publishable over HTTP? The app root minus the ID-keyed data
  * partition — per-user app data is never served through the live site.
  */
 export function appPathServable(app: AppPaths, path: string): boolean {
@@ -377,11 +420,31 @@ export async function resolveAppEntry(workspaceId: string, target: unknown): Pro
 
 /** Persist a manifest by appId and refresh its name→appId alias. */
 export async function saveApp(workspaceId: string, manifest: AppManifest): Promise<void> {
-  await writeSvcRecord(workspaceId, APPS_SCOPE, manifest.appId, manifest, manifest.createdBy);
-  await setAlias(workspaceId, manifest.name, manifest.appId);
-  await indexAppLocation(workspaceId, manifest.appId, manifest.name);
+  const record = hydrateAppRecord(manifest);
+  await writeSvcRecord(workspaceId, APPS_SCOPE, record.appId, record, record.createdBy);
+  await setAlias(workspaceId, record.name, record.appId);
+  await indexAppLocation(workspaceId, record.appId, record.name);
   const { syncDirectoryEntry } = await import("./directory.js");
-  await syncDirectoryEntry(workspaceId, manifest);
+  await syncDirectoryEntry(workspaceId, record);
+}
+
+/**
+ * Ensure `root` is set and `paths`/`entry` are the derived projections of that
+ * root. Pre-migration records that only have `paths[0]`/`entry` gain `root`.
+ */
+export function hydrateAppRecord(manifest: AppManifest): AppManifest {
+  const root =
+    manifest.root ||
+    manifest.paths?.[0] ||
+    (manifest.entry ? pathDir(manifest.entry) : "");
+  if (!root) return manifest;
+  return {
+    ...manifest,
+    root,
+    slug: manifest.slug ?? manifest.name,
+    paths: [root],
+    entry: manifest.entry || `${root}/${ENTRY_CANDIDATES[0]}`,
+  };
 }
 
 /** Read a manifest by durable appId. No name-keyed or legacy-shape rebinding. */
@@ -389,12 +452,16 @@ export async function readApp(
   workspaceId: string,
   appId: string,
 ): Promise<AppManifest | undefined> {
-  return readSvcRecord<AppManifest>(workspaceId, APPS_SCOPE, appId);
+  const raw = await readSvcRecord<AppManifest>(workspaceId, APPS_SCOPE, appId);
+  return raw ? hydrateAppRecord(raw) : undefined;
 }
 
 export async function listApps(workspaceId: string): Promise<AppManifest[]> {
   const entries = await listSvcRecords<AppManifest>(workspaceId, APPS_SCOPE);
-  return entries.map((entry) => entry.value).filter((m): m is AppManifest => Boolean(m?.appId));
+  return entries
+    .map((entry) => entry.value)
+    .filter((m): m is AppManifest => Boolean(m?.appId))
+    .map(hydrateAppRecord);
 }
 
 export interface RemoveAppOptions {

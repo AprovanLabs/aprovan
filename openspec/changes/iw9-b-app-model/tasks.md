@@ -29,28 +29,28 @@ Ordering mirrors tech-plan.md's Rollout: server model (1) → domain modules
 
 ## 1. Server — App roots + overlap validation
 
-> Depends-on: - | Repo: aprovan | Touches: aprovan/server/workspace/src/apps/store.ts, aprovan/server/workspace/src/apps/roots.ts, aprovan/server/workspace/tests/apps-roots.test.ts | Verify: pnpm --filter @aprovan/workspace test -- apps-roots.test.ts
+> Depends-on: - | Repo: aprovan | Touches: aprovan/server/workspace/src/apps/store.ts, aprovan/server/workspace/src/apps/roots.ts, aprovan/server/workspace/src/apps/service.ts, aprovan/server/workspace/tests/apps-roots.test.ts | Verify: pnpm --filter @aprovan/workspace test -- apps-roots.test.ts
 
-- [ ] 1.1 In `apps/store.ts`, delete the `entry: string` and `paths: string[]`
+- [x] 1.1 In `apps/store.ts`, delete the `entry: string` and `paths: string[]`
       fields from the manifest's operational shape (`store.ts:90-105`);
       derive the single binding from F4's `AppRecord.root` instead
       (`app-roots` — "Every app occupies exactly one root under Apps/").
-- [ ] 1.2 Narrow `appPathAllowed`/`appPathServable` (`store.ts:328-338`) to
+- [x] 1.2 Narrow `appPathAllowed`/`appPathServable` (`store.ts:328-338`) to
       check containment against the one `root` string instead of iterating a
       `paths[]` array.
-- [ ] 1.3 Create `apps/roots.ts` exporting
+- [x] 1.3 Create `apps/roots.ts` exporting
       `assertRootAvailable(workspaceId, root): Promise<void>` — 409 when
       `root` equals, is contained by, or contains any existing app's root in
       the workspace (tech-plan D2's both-directions containment check).
-- [ ] 1.4 Wire `assertRootAvailable` into the publish path in
+- [x] 1.4 Wire `assertRootAvailable` into the publish path in
       `apps/service.ts` (the `resolveBinding`-adjacent call site,
       `service.ts:~474`); reject (400) any publish/update request that still
       supplies extra `paths[]` entries, pointing the error at mounts
       (`app-roots` — "Publish with extra paths rejected").
-- [ ] 1.5 Delete `resolveBinding`'s dedupe-only paths merge
+- [x] 1.5 Delete `resolveBinding`'s dedupe-only paths merge
       (`apps/service.ts:460-491`) now that binding = root only; publish calls
       F4's `reconcileApp` for identity/derived-state instead.
-- [ ] 1.6 Add `tests/apps-roots.test.ts`: single-root binding on publish;
+- [x] 1.6 Add `tests/apps-roots.test.ts`: single-root binding on publish;
       nested-publish 409 (both containment directions); extra-paths 400;
       invalid `app.yaml` keeps last-good derived state without throwing at
       app users (`app-roots` scenarios, all four).
@@ -121,7 +121,7 @@ Ordering mirrors tech-plan.md's Rollout: server model (1) → domain modules
 
 ## 4. Server — Artifact sharing (person/link) + anonymous read route
 
-> Depends-on: - | Repo: aprovan | Touches: aprovan/server/workspace/src/vfs/shares.ts, aprovan/server/workspace/src/routes/share.ts, aprovan/server/workspace/tests/vfs-shares.test.ts | Verify: pnpm --filter @aprovan/workspace test -- vfs-shares.test.ts
+> Depends-on: 1 | Repo: aprovan | Touches: aprovan/server/workspace/src/vfs/shares.ts, aprovan/server/workspace/src/routes/share.ts, aprovan/server/workspace/src/apps/store.ts, aprovan/server/workspace/tests/vfs-shares.test.ts | Verify: pnpm --filter @aprovan/workspace test -- vfs-shares.test.ts
 
 - [ ] 4.1 Create `vfs/shares.ts`: share record type + store under
       `svc#vfs#shares/<shareId>` (`{shareId, path, kind: "person" | "link",
