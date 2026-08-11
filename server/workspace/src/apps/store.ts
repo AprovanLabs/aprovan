@@ -351,6 +351,11 @@ export function partitionAccess(
 /**
  * Throws `ServiceError("Not found: <path>", 404)` when `path` sits inside
  * another user's data partition — deny-as-404.
+ *
+ * Person-shares are checked at this same choke point: an active person-share
+ * covering `path` for `callerSub` lifts the foreign-partition denial so the
+ * recipient can read (artifact-sharing — "Recipient reads, others cannot").
+ * Expired / revoked / absent shares stay indistinguishable from never-existed.
  */
 export async function assertPartitionAccess(
   workspaceId: string,
@@ -358,9 +363,12 @@ export async function assertPartitionAccess(
   path: string,
 ): Promise<void> {
   const hidden = await hiddenDataPrefixes(workspaceId);
-  if (partitionAccess(path, callerSub, hidden) === "foreign") {
-    throw new ServiceError(`Not found: ${path}`, 404);
-  }
+  if (partitionAccess(path, callerSub, hidden) !== "foreign") return;
+  // Lazy import keeps store.ts free of a hard cycle with vfs/shares → svc-records
+  // while still routing every person-share grant through this one choke point.
+  const { personShareAllowsRead } = await import("../vfs/shares.js");
+  if (await personShareAllowsRead(workspaceId, callerSub, path)) return;
+  throw new ServiceError(`Not found: ${path}`, 404);
 }
 
 /**

@@ -123,7 +123,7 @@ Ordering mirrors tech-plan.md's Rollout: server model (1) → domain modules
 
 > Depends-on: 1 | Repo: aprovan | Touches: aprovan/server/workspace/src/vfs/shares.ts, aprovan/server/workspace/src/routes/share.ts, aprovan/server/workspace/src/apps/store.ts, aprovan/server/workspace/tests/vfs-shares.test.ts | Verify: pnpm --filter @aprovan/workspace test -- vfs-shares.test.ts
 
-- [ ] 4.1 Create `vfs/shares.ts`: share record type + store under
+- [x] 4.1 Create `vfs/shares.ts`: share record type + store under
       `svc#vfs#shares/<shareId>` (`{shareId, path, kind: "person" | "link",
       grantee?: sub, keyHmac?, expiresAt, createdBy, revokedAt?}`, tech-plan
       D6); `createPersonShare`, `createLinkShare` (mints a 256-bit key,
@@ -131,21 +131,21 @@ Ordering mirrors tech-plan.md's Rollout: server model (1) → domain modules
       `resolveLinkShare(key)` (recompute-and-constant-time-compare lookup,
       checks expiry/revocation), `revokeShare`, `listSharesCreatedBy`,
       `listSharesReceivedBy`.
-- [ ] 4.2 Wire person-share reads into the existing authenticated vfs read
+- [x] 4.2 Wire person-share reads into the existing authenticated vfs read
       path: a share check at the same choke point as partition access
       (`apps/store.ts`'s `assertPartitionAccess` family), deny-as-404 on no
       share/expired/revoked (`artifact-sharing` — "Recipient reads, others
       cannot", "Revocation is immediate").
-- [ ] 4.3 Create `routes/share.ts`: `GET /share/:key/*subpath?` — anonymous,
+- [x] 4.3 Create `routes/share.ts`: `GET /share/:key/*subpath?` — anonymous,
       resolves the link, serves file bytes read-only. This module SHALL
       import no record/workflow/tool modules (invariant 9 made structural,
       per tech-plan D6) — enforce by keeping its only internal import as
       `vfs/shares.ts` + the raw FS read primitive, never `apps/service.ts`,
       `records.ts`, or any workflow module.
-- [ ] 4.4 Confirm `visibility` (installability) and share records are read
+- [x] 4.4 Confirm `visibility` (installability) and share records are read
       from entirely independent code paths — no function computes one from
       the other (`artifact-sharing` — "Shared file, private app").
-- [ ] 4.5 Add `tests/vfs-shares.test.ts`: store holds no usable key (HMAC
+- [x] 4.5 Add `tests/vfs-shares.test.ts`: store holds no usable key (HMAC
       only); expiry and revocation both 404 indistinguishably from
       never-existed; anonymous read succeeds while write/keyvalue/workflow
       attempts with the same link key all fail 401/404; link doesn't leak
