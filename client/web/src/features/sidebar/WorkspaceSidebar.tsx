@@ -1,6 +1,7 @@
 import { MobileDrawer, WorkspaceTree } from "@aprovan/editor";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ensureMountsLoaded, mountsStore, useMountTreeTitles } from "@/components/mounts";
 import { usePresenceTitleMap } from "@/features/presence";
 import {
   fromDisplayPath,
@@ -127,6 +128,39 @@ export function WorkspaceSidebar({
     [openAppTab],
   );
 
+  // Mount badges (stream 11) — titles keyed by display path; store updates
+  // after add/remove so the tree marks without a full page reload.
+  const rawMountTitles = useMountTreeTitles();
+  const mountTitles = useMemo(() => {
+    if (rawMountTitles.size === 0) return undefined;
+    const mapped = new Map<string, string>();
+    for (const [path, title] of rawMountTitles) {
+      mapped.set(toDisplayPath(path, privateRoot), title);
+    }
+    return mapped;
+  }, [rawMountTitles, privateRoot]);
+
+  useEffect(() => {
+    void ensureMountsLoaded().catch(() => undefined);
+  }, []);
+
+  // When mounts change, refresh the path list so mounted subtrees appear/disappear.
+  useEffect(() => {
+    let prev = mountsStore
+      .getSnapshot()
+      .map((m) => m.prefix)
+      .join("\0");
+    return mountsStore.subscribe(() => {
+      const next = mountsStore
+        .getSnapshot()
+        .map((m) => m.prefix)
+        .join("\0");
+      if (next === prev) return;
+      prev = next;
+      void refreshWorkspace();
+    });
+  }, [refreshWorkspace]);
+
   return (
     <MobileDrawer
       open={sidebarOpen}
@@ -156,6 +190,7 @@ export function WorkspaceSidebar({
             onRefresh={() => void refreshWorkspace()}
             refreshing={workspaceLoading}
             presenceTitles={presenceTitles}
+            mountTitles={mountTitles}
             title="Files"
             className="flex-1 min-h-0"
           />
