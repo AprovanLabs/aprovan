@@ -203,7 +203,7 @@ Ordering mirrors tech-plan.md's Rollout: server model (1) → domain modules
 
 > Depends-on: 1, 3, 5 | Repo: aprovan | Touches: aprovan/server/workspace/scripts/migrate-app-roots.ts, aprovan/server/workspace/scripts/migrate-installs-to-copy.ts, aprovan/server/workspace/tests/migrate-app-model.test.ts | Verify: pnpm --filter @aprovan/workspace test -- migrate-app-model.test.ts
 
-- [ ] 7.1 Write `scripts/migrate-app-roots.ts`: for every existing manifest,
+- [x] 7.1 Write `scripts/migrate-app-roots.ts`: for every existing manifest,
       set `root = paths[0]`; for each remaining `paths[]` entry, call
       stream 5's mount-add logic to create an equivalent mount under the
       app's root; write `app.yaml` at the root if absent (via F4's
@@ -211,7 +211,7 @@ Ordering mirrors tech-plan.md's Rollout: server model (1) → domain modules
       completed migration is a no-op (compare current state before writing).
       Snapshot the pre-migration store state before mutating (rollback
       artifact, tech-plan Rollout step 5).
-- [ ] 7.2 Write `scripts/migrate-installs-to-copy.ts`: for every install
+- [x] 7.2 Write `scripts/migrate-installs-to-copy.ts`: for every install
       record, materialize a copy of the resolved release's content into the
       installer's workspace (seed: the deleted `materializeFork` logic,
       preserved here before stream 3 deletes it from `install.ts`), set
@@ -220,7 +220,7 @@ Ordering mirrors tech-plan.md's Rollout: server model (1) → domain modules
       `editing`/`prefix`. Installs whose origin is already gone and never
       materialized are flagged broken in the install list, not silently
       dropped (`app-install-lifecycle` REMOVED-requirement migration note).
-- [ ] 7.3 Add `tests/migrate-app-model.test.ts`: a manifest with
+- [x] 7.3 Add `tests/migrate-app-model.test.ts`: a manifest with
       `["Apps/tasks", "shared/lib"]` migrates to root `Apps/tasks` +
       a mount at `shared/lib`, and reads of `shared/lib/**` still succeed
       post-migration (`app-roots` — "Migrated app keeps reading its
@@ -228,7 +228,7 @@ Ordering mirrors tech-plan.md's Rollout: server model (1) → domain modules
       double-writes; an install with a dead origin migrates to a flagged
       broken state rather than being dropped; a pre-migration snapshot file
       is written before any mutation.
-- [ ] 7.4 Grep-gate: confirm no `paths` binding remains in app-model server
+- [x] 7.4 Grep-gate: confirm no `paths` binding remains in app-model server
       code and `editing`/`prefix`/`resolvedRelease`/`cachedOriginRelease` are
       gone — run in both repos (MIGRATION-DEBT rule): `grep -rn
       "\.paths\b" AAP/server/workspace/src/apps REG/packages 2>/dev/null`
