@@ -294,18 +294,18 @@ Ordering mirrors tech-plan.md's Rollout: server model (1) → domain modules
 
 > Depends-on: 6 | Repo: aprovan | Touches: aprovan/client/web/src/components/sharing/** | Verify: pnpm --filter @aprovan/patchwork-web typecheck
 
-- [ ] 10.1 Build the Share dialog (Person / Link tabs) per ux.md: Person tab
+- [x] 10.1 Build the Share dialog (Person / Link tabs) per ux.md: Person tab
       is a workspace-member combobox; Link tab has an expiry `Select`
       (default per ux.md Open Question 2, recommended 7 days with an
       explicit "No expiry" opt-in) and a one-time key reveal (monospace,
       copy button, persistent "won't be shown again" caption).
-- [ ] 10.2 Build the **Shared with me** listing (flat list, sharer identity,
+- [x] 10.2 Build the **Shared with me** listing (flat list, sharer identity,
       shared date, empty state "Nothing shared with you yet").
-- [ ] 10.3 Build the **Manage shares** table (kind, recipient/label, created,
+- [x] 10.3 Build the **Manage shares** table (kind, recipient/label, created,
       expiry, status, revoke action via `AlertDialog` confirmation); a failed
       revoke leaves the row in a distinct "revoke failed, retry" state, never
       silently reverting to "active".
-- [ ] 10.4 Build the anonymous link-landing view: read-only file render, no
+- [x] 10.4 Build the anonymous link-landing view: read-only file render, no
       sibling/parent navigation, no edit affordance; expired/revoked links
       render a generic "This link isn't available" page indistinguishable
       from a never-existed link.
