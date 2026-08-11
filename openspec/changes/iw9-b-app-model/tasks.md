@@ -59,21 +59,21 @@ Ordering mirrors tech-plan.md's Rollout: server model (1) → domain modules
 
 > Depends-on: 1 | Repo: aprovan | Touches: aprovan/server/workspace/src/apps/personal.ts, aprovan/server/workspace/tests/apps-personal.test.ts | Verify: pnpm --filter @aprovan/workspace test -- apps-personal.test.ts
 
-- [ ] 2.1 Create `apps/personal.ts` exporting
+- [x] 2.1 Create `apps/personal.ts` exporting
       `ensurePersonalApp(workspaceId, actor): Promise<AppRecord>` — lazy
       create only (slug `personal`, root `Apps/personal`), no special flag on
       the manifest, recognized by slug at this one creation site only
       (tech-plan D3).
-- [ ] 2.2 Export `promoteApp({workspaceId, source, slug, actor})` — (1)
+- [x] 2.2 Export `promoteApp({workspaceId, source, slug, actor})` — (1)
       `assertRootAvailable` (from stream 1), (2) copy the VFS subtree to
       `Apps/<slug>`, (3) call F4's `reconcileApp` to mint the new appId
       (first-sight flow), (4) delete the source subtree last — copy-then-
       delete-last is the atomicity strategy (tech-plan D3; no VFS move
       primitive exists).
-- [ ] 2.3 Grep-confirm no `isPersonalApp`/`PERSONAL_APP_NAME`/
+- [x] 2.3 Grep-confirm no `isPersonalApp`/`PERSONAL_APP_NAME`/
       `PERSONAL_PREFIX`/`.personal` special-casing was reintroduced (baseline
       is already clean — keep it that way; do not add any).
-- [ ] 2.4 Add `tests/apps-personal.test.ts`: lazy creation on first one-off
+- [x] 2.4 Add `tests/apps-personal.test.ts`: lazy creation on first one-off
       (`personal-app` scenario 1); promote moves/mints/re-points (scenario);
       promote is atomic under a simulated failure before the delete step
       (source subtree intact, no orphan row); promoted app has no back-link
