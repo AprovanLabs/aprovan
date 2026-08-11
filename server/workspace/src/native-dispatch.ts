@@ -32,6 +32,7 @@ import { getFsStore, listAll, type IFsStore } from "./fs-store.js";
 import { getRecordStore, type IRecordStore } from "./records.js";
 import { ServiceError, type ServiceContext } from "./service-kernel.js";
 import {
+  appRefName,
   commitTree,
   diffSnapshots,
   listRefs,
@@ -55,6 +56,37 @@ function filterDiffByPrefix(diff: VcsDiff, prefix?: string): VcsDiff {
     added: diff.added.filter((e) => pathUnderPrefix(e.path, prefix)),
     modified: diff.modified.filter((e) => pathUnderPrefix(e.path, prefix)),
     removed: diff.removed.filter((e) => pathUnderPrefix(e.path, prefix)),
+  };
+}
+
+/**
+ * Map wire `scope: { app }` onto F1 `prefix`/`ref` (tech-plan Interfaces).
+ * Explicit `prefix`/`ref` already on the args win over the mapped values only
+ * when scope is absent; when scope is present it owns both.
+ */
+async function applyVcsAppScope(
+  workspaceId: string,
+  args: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const scope = args["scope"];
+  if (!scope || typeof scope !== "object" || Array.isArray(scope)) return args;
+  const appRef = (scope as Record<string, unknown>)["app"];
+  if (typeof appRef !== "string" || !appRef.trim()) return args;
+  const { resolveAppRef } = await import("./apps/identity.js");
+  const { appRoot, readApp } = await import("./apps/store.js");
+  const appId = await resolveAppRef(workspaceId, appRef.trim());
+  const manifest = await readApp(workspaceId, appId);
+  if (!manifest) throw new ServiceError(`Unknown app: ${appRef}`, 404);
+  const prefix = appRoot({
+    id: manifest.appId,
+    name: manifest.name,
+    root: manifest.root,
+    paths: manifest.paths ?? (manifest.root ? [manifest.root] : []),
+  });
+  return {
+    ...args,
+    prefix,
+    ref: appRefName(appId),
   };
 }
 
@@ -436,6 +468,15 @@ export async function dispatchAprovanNativeOp(
     if (interfaceId === "vcs" && operation.startsWith("mounts.")) {
       return dispatchVcsMountsOp(ctx, operation, args);
     }
+    // App-scope mapping for all six vcs verbs (iw9-a stream 1): scope:{app}
+    // → prefix=<app root>, ref=app/<appId> before the native wire strip.
+    let normalizedArgs =
+      interfaceId === "events" && operation === "emit" && typeof args["type"] !== "string"
+        ? { ...args, type: typeof args["channel"] === "string" ? args["channel"] : "event" }
+        : args;
+    if (interfaceId === "vcs" && !operation.startsWith("mounts.")) {
+      normalizedArgs = await applyVcsAppScope(ctx.workspaceId, normalizedArgs);
+    }
     // VFS product surface: partitions, service-path hiding, sessions, commit
     // pins, mounts. Adapt delete to the contract's boolean `deleted`.
     if (interfaceId === "vfs") {
@@ -456,11 +497,8 @@ export async function dispatchAprovanNativeOp(
       const result = await keyvalueProductService.call(ctx, operation, args);
       return adaptKeyvalueProductResult(operation, result);
     }
-    // Default `type` for events.emit when callers still pass only channel+payload.
-    const normalizedArgs =
-      interfaceId === "events" && operation === "emit" && typeof args["type"] !== "string"
-        ? { ...args, type: typeof args["channel"] === "string" ? args["channel"] : "event" }
-        : args;
+    // Default `type` for events.emit when callers still pass only channel+payload
+    // is applied above into normalizedArgs.
     return await dispatchNativeOp(interfaceId, operation, normalizedArgs, buildNativeContext(ctx));
   } catch (err) {
     if (err instanceof ServiceError) throw err;

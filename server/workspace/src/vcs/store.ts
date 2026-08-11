@@ -331,9 +331,81 @@ export async function writeRef(
   return ref;
 }
 
-export async function listRefs(workspaceId: string): Promise<VcsRef[]> {
+/**
+ * List refs, optionally restricted to names that equal `prefix` or start with
+ * `prefix/` (tech-plan D1 — tag/channel discovery).
+ */
+export async function listRefs(workspaceId: string, prefix?: string): Promise<VcsRef[]> {
   const entries = await listSvcRecords<VcsRef>(workspaceId, REFS_SCOPE);
-  return entries.map((entry) => entry.value).sort((a, b) => a.name.localeCompare(b.name));
+  const refs = entries.map((entry) => entry.value);
+  const filtered =
+    prefix === undefined || prefix === ""
+      ? refs
+      : refs.filter((ref) => ref.name === prefix || ref.name.startsWith(`${prefix}/`));
+  return filtered.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** Immutable tag ref: `tag/app/<appId>/<releaseId>` (tech-plan D1). */
+export async function writeTag(
+  workspaceId: string,
+  name: string,
+  commit: string,
+  updatedBy = "system",
+): Promise<VcsRef> {
+  const refKey = refName(name);
+  if (!refKey.startsWith("tag/")) {
+    throw new ServiceError(`tag ref must start with tag/: ${name}`, 400);
+  }
+  const existing = await readRef(workspaceId, refKey);
+  if (existing) {
+    throw new ServiceError(`tag already exists: ${refKey}`, 409);
+  }
+  return writeRef(workspaceId, refKey, commit, updatedBy);
+}
+
+/** Movable channel ref: `channel/app/<appId>/<channel>` (tech-plan D1). */
+export async function moveChannel(
+  workspaceId: string,
+  name: string,
+  commit: string,
+  updatedBy = "system",
+): Promise<VcsRef> {
+  const refKey = refName(name);
+  if (!refKey.startsWith("channel/")) {
+    throw new ServiceError(`channel ref must start with channel/: ${name}`, 400);
+  }
+  return writeRef(workspaceId, refKey, commit, updatedBy);
+}
+
+/** Canonical tag ref name for an app release. */
+export function tagRefName(appId: string, releaseId: string): string {
+  return `tag/app/${appId}/${releaseId}`;
+}
+
+/** Canonical channel ref name for an app channel. */
+export function channelRefName(appId: string, channel: string): string {
+  return `channel/app/${appId}/${channel}`;
+}
+
+/** App-scope commit ref. */
+export function appRefName(appId: string): string {
+  return `app/${appId}`;
+}
+
+function pathUnderPrefix(path: string, prefix: string): boolean {
+  return path === prefix || path.startsWith(`${prefix}/`);
+}
+
+/** Keep only mount lineage/provenance whose mount prefix falls under `scope`. */
+export function filterLineageToPrefix(
+  lineage: { entries: MountLineageEntry[]; provenance: MountProvenance[] },
+  scope: string,
+): { entries: MountLineageEntry[]; provenance: MountProvenance[] } {
+  if (!scope) return lineage;
+  return {
+    entries: lineage.entries.filter((entry) => pathUnderPrefix(entry.prefix, scope)),
+    provenance: lineage.provenance.filter((entry) => pathUnderPrefix(entry.prefix, scope)),
+  };
 }
 
 /** A commit id (full or unambiguous prefix ≥ 8 chars) or a ref name. */
@@ -386,6 +458,11 @@ export async function commitTree(
     prefix?: string;
     /** Ref to read and advance; defaults to "main". Validated via refName(). */
     ref?: string;
+    /**
+     * Parent override (tech-plan D2). Default remains `[head]` (or `[]` for a
+     * new ref). Used by session merge commits: `[mainHead, sessionHead]`.
+     */
+    parents?: string[];
   },
 ): Promise<{ commit: VcsCommit; created: boolean }> {
   const prefix = options.prefix ?? "";
@@ -393,17 +470,28 @@ export async function commitTree(
   // Mount lineage rides every snapshot: tokens go INTO the snapshot (and
   // its identity — the unchanged-head comparison below therefore covers
   // "native entries AND mount tokens" for free), provenance onto the commit.
-  const lineage = await collectMountLineage(workspaceId);
+  // App-scoped commits keep only mounts under the commit prefix (spec
+  // "Foreign mounts excluded"); workspace commits keep full lineage.
+  const rawLineage = await collectMountLineage(workspaceId);
+  const lineage = filterLineageToPrefix(rawLineage, prefix);
   const snapshot = buildSnapshot(await visibleEntries(workspaceId, prefix), prefix, lineage.entries);
   const ref = await readRef(workspaceId, refKey);
   const head = ref ? await readCommit(workspaceId, ref.commit) : undefined;
-  if (head && head.snapshot === snapshot.id) {
+  const parents =
+    options.parents !== undefined ? options.parents : head ? [head.id] : [];
+  // Short-circuit only when the tree is unchanged *and* parents would match
+  // the existing head — a parents override (merge commit) must always create.
+  if (
+    head &&
+    head.snapshot === snapshot.id &&
+    options.parents === undefined
+  ) {
     return { commit: head, created: false };
   }
   await saveSnapshot(workspaceId, snapshot);
   const commit = await createCommit(workspaceId, {
     snapshot,
-    parents: head ? [head.id] : [],
+    parents,
     message: options.message,
     author: options.author,
     sessionId: options.sessionId,
