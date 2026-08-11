@@ -27,9 +27,10 @@ import {
   workflowCallable,
 } from "../apps/capabilities.js";
 import {
-  cachedOriginRelease,
   findInstallByOrigin,
+  installServingManifest,
   installedScope,
+  installRoot,
   readInstall,
   type AppInstallation,
 } from "../apps/install.js";
@@ -107,29 +108,25 @@ async function resolveAppSession(c: HonoCtx): Promise<AppSession> {
   } else {
     if (!workspaceIdParam || !nameParam) throw new ServiceError("Not found", 404);
     workspaceId = workspaceIdParam;
-    // Install-id address: /apps/:ws/:installId
+    // Install-id address: /apps/:ws/:installId — local copy only (D8).
     if (isAppId(nameParam)) {
       const install = await readInstall(workspaceId, nameParam);
       if (install) {
-        const originManifest =
-          (await cachedOriginRelease(
-            install.originWorkspaceId,
-            install.originAppId,
-            install.resolvedRelease,
-          ))?.manifest ??
-          (await readApp(install.originWorkspaceId, install.originAppId).catch(() => undefined));
-        if (!originManifest) throw new ServiceError("Not found", 404);
-        const role = callerRole(originManifest, sub);
+        const localManifest = installServingManifest(install);
+        if (!localManifest) throw new ServiceError("Not found", 404);
+        const role = callerRole(localManifest, sub);
         if (!role) throw new ServiceError("You do not have access to this app", 403);
-        const scope = installedScope(originManifest, install);
+        const scope = installedScope(localManifest, install);
         const interfaceInstances: Record<string, string> = {};
         for (const [contract, profileId] of Object.entries(install.bindings)) {
           interfaceInstances[contract] = `${contract}`; // profile pin applied at dispatch
           void profileId;
         }
         return {
-          manifest: originManifest,
-          workspaceId: install.originWorkspaceId,
+          manifest: localManifest,
+          // Code lives in the installer's copy; credentials still resolve via
+          // originAppId lineage when grants need the publisher workspace.
+          workspaceId,
           executionWorkspaceId: workspaceId,
           install,
           sub,
@@ -139,8 +136,6 @@ async function resolveAppSession(c: HonoCtx): Promise<AppSession> {
             userId: sub,
             appScope: { ...scope, userId: sub, role },
             traceId: newTraceId(),
-            // Bind contracts to their install profiles via instance redirect
-            // when we can resolve profile names; profile id pin happens below.
           },
         };
       }
@@ -165,17 +160,12 @@ async function resolveAppSession(c: HonoCtx): Promise<AppSession> {
     : undefined;
 
   if (install && callerWs) {
-    // Prefer pinned release's embedded manifest when available.
-    const pinned = await cachedOriginRelease(
-      install.originWorkspaceId,
-      install.originAppId,
-      install.resolvedRelease,
-    );
-    const effective = pinned?.manifest ?? manifest;
+    // Serve the installer's local copy manifest — never re-read origin.
+    const effective = installServingManifest(install, manifest) ?? manifest;
     const scope = installedScope(effective, install);
     return {
       manifest: effective,
-      workspaceId,
+      workspaceId: callerWs,
       executionWorkspaceId: callerWs,
       install,
       sub,
@@ -346,9 +336,10 @@ async function handleGetManifest(c: {
         ? {
             installId: session.install.installId,
             workspaceId: session.executionWorkspaceId,
-            prefix: session.install.prefix,
-            resolvedRelease: session.install.resolvedRelease,
-            editing: session.install.editing,
+            root: installRoot(session.install),
+            pin: session.install.pin,
+            hosting: session.install.hosting,
+            hostingWorkspaceId: session.install.hostingWorkspaceId,
             bindings: session.install.bindings,
             config: session.install.config,
           }
