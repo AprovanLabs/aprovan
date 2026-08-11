@@ -17,6 +17,7 @@ import {
 } from "../svc-records.js";
 import { DEPLOYMENT_TENANT } from "./identity.js";
 import { DEFAULT_CHANNEL } from "./releases.js";
+import { releaseGlobalSlug } from "./slugs.js";
 import { listApps, type AppManifest, type AppRequirement } from "./store.js";
 
 const DIRECTORY_SCOPE = svcScope("directory");
@@ -24,9 +25,13 @@ const DIRECTORY_SCOPE = svcScope("directory");
 export interface DirectoryEntry {
   appId: string;
   name: string;
+  /** Vanity slug — `manifest.slug ?? manifest.name` so every row has one. */
+  slug: string;
   workspaceId: string;
   title?: string;
   description?: string;
+  /** Custom icon from last-reconciled yaml; undefined → UI fallback. */
+  icon?: string;
   requires?: AppRequirement[];
   liveRelease?: string;
   updatedAt: string;
@@ -46,13 +51,22 @@ function toEntry(workspaceId: string, manifest: AppManifest): DirectoryEntry {
   return {
     appId: manifest.appId,
     name: manifest.name,
+    slug: manifest.slug ?? manifest.name,
     workspaceId,
     title: manifest.title,
     description: manifest.description,
+    icon: manifest.declared?.icon,
     requires: manifest.requires,
     liveRelease: manifest.channels?.[DEFAULT_CHANNEL],
     updatedAt: manifest.updatedAt,
   };
+}
+
+/** Release a deployment-wide global slug claim held by this app (no-op if none). */
+async function releaseAppGlobalClaim(manifest: AppManifest): Promise<void> {
+  const slug = manifest.slug ?? manifest.name;
+  if (!slug) return;
+  await releaseGlobalSlug(slug, manifest.appId);
 }
 
 /** Upsert or drop the directory row to match current visibility. */
@@ -63,6 +77,8 @@ export async function syncDirectoryEntry(
   assertNotDeploymentTenant(workspaceId);
   if ((manifest.visibility ?? "private") !== "public") {
     await dropDirectoryEntry(manifest.appId);
+    // Unpublish releases the global vanity claim (spec app-slug).
+    await releaseAppGlobalClaim(manifest);
     return;
   }
   await writeSvcRecord(

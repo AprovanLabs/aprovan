@@ -38,6 +38,7 @@ import {
 import {
   dropAlias,
   dropAppLocation,
+  dropRootBinding,
   indexAppLocation,
   isAppId,
   readAlias,
@@ -45,6 +46,7 @@ import {
   type AppId,
 } from "./identity.js";
 import type { AppYaml, AppYamlIssue } from "./manifest.js";
+import { releaseGlobalSlug } from "./slugs.js";
 
 const APPS_SCOPE = svcScope("apps");
 const WORKSPACE_SCOPE = svcScope("workspace");
@@ -479,6 +481,13 @@ export async function removeApp(
   if (manifest) {
     await dropAlias(workspaceId, manifest.name);
     await dropAppLocation(manifest.appId);
+    if (manifest.root) {
+      await dropRootBinding(workspaceId, manifest.root);
+    }
+    const slug = manifest.slug ?? manifest.name;
+    if (slug) {
+      await releaseGlobalSlug(slug, manifest.appId);
+    }
     const { dropDirectoryEntry } = await import("./directory.js");
     await dropDirectoryEntry(manifest.appId);
   }
