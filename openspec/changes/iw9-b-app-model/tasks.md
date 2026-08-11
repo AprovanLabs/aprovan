@@ -240,24 +240,24 @@ Ordering mirrors tech-plan.md's Rollout: server model (1) → domain modules
 
 > Depends-on: 6 | Repo: aprovan | Touches: aprovan/client/web/src/features/sidebar/**, aprovan/client/web/src/lib/native-surfaces.tsx | Verify: pnpm --filter @aprovan/patchwork-web typecheck
 
-- [ ] 8.1 In `WorkspaceSidebar.tsx`, add an **Apps** section between Files
+- [x] 8.1 In `WorkspaceSidebar.tsx`, add an **Apps** section between Files
       (`:144`) and the native-surfaces block (`:200-213`): one row per
       `apps.list` entry (own, Personal, installed, indistinguishable in
       kind), each rendering an `AppIconTile` — custom icon from `app.yaml`
       when present, else F4's `appIconFallback(slug)` letter+color
       (`app-launcher` — "Every launcher row has an icon").
-- [ ] 8.2 Row click opens the app's pane/tab directly (never a management
+- [x] 8.2 Row click opens the app's pane/tab directly (never a management
       view); the Apps section header carries the sole affordance into
       `native://apps` management (`app-launcher` — "Launcher opens the
       app").
-- [ ] 8.3 Move the `NATIVE_SURFACES.map` block (`:200-213`) behind a
+- [x] 8.3 Move the `NATIVE_SURFACES.map` block (`:200-213`) behind a
       secondary/collapsed **Workspace** affordance — placement per
       ux.md Open Question 3 (recommended: collapsed section). Every
       `native://<id>` tab key keeps resolving through the unchanged
       `NATIVE_SURFACES` registry (`apps-native-surface` — "Surface registry
       is the single projection"; no changes to `native-surfaces.tsx`'s
       registry entries, only to where `WorkspaceSidebar` renders them).
-- [ ] 8.4 Handle sidebar loading/empty/error states per ux.md's Sidebar
+- [x] 8.4 Handle sidebar loading/empty/error states per ux.md's Sidebar
       screen: row skeletons while `apps.list` resolves; "No apps yet" row
       plus create/install entry point on an empty workspace; inline retry
       row on `apps.list` failure without blocking Files/Workspace; a warning

@@ -4,9 +4,12 @@
  * here — identity (id/title/icon/description) plus its Panel component.
  *
  * capability = namespace, extended one step: namespace = app surface. The
- * sidebar's Workspace group, the `native://` content tabs, and the app
- * inspector's contextual tabs are all projections of this one list —
- * adding the next surface is an entry here, not a UX negotiation.
+ * sidebar's demoted Workspace group (collapsed secondary affordance — not
+ * the front door; see `WorkspaceSidebar` + iw9-b app-launcher), the
+ * `native://` content tabs, and the app inspector's contextual tabs are
+ * all projections of this one list — adding the next surface is an entry
+ * here, not a UX negotiation. Registry entries themselves are placement-
+ * independent; only where the sidebar renders them changed for iw9-b.
  */
 
 import {
@@ -58,11 +61,13 @@ export interface NativeSurfaceDef {
 }
 
 /**
- * Order is the sidebar order (docs' inventory table). `appTab` is set only
- * where the panel actually does something with `scope` — Data describes the
- * app's partition, Activity filters traces to the app, Notifications filters
- * on the server-stamped emitting app. Agents, Webhooks, Sync, Sessions and
- * Interfaces are workspace-level configuration, so they stay off app panes.
+ * Order is the demoted Workspace section order (docs' inventory table). The
+ * Apps launcher is a separate sidebar projection — not this list. `appTab`
+ * is set only where the panel actually does something with `scope` — Data
+ * describes the app's partition, Activity filters traces to the app,
+ * Notifications filters on the server-stamped emitting app. Agents,
+ * Webhooks, Sync, Sessions and Interfaces are workspace-level
+ * configuration, so they stay off app panes.
  *
  * Icons mirror each panel's own header icon so a row and the pane it opens
  * read as the same thing.
