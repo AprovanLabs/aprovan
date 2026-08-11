@@ -23,6 +23,7 @@ import { permissionsRouter } from "./routes/permissions.js";
 import { workspaceProfilesRouter } from "./routes/profiles.js";
 import { sandboxHostsRouter } from "./routes/sandbox-hosts.js";
 import { sessionRouter } from "./routes/session.js";
+import { shareRouter } from "./routes/share.js";
 import { toolsRouter } from "./routes/tools.js";
 import { wellKnownRouter } from "./routes/well-known.js";
 import type { GatewayConfig } from "./contract.js";
@@ -142,6 +143,8 @@ export function createApp(): Hono {
 
   // Unauthenticated — must be mounted before requireAuth touches any prefix.
   app.route("/.well-known", wellKnownRouter);
+  // Link-share anonymous read (iw9-b D6 / invariant 9) — no Cognito.
+  app.route("/share", shareRouter);
   // Workflow webhooks + cron tick authenticate with their own tokens.
   app.route("/hooks", hooksRouter);
   // Sandbox host relay: registered machines dial out and lease work with
