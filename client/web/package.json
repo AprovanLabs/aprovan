@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@ai-sdk/react": "^3.0.69",
+    "@aprovan/agent-protocol": "workspace:*",
     "@aprovan/patchwork": "workspace:*",
     "@aprovan/editor": "workspace:*",
     "@aprovan/registry-main": "workspace:*",
