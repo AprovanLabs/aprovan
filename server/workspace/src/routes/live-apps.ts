@@ -42,9 +42,9 @@ import {
 } from "../apps/releases.js";
 import { generateAppSdk } from "../apps/sdk.js";
 import {
-  cachedOriginRelease,
+  installRoot,
+  installServingManifest,
   readInstall,
-  remapEntry,
 } from "../apps/install.js";
 import { isAppId, resolveAppLocation, resolveAppRef } from "../apps/identity.js";
 import {
@@ -80,11 +80,11 @@ export const liveAppsRouter = new Hono();
 
 interface LiveApp {
   manifest: AppManifest;
-  /** Workspace whose FS is read for content (origin when serving a default install). */
+  /** Workspace whose FS is read for content (always the installer for copies). */
   workspaceId: string;
-  /** Pinned release when serving an install or channel pin. */
+  /** Pinned release when serving a channel pin on an origin app (not installs). */
   release?: AppRelease;
-  /** True when content comes from a materialized local fork. */
+  /** True when content comes from an install-as-copy local root. */
   localFork?: boolean;
 }
 
@@ -112,38 +112,17 @@ async function resolveLiveApp(c: HonoCtx): Promise<LiveApp> {
   const name = c.req.param("name");
   if (!workspaceId || !name) throw new ServiceError("Not found", 404);
 
-  // Install-id address: serve from origin release (editing off) or local fork.
+  // Install-id address: serve the local copy only (D8 — never read origin).
   if (isAppId(name)) {
     const install = await readInstall(workspaceId, name);
     if (install) {
-      const release = await cachedOriginRelease(
-        install.originWorkspaceId,
-        install.originAppId,
-        install.resolvedRelease,
-      );
-      const originManifest =
-        release?.manifest ??
-        (await readApp(install.originWorkspaceId, install.originAppId).catch(() => undefined));
-      if (!originManifest?.entry) throw new ServiceError("Not found", 404);
-
-      if (install.editing && install.prefix) {
-        const forked: AppManifest = {
-          ...originManifest,
-          entry: remapEntry(originManifest.entry, originManifest.paths, install.prefix),
-          paths: [install.prefix],
-          originAppId: install.originAppId,
-        };
-        return {
-          manifest: forked,
-          workspaceId,
-          release,
-          localFork: true,
-        };
-      }
+      const root = installRoot(install);
+      const manifest = installServingManifest(install);
+      if (!manifest?.entry || !root) throw new ServiceError("Not found", 404);
       return {
-        manifest: originManifest,
-        workspaceId: install.originWorkspaceId,
-        release: release ?? undefined,
+        manifest,
+        workspaceId,
+        localFork: true,
       };
     }
   }

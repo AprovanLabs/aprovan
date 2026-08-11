@@ -83,7 +83,7 @@ Ordering mirrors tech-plan.md's Rollout: server model (1) → domain modules
 
 > Depends-on: 1 | Repo: aprovan | Touches: aprovan/server/workspace/src/apps/install.ts, aprovan/server/workspace/src/routes/live-apps.ts, aprovan/server/workspace/src/routes/apps.ts, aprovan/server/workspace/tests/apps-install-copy.test.ts | Verify: pnpm --filter @aprovan/workspace test -- apps-install-copy.test.ts && grep -rn "cachedOriginRelease" AAP/server/workspace/src REG 2>/dev/null
 
-- [ ] 3.1 Rebuild `AppInstallation` in `install.ts` (`install.ts:33-50`):
+- [x] 3.1 Rebuild `AppInstallation` in `install.ts` (`install.ts:33-50`):
       drop `resolvedRelease`, `editing`, `prefix`; add `pin: {tag?: string,
       commit: string}` (commit always present; consumes iw9-a's
       release-as-tag `resolveReleaseTag`, falling back to the app root's VCS
@@ -91,28 +91,28 @@ Ordering mirrors tech-plan.md's Rollout: server model (1) → domain modules
       "managed" | "hosted"` field plus a new `hostingWorkspaceId?: string`
       (tech-plan D4/D5 — field names match F2's landed contract verbatim,
       never `hostingMode`).
-- [ ] 3.2 Rebuild install creation on `materializeFork`'s copy loop
+- [x] 3.2 Rebuild install creation on `materializeFork`'s copy loop
       (`install.ts:262-285` is the seed): copy `app.yaml` + the origin root
       into `Apps/<slug>` in the installer's workspace, validated via
       `assertRootAvailable` (stream 1); on slug collision, fail with 400
       naming the conflict (no auto-suffix — PRD Open Q2 pending; ux.md
       recommends auto-suggest but the API contract stays explicit-choice
       until that question is answered).
-- [ ] 3.3 Delete the request-time origin reads: `cachedOriginRelease` and the
+- [x] 3.3 Delete the request-time origin reads: `cachedOriginRelease` and the
       origin-read branches in `routes/live-apps.ts:119-126` and
       `routes/apps.ts:115-120,169-171`; serving reads only the local copy.
-- [ ] 3.4 Implement the update-check/apply pair: `apps.updateCheck` compares
+- [x] 3.4 Implement the update-check/apply pair: `apps.updateCheck` compares
       the pin against the origin's current release/commit and reports
       "v(N) available"; `apps.applyUpdate` re-copies the archive, requiring
       explicit confirmation when the install has local edits, and is never
       triggered implicitly (`app-install-lifecycle` — "Update is an explicit
       re-copy", "Local edits guard the update").
-- [ ] 3.5 Confirm hosting-mode enforcement: reject an install naming a mode
+- [x] 3.5 Confirm hosting-mode enforcement: reject an install naming a mode
       the app's `hostModes` doesn't cover any flavor of; when >1 hosted
       flavor and/or managed is declared, require an explicit mode in the
       request (400 listing options) — no server-side default guess
       (`app-data-hosting` — "Multi-mode requires the pick").
-- [ ] 3.6 Add `tests/apps-install-copy.test.ts`: install copies the archive
+- [x] 3.6 Add `tests/apps-install-copy.test.ts`: install copies the archive
       and origin is never read at serve time; origin deletion doesn't break
       an existing install (only update-check reports it); update is an
       explicit re-copy with old→new reported; local-edit guard on update;
