@@ -314,13 +314,13 @@ Ordering mirrors tech-plan.md's Rollout: server model (1) → domain modules
 
 > Depends-on: 6 | Repo: aprovan | Touches: aprovan/client/web/src/components/mounts/** | Verify: pnpm --filter @aprovan/patchwork-web typecheck
 
-- [ ] 11.1 Build the mounts table (prefix, type, backend, pinned ref/version,
+- [x] 11.1 Build the mounts table (prefix, type, backend, pinned ref/version,
       creator, remove action) and the add-mount form (git repo + ref +
       optional subpath, or s3 bucket/prefix), backed by stream 6's
       `vcs.mounts.*` procedures.
-- [ ] 11.2 Mark mounted subtrees in the file tree with a read-only badge
+- [x] 11.2 Mark mounted subtrees in the file tree with a read-only badge
       (`vfs-mounts` — "Mounted subtree is marked"); overlap (409) and
       backend-unreachable (400) errors render as visually distinct inline
       messages per ux.md's Mounts panel states.
-- [ ] 11.3 Confirm add/remove reflect in the list and tree without a reload
+- [x] 11.3 Confirm add/remove reflect in the list and tree without a reload
       (`vfs-mounts` — "Add via UI").

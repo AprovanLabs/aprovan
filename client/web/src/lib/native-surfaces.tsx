@@ -23,6 +23,7 @@ import {
   FolderGit,
   GitBranch,
   GitCompareArrows,
+  HardDrive,
   KeyRound,
   LayoutGrid,
   Plug,
@@ -36,6 +37,7 @@ import { CredentialsPanel } from "../components/panels/CredentialsPanel";
 import { InterfacesPanel } from "../components/panels/InterfacesPanel";
 import { KeyValuePanel } from "../components/panels/KeyValuePanel";
 import { LlmPanel } from "../components/panels/LlmPanel";
+import { MountsPanel } from "../components/mounts";
 import { NotificationsPanel } from "../components/panels/NotificationsPanel";
 import { RuntimePanel } from "../components/panels/RuntimePanel";
 import { SandboxesPanel } from "../components/panels/SandboxesPanel";
@@ -108,6 +110,13 @@ export const NATIVE_SURFACES: NativeSurfaceDef[] = [
     icon: FolderGit,
     description: "Choose which git host powers code review and repo tools",
     Panel: VcsPanel,
+  },
+  {
+    id: "mounts",
+    title: "Mounts",
+    icon: HardDrive,
+    description: "Mount shared git or S3 content into this workspace (read-only)",
+    Panel: MountsPanel,
   },
   {
     id: "llm",

@@ -67,6 +67,11 @@ export interface WorkspaceTreeProps {
    * support text decorations inside the shadow host).
    */
   presenceTitles?: ReadonlyMap<string, string>;
+  /**
+   * Mount tooltips keyed by tree path (display path). Mount roots show a
+   * read-only badge glyph; takes precedence over the pin star when both apply.
+   */
+  mountTitles?: ReadonlyMap<string, string>;
 }
 
 const MEDIA_RE = /\.(png|jpe?g|gif|webp|avif|svg|bmp|ico|mp4|webm|mov|m4v|mp3|wav|ogg)$/i;
@@ -386,11 +391,13 @@ export function WorkspaceTree({
   onCreateFile,
   onExpandDirectory,
   presenceTitles,
+  mountTitles,
 }: WorkspaceTreeProps) {
   // Refs keep the once-built model's captured closures pointed at fresh values.
   const modelRef = useRef<PierreModel | null>(null);
   const pinnedRef = useRef(pinnedPaths);
   const presenceRef = useRef(presenceTitles);
+  const mountRef = useRef(mountTitles);
   // The inline "new file" input's state. `prefix` is the seeded directory
   // path (with trailing slash) when opened from a directory's context menu,
   // or "" from the header button (root-level). `seq` is bumped on every open
@@ -410,6 +417,7 @@ export function WorkspaceTree({
   const suppressRef = useRef(false);
   pinnedRef.current = pinnedPaths;
   presenceRef.current = presenceTitles;
+  mountRef.current = mountTitles;
 
   const options = useRef<FileTreeOptions>({
     paths,
@@ -426,6 +434,8 @@ export function WorkspaceTree({
     renderRowDecoration: ({ item }): FileTreeRowDecoration | null => {
       const presenceTitle = presenceRef.current?.get(item.path);
       if (presenceTitle) return { text: '●', title: presenceTitle };
+      const mountTitle = mountRef.current?.get(item.path);
+      if (mountTitle) return { text: '◌', title: mountTitle };
       return pinnedRef.current?.has(item.path) ? { text: '★', title: 'Pinned' } : null;
     },
     onSelectionChange: (selected) => {
