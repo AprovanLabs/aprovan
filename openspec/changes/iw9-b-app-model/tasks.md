@@ -267,25 +267,25 @@ Ordering mirrors tech-plan.md's Rollout: server model (1) → domain modules
 
 > Depends-on: 6 | Repo: aprovan | Touches: aprovan/client/web/src/components/apps/** | Verify: pnpm --filter @aprovan/patchwork-web typecheck
 
-- [ ] 9.1 Build the install dialog: reads the target app's declared
+- [x] 9.1 Build the install dialog: reads the target app's declared
       `hostModes`; no picker when exactly one bucket (managed-only or
       hosted-only) is available; when both managed and a hosted flavor are
       declared, render the two-option picker with the exact copy from
       ux.md/PRD invariant 5 — managed: *"Data lives in your own space..."*;
       hosted: loud disclosure naming the host, visually secondary, never a
       plain radio row (`app-data-hosting` — "Multi-mode requires the pick").
-- [ ] 9.2 Wire the 400-with-declared-modes response into the picker (a
+- [x] 9.2 Wire the 400-with-declared-modes response into the picker (a
       mode-less API call surfaces the accepted options inline, per
       tech-plan's owned `apps.install` contract) and the explicit-slug-on-
       collision 400 into a field-scoped error (no auto-suffix client
       behavior yet — PRD Open Q2 unresolved, ux.md flow step 3 documents the
       explicit-choice fallback).
-- [ ] 9.3 Build the promote-out dialog: source path (read-only), editable
+- [x] 9.3 Build the promote-out dialog: source path (read-only), editable
       slug field pre-filled from the source folder name, live preview URL;
       collision shows a field-scoped error, any other failure shows a
       retry-safe banner leaving the source subtree untouched (ux.md
       Promote-out dialog states).
-- [ ] 9.4 Build the update-available affordance in the apps management
+- [x] 9.4 Build the update-available affordance in the apps management
       surface: "v(N) available → Copy again", explicit local-edits-overwrite
       confirmation when the install has local edits, never an automatic
       trigger (`app-install-lifecycle` — "Update is an explicit re-copy").
