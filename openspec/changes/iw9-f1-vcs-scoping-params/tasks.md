@@ -83,23 +83,23 @@
 
 > Depends-on: 1, 2, 3 | Repo: aprovan | Touches: aprovan/server/workspace/tests/vcs-scoping.test.ts | Verify: pnpm --filter @aprovan/workspace test -- tests/vcs-scoping.test.ts
 
-- [ ] 4.1 Create `server/workspace/tests/vcs-scoping.test.ts` (NEW file —
+- [x] 4.1 Create `server/workspace/tests/vcs-scoping.test.ts` (NEW file —
       model setup on the existing suites' helpers without editing them)
       covering every vcs-scoped-commits scenario: default-args parity,
       subtree-only snapshot with `prefix` field set, named-ref advance
       leaving `main` untouched, invalid ref → 400, cross-scope id
       divergence, same-scope idempotence (`created: false`), empty-prefix id
       stability against a precomputed sha256, fresh-ref root commit.
-- [ ] 4.2 Cover vcs-ref-enumeration scenarios through the native backend
+- [x] 4.2 Cover vcs-ref-enumeration scenarios through the native backend
       (`vcsBackend` via dispatch): ref-scoped log, default main, unknown ref
       → `{commits: []}`, branches enumerating `main` + `session/*` + `app/*`
       sorted, empty workspace → `{branches: []}`.
-- [ ] 4.3 Cover vcs-diff-wire-fidelity scenarios: modified `{path, from, to}`
+- [x] 4.3 Cover vcs-diff-wire-fidelity scenarios: modified `{path, from, to}`
       with real content hashes, added/removed `{path, hash}`, show changes
       shape, diff `prefix` filter inclusion/exclusion, no-prefix full diff.
       Assert discovery schemas via `nativeVcsDiscoveryEntries` include the
       new `prefix`/`ref` properties.
-- [ ] 4.4 Definition-of-done grep gates (MIGRATION-DEBT rule): `listRefs` has
+- [x] 4.4 Definition-of-done grep gates (MIGRATION-DEBT rule): `listRefs` has
       a non-test caller (`grep -rn 'listRefs' server/workspace/src --include='*.ts' | grep -v vcs/store.ts` is non-empty);
       no `readRef(workspaceId, "main")` remains in
       `server/workspace/src/native-dispatch.ts`.
