@@ -119,3 +119,33 @@ export async function resolveAppLocation(appId: string): Promise<AppLocationReco
   if (!loc?.workspaceId) throw new ServiceError(`Unknown app: ${appId}`, 404);
   return loc;
 }
+
+/**
+ * Workspace-scoped root → appId binding (T8). Unconditional read/write/delete —
+ * no self-guard; reconcileApp owns all foreign-id / collision checks before
+ * calling these.
+ */
+const ROOT_SCOPE = svcScope("apps", "root");
+
+export interface AppRootBinding {
+  appId: AppId;
+}
+
+export async function readRootBinding(
+  workspaceId: string,
+  root: string,
+): Promise<AppRootBinding | undefined> {
+  return readSvcRecord<AppRootBinding>(workspaceId, ROOT_SCOPE, root).catch(() => undefined);
+}
+
+export async function bindRoot(
+  workspaceId: string,
+  root: string,
+  appId: AppId,
+): Promise<void> {
+  await writeSvcRecord(workspaceId, ROOT_SCOPE, root, { appId } satisfies AppRootBinding);
+}
+
+export async function dropRootBinding(workspaceId: string, root: string): Promise<void> {
+  await deleteSvcRecord(workspaceId, ROOT_SCOPE, root);
+}
