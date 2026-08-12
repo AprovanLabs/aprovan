@@ -340,22 +340,22 @@
 
 > Depends-on: 4, 9 | Repo: aprovan | Touches: aprovan/server/workspace/tests/doc-integration.test.ts | Verify: pnpm --filter @aprovan/workspace test && pnpm --filter @aprovan/patchwork-web test
 
-- [ ] 12.1 End-to-end integration test (real server, no mocks beyond
+- [x] 12.1 End-to-end integration test (real server, no mocks beyond
       timers): open a live session, edit, let it quiesce, `vfs.read` the
       path with no session-specific parameter and confirm plain Markdown,
       no CRDT bytes, staleness within `DOC_QUIESCE_MAX_INTERVAL_MS` (PRD
       Goal 4 validation bar; spec "Files stay the truth agents read").
-- [ ] 12.2 Persisted-size test: drive a doc past `DOC_COMPACT_SIZE_BYTES`
+- [x] 12.2 Persisted-size test: drive a doc past `DOC_COMPACT_SIZE_BYTES`
       with synthetic updates, assert compaction ran and stored size is
       snapshot-plus-bounded-tail, not an unbounded log (PRD Goal 5
       validation bar; spec "Compaction bounds stored size and log age").
-- [ ] 12.3 Anonymous link-share read against a live-session document: an
+- [x] 12.3 Anonymous link-share read against a live-session document: an
       anonymous `GET /share/<key>` (iw9-b's route) returns the materialized
       Markdown only, with no live updates, cursors, or participant info
       leaking through any Document-added code path (PRD Goal 7; spec
       "Anonymous reader sees materialized content only" — assert the
       response contains no doc-namespace or awareness references at all).
-- [ ] 12.4 Full workspace suite (`pnpm --filter @aprovan/workspace test`)
+- [x] 12.4 Full workspace suite (`pnpm --filter @aprovan/workspace test`)
       and client suite stay green; confirm no file outside
       `server/workspace/src/doc/`, `server/workspace/src/realtime/`
       (streams 3-4 only), `services.ts`/`routes/fs.ts` (stream 5's two
