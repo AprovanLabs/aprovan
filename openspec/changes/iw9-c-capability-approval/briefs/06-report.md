@@ -1,7 +1,7 @@
 # Report: stream 6 — aprovan dependency pin bump
 
 **Status:** done  
-**PR:** (this PR)  
+**PR:** https://github.com/AprovanLabs/aprovan/pull/237  
 **Pin commit:** `chore(workspace): pin registry-server 0.2.11 and utdk clients 0.1.3`
 
 ## Exact pins landed
