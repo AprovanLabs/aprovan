@@ -72,31 +72,31 @@ cross-repo rule 4).
 
 > Depends-on: - | Repo: registry | Touches: registry/packages/registry-server/src/storage/**, registry/packages/registry-server/src/dispatch/**, registry/packages/registry-server/src/mcp/sandbox-tool.ts, registry/packages/registry-server/src/index.ts, registry/packages/registry-server/src/dispatch/__tests__/resource-grants.test.ts | Verify: cd /Users/jacob/Documents/Code/AprovanLabs/registry && pnpm --filter @aprovan/registry-server test -- resource-grants
 
-- [ ] 3.1 Add a `resource_grants` store beside `profile_grants` in
+- [x] 3.1 Add a `resource_grants` store beside `profile_grants` in
       `storage/*` (sqlite + dsql drivers, same seam) with the
       `ResourceGrantRow` shape from tech-plan "Interfaces & Data"
       (`id, tenantId, subject{kind,id}, capability, resourcePattern,
       credentialLevel, grantedBy, createdAt, revokedAt?`). Spec:
       resource-grants "Grants are keyed by capability and resource
       pattern" (tech-plan D2).
-- [ ] 3.2 Implement `matchesResourcePattern(pattern, resource): boolean`
+- [x] 3.2 Implement `matchesResourcePattern(pattern, resource): boolean`
       (~100 LOC, cf. Cloudflare OS `matchesResourceUrlPattern`): literal
       segments, `*` single-segment wildcard, `**`/trailing-`*` suffix
       wildcard, case-insensitive host, no regex, no network I/O, pure.
       Spec: resource-grants "URL-pattern matcher", scenarios "Wildcard
       host segment", "No partial-segment match".
-- [ ] 3.3 Export `ResourceGrantRow`, `matchesResourcePattern`, and CRUD on
+- [x] 3.3 Export `ResourceGrantRow`, `matchesResourcePattern`, and CRUD on
       the new store from `packages/registry-server/src/index.ts` — this
       is the contract aprovan's `evaluateDispatch` (stream 8) and the
       client-side `ResourcePatternInput` preview (stream 13) both build
       against.
-- [ ] 3.4 Wire resource-pattern checks into registry-server's own
+- [x] 3.4 Wire resource-pattern checks into registry-server's own
       MCP/sandbox dispatch (`mcp/sandbox-tool.ts`), extending
       `grant-enforcement` streams 4-5's single predicate rather than
       adding a second one. Spec: resource-grants "One dispatch
       chokepoint" (registry-side half — aprovan's four dispatch paths are
       stream 8).
-- [ ] 3.5 New test file `dispatch/__tests__/resource-grants.test.ts`:
+- [x] 3.5 New test file `dispatch/__tests__/resource-grants.test.ts`:
       matcher scenarios above, resource-grant row CRUD round-trip,
       MCP/sandbox dispatch denies a resource outside the pattern and
       allows one inside it.
