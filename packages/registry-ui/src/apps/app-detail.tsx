@@ -910,15 +910,16 @@ function InstallSettingsTab({
   const [configText, setConfigText] = React.useState(
     () => JSON.stringify(install.config ?? {}, null, 2),
   );
-  const [editing, setEditing] = React.useState(install.editing);
+  const [editing, setEditing] = React.useState(Boolean(install.editing));
   const [busy, setBusy] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [status, setStatus] = React.useState<string | null>(null);
+  const copyModel = Boolean(install.root) || install.hosting != null;
 
   React.useEffect(() => {
     setBindings(install.bindings);
     setConfigText(JSON.stringify(install.config ?? {}, null, 2));
-    setEditing(install.editing);
+    setEditing(Boolean(install.editing));
     setError(null);
     setStatus(null);
   }, [install.installId, install.bindings, install.config, install.editing]);
@@ -926,7 +927,12 @@ function InstallSettingsTab({
   const pinLabel =
     "channel" in install.pin
       ? `channel · ${install.pin.channel}`
-      : `release · ${install.pin.release}`;
+      : "release" in install.pin
+        ? `release · ${install.pin.release}`
+        : "commit" in install.pin
+          ? `commit · ${String((install.pin as { commit: string }).commit).slice(0, 12)}`
+          : "pin";
+  const materialRoot = install.root ?? install.prefix;
 
   const save = async () => {
     setBusy("save");
@@ -944,7 +950,7 @@ function InstallSettingsTab({
         install: install.installId,
         bindings,
         config,
-        editing,
+        ...(copyModel ? {} : { editing }),
       }),
     );
     setBusy(null);
@@ -981,11 +987,14 @@ function InstallSettingsTab({
       <FieldRow label="Pin">
         <span className="flex flex-wrap items-center gap-1.5">
           <span className={`${BADGE} border-border font-mono`}>{pinLabel}</span>
-          {install.resolvedRelease && (
+          {!copyModel && install.resolvedRelease ? (
             <span className="font-mono text-[0.65rem] text-muted-foreground">
               → {install.resolvedRelease.slice(0, 12)}
             </span>
-          )}
+          ) : null}
+          {materialRoot ? (
+            <span className="font-mono text-[0.65rem] text-muted-foreground">{materialRoot}</span>
+          ) : null}
           {install.updateAvailable && (
             <span className={`${BADGE} border-emerald-300 text-emerald-700`}>update available</span>
           )}
@@ -1033,41 +1042,43 @@ function InstallSettingsTab({
         />
       </div>
 
-      <div className="space-y-1.5">
-        <SectionHeading>Editing</SectionHeading>
-        {editing ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs">Editing enabled</span>
-            {install.prefix ? (
-              <span className="font-mono text-[0.65rem] text-muted-foreground">
-                {install.prefix}
-              </span>
-            ) : null}
-            <button className={SMALL_BUTTON} onClick={() => setEditing(false)} type="button">
-              Disable
-            </button>
-          </div>
-        ) : (
-          <>
-            <p className="text-[0.65rem] text-muted-foreground">
-              Copies the pinned release&apos;s source into this workspace
+      {!copyModel ? (
+        <div className="space-y-1.5">
+          <SectionHeading>Editing</SectionHeading>
+          {editing ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs">Editing enabled</span>
               {install.prefix ? (
-                <>
-                  {" "}
-                  at <span className="font-mono">{install.prefix}</span>
-                </>
+                <span className="font-mono text-[0.65rem] text-muted-foreground">
+                  {install.prefix}
+                </span>
               ) : null}
-              . Future updates from the origin may overwrite local edits or be blocked.
-            </p>
-            <ConfirmButton
-              armedLabel="Confirm enable editing?"
-              label="Enable editing"
-              onConfirm={() => setEditing(true)}
-              tone="caution"
-            />
-          </>
-        )}
-      </div>
+              <button className={SMALL_BUTTON} onClick={() => setEditing(false)} type="button">
+                Disable
+              </button>
+            </div>
+          ) : (
+            <>
+              <p className="text-[0.65rem] text-muted-foreground">
+                Copies the pinned release&apos;s source into this workspace
+                {install.prefix ? (
+                  <>
+                    {" "}
+                    at <span className="font-mono">{install.prefix}</span>
+                  </>
+                ) : null}
+                . Future updates from the origin may overwrite local edits or be blocked.
+              </p>
+              <ConfirmButton
+                armedLabel="Confirm enable editing?"
+                label="Enable editing"
+                onConfirm={() => setEditing(true)}
+                tone="caution"
+              />
+            </>
+          )}
+        </div>
+      ) : null}
 
       <ErrorLine error={error} />
       <div className="flex items-center gap-2 border-t pt-2">

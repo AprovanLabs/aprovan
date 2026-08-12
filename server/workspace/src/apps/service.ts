@@ -354,16 +354,22 @@ async function summarizeInstall(
   origin: AppManifest | undefined,
   userId: string,
 ) {
+  const copyModel = Boolean(install.root);
   return {
     installId: install.installId,
     originAppId: install.originAppId,
     originWorkspaceId: install.originWorkspaceId,
     pin: install.pin,
-    resolvedRelease: install.resolvedRelease,
     bindings: install.bindings,
     config: install.config,
-    editing: install.editing,
-    prefix: install.prefix,
+    // Legacy wire fields — only for pre-migration installs (7.4 quarantine).
+    ...(!copyModel
+      ? {
+          resolvedRelease: install.resolvedRelease,
+          editing: install.editing,
+          prefix: install.prefix,
+        }
+      : {}),
     root: install.root ?? install.prefix,
     hosting: install.hosting ?? "managed",
     hostingWorkspaceId: install.hostingWorkspaceId,

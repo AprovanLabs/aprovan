@@ -121,6 +121,11 @@ export interface AppsPanelProps {
   /** Profiles offered in the install sheet (contract → options). */
   profiles?: ProfileOption[];
   /**
+   * Host-owned install flow (e.g. patchwork `InstallDialog`). When set,
+   * directory Install clicks call this instead of the built-in InstallSheet.
+   */
+  onInstall?: (entry: DirectoryEntry) => void;
+  /**
    * Plain-link fallback for empty states when the host has a URL but no
    * in-app affordance. Ignored when `onCreateWorkflow` is set.
    */
@@ -227,6 +232,7 @@ export function AppsPanel({
   onPublishFlow,
   onCreateProfile,
   profiles,
+  onInstall,
   createWorkflowHref,
   variant = "full",
   selection: controlledSelection,
@@ -249,6 +255,13 @@ export function AppsPanel({
   );
   const selection = controlledSelection !== undefined ? controlledSelection : internalSelection;
   const [installTarget, setInstallTarget] = React.useState<DirectoryEntry | null>(null);
+  const requestInstall = React.useCallback(
+    (entry: DirectoryEntry) => {
+      if (onInstall) onInstall(entry);
+      else setInstallTarget(entry);
+    },
+    [onInstall],
+  );
 
   const select = React.useCallback(
     (next: AppsSelection | null) => {
@@ -316,7 +329,7 @@ export function AppsPanel({
         <DirectoryList
           entries={catalog.directory}
           loading={catalog.loading}
-          onInstall={(entry) => setInstallTarget(entry)}
+          onInstall={requestInstall}
         />
       )}
     </div>
@@ -354,7 +367,7 @@ export function AppsPanel({
           <DirectoryList
             entries={catalog.directory}
             loading={catalog.loading}
-            onInstall={(entry) => setInstallTarget(entry)}
+            onInstall={requestInstall}
           />
         </div>
       );
@@ -473,21 +486,22 @@ export function AppsPanel({
     );
   })();
 
-  const sheet = installTarget && invokeApps && (
-    <InstallSheet
-      entry={installTarget}
-      invokeApps={invokeApps}
-      onClose={() => setInstallTarget(null)}
-      onCreateProfile={onCreateProfile}
-      onInstalled={(installId) => {
-        catalog.refresh();
-        if (installId) select({ kind: "install", installId });
-        setInstallTarget(null);
-      }}
-      open={Boolean(installTarget)}
-      profiles={profiles}
-    />
-  );
+  const sheet =
+    !onInstall && installTarget && invokeApps ? (
+      <InstallSheet
+        entry={installTarget}
+        invokeApps={invokeApps}
+        onClose={() => setInstallTarget(null)}
+        onCreateProfile={onCreateProfile}
+        onInstalled={(installId) => {
+          catalog.refresh();
+          if (installId) select({ kind: "install", installId });
+          setInstallTarget(null);
+        }}
+        open={Boolean(installTarget)}
+        profiles={profiles}
+      />
+    ) : null;
 
   // Private-flows publish CTA (pane/full list footer when flows group exists).
   const flowsGroup = catalog.groups.find((g) => g.kind === "flows");
