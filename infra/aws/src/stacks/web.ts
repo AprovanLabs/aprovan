@@ -88,6 +88,12 @@ function handler(event) {
       },
     };
   }
+  // Anonymous share landing (`/share/:key`) is a client route outside the
+  // /workspace/ Vite base; serve the SPA shell so deep links work.
+  if (uri === "/share" || uri.startsWith("/share/")) {
+    request.uri = "/workspace/index.html";
+    return request;
+  }
   if (!request.uri.includes(".") && !request.uri.endsWith("/")) request.uri += "/";
   if (request.uri.endsWith("/")) request.uri += "index.html";
   return request;
