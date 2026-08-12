@@ -59,6 +59,7 @@ import { notificationsService } from "./notifications/service.js";
 import { telemetryService } from "./telemetry/service.js";
 import { agentsService } from "./agents/service.js";
 import { assertPathGranted, pathAccess } from "./grants.js";
+import { reconcileOrPassThrough } from "./doc/reconcile.js";
 import { sessionsService } from "./vcs/sessions-service.js";
 import { webhooksService } from "./webhooks/service.js";
 import { workflowsService } from "./workflows/service.js";
@@ -613,6 +614,42 @@ const vfs: CoreService = {
           throw new ServiceError("content must be a string", 400);
         }
         const mimeType = typeof args["mimeType"] === "string" ? args["mimeType"] : undefined;
+        // Live-doc reconcile (D7) — access checks above already ran; never
+        // widens authority. Fall through when no live doc (not-live).
+        const reconciled = await reconcileOrPassThrough({
+          workspaceId: ctx.workspaceId,
+          path,
+          content: args["content"],
+          base: typeof args["base"] === "string" ? args["base"] : undefined,
+          actor: {
+            userId: ctx.userId,
+            ...(typeof args["agentProfile"] === "string"
+              ? { agentProfile: args["agentProfile"] }
+              : {}),
+            ...(ctx.appScope ? { app: ctx.appScope.name } : {}),
+          },
+          explicitSessionId:
+            typeof args["session"] === "string" && args["session"]
+              ? args["session"]
+              : undefined,
+        });
+        if (reconciled.kind === "applied") {
+          return {
+            path,
+            reconciled: true as const,
+            appliedBlocks: reconciled.appliedBlocks,
+          };
+        }
+        if (reconciled.kind === "conflict") {
+          return {
+            path,
+            reconciled: true as const,
+            conflict: true as const,
+            sessionId: reconciled.sessionId,
+            appliedBlocks: reconciled.appliedBlocks,
+            failed: reconciled.failed,
+          };
+        }
         const staged = await stagedSession(ctx, args, true);
         if (staged) {
           return sessionWrite(ctx.workspaceId, staged, path, args["content"], mimeType);
