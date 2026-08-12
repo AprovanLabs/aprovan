@@ -1,11 +1,13 @@
 /**
  * In-tab host for workspace `.md` paths: CollabMarkdownEditor + doc presence
- * cluster + reconnecting badge (ux.md open-doc flow).
+ * cluster + reconnecting badge + conflict DraftBanner (ux.md open-doc /
+ * conflict-resolve flows).
  */
 
 import { CollabMarkdownEditor } from "@aprovan/editor";
 import {
   DocPresenceCluster,
+  DraftBanner,
   useDocumentSession,
 } from "@/features/document";
 
@@ -16,10 +18,12 @@ export function DocumentCollabTab({
   path: string;
   initialContent: string;
 }) {
-  const { doc, awareness, userInfo, reconnecting } = useDocumentSession(path);
+  const session = useDocumentSession(path);
+  const { doc, awareness, userInfo, reconnecting } = session;
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
+      <DraftBanner session={session} />
       <div className="flex items-center gap-2 px-3 py-1 border-b shrink-0 min-h-7">
         <DocPresenceCluster path={path} />
         {reconnecting ? (

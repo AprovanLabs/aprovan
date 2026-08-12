@@ -1,5 +1,6 @@
 export { DocumentAppTile } from "./DocumentAppTile";
 export { DocPresenceCluster } from "./DocPresenceCluster";
+export { DraftBanner, type DraftBannerProps } from "./DraftBanner";
 export {
   documentStore,
   DocumentStore,
@@ -12,5 +13,9 @@ export {
 } from "./store";
 export {
   useDocumentSession,
+  applyLiveContent,
+  forceMaterializeAndCommit,
+  pickDraftForPath,
+  sessionTouchesPath,
   type DocumentSession,
 } from "./useDocumentSession";
