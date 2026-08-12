@@ -1,8 +1,8 @@
 # Stream 2 report — CF-1 app-scoped realtime handler
 
-**PR:** (filled after `gh pr create`)
+**PR:** https://github.com/AprovanLabs/aprovan/pull/233
 **Branch:** `feat/iw9-chat-cf1-realtime`
-**Base:** `origin/main` (@ `85595e2` — stream 1 #225)
+**Base:** `origin/main`
 
 ## Built
 
