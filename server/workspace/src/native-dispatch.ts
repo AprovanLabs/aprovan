@@ -558,6 +558,7 @@ async function dispatchVfsShareOp(
     createLinkShare,
     createPersonShare,
     listSharesCreatedBy,
+    listSharesReceivedBy,
     revokeShare,
   } = await import("./vfs/shares.js");
 
@@ -592,6 +593,10 @@ async function dispatchVfsShareOp(
     }
     case "shares.list": {
       const shares = await listSharesCreatedBy(ctx.workspaceId, ctx.userId);
+      return { shares };
+    }
+    case "shares.received": {
+      const shares = await listSharesReceivedBy(ctx.workspaceId, ctx.userId);
       return { shares };
     }
     case "shares.revoke": {

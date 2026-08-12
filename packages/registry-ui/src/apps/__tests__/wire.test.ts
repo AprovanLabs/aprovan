@@ -72,9 +72,36 @@ describe("normalizeInstall pin + bindings", () => {
       originAppId: "01HXAPP0000000000000000001",
       pin: { channel: "live" },
       bindings: { sql: "prof_1" },
-      editing: false,
       available: true,
     });
+    expect(install?.editing).toBeUndefined();
+  });
+
+  it("keeps editing only when true; projects root/hosting for copy installs", () => {
+    const legacy = normalizeInstall({
+      installId: "01HXINS0000000000000000003",
+      originAppId: "01HXAPP0000000000000000001",
+      pin: { channel: "live" },
+      bindings: {},
+      config: {},
+      editing: true,
+      prefix: "apps/legacy",
+    });
+    expect(legacy?.editing).toBe(true);
+    expect(legacy?.prefix).toBe("apps/legacy");
+
+    const copy = normalizeInstall({
+      installId: "01HXINS0000000000000000004",
+      originAppId: "01HXAPP0000000000000000001",
+      pin: { channel: "live" },
+      bindings: {},
+      config: {},
+      root: "apps/reports",
+      hosting: "managed",
+    });
+    expect(copy?.root).toBe("apps/reports");
+    expect(copy?.hosting).toBe("managed");
+    expect(copy?.editing).toBeUndefined();
   });
 
   it("accepts release pins", () => {

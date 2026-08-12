@@ -578,6 +578,11 @@ function nativeVfsShareDiscoveryEntries(namespace: string): ToolEntry[] {
       inputSchema: { type: "object", properties: {} },
     },
     {
+      operation: "shares.received",
+      description: "List person-shares received by the caller in this workspace.",
+      inputSchema: { type: "object", properties: {} },
+    },
+    {
       operation: "shares.revoke",
       description: "Revoke an artifact share by shareId.",
       inputSchema: {

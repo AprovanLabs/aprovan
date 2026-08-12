@@ -4,7 +4,8 @@
  * management. Loading / empty / error states per iw9-b ux.md Sidebar.
  */
 
-import { AlertTriangle, Plus, RefreshCw, Settings2 } from "lucide-react";
+import { AlertTriangle, PackagePlus, RefreshCw, Settings2, Sparkles } from "lucide-react";
+import { setAppsEntryIntent } from "./apps-entry";
 import { AppIconTile, AppIconTileSkeleton } from "./AppIconTile";
 import { useAppsLauncher, type LauncherApp } from "./useAppsLauncher";
 
@@ -19,6 +20,16 @@ export function AppsLauncher({
   onOpenManagement: () => void;
 }) {
   const { apps, loading, error, refresh } = useAppsLauncher();
+
+  const openInstall = () => {
+    setAppsEntryIntent("directory");
+    onOpenManagement();
+  };
+
+  const openPromote = () => {
+    setAppsEntryIntent("promote");
+    onOpenManagement();
+  };
 
   return (
     <section className="shrink-0 border-t">
@@ -63,12 +74,21 @@ export function AppsLauncher({
             <div className="px-2 py-1 text-xs text-muted-foreground">No apps yet</div>
             <button
               type="button"
-              onClick={onOpenManagement}
+              onClick={openInstall}
               className="flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-xs text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-              title="Create or install an app"
+              title="Install an app from the directory"
             >
-              <Plus className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate">Create or install</span>
+              <PackagePlus className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">Install from directory</span>
+            </button>
+            <button
+              type="button"
+              onClick={openPromote}
+              className="flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-xs text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+              title="Promote a Personal folder into an app"
+            >
+              <Sparkles className="h-3.5 w-3.5 shrink-0" />
+              <span className="truncate">Promote from Personal</span>
             </button>
           </div>
         ) : (

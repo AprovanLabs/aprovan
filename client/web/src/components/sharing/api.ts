@@ -1,12 +1,14 @@
 /**
  * Client transport for vfs person/link shares (iw9-b stream 10).
  *
- * Procedures (stream 6 / #196):
- *   POST /tools/vfs/share          {path, expiresAt, person} | {path, expiresAt, link:true}
- *   POST /tools/vfs/shares.list    {}
- *   POST /tools/vfs/shares.revoke  {shareId}
+ * Procedures (stream 6 / #196 + followups):
+ *   POST /tools/vfs/share           {path, expiresAt, person} | {path, expiresAt, link:true}
+ *   POST /tools/vfs/shares.list     {}
+ *   POST /tools/vfs/shares.received {}
+ *   POST /tools/vfs/shares.revoke   {shareId}
  *
  * Anonymous read: GET /share/:key (gateway-relative via GATEWAY_BASE).
+ * SPA landing: `/share/:key` mounts ShareLandingPage outside AuthGate.
  */
 
 import { GATEWAY_BASE } from "@/lib/gateway";
@@ -67,12 +69,7 @@ export async function listSharesCreated(): Promise<VfsShare[]> {
 }
 
 /**
- * Shares received by the current user.
- *
- * Stream 6 only wired `shares.list` (created-by). The store already has
- * `listSharesReceivedBy`; this calls the natural `shares.received` op so the
- * UI is ready when the server registers it. Until then the listing surfaces
- * its load-failure + retry state.
+ * Shares received by the current user (`vfs.shares.received` → listSharesReceivedBy).
  */
 export async function listSharesReceived(): Promise<VfsShare[]> {
   const data = (await invokeVfs("shares.received", {})) as { shares?: VfsShare[] };

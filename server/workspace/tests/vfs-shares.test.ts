@@ -156,6 +156,15 @@ describe("person-share choke point", () => {
     const received = await listSharesReceivedBy(WS, BOB);
     expect(received.some((s) => s.shareId === share.shareId)).toBe(true);
 
+    const { dispatchAprovanNativeOp } = await import("../src/native-dispatch.js");
+    const viaTool = (await dispatchAprovanNativeOp(
+      { workspaceId: WS, userId: BOB },
+      "vfs",
+      "shares.received",
+      {},
+    )) as { shares: Array<{ shareId: string }> };
+    expect(viaTool.shares.some((s) => s.shareId === share.shareId)).toBe(true);
+
     await revokeShare(WS, share.shareId, ALICE);
     await expect(assertPartitionAccess(WS, BOB, path)).rejects.toMatchObject({
       status: 404,

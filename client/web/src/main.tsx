@@ -4,12 +4,19 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import AuthGate from './components/AuthGate';
+import { ShareLandingPage } from './components/sharing';
 import { isDesktopBridgeAvailable } from './features/workspaces/desktop';
 import { authClient } from './lib/auth';
 import { bindDesktopGateway } from './lib/desktop-gateway';
 import './index.css';
 
 const isCallback = window.location.pathname.endsWith('/auth/callback');
+
+/** Anonymous link landing — must not sit behind AuthGate (product path `/share/:key`). */
+function matchShareKey(pathname: string): string | null {
+  const m = pathname.match(/(?:^|\/)share\/([^/]+)/);
+  return m?.[1] ? decodeURIComponent(m[1]) : null;
+}
 
 function Root() {
   if (isCallback) {
@@ -28,6 +35,10 @@ function Root() {
         )}
       />
     );
+  }
+  const shareKey = matchShareKey(window.location.pathname);
+  if (shareKey) {
+    return <ShareLandingPage shareKey={shareKey} />;
   }
   return (
     <AuthGate>

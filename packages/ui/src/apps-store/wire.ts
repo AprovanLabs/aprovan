@@ -534,11 +534,26 @@ export interface InstallSummary {
   title?: string;
   description?: string;
   pin: AppPin;
+  /**
+   * @deprecated Copy-model installs omit this; prefer `pin` / `root`.
+   * Present only on pre-migration records.
+   */
   resolvedRelease?: string | null;
   bindings: Record<string, string>;
   config: Record<string, unknown>;
-  editing: boolean;
+  /**
+   * @deprecated Copy installs are always materialized. Omitted on copy-model
+   * summaries; default false when absent.
+   */
+  editing?: boolean;
+  /**
+   * @deprecated Prefer `root`. Present only on pre-migration records.
+   */
   prefix?: string;
+  /** Local materialization root (`apps/<slug>`) for copy-model installs. */
+  root?: string;
+  /** F2 hosting bucket when projected by the gateway. */
+  hosting?: "managed" | "hosted";
   available?: boolean;
   updateAvailable?: boolean;
   requires?: AppRequirement[];
@@ -580,8 +595,8 @@ export function normalizeInstall(raw: unknown): InstallSummary | null {
     pin,
     bindings,
     config,
-    editing: pick(record, "editing") === true,
   };
+  if (pick(record, "editing") === true) install.editing = true;
   const originWorkspaceId = asString(
     pick(record, "originWorkspaceId", "origin_workspace_id", "workspaceId", "workspace_id"),
   );
@@ -598,6 +613,10 @@ export function normalizeInstall(raw: unknown): InstallSummary | null {
   }
   const prefix = asString(pick(record, "prefix"));
   if (prefix) install.prefix = prefix;
+  const root = asString(pick(record, "root"));
+  if (root) install.root = root;
+  const hosting = asString(pick(record, "hosting"));
+  if (hosting === "managed" || hosting === "hosted") install.hosting = hosting;
   if (typeof pick(record, "available") === "boolean") {
     install.available = pick(record, "available") === true;
   }
