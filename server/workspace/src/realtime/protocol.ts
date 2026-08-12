@@ -9,8 +9,8 @@ import { z } from "zod";
 export type Topic = `${string}:${string}`;
 
 /**
- * Reserved namespace: future Yjs/Loro CRDT document sync (path-keyed like presence).
- * Not implemented in v1 — subscribe/publish → `reserved-namespace`.
+ * Document CRDT sync namespace (`doc:<path>`). Registered by `createDocHandler`
+ * (iw9-doc-markdown) — no longer reserved.
  */
 export const RESERVED_NAMESPACE_DOC = "doc";
 
@@ -22,7 +22,6 @@ export const RESERVED_NAMESPACE_DOC = "doc";
 export const RESERVED_NAMESPACE_FS = "fs";
 
 export const RESERVED_NAMESPACES = new Set<string>([
-  RESERVED_NAMESPACE_DOC,
   RESERVED_NAMESPACE_FS,
 ]);
 
