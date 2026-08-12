@@ -53,12 +53,12 @@
 
 > Depends-on: 1 | Repo: aprovan | Touches: aprovan/server/workspace/src/doc/registry.ts, aprovan/server/workspace/src/doc/persistence.ts, aprovan/server/workspace/tests/doc-registry.test.ts, aprovan/server/workspace/tests/doc-persistence.test.ts | Verify: pnpm --filter @aprovan/workspace exec vitest run tests/doc-registry.test.ts tests/doc-persistence.test.ts && pnpm --filter @aprovan/workspace typecheck
 
-- [ ] 2.1 `doc/registry.ts`: `docKey(workspaceId, path)`, `LiveDoc` type,
+- [x] 2.1 `doc/registry.ts`: `docKey(workspaceId, path)`, `LiveDoc` type,
       `getOrLoadDoc`/`releaseDoc`/`hasLiveDoc` per tech-plan "Interfaces &
       Data" — private module-level `Map`, not layered on iw9-f5's
       `NamespaceStore` (tech-plan D2). `getOrLoadDoc` on a cache miss calls
       `persistence.loadDurable`.
-- [ ] 2.2 `doc/persistence.ts`: `svc#doc#snapshot` / `svc#doc#updates#<docKey>`
+- [x] 2.2 `doc/persistence.ts`: `svc#doc#snapshot` / `svc#doc#updates#<docKey>`
       scopes via `svc-records.ts`'s `svcScope`/`writeSvcRecord`/
       `readSvcRecord`/`listSvcRecords`/`seqKey` (tech-plan D4); `loadDurable`
       (snapshot then replay log in seq order → fresh `Y.Doc` if none exists,
@@ -66,12 +66,12 @@
       initialize from current file content via `getFsStore().read`);
       `appendUpdate` (one svc-record per update, batched if the caller
       passes multiple).
-- [ ] 2.3 Compaction (`compactIfDue`, tech-plan D6): `DOC_COMPACT_SIZE_BYTES`
+- [x] 2.3 Compaction (`compactIfDue`, tech-plan D6): `DOC_COMPACT_SIZE_BYTES`
       (256 KiB) / `DOC_COMPACT_AGE_MS` (24h) constants, both overridable for
       tests; write new snapshot + delete covered log entries atomically
       w.r.t. readers (spec document-persistence "Compaction bounds stored
       size and log age" — both size- and age-triggered scenarios).
-- [ ] 2.4 Tests: restart-reconstructs-doc (snapshot+log replay reproduces
+- [x] 2.4 Tests: restart-reconstructs-doc (snapshot+log replay reproduces
       content, spec "Restart reconstructs the doc"); compaction shrinks log
       and preserves content identity before/after (spec "Long-lived doc
       stays bounded"); age-triggered compaction with size threshold never
