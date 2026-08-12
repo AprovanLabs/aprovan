@@ -27,20 +27,20 @@ already on main). This stream's manifest stops at capabilities/hostModes.
 
 ## Tasks
 
-- [ ] 9.1 (iw9-f4/iw9-b-gated) `Apps/document/app.yaml` per tech-plan
+- [x] 9.1 (iw9-f4/iw9-b-gated) `Apps/document/app.yaml` per tech-plan
       "Interfaces & Data" App manifest block: `title`, `description`,
       `icon`, `capabilities: ["vfs.*", "sessions.*", "agents.run"]`,
       `hostModes: ["managed"]` — single mode so iw9-b's install flow skips
       the hosting prompt (spec document-app "Install skips the hosting
       prompt"; D2).
-- [ ] 9.2 Confirm reconcile (iw9-f4's `reconcileApp`) accepts the manifest
+- [x] 9.2 Confirm reconcile (iw9-f4's `reconcileApp`) accepts the manifest
       with no hand-written `appId` (spec "Manifest validates") — this task
       is verification against the landed iw9-f4 surface, not new reconcile
       code.
-- [ ] 9.3 Document's app tile uses the manifest's declared icon or the D6
+- [x] 9.3 Document's app tile uses the manifest's declared icon or the D6
       fallback via the shared `packages/ui/src/apps/app-icon.ts` (iw9-f4) —
       no Document-specific icon rendering code.
-- [ ] 9.4 Sharing: confirm a file under `Apps/document/`'s root link-shares
+- [x] 9.4 Sharing: confirm a file under `Apps/document/`'s root link-shares
       and person-shares through iw9-b's existing `vfs.share`/
       `GET /share/<key>` surface with zero Document-specific code (spec
       "Share management is platform-native") — verification task, add a

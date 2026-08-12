@@ -329,3 +329,44 @@ describe("routes/share.ts import graph (static)", () => {
     );
   });
 });
+
+/**
+ * Document app (iw9-doc-markdown stream 9 / 9.4): files under the Document
+ * app root share through platform vfs.share only — no Document-specific
+ * share store, keys, or ACLs. (`Apps/document/…` is partition-open, so
+ * person-share coverage is asserted via the share record, not foreign-deny.)
+ */
+describe("Document app root shares (platform-native)", () => {
+  it("link-shares and person-shares a file under Apps/document/; revoke ends access", async () => {
+    const path = "Apps/document/notes.md";
+    const content = "# hello from document\n";
+    await getFsStore().write(WS, path, content);
+
+    const { key, share: link } = await createLinkShare(WS, {
+      path,
+      expiresAt: farFuture(),
+      createdBy: ALICE,
+    });
+
+    const anon = await shareApp().request(`/share/${key}`);
+    expect(anon.status).toBe(200);
+    expect(((await anon.json()) as { content: string }).content).toBe(content);
+
+    const person = await createPersonShare(WS, {
+      path,
+      grantee: BOB,
+      expiresAt: farFuture(),
+      createdBy: ALICE,
+    });
+    const received = await listSharesReceivedBy(WS, BOB);
+    expect(received.some((s) => s.shareId === person.shareId && s.path === path)).toBe(true);
+
+    await revokeShare(WS, link.shareId, ALICE);
+    expect((await shareApp().request(`/share/${key}`)).status).toBe(404);
+    expect(await resolveLinkShare(key)).toBeUndefined();
+
+    await revokeShare(WS, person.shareId, ALICE);
+    const after = await listSharesReceivedBy(WS, BOB);
+    expect(after.some((s) => s.shareId === person.shareId)).toBe(false);
+  });
+});
