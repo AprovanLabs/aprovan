@@ -1,7 +1,7 @@
 # Report: stream 13 — client review surface + install/JIT cards
 
 **Status:** done  
-**PR:** (see PR URL after open)  
+**PR:** https://github.com/AprovanLabs/aprovan/pull/249  
 **Branch:** `feat/iw9-c-client-review`  
 **Verify:** `pnpm --filter @aprovan/patchwork-web test -- review-surface` — 14 passed
 
