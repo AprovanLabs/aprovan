@@ -33,6 +33,15 @@ export { WidgetPreview, type WidgetPreviewProps } from "./components/WidgetPrevi
 export { MobileDrawer, type MobileDrawerProps } from "./components/MobileDrawer";
 export { MarkdownEditor } from "./components/MarkdownEditor";
 export { MarkdownPreview } from "./components/MarkdownPreview";
+export {
+  CollabMarkdownEditor,
+  type CollabMarkdownEditorProps,
+} from "./components/CollabMarkdownEditor";
+export {
+  YJS_CONTENT_KEY,
+  getContentText,
+  type CollabUserInfo,
+} from "./lib/yjs-cm6";
 export type { ServiceInfo } from "./components/ServicesInspector";
 
 // Edit components — intentional public API boundary (see components/edit/index.ts)

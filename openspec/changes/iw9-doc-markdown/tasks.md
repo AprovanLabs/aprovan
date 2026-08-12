@@ -186,21 +186,21 @@
 
 > Depends-on: 1 | Repo: aprovan | Touches: aprovan/packages/editor/src/components/CollabMarkdownEditor.tsx, aprovan/packages/editor/src/lib/yjs-cm6.ts, aprovan/packages/editor/src/index.ts, aprovan/packages/editor/src/__tests__/collab-markdown-editor.test.ts | Verify: pnpm --filter @aprovan/editor test && pnpm --filter @aprovan/editor typecheck
 
-- [ ] 6.1 `CollabMarkdownEditor.tsx`: new CM6 host modeled on
+- [x] 6.1 `CollabMarkdownEditor.tsx`: new CM6 host modeled on
       `packages/editor/src/ts/index.tsx`'s pattern (`basicSetup`/
       `EditorView` from `"codemirror"`, `EditorState`/`Compartment` from
       `"@codemirror/state"`, `ts/index.tsx:9,24-25`) — NOT a modification of
       `MarkdownEditor.tsx` (TipTap) or `CodeBlockView.tsx` (Shiki, read-only)
       per tech-plan Context. Props: `{ doc: Y.Doc, awareness: Awareness,
       userInfo: {name, color}, initialContent: string, readOnly?: boolean }`.
-- [ ] 6.2 Bind `y-codemirror.next`'s `yCollab` extension to
+- [x] 6.2 Bind `y-codemirror.next`'s `yCollab` extension to
       `doc.getText("content")` + `awareness`; local edits flow through CM6's
       normal transaction path (no manual diffing on the client, tech-plan
       "Client" interface note).
-- [ ] 6.3 `readOnly` mode renders `MarkdownPreview.tsx` instead of mounting
+- [x] 6.3 `readOnly` mode renders `MarkdownPreview.tsx` instead of mounting
       CM6 at all (ux.md "Read-only share view" — used for the anonymous
       link-share flow, no live doc object is ever constructed for it).
-- [ ] 6.4 Tests: two independent `Y.Doc` instances wired through a
+- [x] 6.4 Tests: two independent `Y.Doc` instances wired through a
       loopback (no network) converge after applying each other's
       `Y.encodeStateAsUpdate` — proves the binding round-trips text through
       CM6 correctly (unit-level substitute for a full E2E; the two-browser
