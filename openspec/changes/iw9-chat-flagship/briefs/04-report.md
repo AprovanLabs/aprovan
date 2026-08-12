@@ -1,6 +1,6 @@
 # Stream 4 report — Chat `app.yaml`, host modes, capability ceiling
 
-**PR:** (set after open)
+**PR:** https://github.com/AprovanLabs/aprovan/pull/230
 **Branch:** `feat/iw9-chat-app-manifest`
 **Base:** `origin/main`
 
