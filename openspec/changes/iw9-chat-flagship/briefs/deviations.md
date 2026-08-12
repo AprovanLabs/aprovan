@@ -136,3 +136,35 @@ lived only inside `identity-relational.test.ts`).
 
 **Adaptation:** added a minimal `tests/invites.test.ts` that asserts
 create/get/list/consume/revoke with **no** `target` field.
+
+## Stream 7 (ChatTimelineAdapter + messaging UI)
+
+### D10 — CF-1 boot registration still absent (carry-forward D4)
+
+**Task / live subscribe:** adapter subscribes to `app:<installId>`.
+
+**Reality:** `createAppTopicsHandler` is not registered in `socket.ts`
+(stream 2 D4; outside stream 7 Touches).
+
+**Adaptation:** unit tests inject a fake realtime client. Production live
+subscribe remains blocked until the one-liner follow-up:
+`broker.registerNamespace(createAppTopicsHandler(broker));`
+
+### D11 — No zod in patchwork-web
+
+**Tech-plan:** record shapes as zod in `features/messaging/schema.ts`.
+
+**Reality:** Touches forbid `package.json`; patchwork-web has no zod dep.
+
+**Adaptation:** TypeScript types + light parsers mirroring server zod
+schemas in `apps/chat/schema.ts`.
+
+### D12 — Shared-partition keyvalue `instance` arg not on main
+
+**Tech-plan:** adapter talks to `records.*` on the F2 shared partition.
+
+**Reality:** F2 stream 3 (`resolveRecordScope` + keyvalue `instance`) is
+not on main; keyvalue still scopes to `ws` / per-user app partitions.
+
+**Adaptation:** `createKeyvalueRecordsClient` passes `{ instance }` for
+forward-compat; tests inject an in-memory records client.
