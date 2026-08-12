@@ -17,6 +17,7 @@
  */
 
 import { AGENT_EFFORTS, type AgentEffort } from "@utdk/agent";
+import { readApp } from "../apps/store.js";
 import { getFsStore } from "../fs-store.js";
 import {
   deleteSvcRecord,
@@ -32,6 +33,7 @@ import { requireSandbox, type RepoMountRef } from "../sandboxes/store.js";
 import { ServiceError, type CoreService, type ServiceContext } from "../service-kernel.js";
 import { listRepoFiles, readRepoFile } from "../vcs/mounts.js";
 import { visibleEntries } from "../vcs/store.js";
+import { intersectAppRunTools, resolveAppProfile } from "./app-profiles.js";
 import {
   parseLlmTier,
   selectLlmInstance,
@@ -98,6 +100,12 @@ export interface AgentProfile {
    * filesystem runtime will materialize them for real.
    */
   mounts?: AgentMount[];
+  /**
+   * App provenance for a manifest-declared profile (iw9-d CF-5). Set only by
+   * `resolveAppProfile` — never accepted from request input and never written
+   * by `agents.create`/`update`. Workspace-stored profiles leave it undefined.
+   */
+  app?: { appId: string; slug: string };
   createdBy: string;
   createdAt: string;
   updatedAt: string;
@@ -443,9 +451,22 @@ export async function renderAgentRun(
   // nothing it was not explicitly granted. A sandbox-bound run additionally
   // gets the sandbox projection, or it could not touch the box it was
   // bound to.
+  //
+  // App-scoped profiles (CF-5): authority = declared ∩ app grants ∩ invoker
+  // grants, computed here at render — never snapshotted. The runner's
+  // pattern-list bound and invokeTool's ctx.grants re-check stay untouched.
+  let profileTools = profile.grants?.tools;
+  if (profile.app) {
+    const app = await readApp(ctx.workspaceId, profile.app.appId);
+    profileTools = intersectAppRunTools({
+      declared: profile.grants?.tools ?? [],
+      appAllowed: app?.allowedTools ?? [],
+      invokerTools: ctx.grants?.tools,
+    });
+  }
   const toolPatterns = sandbox
-    ? [...new Set([...(profile.grants?.tools ?? []), ...SANDBOX_RUN_TOOLS])]
-    : profile.grants?.tools;
+    ? [...new Set([...(profileTools ?? []), ...SANDBOX_RUN_TOOLS])]
+    : profileTools;
   const tools = toolPatterns?.length
     ? toolPatterns.map((pattern) => ({ name: pattern }))
     : undefined;
@@ -461,15 +482,25 @@ export async function renderAgentRun(
     ...(typeof args["session"] === "string" && args["session"]
       ? { session: args["session"] }
       : {}),
-    metadata: { agent: profile.name, ...(sandbox ? { sandboxId: sandbox.id } : {}) },
+    metadata: {
+      agent: profile.name,
+      // Invoker remains principal/payer via runCtx.userId; app profile is the via-path.
+      ...(profile.app ? { app: profile.app } : {}),
+      ...(sandbox ? { sandboxId: sandbox.id } : {}),
+    },
   };
 
   // The dispatch-side boundary must agree with the tool list above, or the
   // model would be offered sandbox calls that invokeTool then denies.
   const grants =
-    sandbox && profile.grants?.tools
-      ? { ...profile.grants, tools: [...new Set([...profile.grants.tools, ...SANDBOX_RUN_TOOLS])] }
-      : profile.grants;
+    sandbox && profileTools
+      ? {
+          ...(profile.grants ?? {}),
+          tools: [...new Set([...profileTools, ...SANDBOX_RUN_TOOLS])],
+        }
+      : profile.app
+        ? { ...(profile.grants ?? {}), tools: profileTools ?? [] }
+        : profile.grants;
 
   const llmInstance = await selectRunLlm(ctx.workspaceId, profile, effort);
   const runCtx: ServiceContext = {
@@ -734,6 +765,13 @@ export const agentsService: CoreService = {
     // is blocked for the same reason a profile write is: a run executes with
     // the profile's workspace-level reach, and an app triggers agent work
     // through its allow-listed workflows, not by driving loops directly.
+    //
+    // Exception (iw9-d CF-5): `run` is permitted only for `<own-slug>/<agent>`
+    // when that agent is declared in the calling app's own manifest. The
+    // declaration is authored by a person in app.yaml (invariant 11) — the
+    // app cannot mint or edit it at run time — and effective authority is
+    // still declared ∩ app grants ∩ invoker grants at render (invariant 2).
+    // Every other run, and all create/update/delete, keep the 403 below.
     if (ctx.appScope) {
       if (
         procedure === "get" ||
@@ -743,6 +781,19 @@ export const agentsService: CoreService = {
       ) {
         // Reads are harmless (grants only narrow), and let app workflows
         // resolve an assignee's provider/model/prompt and show executions.
+      } else if (procedure === "run") {
+        const agentName = typeof args["agent"] === "string" ? args["agent"] : "";
+        const ownPrefix = `${ctx.appScope.name}/`;
+        const short =
+          agentName.startsWith(ownPrefix) && !agentName.slice(ownPrefix.length).includes("/")
+            ? agentName.slice(ownPrefix.length)
+            : "";
+        const resolved = short
+          ? await resolveAppProfile(ctx.workspaceId, ctx.appScope.id, short)
+          : undefined;
+        if (!resolved) {
+          throw new ServiceError("Apps cannot manage or run agent profiles", 403);
+        }
       } else {
         throw new ServiceError("Apps cannot manage or run agent profiles", 403);
       }
@@ -806,7 +857,24 @@ export const agentsService: CoreService = {
 
       case "get": {
         const name = typeof args["name"] === "string" ? args["name"] : "";
-        const profile = await readAgentProfile(ctx.workspaceId, name);
+        const slash = name.indexOf("/");
+        let profile =
+          slash > 0
+            ? await (async () => {
+                const slug = name.slice(0, slash);
+                const short = name.slice(slash + 1);
+                if (!short || short.includes("/")) return undefined;
+                // Prefer the calling app when scoped; otherwise resolve via slug match on installed apps.
+                if (ctx.appScope && ctx.appScope.name === slug) {
+                  return resolveAppProfile(ctx.workspaceId, ctx.appScope.id, short);
+                }
+                const { listApps } = await import("../apps/store.js");
+                const apps = await listApps(ctx.workspaceId);
+                const app = apps.find((entry) => (entry.slug ?? entry.name) === slug);
+                if (!app) return undefined;
+                return resolveAppProfile(ctx.workspaceId, app.appId, short);
+              })()
+            : await readAgentProfile(ctx.workspaceId, name);
         if (!profile) throw new ServiceError(`Unknown agent: ${name}`, 404);
         return { agent: profile };
       }
@@ -828,7 +896,16 @@ export const agentsService: CoreService = {
 
       case "run": {
         const name = typeof args["agent"] === "string" ? args["agent"] : "";
-        const profile = await readAgentProfile(ctx.workspaceId, name);
+        let profile: AgentProfile | undefined;
+        if (ctx.appScope) {
+          const ownPrefix = `${ctx.appScope.name}/`;
+          const short = name.startsWith(ownPrefix) ? name.slice(ownPrefix.length) : "";
+          profile = short
+            ? await resolveAppProfile(ctx.workspaceId, ctx.appScope.id, short)
+            : undefined;
+        } else {
+          profile = await readAgentProfile(ctx.workspaceId, name);
+        }
         if (!profile) throw new ServiceError(`Unknown agent: ${name}`, 404);
         // A sandbox binding resolves to a live record now — a run handed a
         // destroyed or unknown box should fail before a model call is spent.
