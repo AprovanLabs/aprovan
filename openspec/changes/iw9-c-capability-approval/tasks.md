@@ -370,7 +370,7 @@ cross-repo rule 4).
 
 > Depends-on: 9, 10 | Repo: aprovan | Touches: aprovan/server/workspace/src/review-surface.ts, aprovan/server/workspace/src/notifications/service.ts, aprovan/server/workspace/tests/review-surface.test.ts | Verify: cd /Users/jacob/Documents/Code/AprovanLabs/aprovan && pnpm --filter @aprovan/workspace test -- review-surface
 
-- [ ] 12.1 New module `review-surface.ts`: a projection API composing
+- [x] 12.1 New module `review-surface.ts`: a projection API composing
       queued actions (stream 9), staged session changes (iw9-a's
       answerable sessions), merge conflicts, and capability requests
       (install/JIT/ask/draft cards from stream 10) into one `ReviewItem`
@@ -378,7 +378,7 @@ cross-repo rule 4).
       badge count. New decision kinds are added as item kinds of this
       surface, never a new surface. Spec: review-surface "One surface,
       four item kinds", scenario "Mixed queue in one list".
-- [ ] 12.2 `ReviewItem.shell` is built server-side only from the
+- [x] 12.2 `ReviewItem.shell` is built server-side only from the
       authoritative request data (who, capability, resource, credential
       level, effect, available decisions); `widget` carries only the
       app-supplied payload path/data. A widget-originated call re-enters
@@ -386,7 +386,7 @@ cross-repo rule 4).
       Spec: "Shell renders the decision, widget renders only the
       payload", scenarios "Widget cannot spoof the shell", "Payload edit
       re-renders shell", "No widget, generic card".
-- [ ] 12.3 Retrofit `notifications/service.ts`'s existing
+- [x] 12.3 Retrofit `notifications/service.ts`'s existing
       `NotificationRecord.widget` (`:66`) onto the same shell/widget
       split and the same sandbox host as review items; `choices` render
       in the shell, not the widget; preserve the existing constraint that
@@ -394,14 +394,14 @@ cross-repo rule 4).
       `evaluateDispatch` on widget-originated calls, not a separate
       check). Spec: "Notifications adopt the shell/widget split", scenario
       "Notification widget is sandboxed like a review widget".
-- [ ] 12.4 Route each item to the queue of the principal with authority
+- [x] 12.4 Route each item to the queue of the principal with authority
       to decide it: workspace-credential grants → admins; user-credential
       and own-run approvals (`ask`, JIT) → the invoker (D15); a user is
       never shown a decision they cannot make except read-only admin
       visibility. Spec: "Decisions route to the holder of authority",
       scenarios "Run approval goes to invoker", "Workspace grant goes to
       admins".
-- [ ] 12.5 New test file `tests/review-surface.test.ts`: one queued
+- [x] 12.5 New test file `tests/review-surface.test.ts`: one queued
       action + one staged change + one JIT request produce a combined
       list with badge count 3, filterable by kind; a widget claiming a
       different capability than the request does not change the shell
