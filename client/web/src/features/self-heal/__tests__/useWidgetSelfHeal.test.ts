@@ -6,6 +6,7 @@
  * (stream 6's `startChatTurnStream` path), not `sendMessage`.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { ChatTurnRequest } from "@aprovan/agent-protocol";
 import type { UIMessage } from "ai";
 
 vi.mock("@/lib/telemetry", () => ({
@@ -182,7 +183,7 @@ describe("composeHealText / resolveHealSessionId", () => {
 });
 
 describe("heal action uses startChatTurnStream path (not sendMessage)", () => {
-  const startHealTurn = vi.fn(async () => ({
+  const startHealTurn = vi.fn(async (_request: ChatTurnRequest) => ({
     response: {
       runId: "agr-heal",
       sessionId: "sess-1",
