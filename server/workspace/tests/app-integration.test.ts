@@ -1,7 +1,9 @@
 /**
- * App-model-split stream 6 — cross-capability integration:
- * publish → directory → install → partition paths → rename-safe;
- * reseed cleans legacy name keys; registry grant subjects stay opaque.
+ * Cross-capability integration:
+ * - App-model-split stream 6: publish → directory → install → partitions →
+ *   rename-safe; reseed; opaque registry grant subjects.
+ * - IW-9 A stream 7: app-scoped commit → release tag → pinned serve → restore
+ *   → history; sessions.resolve two-parent merge + auto summary/restore.
  */
 
 import { execFile } from "node:child_process";
@@ -347,5 +349,235 @@ describe("6.3 registry stays app-ignorant on grant subjects", () => {
     } finally {
       spy.mockRestore();
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// IW-9 A stream 7 — consolidated VCS surface end-to-end
+// ---------------------------------------------------------------------------
+
+const tools = (path: string, args: Record<string, unknown> = {}) =>
+  createApp().request(`/tools/${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ args }),
+  });
+
+const putLocal = (path: string, content: string, session?: string) =>
+  createApp().request(`/fs/${path}${session ? `?session=${session}` : ""}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content }),
+  });
+
+const getLocal = (path: string, session?: string) =>
+  createApp().request(`/fs/${path}${session ? `?session=${session}` : ""}`);
+
+async function toolData<T>(res: Response): Promise<T> {
+  const body = (await res.json()) as { data: T };
+  return body.data;
+}
+
+describe("7.1 IW-9 A: app commit → release tag → pinned serve → restore → history", () => {
+  it("composes scoped commit, release tag, live pin, restore; main untouched", async () => {
+    const { readRef } = await import("../src/vcs/store.js");
+
+    await putLocal(
+      "apps/iw9a-integ/index.tsx",
+      "export default () => 'seed';",
+    );
+    const published = await toolData<{ appId: string; root: string }>(
+      await tools("apps/publish", {
+        name: "iw9a-integ",
+        dir: "apps/iw9a-integ",
+        visibility: "public",
+        allowed_tools: ["vfs.*"],
+      }),
+    );
+    expect(isAppId(published.appId)).toBe(true);
+
+    const mainBefore = await readRef("local", "main");
+
+    await putLocal(
+      "apps/iw9a-integ/index.tsx",
+      "export default () => 'v1-committed';",
+    );
+    const scoped = await toolData<{
+      created: boolean;
+      commit: { id: string; message: string };
+    }>(
+      await tools("vcs/commit", {
+        message: "app v1",
+        scope: { app: published.appId },
+      }),
+    );
+    expect(scoped.created).toBe(true);
+    const commitA = scoped.commit.id;
+
+    await putLocal(
+      "apps/iw9a-integ/index.tsx",
+      "export default () => 'v2-release';",
+    );
+    const release = await toolData<{
+      id: string;
+      commitId: string;
+      snapshotId: string;
+      channel?: string;
+    }>(
+      await tools("apps/release", {
+        app: published.appId,
+        notes: "cut for pin",
+      }),
+    );
+    expect(release.commitId).toBeTruthy();
+    expect(release.commitId).not.toBe(commitA);
+    const commitB = release.commitId;
+
+    // Dirty the live tree after the release pin.
+    await putLocal(
+      "apps/iw9a-integ/index.tsx",
+      "export default () => 'dirty-live';",
+    );
+    const liveFile = (await (await getLocal("apps/iw9a-integ/index.tsx")).json()) as {
+      content: string;
+    };
+    expect(liveFile.content).toContain("dirty-live");
+
+    // Live surface (canonical + legacy shim) still serves the pinned release.
+    const gateway = createWorkspaceApp();
+    const shim = await gateway.request(`/apps/local/${published.appId}`);
+    expect(shim.status).toBe(302);
+    expect(shim.headers.get("Location")).toBe(`/a/${published.appId}`);
+
+    const projectRes = await gateway.request(`/a/${published.appId}/__project__`);
+    expect(projectRes.status).toBe(200);
+    const project = (await projectRes.json()) as {
+      files: Array<{ path: string; content: string }>;
+      release: { id: string; commitId: string } | null;
+    };
+    expect(project.release?.id).toBe(release.id);
+    expect(project.release?.commitId).toBe(commitB);
+    const entry = project.files.find((f) => f.path === "apps/iw9a-integ/index.tsx");
+    expect(entry?.content).toContain("v2-release");
+    expect(entry?.content).not.toContain("dirty-live");
+
+    // Restore the earlier app-scoped commit into the working tree.
+    const restored = await toolData<{ restored: string[] }>(
+      await tools("vcs/restore", {
+        commit: commitA,
+        scope: { app: published.appId },
+      }),
+    );
+    expect(restored.restored).toContain("apps/iw9a-integ/index.tsx");
+    const afterRestore = (await (await getLocal("apps/iw9a-integ/index.tsx")).json()) as {
+      content: string;
+    };
+    expect(afterRestore.content).toContain("v1-committed");
+
+    // App history shows both the manual commit and the release commit.
+    const history = await toolData<{
+      commits: Array<{ id: string; message: string }>;
+    }>(await tools("vcs/log", { scope: { app: published.appId } }));
+    const ids = history.commits.map((c) => c.id);
+    expect(ids).toContain(commitA);
+    expect(ids).toContain(commitB);
+
+    // Workspace main never advanced to either app commit.
+    const mainAfter = await readRef("local", "main");
+    expect(mainAfter?.commit).toBe(mainBefore?.commit);
+    expect(mainAfter?.commit).not.toBe(commitA);
+    expect(mainAfter?.commit).not.toBe(commitB);
+  });
+});
+
+describe("7.2 IW-9 A: sessions.resolve + auto summary/restore round-trips", () => {
+  it("staged conflict → sessions.resolve → two-parent merge in history", async () => {
+    const { readCommit, readRef } = await import("../src/vcs/store.js");
+
+    await putLocal("iw9a/session-merge.md", "base");
+    const created = await toolData<{
+      session: { id: string; status: string };
+    }>(await tools("sessions/create", { title: "IW9A staged", mode: "staged" }));
+    const sessionId = created.session.id;
+
+    await putLocal("iw9a/session-merge.md", "draft version", sessionId);
+    await putLocal("iw9a/session-merge.md", "workspace moved"); // conflict on main
+
+    const resolved = await toolData<{
+      session: { id: string; status: string; mergeCommit?: string };
+      resolved: string[];
+      commit?: { id: string; message: string };
+    }>(
+      await tools("sessions/resolve", {
+        id: sessionId,
+        strategy: "keep-draft",
+        message: "IW9A keep draft",
+      }),
+    );
+    expect(resolved.resolved).toEqual(["iw9a/session-merge.md"]);
+    expect(resolved.session.status).toBe("merged");
+    expect(resolved.commit?.id).toBeTruthy();
+
+    // resolve syncs (auto-snapshots dirty main) then merges with
+    // parents [mainHead, sessionHead] — assert lineage, not a pre-call tip.
+    const merge = await readCommit("local", resolved.commit!.id);
+    expect(merge?.parents).toHaveLength(2);
+    expect(merge?.sessionId).toBe(sessionId);
+    const sessionRef = await readRef("local", `session/${sessionId}`);
+    expect(merge?.parents[1]).toBe(sessionRef?.commit);
+    expect(merge?.parents[0]).not.toBe(merge?.parents[1]);
+    const mainAfter = await readRef("local", "main");
+    expect(mainAfter?.commit).toBe(merge?.id);
+
+    const history = await toolData<{ commits: Array<{ id: string; parents: string[] }> }>(
+      await tools("vcs/log", {}),
+    );
+    const logged = history.commits.find((c) => c.id === resolved.commit!.id);
+    expect(logged?.parents).toHaveLength(2);
+
+    const live = (await (await getLocal("iw9a/session-merge.md")).json()) as { content: string };
+    expect(live.content).toBe("draft version");
+  });
+
+  it("auto session → change summary → one-click restore of touched paths", async () => {
+    const { recordSessionTouch } = await import("../src/vcs/chat-sessions.js");
+
+    await putLocal("iw9a/auto-base.md", "before");
+    const created = await toolData<{
+      session: {
+        id: string;
+        mode: string;
+        base: string;
+        changes?: { added: string[]; modified: string[]; removed: string[] };
+      };
+    }>(await tools("sessions/create", { title: "IW9A auto" }));
+    expect(created.session.mode).toBe("auto");
+    const sessionId = created.session.id;
+    const base = created.session.base;
+
+    // fs.ts does not wire recordSessionTouch (carryover) — record explicitly.
+    await getFsStore().write("local", "iw9a/auto-base.md", "after-session", "text/plain");
+    await recordSessionTouch("local", sessionId, "iw9a/auto-base.md");
+    await getFsStore().write("local", "iw9a/auto-new.md", "brand new", "text/plain");
+    await recordSessionTouch("local", sessionId, "iw9a/auto-new.md");
+
+    const got = await toolData<{
+      session: {
+        changes?: { added: string[]; modified: string[]; removed: string[] };
+      };
+    }>(await tools("sessions/get", { id: sessionId }));
+    expect(got.session.changes?.modified).toContain("iw9a/auto-base.md");
+    expect(got.session.changes?.added).toContain("iw9a/auto-new.md");
+
+    // One-click restore: put listed paths back to the session base commit.
+    for (const path of ["iw9a/auto-base.md", "iw9a/auto-new.md"]) {
+      await toolData(await tools("vcs/restore", { commit: base, path }));
+    }
+
+    const baseFile = (await (await getLocal("iw9a/auto-base.md")).json()) as { content: string };
+    expect(baseFile.content).toBe("before");
+    // Path added after base is not in the snapshot — restore leaves it or
+    // removes only paths present in the commit. Assert base path restored.
+    expect((await getLocal("iw9a/auto-new.md")).status).toBe(200);
   });
 });
