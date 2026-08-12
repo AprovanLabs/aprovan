@@ -452,7 +452,7 @@ export function createIdentityStoreDynamo(): IIdentityStore {
     },
 
     invites: {
-      async create(workspaceId, email, role, groupIds, invitedBy) {
+      async create(workspaceId, email, role, groupIds, invitedBy, target) {
         const inviteToken = randomBytes(32).toString("hex");
         const now = new Date().toISOString();
         const expiresAt = Math.floor(Date.now() / 1000) + INVITE_TTL_SECONDS;
@@ -465,6 +465,7 @@ export function createIdentityStoreDynamo(): IIdentityStore {
           invitedBy,
           createdAt: now,
           expiresAt,
+          ...(target ? { target } : {}),
         };
         const { client, PutCommand } = await dynamo();
         await client.send(
@@ -499,9 +500,15 @@ export function createIdentityStoreDynamo(): IIdentityStore {
         return true;
       },
       async consume(inviteToken) {
-        const invite = await getInvite(inviteToken);
-        if (!invite) return undefined;
-        const { client, DeleteCommand } = await dynamo();
+        const { client, GetCommand, DeleteCommand } = await dynamo();
+        const result = await client.send(
+          new GetCommand({ TableName: DYNAMODB_INVITES_TABLE(), Key: { inviteToken } }),
+        );
+        if (!result.Item) return undefined;
+        const invite = result.Item as InviteRecord;
+        if (invite.expiresAt <= Math.floor(Date.now() / 1000)) {
+          throw Object.assign(new Error("Invite expired"), { code: "invite_expired" as const });
+        }
         await client.send(
           new DeleteCommand({ TableName: DYNAMODB_INVITES_TABLE(), Key: { inviteToken } }),
         );
