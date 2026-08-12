@@ -23,27 +23,27 @@ names below are `openspec/changes/iw9-chat-flagship/specs/<capability>/spec.md`.
 
 > Depends-on: - | Repo: aprovan | Touches: aprovan/server/workspace/src/apps/chat/schema.ts, aprovan/server/workspace/src/apps/chat/service.ts, aprovan/server/workspace/src/apps/chat/authz.ts, aprovan/server/workspace/tests/chat-data-model.test.ts | Verify: pnpm --filter @aprovan/workspace exec vitest run tests/chat-data-model.test.ts && pnpm --filter @aprovan/workspace typecheck
 
-- [ ] 1.1 Define `Channel` and `Message` zod schemas exactly as specified in
+- [x] 1.1 Define `Channel` and `Message` zod schemas exactly as specified in
       tech-plan.md "Interfaces & Data" (`ch#<channelId>`,
       `msg#<channelId>#<messageId>` ULID keys, `parentId` for one-level
       threads, `agent` marker field) in `apps/chat/schema.ts`.
-- [ ] 1.2 Implement channel/message CRUD against F2's shared partition via
+- [x] 1.2 Implement channel/message CRUD against F2's shared partition via
       `resolveRecordScope(ctx, { instance })` (iw9-f2 frozen seam) —
       `createChannel`, `postMessage` (rejects `parentId` pointing at a
       message that itself has a `parentId` — spec `chat-app` "Thread nesting
       is bounded"), `listChannels`, `fetchWindow`/`fetchOlder` by
       `createdAt`/id ordering.
-- [ ] 1.3 Implement `canReadChannel(principal, installId, channelId)` in
+- [x] 1.3 Implement `canReadChannel(principal, installId, channelId)` in
       `apps/chat/authz.ts`: public channel ⇒ any F2 instance participant
       (via `assertInstanceAccess`); restricted channel ⇒ participant is also
       in the channel's `members` list. This is the ONE authz function T3
       commits to sharing between the read path (this stream) and CF-1's
       delivery filter (stream 2) — export it, do not duplicate it.
-- [ ] 1.4 Enforce deny-as-404 for non-participants and non-members
+- [x] 1.4 Enforce deny-as-404 for non-participants and non-members
       (spec `chat-app` "Non-participant cannot read instance data",
       "Restricted channel hides from non-members" — invariant 8 posture, no
       existence oracle).
-- [ ] 1.5 New test file `tests/chat-data-model.test.ts`: attributed message
+- [x] 1.5 New test file `tests/chat-data-model.test.ts`: attributed message
       write, thread-reply-of-reply rejected, restricted channel invisible to
       non-members, non-participant 404 on every read/write surface,
       `canReadChannel` unit-covered for public/restricted/non-member/
