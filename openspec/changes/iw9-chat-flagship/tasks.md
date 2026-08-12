@@ -311,23 +311,23 @@ names below are `openspec/changes/iw9-chat-flagship/specs/<capability>/spec.md`.
 
 > Depends-on: 3, 4, 8, 9 | Repo: aprovan | Touches: aprovan/client/web/e2e/chat-hosted-guest-join.spec.ts | Verify: pnpm --filter @aprovan/patchwork-web exec playwright test e2e/chat-hosted-guest-join.spec.ts --retries=0
 
-- [ ] 11.1 Flow: creator installs Chat into their personal space choosing
+- [x] 11.1 Flow: creator installs Chat into their personal space choosing
       **hosted-by-creator** (assert D1 default is surfaced, not silently
       applied — spec `chat-app` "Hosted default is the creator's personal
       space"), invites a guest by link, guest (separate browser context, no
       pre-existing workspace membership) opens the link, authenticates,
       accepts the join card, and posts a message in a granted channel — PRD
       goal "Hosted install (friends)".
-- [ ] 11.2 Assert the guest never becomes a member of the creator's
+- [x] 11.2 Assert the guest never becomes a member of the creator's
       workspace (server-side membership check returns empty — spec
       `chat-guest-access` "Guest joins hosted instance via link") and the
       hosted-vs-managed disclosure text is visible in the guest's join card
       and instance header (invariant 5 copy, ux.md verbatim).
-- [ ] 11.3 Negative cases in the same spec: expired/consumed/revoked invite
+- [x] 11.3 Negative cases in the same spec: expired/consumed/revoked invite
       link shows the distinguishable terminal copy and creates no
       participation (spec "Invite is single-use and expiring", "Host
       revokes a pending invite").
-- [ ] 11.4 Removed-guest case: host removes the guest mid-session (open
+- [x] 11.4 Removed-guest case: host removes the guest mid-session (open
       connection); assert the guest's next fan-out event is not delivered
       and their next store read is denied, without requiring a reconnect
       (spec `chat-guest-access` "Removed guest loses live access" —
