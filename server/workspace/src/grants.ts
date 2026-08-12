@@ -288,7 +288,7 @@ function grantsForCapability(
 
 /**
  * The one dispatch chokepoint. Returns allow | deny | queue | ask.
- * Queue/ask ids are provisional here — persistence is stream 9 / cards stream 10.
+ * Queue persists via action-queue.ts (stream 9); ask cards are stream 10.
  */
 export async function evaluateDispatch(
   req: DispatchRequest,
@@ -382,7 +382,11 @@ export async function evaluateDispatch(
 
   const matched = forCap.filter((g) => resourceMatchesGrant(g, req.resource));
   if (matched.length === 0) {
-    return { kind: "queue", queuedActionId: randomUUID() };
+    // Resource miss only — capability already passed above. Persist the
+    // queued-action record (capability-level misses never reach here).
+    const { enqueueQueuedAction } = await import("./action-queue.js");
+    const queuedActionId = await enqueueQueuedAction(req);
+    return { kind: "queue", queuedActionId };
   }
 
   // Credential-level routing: when the request names a level, prefer grants

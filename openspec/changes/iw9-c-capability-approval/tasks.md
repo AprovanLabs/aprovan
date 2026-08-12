@@ -248,26 +248,26 @@ cross-repo rule 4).
 
 > Depends-on: 8 | Repo: aprovan | Touches: aprovan/server/workspace/src/action-queue.ts, aprovan/server/workspace/src/grants.ts (queue-decision branch only), aprovan/server/workspace/tests/action-queue.test.ts | Verify: cd /Users/jacob/Documents/Code/AprovanLabs/aprovan && pnpm --filter @aprovan/workspace test -- action-queue
 
-- [ ] 9.1 New module `action-queue.ts`: `QueuedAction` persisted as an
+- [x] 9.1 New module `action-queue.ts`: `QueuedAction` persisted as an
       `svc#` record (`svcScope("actions", "queue")`, the `agents/
       runner.ts` `RUNS_SCOPE` precedent) with lifecycle `queued →
       released | discarded | expired` (terminal, no further
       transitions). Spec: action-exception-queue "Out-of-grant actions
       queue", "Queued actions expire" (default 7 days, PRD Open Question
       1 resolved this way).
-- [ ] 9.2 `evaluateDispatch`'s `queue` decision (stream 8) calls into
+- [x] 9.2 `evaluateDispatch`'s `queue` decision (stream 8) calls into
       `action-queue.ts` to persist the record and returns
       `{ kind: "queue", queuedActionId }`; a capability-level denial
       (namespace not granted at all) never queues — it denies or raises a
       JIT card (stream 10). Spec scenario: "Resource miss queues",
       "Namespace miss does not queue".
-- [ ] 9.3 Chain semantics: expose `queueForChain(runId, resultDependent):
+- [x] 9.3 Chain semantics: expose `queueForChain(runId, resultDependent):
       { queuedActionId }` so the caller (agents/runner.ts, wired in
       stream 10) can tell fire-and-forget from result-dependent chains and
       decide whether to continue the turn or end it with "queued N
       actions". Spec: "Chain semantics", scenarios "Fire-and-forget
       continues", "Result-dependent ends turn".
-- [ ] 9.4 `release(id, reviewerId, rememberPattern?)`: executes the
+- [x] 9.4 `release(id, reviewerId, rememberPattern?)`: executes the
       original args verbatim exactly once via `evaluateDispatch`'s allow
       path, marks the record terminal, and — if `rememberPattern` is set
       — writes a `ResourceGrantRow` through the standard grant path (the
@@ -275,11 +275,11 @@ cross-repo rule 4).
       on a terminal record is a no-op error. `discard(id, reviewerId)`:
       marks terminal, no execution, no undo. Spec: "Release and discard",
       scenarios "Release executes once", "Release with remember".
-- [ ] 9.5 Every transition (queued/released/discarded/expired) carries
+- [x] 9.5 Every transition (queued/released/discarded/expired) carries
       the F3 attribution triple and writes an audit row via `audit.ts`.
       Spec: "Queue rows carry full attribution", scenario "Attribution
       survives release".
-- [ ] 9.6 New test file `tests/action-queue.test.ts`: full lifecycle
+- [x] 9.6 New test file `tests/action-queue.test.ts`: full lifecycle
       round-trip, double-release is a no-op error, expiry after the
       configured window discards without executing, remember-pattern
       release writes a grant that later dispatches match directly,
