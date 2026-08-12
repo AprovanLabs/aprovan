@@ -20,6 +20,11 @@ export interface SessionChanges {
   added: string[];
   modified: string[];
   removed: string[];
+  /**
+   * Auto sessions without a touched-path set: summary is the full base→live
+   * diff and may include concurrent other activity.
+   */
+  includesOtherActivity?: boolean;
 }
 
 export interface ChatSessionInfo {
@@ -162,6 +167,29 @@ export async function discardSessionChanges(
     session: ChatSessionInfo;
   };
   return data.session;
+}
+
+/**
+ * One-call merge completion: sync, settle conflicts by strategy, optionally
+ * apply. MergeDialog prefers this over client-side discard/write + close.
+ */
+export async function resolveChatSession(
+  id: string,
+  options: {
+    strategy: "keep-draft" | "keep-workspace";
+    apply?: boolean;
+    message?: string;
+  },
+): Promise<{
+  session: ChatSessionInfo;
+  resolved: string[];
+  commit?: { id: string; message: string };
+}> {
+  return (await invokeSessionsTool("resolve", { id, ...options })) as {
+    session: ChatSessionInfo;
+    resolved: string[];
+    commit?: { id: string; message: string };
+  };
 }
 
 /** "just now" / "5m ago" / "2h ago" / "Jul 25" — for "workspace as of …". */

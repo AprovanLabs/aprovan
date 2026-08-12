@@ -1,11 +1,10 @@
 /**
  * SessionsPanel — native surface over the gateway `sessions` namespace.
  *
- * A chat session is a branch (docs/vcs-and-sessions.md): staged sessions keep
- * their file edits in an overlay until someone applies them, auto sessions
- * write through. The session bar drives *the one you are in*; this panel is
- * the log of every other one — what they staged, whether anyone applied it,
- * what is still open.
+ * A chat is either write-through or a draft that keeps file edits to itself
+ * until someone applies them. The session bar drives *the one you are in*;
+ * this panel is the log of every other one — what they changed, whether
+ * anyone applied it, what is still open.
  *
  * Rows are dense on purpose: a session's title, status and freshness fit on
  * one line, and the destructive/plain-language actions (see SessionBar's
@@ -18,7 +17,7 @@
  * file tabs / tree rows for the focused workspace file — never in this list.
  */
 
-import { Check, ChevronDown, ChevronRight, ExternalLink, GitBranch, Loader2 } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, ExternalLink, History, Loader2 } from "lucide-react";
 import { useState } from "react";
 import {
   ArmedButton,
@@ -33,9 +32,10 @@ import {
   type PanelHostActions,
   usePanelData,
 } from "./shell";
+import { ChangeList } from "@/components/ChangeList";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { sessionWindowUrl } from "@/lib/chat-sessions";
+import { sessionWindowUrl, type SessionMode } from "@/lib/chat-sessions";
 import { invokeNamespaceTool } from "@/lib/tools";
 
 type SessionStatus = "open" | "merged" | "closed";
@@ -50,7 +50,7 @@ interface SessionRecord {
   id: string;
   title: string;
   status: SessionStatus;
-  mode: "auto" | "staged";
+  mode: SessionMode;
   base: string;
   /** When the base snapshot was taken — rendered as "workspace as of …". */
   baseAt?: string;
@@ -65,9 +65,9 @@ interface SessionRecord {
 const invokeSessions = invokeNamespaceTool("sessions");
 
 const STATUS_TABS = [
-  { id: "open", label: "Open" },
-  { id: "merged", label: "Merged" },
-  { id: "closed", label: "Closed" },
+  { id: "open", label: "Active" },
+  { id: "merged", label: "Applied" },
+  { id: "closed", label: "Archived" },
 ] as const;
 
 type TabId = (typeof STATUS_TABS)[number]["id"];
@@ -79,7 +79,7 @@ const STATUS_DOT: Record<SessionStatus, string> = {
 };
 
 const EMPTY_COPY: Record<TabId, string> = {
-  open: "Open chats appear here. Start one from the chat pane.",
+  open: "Active chats appear here. Start one from the chat pane.",
   merged: "Chats you've applied to the workspace appear here.",
   closed: "Archived chats appear here.",
 };
@@ -89,64 +89,15 @@ function changeCount(changes: SessionChanges | undefined): number {
   return changes.added.length + changes.modified.length + changes.removed.length;
 }
 
-/** +added ~modified −removed, compact enough for the collapsed row. */
+/** Compact change counts for the collapsed row — word vocabulary, no glyphs. */
 function ChangeSummary({ changes }: { changes: SessionChanges }) {
+  const parts: string[] = [];
+  if (changes.added.length > 0) parts.push(`${changes.added.length} new`);
+  if (changes.modified.length > 0) parts.push(`${changes.modified.length} edited`);
+  if (changes.removed.length > 0) parts.push(`${changes.removed.length} removed`);
+  if (parts.length === 0) return null;
   return (
-    <span className="flex shrink-0 items-center gap-1 font-mono text-[11px] text-muted-foreground">
-      {changes.added.length > 0 && (
-        <span className="text-emerald-600 dark:text-emerald-400">+{changes.added.length}</span>
-      )}
-      {changes.modified.length > 0 && (
-        <span className="text-amber-600 dark:text-amber-400">~{changes.modified.length}</span>
-      )}
-      {changes.removed.length > 0 && (
-        <span className="text-destructive">−{changes.removed.length}</span>
-      )}
-    </span>
-  );
-}
-
-/** The changed-file list shown in the expanded row. Opens a file through the
- *  host's `onOpenFile` when threaded (SessionBar's pattern); otherwise it's
- *  a plain, non-interactive list. */
-function ChangeList({
-  changes,
-  onOpenFile,
-}: {
-  changes: SessionChanges;
-  onOpenFile?: (path: string) => void;
-}) {
-  const groups: Array<[string, string[], string]> = [
-    ["+", changes.added, "text-emerald-600 dark:text-emerald-400"],
-    ["~", changes.modified, "text-amber-600 dark:text-amber-400"],
-    ["−", changes.removed, "text-destructive"],
-  ];
-  return (
-    <div className="space-y-0.5">
-      {groups.map(([mark, paths, className]) =>
-        paths.map((path) =>
-          onOpenFile ? (
-            <button
-              key={`${mark}${path}`}
-              type="button"
-              onClick={() => onOpenFile(path)}
-              className="flex w-full items-center gap-1.5 rounded px-1 py-0.5 text-left font-mono text-[11px] hover:bg-muted"
-              title={`Open ${path}`}
-            >
-              <span className={`shrink-0 ${className}`}>{mark}</span>
-              <span className="truncate text-muted-foreground">{path}</span>
-            </button>
-          ) : (
-            <div key={`${mark}${path}`} className="flex items-center gap-1.5 px-1 font-mono text-[11px]">
-              <span className={`shrink-0 ${className}`}>{mark}</span>
-              <span className="truncate text-muted-foreground" title={path}>
-                {path}
-              </span>
-            </div>
-          ),
-        ),
-      )}
-    </div>
+    <span className="shrink-0 text-[11px] text-muted-foreground">{parts.join(", ")}</span>
   );
 }
 
@@ -162,9 +113,9 @@ function SessionEntry({
   const [expanded, setExpanded] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const staged = changeCount(session.changes);
+  const changed = changeCount(session.changes);
   const isOpen = session.status === "open";
-  const isDraft = session.mode === "staged";
+  const isDraft = session.mode !== "auto";
 
   const run = (operation: string, args: Record<string, unknown>) => {
     setBusy(operation);
@@ -221,7 +172,7 @@ function SessionEntry({
             Draft
           </Badge>
         )}
-        {session.changes && staged > 0 && <ChangeSummary changes={session.changes} />}
+        {session.changes && changed > 0 && <ChangeSummary changes={session.changes} />}
         <span className="shrink-0 text-[11px] text-muted-foreground">
           {session.messageCount} msg{session.messageCount === 1 ? "" : "s"}
         </span>
@@ -237,8 +188,12 @@ function SessionEntry({
             {session.mergeCommit && " · applied to the workspace"}
           </div>
 
-          {session.changes && staged > 0 && (
-            <ChangeList changes={session.changes} onOpenFile={hostActions.onOpenFile} />
+          {session.changes && changed > 0 && (
+            <ChangeList
+              changes={session.changes}
+              onOpen={hostActions.onOpenFile}
+              collapseAfter={8}
+            />
           )}
 
           {actionError && <div className="text-destructive">{actionError}</div>}
@@ -257,7 +212,7 @@ function SessionEntry({
                 Get latest changes
               </Button>
             )}
-            {isOpen && staged > 0 && (
+            {isOpen && changed > 0 && (
               <Button
                 variant="outline"
                 size="sm"
@@ -275,7 +230,7 @@ function SessionEntry({
               <ArmedButton
                 label="Archive"
                 armedLabel={
-                  staged > 0 ? "Archive without applying?" : "Confirm archive?"
+                  changed > 0 ? "Archive without applying?" : "Confirm archive?"
                 }
                 onConfirm={() => run("close", { stage: false })}
               />
@@ -309,9 +264,9 @@ export function SessionsPanel({ scope: _scope }: NativePanelProps) {
 
   return (
     <PanelShell
-      icon={GitBranch}
+      icon={History}
       title="Sessions"
-      description="Chat history you can stage, apply, and archive"
+      description="Chat history you can keep to itself, apply, and archive"
       onRefresh={refresh}
       refreshing={loading}
     >

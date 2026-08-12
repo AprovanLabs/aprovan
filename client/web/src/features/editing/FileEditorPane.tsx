@@ -4,6 +4,7 @@ import {
 } from "@aprovan/editor";
 import type { Checker, Compiler } from "@aprovan/patchwork";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { ChangeList } from "@/components/ChangeList";
 import { useDirectSave } from "./useDirectSave";
 import { useLazyDraft } from "./useLazyDraft";
 import {
@@ -181,6 +182,9 @@ export function FileEditorPane({
               await draft.discard();
             },
             onOpenFile,
+            renderChangeList: ({ changes, onOpen }) => (
+              <ChangeList changes={changes} onOpen={onOpen} collapseAfter={8} />
+            ),
           }
         : { kind: "direct", save: direct.state };
 
