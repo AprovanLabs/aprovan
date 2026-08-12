@@ -311,26 +311,26 @@
 
 > Depends-on: 6, 7, 8 | Repo: aprovan | Touches: aprovan/client/web/e2e/doc-live-cursors.spec.ts, aprovan/client/web/e2e/doc-agent-merge.spec.ts, aprovan/client/web/e2e/doc-conflict-draft.spec.ts | Verify: pnpm --filter @aprovan/patchwork-web exec playwright test e2e/doc-live-cursors.spec.ts e2e/doc-agent-merge.spec.ts e2e/doc-conflict-draft.spec.ts --retries=0
 
-- [ ] 11.1 (iw9-chat-flagship-gated) Reuse `e2e/fixtures/two-users.ts`
+- [x] 11.1 (iw9-chat-flagship-gated) Reuse `e2e/fixtures/two-users.ts`
       (do not re-bootstrap Playwright — external dependency note above);
       `doc-live-cursors.spec.ts`: two browser contexts open the same
       document, user A types, user B sees the character appear without
       reload and sees A's named cursor move (PRD Goal 1 validation bar;
       spec document-collab "Two users see each other's cursors" +
       "Concurrent joiners share one doc").
-- [ ] 11.2 `doc-agent-merge.spec.ts`: a user has the document open and
+- [x] 11.2 `doc-agent-merge.spec.ts`: a user has the document open and
       typing in one region while a triggered `doc/fix-typos` run (or a
       direct `vfs.write` against the test fixture, if stream 10 hasn't
       landed yet — call out which in the test) edits another region; assert
       both edits are present and the user's session never shows a
       disconnect/clobber (PRD Goal 2 validation bar).
-- [ ] 11.3 `doc-conflict-draft.spec.ts`: force a conflict (rewrite the exact
+- [x] 11.3 `doc-conflict-draft.spec.ts`: force a conflict (rewrite the exact
       region a queued agent write targets, beyond fuzzy tolerance, before
       the write lands), assert the draft banner appears, resolve through
       the `MergeDialog`, assert the resolution lands as one commit and the
       session returns to `auto` (PRD Goal 3 validation bar; spec "Manual
       save resolves the draft").
-- [ ] 11.4 Raw WebSocket frame capture (reuse `e2e/fixtures/ws-capture.ts`
+- [x] 11.4 Raw WebSocket frame capture (reuse `e2e/fixtures/ws-capture.ts`
       from iw9-chat-flagship if landed, else `page.on("websocket")`
       directly) on the live-cursors spec: assert no anonymous connection
       ever appears in a `doc:<path>` topic's subscriber set (invariant 9
