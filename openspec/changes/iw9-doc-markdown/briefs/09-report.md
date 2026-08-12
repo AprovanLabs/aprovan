@@ -1,6 +1,6 @@
 # Stream 9 report — Document `app.yaml` + tile
 
-**PR:** (filled after open)
+**PR:** https://github.com/AprovanLabs/aprovan/pull/254
 **Branch:** `feat/iw9-doc-app-manifest`
 **Base:** `origin/main`
 
