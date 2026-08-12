@@ -85,10 +85,10 @@
 
 > Depends-on: 2 | Repo: aprovan | Touches: aprovan/server/workspace/src/realtime/protocol.ts, aprovan/server/workspace/src/doc/doc-namespace.ts, aprovan/server/workspace/src/realtime/socket.ts, aprovan/server/workspace/tests/doc-namespace.test.ts | Verify: pnpm --filter @aprovan/workspace exec vitest run tests/doc-namespace.test.ts realtime-broker.test.ts && pnpm --filter @aprovan/workspace typecheck
 
-- [ ] 3.1 (F5-gated) Remove `"doc"` from `RESERVED_NAMESPACES`
+- [x] 3.1 (F5-gated) Remove `"doc"` from `RESERVED_NAMESPACES`
       (`protocol.ts:15,24-27`) — the reservation comment names exactly this
       change as its consumer.
-- [ ] 3.2 `doc/doc-namespace.ts`: `createDocHandler(broker)` returning a
+- [x] 3.2 `doc/doc-namespace.ts`: `createDocHandler(broker)` returning a
       `NamespaceHandler` modeled on `presence.ts:69-195`'s shape —
       `onSubscribe` (async: `getOrLoadDoc`, reply with a `DocSyncFrame` per
       tech-plan "Interfaces & Data", then a second `event` frame carrying
@@ -99,9 +99,9 @@
       (`awarenessProtocol.removeAwarenessStates` for the conn's clientID,
       broadcast the removal, decrement `LiveDoc.participants`, schedule
       release when it hits zero per D2's ordered teardown).
-- [ ] 3.3 Register the handler in `attachRealtime`
+- [x] 3.3 Register the handler in `attachRealtime`
       (`socket.ts:154-157`, beside `createPresenceHandler`).
-- [ ] 3.4 Tests: two connections joining the same `(workspaceId, path)`
+- [x] 3.4 Tests: two connections joining the same `(workspaceId, path)`
       converge to one `LiveDoc` (spec document-collab "Concurrent joiners
       share one doc"); reconnect syncs against live state, not a fresh file
       read (spec "Doc identity survives reconnect"); awareness join/update/

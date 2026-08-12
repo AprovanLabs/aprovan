@@ -19,6 +19,7 @@ import {
 } from "../middleware/auth.js";
 import { getCurrentWorkspace } from "../sessions.js";
 import { listUserGroupIds } from "../userGroups.js";
+import { createDocHandler } from "../doc/doc-namespace.js";
 import { createBroker, type Conn, type RealtimeBroker } from "./broker.js";
 import { createAppTopicsHandler } from "./app-topics.js";
 import { createPresenceHandler } from "./presence.js";
@@ -153,8 +154,9 @@ export function attachRealtime(
   options: AttachRealtimeOptions = {},
 ): RealtimeHandle {
   const broker = options.broker ?? createBroker();
-  // Presence (file-presence) + Chat CF-1 app-scoped topics.
+  // Presence (file-presence) + Doc CRDT sync + Chat CF-1 app-scoped topics.
   broker.registerNamespace(createPresenceHandler(broker));
+  broker.registerNamespace(createDocHandler(broker));
   broker.registerNamespace(createAppTopicsHandler(broker));
   const pingIntervalMs = options.pingIntervalMs ?? DEFAULT_PING_INTERVAL_MS;
   const maxMissedPongs = options.maxMissedPongs ?? DEFAULT_MAX_MISSED_PONGS;

@@ -829,6 +829,9 @@ importers:
       hono:
         specifier: ^4.6.20
         version: 4.12.33
+      lib0:
+        specifier: ^0.2.85
+        version: 0.2.117
       quickjs-emscripten-core:
         specifier: 0.32.0
         version: 0.32.0
