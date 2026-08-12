@@ -172,24 +172,24 @@ names below are `openspec/changes/iw9-chat-flagship/specs/<capability>/spec.md`.
 
 > Depends-on: - | Repo: aprovan | Touches: aprovan/client/web/src/vendor/buzz-timeline/**, aprovan/client/web/NOTICE, aprovan/patches/virtua@0.49.3.patch, aprovan/package.json, aprovan/client/web/package.json | Verify: pnpm install --frozen-lockfile=false && pnpm --filter @aprovan/patchwork-web typecheck && test -f client/web/NOTICE && grep -q "block/buzz" client/web/NOTICE
 
-- [ ] 6.1 Copy `MessageTimeline.tsx` (fully presentational, ~50 props) and
+- [x] 6.1 Copy `MessageTimeline.tsx` (fully presentational, ~50 props) and
       the hook cluster `useAnchoredScroll`, `useLoadOlderOnScroll`,
       `useVirtualizedBottomSettle`, `useTimelineRetention` from
       github.com/block/buzz (`desktop/src/features/messages/`) into
       `client/web/src/vendor/buzz-timeline/`, Apache-2.0 headers retained
       verbatim, import paths adjusted only (D24, tech-plan T2).
-- [ ] 6.2 Add `virtua@0.49.3` as a pinned dependency of `client/web`; apply
+- [x] 6.2 Add `virtua@0.49.3` as a pinned dependency of `client/web`; apply
       buzz's `patches/virtua@0.49.3.patch` via `pnpm patch` and register
       `patchedDependencies` in the root `package.json` (tech-plan T2 —
       required for stable upward-history-prepend; do not use unpatched
       virtua).
-- [ ] 6.3 Add a `client/web/NOTICE` entry ("Portions derived from
+- [x] 6.3 Add a `client/web/NOTICE` entry ("Portions derived from
       block/buzz, Apache-2.0") plus a `LICENSE` copy inside
       `vendor/buzz-timeline/`, and a `vendor/buzz-timeline/README.md`
       recording the upstream commit SHA the lift was taken from (tech-plan
       Risks — "patch breaks on virtua bump" mitigation: renovate/dependabot
       exclusion noted here too).
-- [ ] 6.4 Confirm no local edits beyond import-path fixes: any divergence
+- [x] 6.4 Confirm no local edits beyond import-path fixes: any divergence
       from upstream gets a dated note in the vendor README, not a silent
       diff (tech-plan Architecture "Component responsibilities").
 
