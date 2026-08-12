@@ -116,7 +116,8 @@ CREATE TABLE IF NOT EXISTS invites (
   group_ids text,
   invited_by text,
   created_at text,
-  expires_at bigint
+  expires_at bigint,
+  target text
 );
 
 CREATE INDEX ASYNC IF NOT EXISTS invites_by_email_workspace ON invites (email, workspace_id);

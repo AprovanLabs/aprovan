@@ -20,6 +20,7 @@ import type {
   GroupRecord,
   IIdentityStore,
   InviteRecord,
+  InviteTarget,
   MembershipRecord,
   Permission,
   UserRecord,
@@ -71,7 +72,8 @@ CREATE TABLE IF NOT EXISTS user_sessions (
 );
 CREATE TABLE IF NOT EXISTS invites (
   invite_token TEXT PRIMARY KEY, email TEXT NOT NULL, workspace_id TEXT NOT NULL,
-  role TEXT, group_ids TEXT, invited_by TEXT, created_at TEXT, expires_at INTEGER
+  role TEXT, group_ids TEXT, invited_by TEXT, created_at TEXT, expires_at INTEGER,
+  target TEXT
 );
 CREATE INDEX IF NOT EXISTS invites_by_email_workspace ON invites(email, workspace_id);
 CREATE INDEX IF NOT EXISTS invites_by_workspace ON invites(workspace_id);
@@ -107,6 +109,12 @@ const WORKSPACE_LOCUS_COLUMNS: Array<{ name: string; ddl: string }> = [
   { name: "vfs_root", ddl: "ALTER TABLE workspaces ADD COLUMN vfs_root TEXT" },
 ];
 
+/** Additive CF-2 target column for invite rows that predate instance targeting. */
+const INVITE_TARGET_COLUMN = {
+  name: "target",
+  ddl: "ALTER TABLE invites ADD COLUMN target TEXT",
+};
+
 function ensureWorkspaceLocusColumns(db: InstanceType<ReturnType<typeof loadSqlite>>): void {
   const existing = new Set(
     (db.prepare("PRAGMA table_info(workspaces)").all() as Array<{ name: string }>).map(
@@ -118,12 +126,22 @@ function ensureWorkspaceLocusColumns(db: InstanceType<ReturnType<typeof loadSqli
   }
 }
 
+function ensureInviteTargetColumn(db: InstanceType<ReturnType<typeof loadSqlite>>): void {
+  const existing = new Set(
+    (db.prepare("PRAGMA table_info(invites)").all() as Array<{ name: string }>).map(
+      (row) => row.name,
+    ),
+  );
+  if (!existing.has(INVITE_TARGET_COLUMN.name)) db.exec(INVITE_TARGET_COLUMN.ddl);
+}
+
 export function createSqliteIdentityClient(directory = workspaceDataDir()): IdentitySqlClient {
   mkdirSync(directory, { recursive: true, mode: 0o700 });
   const SqliteDatabase = loadSqlite();
   const db = new SqliteDatabase(join(directory, "workspace.db"));
   db.exec(SQLITE_IDENTITY_DDL);
   ensureWorkspaceLocusColumns(db);
+  ensureInviteTargetColumn(db);
   return {
     async all<T>(sql: string, params: unknown[] = []): Promise<T[]> {
       return db.prepare(sql).all(...params) as T[];
@@ -180,6 +198,32 @@ function toGroup(row: Record<string, unknown>): GroupRecord {
   };
 }
 
+function parseInviteTarget(raw: unknown): InviteTarget | undefined {
+  if (raw == null || raw === "") return undefined;
+  try {
+    const parsed = (typeof raw === "string" ? JSON.parse(raw) : raw) as unknown;
+    if (
+      parsed &&
+      typeof parsed === "object" &&
+      (parsed as { kind?: unknown }).kind === "app-instance" &&
+      typeof (parsed as { installId?: unknown }).installId === "string"
+    ) {
+      const channelIds = (parsed as { channelIds?: unknown }).channelIds;
+      const target: InviteTarget = {
+        kind: "app-instance",
+        installId: (parsed as { installId: string }).installId,
+      };
+      if (Array.isArray(channelIds)) {
+        target.channelIds = channelIds.filter((id): id is string => typeof id === "string");
+      }
+      return target;
+    }
+  } catch {
+    // Malformed target — treat as absent (legacy membership path).
+  }
+  return undefined;
+}
+
 function toInvite(row: Record<string, unknown>): InviteRecord {
   let groupIds: string[] = [];
   try {
@@ -188,6 +232,7 @@ function toInvite(row: Record<string, unknown>): InviteRecord {
   } catch {
     // Malformed group list — treat as none.
   }
+  const target = parseInviteTarget(row["target"]);
   return {
     inviteToken: String(row["invite_token"]),
     workspaceId: String(row["workspace_id"]),
@@ -197,6 +242,7 @@ function toInvite(row: Record<string, unknown>): InviteRecord {
     invitedBy: String(row["invited_by"] ?? ""),
     createdAt: String(row["created_at"] ?? ""),
     expiresAt: Number(row["expires_at"]),
+    ...(target ? { target } : {}),
   };
 }
 
@@ -413,7 +459,7 @@ export function createIdentityStoreSql(client: IdentitySqlClient): IIdentityStor
     },
 
     invites: {
-      async create(workspaceId, email, role, groupIds, invitedBy) {
+      async create(workspaceId, email, role, groupIds, invitedBy, target) {
         const record: InviteRecord = {
           inviteToken: randomBytes(32).toString("hex"),
           workspaceId,
@@ -423,11 +469,12 @@ export function createIdentityStoreSql(client: IdentitySqlClient): IIdentityStor
           invitedBy,
           createdAt: new Date().toISOString(),
           expiresAt: nowEpoch() + INVITE_TTL_SECONDS,
+          ...(target ? { target } : {}),
         };
         await client.run(
           `INSERT INTO invites
-           (invite_token, email, workspace_id, role, group_ids, invited_by, created_at, expires_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+           (invite_token, email, workspace_id, role, group_ids, invited_by, created_at, expires_at, target)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             record.inviteToken,
             record.email,
@@ -437,6 +484,7 @@ export function createIdentityStoreSql(client: IdentitySqlClient): IIdentityStor
             record.invitedBy,
             record.createdAt,
             record.expiresAt,
+            record.target ? JSON.stringify(record.target) : null,
           ],
         );
         return record;
@@ -456,8 +504,15 @@ export function createIdentityStoreSql(client: IdentitySqlClient): IIdentityStor
         return true;
       },
       async consume(inviteToken) {
-        const invite = await getInvite(inviteToken);
-        if (!invite) return undefined;
+        const rows = await client.all(`SELECT * FROM invites WHERE invite_token = ?`, [
+          inviteToken,
+        ]);
+        const row = rows[0];
+        if (!row) return undefined;
+        const invite = toInvite(row);
+        if (invite.expiresAt <= nowEpoch()) {
+          throw Object.assign(new Error("Invite expired"), { code: "invite_expired" as const });
+        }
         await client.run(`DELETE FROM invites WHERE invite_token = ?`, [inviteToken]);
         return invite;
       },
