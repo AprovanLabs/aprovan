@@ -140,7 +140,7 @@ names below are `openspec/changes/iw9-chat-flagship/specs/<capability>/spec.md`.
 
 > Depends-on: 1, 4 | Repo: aprovan | Touches: aprovan/Apps/chat/agents/summarize.ts, aprovan/server/workspace/tests/chat-summarize-agent.test.ts | Verify: pnpm --filter @aprovan/workspace exec vitest run tests/chat-summarize-agent.test.ts
 
-- [ ] 5.1 Before starting: verify **`iw9-d-agent-loop-server` stream 10
+- [x] 5.1 Before starting: verify **`iw9-d-agent-loop-server` stream 10
       ("App-scoped agent profiles (CF-5)") has landed** — it is the assigned
       owner of finding CF-5 (`IW-9-EXECUTION-OVERVIEW.md` finding 1) and
       covers the whole seam, so there is no separate iw9-b dependency for
@@ -150,19 +150,19 @@ names below are `openspec/changes/iw9-chat-flagship/specs/<capability>/spec.md`.
       `create`/`update` stay 403 (10.4) — see D's
       `specs/app-scoped-agent-profiles/spec.md`. If it has not landed, stop
       and raise against iw9-d — do not build a Chat-local agent loop.
-- [ ] 5.2 Declare `chat/summarize` in `Apps/chat/app.yaml`'s agent list,
+- [x] 5.2 Declare `chat/summarize` in `Apps/chat/app.yaml`'s agent list,
       bounded by Chat's capability ceiling (D15, invariant 2 — intersection
       of invoker authority and app grant); tool access limited to
       `canReadChannel`-gated message reads on the invoked channel/thread and
       one write: posting its own summary reply.
-- [ ] 5.3 Wire invoker attribution and billing: the run record names the
+- [x] 5.3 Wire invoker attribution and billing: the run record names the
       invoker as payer/principal (D22); approvals raised by the run route to
       the invoker's queue (D15) — both via iw9-d's existing `agents.run`
       plumbing, no Chat-local billing code.
-- [ ] 5.4 Summary output posts through stream 1's `postMessage` with the
+- [x] 5.4 Summary output posts through stream 1's `postMessage` with the
       `agent: { profile: "chat/summarize", invoker }` marker (spec
       `chat-summarize-agent` "Summary is an attributed message").
-- [ ] 5.5 New test file `tests/chat-summarize-agent.test.ts`: run scoped to
+- [x] 5.5 New test file `tests/chat-summarize-agent.test.ts`: run scoped to
       a guest's readable channels only when a restricted channel exists in
       the same instance (no tool call in the trace touches it), out-of-grant
       tool call denied not silently succeeding, run record attributes
