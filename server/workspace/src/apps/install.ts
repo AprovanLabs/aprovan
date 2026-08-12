@@ -13,6 +13,14 @@
  */
 
 import { createHash } from "node:crypto";
+import { parse as parseYaml } from "yaml";
+import {
+  confirmInstallCeiling,
+  declareAppAlwaysAsk,
+  proposeInstallCeiling,
+  saveInstallCard,
+  type CapabilityCard,
+} from "../capability-cards.js";
 import { getFsStore, listAll } from "../fs-store.js";
 import { ServiceError } from "../service-kernel.js";
 import {
@@ -949,4 +957,66 @@ export async function applyUpdate(
   };
   await saveInstall(installWorkspaceId, next);
   return { install: next, from, to };
+}
+
+// ---------------------------------------------------------------------------
+// Install ceiling card (iw9-c stream 10) — static scan vs app.yaml
+// ---------------------------------------------------------------------------
+
+/**
+ * Peek `alwaysAsk` from raw app.yaml without going through AppYamlSchema
+ * (strict schema does not yet list the field — stream 10 stores it via
+ * {@link declareAppAlwaysAsk}).
+ */
+export function extractAlwaysAskFromYaml(content: string): string[] {
+  try {
+    const raw = parseYaml(content);
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return [];
+    const value = (raw as Record<string, unknown>)["alwaysAsk"];
+    if (!Array.isArray(value)) return [];
+    return value.filter((v): v is string => typeof v === "string");
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Build + persist an install ceiling card from archive sources and the
+ * manifest's capability declaration. Does not install or write grants.
+ */
+export async function proposeInstallCeilingCard(input: {
+  workspaceId: string;
+  invokerId: string;
+  sources: string[];
+  declaredCapabilities: string[];
+  appYamlContent?: string;
+  appId?: string;
+}): Promise<CapabilityCard> {
+  const card = proposeInstallCeiling({
+    workspaceId: input.workspaceId,
+    invokerId: input.invokerId,
+    sources: input.sources,
+    declaredCapabilities: input.declaredCapabilities,
+  });
+  await saveInstallCard(card);
+  if (input.appId && input.appYamlContent) {
+    const alwaysAsk = extractAlwaysAskFromYaml(input.appYamlContent);
+    if (alwaysAsk.length > 0) {
+      await declareAppAlwaysAsk(input.workspaceId, input.appId, alwaysAsk);
+    }
+  }
+  return card;
+}
+
+/**
+ * Confirm the install ceiling: capability-level grants only. Rejects when
+ * the card is blocked by undeclared use.
+ */
+export async function confirmInstallCeilingCard(
+  workspaceId: string,
+  cardId: string,
+  reviewerId: string,
+  subject?: { kind: "user" | "group" | "app-install"; id: string },
+): Promise<CapabilityCard> {
+  return confirmInstallCeiling(workspaceId, cardId, reviewerId, subject);
 }

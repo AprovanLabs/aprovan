@@ -289,7 +289,7 @@ cross-repo rule 4).
 
 > Depends-on: 8, 9 | Repo: aprovan | Touches: aprovan/server/workspace/src/capability-cards.ts, aprovan/server/workspace/src/agents/runner.ts (pending_action emission + resume only), aprovan/server/workspace/src/apps/install.ts, aprovan/server/workspace/src/workflows/invoke.ts (ask step only), aprovan/server/workspace/tests/capability-cards.test.ts | Verify: cd /Users/jacob/Documents/Code/AprovanLabs/aprovan && pnpm --filter @aprovan/workspace test -- capability-cards
 
-- [ ] 10.1 New module `capability-cards.ts`: install-card ceiling
+- [x] 10.1 New module `capability-cards.ts`: install-card ceiling
       proposal — statically analyze the app archive with `@utdk/remote`'s
       `scanToolsAccess` (stream 6.1's new dependency), reconcile the
       resulting namespace list against `app.yaml` capability declarations
@@ -299,7 +299,7 @@ cross-repo rule 4).
       capability-approval-flow "Install card proposes a static-analysis
       ceiling", scenarios "Ceiling proposed from code", "Undeclared use
       blocks", "Ceiling is coarse, resources come later".
-- [ ] 10.2 Wire `agents/runner.ts` to emit `RunEvent`'s reserved
+- [x] 10.2 Wire `agents/runner.ts` to emit `RunEvent`'s reserved
       `pending_action` (iw9-d) when `evaluateDispatch` returns `ask` —
       this is the first producer of that event type. The turn ends;
       acceptance persists the grant, releases queued actions it covers
@@ -307,12 +307,12 @@ cross-repo rule 4).
       resume/reattach extension point — no held connection, no suspended
       process (D5). Spec: "JIT capability cards are non-blocking",
       scenarios "Miss ends the turn", "Accept resumes".
-- [ ] 10.3 Explicit `ask` workflow step (`workflows/invoke.ts`): ends the
+- [x] 10.3 Explicit `ask` workflow step (`workflows/invoke.ts`): ends the
       turn with a card in the invoker's queue (D15 — approvals from a run
       go to the invoker, not the admin by default); resumes the workflow
       with the answer on response. Spec: "Explicit ask action", scenario
       "Workflow asks".
-- [ ] 10.4 App always-ask policy: an app manifest (`app.yaml`, iw9-b)
+- [x] 10.4 App always-ask policy: an app manifest (`app.yaml`, iw9-b)
       declares action classes that always raise a card even inside a
       granted resource; workspace policy may add always-ask classes or
       narrow grants but a write that would clear an app-declared
@@ -320,12 +320,12 @@ cross-repo rule 4).
       (D12 tighten-only). Spec: "App always-ask policy, workspace tightens
       only", scenarios "Always-ask fires inside a grant", "Workspace
       cannot loosen".
-- [ ] 10.5 Agent draft-not-instantiate: the agent-reachable
+- [x] 10.5 Agent draft-not-instantiate: the agent-reachable
       install-proposal tool creates a draft install/grant/profile record
       only — no grant, install, or profile exists until a human confirms
       the resulting card (invariant 11). Spec: "Agents draft, people
       instantiate", scenario "Agent proposes an install".
-- [ ] 10.6 New test file `tests/capability-cards.test.ts`: install card
+- [x] 10.6 New test file `tests/capability-cards.test.ts`: install card
       lists exactly the statically-discovered capabilities pre-filled
       from `app.yaml`; undeclared use blocks install; a JIT miss on a
       result-dependent tool call ends the turn and accept resumes with
