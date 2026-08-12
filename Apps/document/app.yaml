@@ -1,0 +1,16 @@
+# Document flagship app — managed-only (D2 / invariant 5).
+# Capability ceiling: VFS + sessions + agents.run for doc/fix-typos (stream 10).
+# Agent profile is NOT declared here — stream 10 owns doc/fix-typos.
+
+slug: document
+title: Document
+description: Markdown-first live documents
+icon: document.svg
+
+hostModes:
+  - managed
+
+capabilities:
+  - vfs.*
+  - sessions.*
+  - agents.run
