@@ -337,24 +337,24 @@ names below are `openspec/changes/iw9-chat-flagship/specs/<capability>/spec.md`.
 
 > Depends-on: 2, 7, 9, 10, 11 | Repo: aprovan | Touches: aprovan/client/web/e2e/chat-presence.spec.ts, aprovan/client/web/e2e/chat-invariant7-guest-isolation.spec.ts | Verify: pnpm --filter @aprovan/patchwork-web exec playwright test e2e/chat-presence.spec.ts e2e/chat-invariant7-guest-isolation.spec.ts --retries=0 && ! grep -rn "records\.\(set\|put\|write\)\|vfs\.\(write\|put\)" server/workspace/src/realtime/app-topics.ts
 
-- [ ] 12.1 Presence spec (`chat-presence.spec.ts`): two connected users see
+- [x] 12.1 Presence spec (`chat-presence.spec.ts`): two connected users see
       each other online, typing indicator round-trips within ~4s TTL, and
       disconnect clears presence for all viewers (PRD goal "Presence
       visible", spec `chat-realtime` "Presence and typing are ephemeral").
-- [ ] 12.2 Grep gate (in Verify) proving zero writes to `records.*`/`vfs.*`
+- [x] 12.2 Grep gate (in Verify) proving zero writes to `records.*`/`vfs.*`
       on any code path in `realtime/app-topics.ts` — the PRD's
       grep-verifiable claim, enforced as an actual gate, not a manual check.
-- [ ] 12.3 Invariant-7 spec (`chat-invariant7-guest-isolation.spec.ts`): a
+- [x] 12.3 Invariant-7 spec (`chat-invariant7-guest-isolation.spec.ts`): a
       guest with a live subscription captures its full raw WebSocket frame
       stream (stream 9's capture helper) while a message is posted to a
       restricted channel the guest cannot read; assert zero frames reference
       that channel. `retries=0` per tech-plan T6 ("a flaky security
       assertion is worse than a slow one").
-- [ ] 12.4 Same spec, second case: revoke a participant's channel access
+- [x] 12.4 Same spec, second case: revoke a participant's channel access
       mid-session (open subscription) and assert post-revocation events are
       filtered without a reconnect (spec `chat-realtime` "Revocation takes
       effect at fan-out").
-- [ ] 12.5 Findings and attribution close-out: re-read tech-plan.md
+- [x] 12.5 Findings and attribution close-out: re-read tech-plan.md
       "Findings" (CF-1..CF-5) against what actually landed — append any gap
       discovered during implementation that wasn't anticipated (spec
       `chat-app` "Gap discovered during implementation"); confirm
@@ -364,5 +364,5 @@ names below are `openspec/changes/iw9-chat-flagship/specs/<capability>/spec.md`.
       `routes/invites.ts` (stream 3) changed under `server/workspace/src/`
       (`git diff --stat` scoped review — the "one deliberate, minimal core
       touch" claim, tech-plan Non-Goals).
-- [ ] 12.6 Run `openspec validate --change iw9-chat-flagship --strict` and
+- [x] 12.6 Run `openspec validate --change iw9-chat-flagship --strict` and
       fix anything it flags before closing the change.
