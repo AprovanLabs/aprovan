@@ -11,11 +11,8 @@ import SessionControls from "@/components/SessionControls";
 import { PatchworkCtx, SharedEditSessionCtx, WidgetErrorReporterCtx } from "@/contexts";
 import { ChatDock, useChatPanelLayout } from "@/features/chat/ChatDock";
 import { useChatFileContext } from "@/features/chat/chat-file-context";
-import { useChatTransport, useEditTransport } from "@/features/chat/chat-transport";
-import {
-  USE_RUN_TRANSPORT,
-  useRunTransport,
-} from "@/features/chat/run-transport";
+import { useEditTransport } from "@/features/chat/chat-transport";
+import { useRunTransport } from "@/features/chat/run-transport";
 import { APROVAN_LOGO } from "@/features/chat/MessageParts";
 import { useChatProviders, useChatSubmit } from "@/features/chat/useChatSubmit";
 import { EditModalHost } from "@/features/edit-modal/EditModalHost";
@@ -78,23 +75,12 @@ export default function ChatPage() {
   // Session id for RunTransport chat-turn posts (server lazy-creates when unset).
   // Kept in sync below once orchestration has an active session.
   const sessionIdRef = useRef<string | undefined>(undefined);
-  // Dev-only: both transports stay constructed; USE_RUN_TRANSPORT (default off)
-  // selects the run-protocol path. Stream 8 flips the default and deletes legacy.
-  const legacyTransport = useChatTransport({
-    chatProviderRef: providers.chatProviderRef,
-    chatModelRef: providers.chatModelRef,
-    imagePromptsRef: bootstrap.imagePromptsRef,
-    namespaces: bootstrap.namespaces,
-    services: bootstrap.services,
-    contextFilesRef,
-  });
-  const runTransport = useRunTransport({
+  const transport = useRunTransport({
     chatProviderRef: providers.chatProviderRef,
     chatModelRef: providers.chatModelRef,
     contextFilesRef,
     sessionIdRef,
   });
-  const transport = USE_RUN_TRANSPORT ? runTransport : legacyTransport;
   const editTransport = useEditTransport({
     chatProviderRef: providers.chatProviderRef,
     chatModelRef: providers.chatModelRef,
