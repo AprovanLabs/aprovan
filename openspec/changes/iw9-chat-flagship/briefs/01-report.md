@@ -1,6 +1,6 @@
 # Stream 1 report — Chat data model + channel authz
 
-**PR:** (filled after open)
+**PR:** https://github.com/AprovanLabs/aprovan/pull/225
 **Branch:** `feat/iw9-chat-data-model`
 **Base:** `origin/main`
 
