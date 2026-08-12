@@ -20,13 +20,11 @@
  * Manifests are stored under `svc#apps / <appId>`; `(workspaceId, name)` is a
  * mutable alias only (see apps/identity.ts).
  *
- * The UI `entry` is an ordinary FS file, so its content is version history for
- * free (the FS store content-versions every write). The helpers at the bottom
- * of this file surface that history for the `apps.versions/version/restore`
- * ops — the versioned artifact is the derived `entry` under the app root.
+ * The UI `entry` is an ordinary FS file under the app root. App releases pin
+ * app-scoped commits via `apps/release-tags.ts` (not per-file version helpers).
  */
 
-import { getFsStore, listAll, normalizeFsPath, type FsEntry, type FsFile } from "../fs-store.js";
+import { getFsStore, listAll, normalizeFsPath } from "../fs-store.js";
 import { ServiceError } from "../service-kernel.js";
 import {
   deleteSvcRecord,
@@ -153,7 +151,7 @@ export interface AppManifest {
   requires?: AppRequirement[];
   /**
    * Channel → release id. The live page serves `channels.live`'s pinned
-   * content when set (see apps/releases.ts); `?channel=preview` serves
+   * commit when set (see apps/release-tags.ts); `?channel=preview` serves
    * `channels.preview` to the app's admins.
    */
   channels?: Record<string, string>;
@@ -503,43 +501,6 @@ export async function removeApp(
     await getFsStore().removePrefix(workspaceId, `${APP_DATA_ROOT}/${manifest.appId}`);
   }
   return removed;
-}
-
-// ---------------------------------------------------------------------------
-// Entrypoint version history — thin wrappers over the FS store's per-file
-// versioning, keyed on a manifest's `entry`.
-// ---------------------------------------------------------------------------
-
-/** Every stored version of an app's UI entrypoint, newest (live) first. */
-export async function listEntryVersions(
-  workspaceId: string,
-  entry: string,
-): Promise<FsEntry[]> {
-  return getFsStore().listVersions(workspaceId, entry);
-}
-
-/** One pinned version of an app's UI entrypoint by content hash. */
-export async function readEntryVersion(
-  workspaceId: string,
-  entry: string,
-  hash: string,
-): Promise<FsFile | undefined> {
-  return getFsStore().read(workspaceId, entry, hash);
-}
-
-/**
- * Restore a past entrypoint version by re-writing its content as the new
- * latest. Append-only: history is preserved and the old content simply becomes
- * live again. Returns the new latest file, or undefined when `hash` is unknown.
- */
-export async function restoreEntryVersion(
-  workspaceId: string,
-  entry: string,
-  hash: string,
-): Promise<FsFile | undefined> {
-  const version = await getFsStore().read(workspaceId, entry, hash);
-  if (!version) return undefined;
-  return getFsStore().write(workspaceId, entry, version.content, version.mimeType);
 }
 
 export async function readWorkspaceConfig(workspaceId: string): Promise<WorkspaceConfig> {

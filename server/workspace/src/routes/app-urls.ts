@@ -10,12 +10,12 @@
  * Serving logic moved here from `routes/live-apps.ts`. Legacy `/apps/…`
  * paths are resolve-then-302 shims only (see live-apps.ts).
  *
- * **Channels.** When the manifest has a channel pointer, content requests
- * serve that release's pinned hashes (the entry is read at `entryHash`)
- * instead of the latest write; with no pointer, latest — so an app that never
- * cuts a release behaves exactly as it always did. `?channel=preview` (or any
- * non-default channel) is honoured only for callers holding the app's admin
- * role, and is checked on the token-bearing endpoints, not on page chrome.
+ * **Channels.** When a channel ref (or manifest channel pointer) resolves to
+ * a release tag, content requests serve files from that release commit's
+ * snapshot instead of the latest write; with no pointer, latest — so an app
+ * that never cuts a release behaves exactly as it always did. `?channel=preview`
+ * (or any non-default channel) is honoured only for callers holding the app's
+ * admin role, and is checked on the token-bearing endpoints, not on page chrome.
  *
  * Visibility is enforced server-side on the project and file endpoints, not
  * on page chrome:
@@ -28,9 +28,10 @@ import { Hono } from "hono";
 import {
   DEFAULT_CHANNEL,
   channelName,
-  resolveChannelRelease,
-  type AppRelease,
-} from "../apps/releases.js";
+  readReleasePath,
+  resolveRelease,
+  type ResolvedRelease,
+} from "../apps/release-tags.js";
 import { generateAppSdk } from "../apps/sdk.js";
 import {
   installRoot,
@@ -44,7 +45,6 @@ import {
   appPathServable,
   callerRole,
   readApp,
-  readEntryVersion,
   resolveAppPath,
   workspacePath,
   type AppManifest,
@@ -76,7 +76,7 @@ interface LiveApp {
   /** Workspace whose FS is read for content (always the installer for copies). */
   workspaceId: string;
   /** Pinned release when serving a channel pin on an origin app (not installs). */
-  release?: AppRelease;
+  release?: ResolvedRelease;
   /** True when content comes from an install-as-copy local root. */
   localFork?: boolean;
   /** Install id when serving `/w/…/a/<installId>` (canonical install surface). */
@@ -185,7 +185,7 @@ async function requireViewer(c: HonoCtx, manifest: AppManifest): Promise<void> {
  * of unreleased content, so it is gated on the app's admin role — checked
  * here, on the token-bearing endpoints, rather than on the page shell.
  */
-async function resolvePin(c: HonoCtx, app: LiveApp): Promise<AppRelease | undefined> {
+async function resolvePin(c: HonoCtx, app: LiveApp): Promise<ResolvedRelease | undefined> {
   // Install-pinned content wins over channel query.
   if (app.release) return app.release;
   const channel = channelName(c.req.query("channel"));
@@ -195,17 +195,17 @@ async function resolvePin(c: HonoCtx, app: LiveApp): Promise<AppRelease | undefi
       throw new ServiceError(`Channel "${channel}" is visible to this app's admins only`, 403);
     }
   }
-  return resolveChannelRelease(app.workspaceId, app.manifest, channel);
+  return resolveRelease(app.workspaceId, app.manifest.appId, channel);
 }
 
 /**
- * Read a file for the live surface, honouring a release pin: the entrypoint
- * is materialised at the release's content hash (the FS keeps every version,
- * so a pinned read is the same read with a hash), everything else is latest.
+ * Read a file for the live surface, honouring a release pin: paths present in
+ * the release commit's snapshot are materialised at that content hash;
+ * everything else falls through to latest.
  */
-async function readPinned(app: LiveApp, path: string, release: AppRelease | undefined) {
-  if (release?.entryHash && path === release.entry) {
-    const pinned = await readEntryVersion(app.workspaceId, path, release.entryHash);
+async function readPinned(app: LiveApp, path: string, release: ResolvedRelease | undefined) {
+  if (release) {
+    const pinned = await readReleasePath(app.workspaceId, release, path);
     if (pinned) return pinned;
   }
   return getFsStore().read(app.workspaceId, path);
@@ -297,7 +297,14 @@ async function handleLiveProject(c: any) {
       entry: manifest.entry,
       paths: manifest.paths,
       files,
-      release: release ? { id: release.id, channel: release.channel, createdAt: release.createdAt } : null,
+      release: release
+        ? {
+            id: release.releaseId,
+            channel: release.channel ?? DEFAULT_CHANNEL,
+            createdAt: release.createdAt,
+            commitId: release.commitId,
+          }
+        : null,
     });
   } catch (err) {
     return errorResponse(c, err);

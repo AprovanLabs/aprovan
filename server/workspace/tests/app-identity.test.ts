@@ -18,7 +18,7 @@ import {
   resolveAppRef,
   setAlias,
 } from "../src/apps/identity.js";
-import { listReleases, saveRelease, snapshotRelease } from "../src/apps/releases.js";
+import { cutRelease, listReleases } from "../src/apps/release-tags.js";
 import { appDataDir, listApps, readApp, saveApp } from "../src/apps/store.js";
 import { getRecordStore } from "../src/records.js";
 import { listSvcRecords, svcScope, writeSvcRecord } from "../src/svc-records.js";
@@ -123,12 +123,10 @@ describe("publish / rename / storage keys", () => {
       }),
     );
 
-    const manifest = (await readApp("local", published.appId))!;
-    const release = await snapshotRelease("local", manifest, {
+    const release = await cutRelease("local", published.appId, {
       channel: "live",
       createdBy: "local",
     });
-    await saveRelease("local", published.appId, release);
 
     const userSub = "alice";
     const records = getRecordStore();
@@ -143,7 +141,7 @@ describe("publish / rename / storage keys", () => {
       originAppId: published.appId,
       originWorkspaceId: "local",
       pin: { channel: "live" },
-      resolvedRelease: release.id,
+      resolvedRelease: release.releaseId,
       bindings: {},
       config: {},
       editing: false,
@@ -163,7 +161,7 @@ describe("publish / rename / storage keys", () => {
     await expect(resolveAppRef("local", "rename-me")).rejects.toMatchObject({ status: 404 });
 
     const releases = await listReleases("local", published.appId);
-    expect(releases.map((r) => r.id)).toContain(release.id);
+    expect(releases.map((r) => r.releaseId)).toContain(release.releaseId);
 
     const note = await records.get("local", `app#${published.appId}#u#${userSub}`, "note");
     expect(note?.value).toEqual({ v: 1 });
@@ -239,23 +237,22 @@ describe("publish / rename / storage keys", () => {
     const published = await data<{ appId: string }>(
       await manage("apps/publish", { name: "keys-check", allowed_tools: ["keyvalue.*"] }),
     );
-    const manifest = (await readApp("local", published.appId))!;
-    const release = await snapshotRelease("local", manifest, {
+    const release = await cutRelease("local", published.appId, {
       channel: "live",
       createdBy: "local",
     });
-    await saveRelease("local", published.appId, release);
 
     const appKeys = (await listSvcRecords("local", svcScope("apps"))).map((e) => e.key);
     expect(appKeys).toContain(published.appId);
     expect(appKeys).not.toContain("keys-check");
 
-    const releaseScope = svcScope("apps", "releases", published.appId);
-    const releaseKeys = await listSvcRecords("local", releaseScope);
-    expect(releaseKeys.length).toBeGreaterThan(0);
-
-    const badReleaseScope = svcScope("apps", "releases", "keys-check");
-    expect(await listSvcRecords("local", badReleaseScope)).toHaveLength(0);
+    // Releases live as VCS tags under tag/app/<appId>/… — never name-keyed scopes.
+    const releases = await listReleases("local", published.appId);
+    expect(releases.map((r) => r.releaseId)).toContain(release.releaseId);
+    expect(await listSvcRecords("local", svcScope("apps", "releases", published.appId))).toHaveLength(
+      0,
+    );
+    expect(await listSvcRecords("local", svcScope("apps", "releases", "keys-check"))).toHaveLength(0);
 
     const listed = await listApps("local");
     expect(listed.some((a) => a.appId === published.appId)).toBe(true);

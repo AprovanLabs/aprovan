@@ -75,7 +75,7 @@ export interface NotificationRecord {
   seenBy: Record<string, string>;
 }
 
-/** Time-prefixed id: sortable, unique (releases.ts precedent). */
+/** Time-prefixed id: sortable, unique (release-tags.ts precedent). */
 function newNotificationId(): string {
   return `${Date.now().toString(36)}-${crypto.randomUUID().slice(0, 8)}`;
 }
