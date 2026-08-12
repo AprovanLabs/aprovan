@@ -1,6 +1,6 @@
 # Stream 12 report — Integration verification
 
-**PR:** (filled after `gh pr create`)
+**PR:** https://github.com/AprovanLabs/aprovan/pull/262
 **Branch:** `feat/iw9-doc-integration`
 **Base:** `origin/main` @ `780e76e` (stream 4 quiesce)
 
