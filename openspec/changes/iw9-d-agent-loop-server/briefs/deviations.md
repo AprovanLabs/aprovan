@@ -210,5 +210,12 @@ match.
 
 ## Execution-time entries
 
-_(none yet — executing agents append below, one heading per finding, naming
-stream and task.)_
+### 6. Runner LLM completions are buffered, not token-streamed (execution, stream 2 / task 2.3)
+
+**Finding.** The native runner's `dispatchInterface(ctx, "llm", "createChatCompletion", …)` call returns one full assistant choice per turn. There is no token/chunk stream on this path today (unlike `POST /llm/:provider/chat` / completions, which pass `stream: true` and drain an upstream `ReadableStream`).
+
+**Branch taken.** Emit a single `assistant_delta` per turn carrying the full `message.content` (including any fenced widget blocks verbatim). Do not fabricate multi-delta fake streams. Upstream provider streaming for the runner is out of scope for this stream.
+
+**UX consequence.** `ux.md`'s "assistant text streams token-wise" is **not** met by this change. Streams 6 (run transport) and 8 (parity/flip) must write delta-granularity tests against **one delta per turn**, not token-wise chunks, until a later change adds real streaming to the runner's LLM call.
+
+---
