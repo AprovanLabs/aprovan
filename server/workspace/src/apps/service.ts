@@ -606,6 +606,7 @@ export const appsService: CoreService = {
     {
       name: "apps.publish",
       operation: "publish",
+      effect: "action",
       description:
         "Publish (or update) an app bound to a single workspace root (apps/<name>). Pass 'entry' or 'dir' to name the UI under that root; the root is derived (never a multi-prefix paths[] list — extras are rejected; use mounts to share content). 'workflows' is the app's export list: each becomes callable as app.<workflow>. 'allowed_tools' may only name the auto-partitioned native namespaces (vfs, keyvalue, events) or the app's own workflows — a provider (github, linear, …) must be reached through an exported workflow. The live app serves at /apps/<workspace>/<name>; identity is a ULID with a mutable name alias.",
       inputSchema: {
@@ -663,6 +664,7 @@ export const appsService: CoreService = {
     {
       name: "apps.list",
       operation: "list",
+      effect: "observation",
       description:
         "List the workspace's published apps with everything a directory needs in one call: appId, path binding, visibility, channels, allow-list, roles, limits, and each exported workflow with its triggers, schemas, webhook path, and last run.",
       inputSchema: { type: "object", properties: {} },
@@ -670,6 +672,7 @@ export const appsService: CoreService = {
     {
       name: "apps.summary",
       operation: "summary",
+      effect: "observation",
       description:
         "Lightweight app list (appId, name, title, visibility, workflow count, updatedAt) — for pickers and menus that don't render workflow detail.",
       inputSchema: { type: "object", properties: {} },
@@ -677,6 +680,7 @@ export const appsService: CoreService = {
     {
       name: "apps.get",
       operation: "get",
+      effect: "observation",
       description: "Get one app: the same composition as apps.list plus its capability report.",
       inputSchema: {
         type: "object",
@@ -689,6 +693,7 @@ export const appsService: CoreService = {
     {
       name: "apps.rename",
       operation: "rename",
+      effect: "action",
       description:
         "Rename an app's mutable alias. Storage keys (manifest, releases, partitions) are unchanged; the old alias 404s and the new one resolves. 409 when the new name is held by another app.",
       inputSchema: {
@@ -703,6 +708,7 @@ export const appsService: CoreService = {
     {
       name: "apps.capabilities",
       operation: "capabilities",
+      effect: "observation",
       description:
         "What this app can touch and where its data lives: the allow-listed native namespaces (procedures, partitioning, rate limits) and the workflows it exports (with their declared input/output schemas). Render this instead of hardcoding namespace lists.",
       inputSchema: {
@@ -716,6 +722,7 @@ export const appsService: CoreService = {
     {
       name: "apps.dataUsers",
       operation: "dataUsers",
+      effect: "observation",
       description:
         "List users with data partitions for an app. Admin-only; audited.",
       inputSchema: {
@@ -729,6 +736,7 @@ export const appsService: CoreService = {
     {
       name: "apps.dataKeys",
       operation: "dataKeys",
+      effect: "observation",
       description:
         "List record keys in one app user's partition. Admin-only; audited.",
       inputSchema: {
@@ -744,6 +752,7 @@ export const appsService: CoreService = {
     {
       name: "apps.dataGet",
       operation: "dataGet",
+      effect: "observation",
       description: "Read one record from an app user's partition. Admin-only; audited.",
       inputSchema: {
         type: "object",
@@ -759,6 +768,7 @@ export const appsService: CoreService = {
     {
       name: "apps.dataRead",
       operation: "dataRead",
+      effect: "observation",
       description:
         "Read one file from an app user's file partition under .apps/<appId>/data/<user>. Admin-only; audited.",
       inputSchema: {
@@ -775,6 +785,7 @@ export const appsService: CoreService = {
     {
       name: "apps.sdk",
       operation: "sdk",
+      effect: "observation",
       description:
         "Generate the app's SDK: { js, dts } — a runtime shim over the app tool proxy plus TypeScript types built from the native namespaces and each exported workflow's declared schemas. Served live at /apps/<workspace>/<name>/__sdk__.js and __sdk__.d.ts.",
       inputSchema: {
@@ -789,6 +800,7 @@ export const appsService: CoreService = {
     {
       name: "apps.release",
       operation: "release",
+      effect: "action",
       description:
         "Cut a release: commit the app scope if dirty, write an immutable tag, and point a channel (default 'live') at it. Releases are free to create and instant to roll back because they pin an app-scoped commit.",
       inputSchema: {
@@ -804,6 +816,7 @@ export const appsService: CoreService = {
     {
       name: "apps.releases",
       operation: "releases",
+      effect: "observation",
       description: "List an app's releases, newest first.",
       inputSchema: {
         type: "object",
@@ -813,6 +826,7 @@ export const appsService: CoreService = {
     {
       name: "apps.channels",
       operation: "channels",
+      effect: "observation",
       description:
         "What each channel currently serves: the release it points at, when it was cut, and its notes. The live page serves 'live'; '?channel=preview' serves 'preview' to the app's admins.",
       inputSchema: {
@@ -823,6 +837,7 @@ export const appsService: CoreService = {
     {
       name: "apps.promote",
       operation: "promote",
+      effect: "action",
       description:
         "Promote a Personal (or any) VFS subtree into a standalone app: {source, slug} → {appId, root}. " +
         "Also supports channel promote {app, from, to} (e.g. preview → live).",
@@ -841,6 +856,7 @@ export const appsService: CoreService = {
     {
       name: "apps.rollback",
       operation: "rollback",
+      effect: "action",
       description: "Move a channel back to the release before the one it serves.",
       inputSchema: {
         type: "object",
@@ -854,6 +870,7 @@ export const appsService: CoreService = {
     {
       name: "apps.install",
       operation: "install",
+      effect: "action",
       description:
         "Install a public app (or any app of this workspace) into THIS workspace as a local copy under apps/<slug>: " +
         "pins {tag?, commit}, records hosting mode, and binds required interface profiles.",
@@ -892,6 +909,7 @@ export const appsService: CoreService = {
     {
       name: "apps.updateCheck",
       operation: "updateCheck",
+      effect: "observation",
       description:
         "Compare an installation's pin against the origin's current release/commit. Returns {current, available?, originAvailable, message?}.",
       inputSchema: {
@@ -915,6 +933,7 @@ export const appsService: CoreService = {
     {
       name: "apps.applyUpdate",
       operation: "applyUpdate",
+      effect: "action",
       description:
         "Re-copy the origin archive onto an installation's local root. Pass confirmOverwrite=true when the local copy has edits.",
       inputSchema: {
@@ -941,6 +960,7 @@ export const appsService: CoreService = {
     {
       name: "apps.update",
       operation: "update",
+      effect: "action",
       description:
         "Re-resolve an installation's pin against the origin (channel → current release, or an explicit newer release). Returns {from, to}. Editing forks require force=true to overwrite local source. Prefer apps.applyUpdate for copy-model installs.",
       inputSchema: {
@@ -956,6 +976,7 @@ export const appsService: CoreService = {
     {
       name: "apps.configure",
       operation: "configure",
+      effect: "action",
       description:
         "Update an installation's bindings, config, and/or editing flag. Enabling editing materializes the pinned release under the install prefix.",
       inputSchema: {
@@ -973,6 +994,7 @@ export const appsService: CoreService = {
     {
       name: "apps.uninstall",
       operation: "uninstall",
+      effect: "action",
       description:
         "Remove an install record. Pass purgeData=true to delete `.apps/<installId>` data partitions.",
       inputSchema: {
@@ -988,12 +1010,14 @@ export const appsService: CoreService = {
     {
       name: "apps.installed",
       operation: "installed",
+      effect: "observation",
       description: "Installations in this workspace, with an available flag when the origin is reachable.",
       inputSchema: { type: "object", properties: {} },
     },
     {
       name: "apps.directory",
       operation: "directory",
+      effect: "observation",
       description:
         "Deployment-wide directory of public apps plus this workspace's own apps. Registry is never consulted.",
       inputSchema: { type: "object", properties: {} },
@@ -1001,6 +1025,7 @@ export const appsService: CoreService = {
     {
       name: "apps.shares",
       operation: "shares",
+      effect: "observation",
       description:
         "List the workspace paths shared with apps (apps always have automatic access to their own declared prefixes; shares expose paths outside them).",
       inputSchema: { type: "object", properties: {} },
@@ -1008,6 +1033,7 @@ export const appsService: CoreService = {
     {
       name: "apps.share",
       operation: "share",
+      effect: "action",
       description:
         "Share a workspace path prefix with apps: { prefix, apps: [names] or '*', mode: 'read'|'readwrite' }. App sessions reach shared paths via '~/<path>'.",
       inputSchema: {
@@ -1023,6 +1049,7 @@ export const appsService: CoreService = {
     {
       name: "apps.unshare",
       operation: "unshare",
+      effect: "action",
       description: "Remove a workspace path share by prefix.",
       inputSchema: {
         type: "object",
@@ -1033,6 +1060,7 @@ export const appsService: CoreService = {
     {
       name: "apps.remove",
       operation: "remove",
+      effect: "action",
       description:
         "Unpublish an app. By default authored files stay; pass purge_data=true to delete `.apps/<appId>` data partitions.",
       inputSchema: {

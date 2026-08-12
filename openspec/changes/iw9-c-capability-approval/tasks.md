@@ -153,24 +153,24 @@ cross-repo rule 4).
 
 > Depends-on: 6 | Repo: aprovan | Touches: aprovan/server/workspace/src/routes/tools.ts (ToolEntry + discovery functions only, not the invoke handler), aprovan/server/workspace/src/service-kernel.ts, aprovan/server/workspace/src/platform-plugins.ts, aprovan/server/workspace/src/apps/service.ts, aprovan/server/workspace/scripts/check-effect-completeness.ts, aprovan/server/workspace/tests/effect-classification.test.ts | Verify: cd /Users/jacob/Documents/Code/AprovanLabs/aprovan && pnpm --filter @aprovan/workspace test -- effect-classification && tsx server/workspace/scripts/check-effect-completeness.ts
 
-- [ ] 7.1 Add `effect: Effect` to `ToolEntry` (`routes/tools.ts:84-96`)
+- [x] 7.1 Add `effect: Effect` to `ToolEntry` (`routes/tools.ts:84-96`)
       and `ServiceToolEntry` (`service-kernel.ts:135-143`); thread it
       through `deriveToolEntries`, `catalogToolEntries`, and every core
       service's static `tools` export (starting with `platform-plugins.ts`
       and `apps/service.ts`) so `GET /tools` surfaces it end to end. Spec:
       effect-classification "Effect is visible on the wire".
-- [ ] 7.2 Annotate every core-service tool entry with an explicit
+- [x] 7.2 Annotate every core-service tool entry with an explicit
       `effect` (read/list/get → `observation`; everything else →
       `action`); an entry with neither an annotation nor a derivable
       method defaults to `action` at dispatch (fail closed). Spec:
       "Handwritten providers and core services are annotated",
       "Unannotated tool fails the completeness gate".
-- [ ] 7.3 New script `scripts/check-effect-completeness.ts`: builds the
+- [x] 7.3 New script `scripts/check-effect-completeness.ts`: builds the
       full tool list for a representative workspace and fails (naming the
       tool) if any entry lacks `effect` and has no derivable method; wire
       it into `pnpm --filter @aprovan/workspace check-types` or an
       equivalent pre-merge step.
-- [ ] 7.4 New test file `tests/effect-classification.test.ts`: tool list
+- [x] 7.4 New test file `tests/effect-classification.test.ts`: tool list
       entries all carry `effect`; a `github.*` GET tool's effect matches
       the bundler-derived value from the pinned package; an observation
       call inside a granted namespace executes without any resource-grant

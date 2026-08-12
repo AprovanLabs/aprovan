@@ -7,11 +7,16 @@
  * deliberately absent: they resolve as interfaces → `@aprovan/native`.
  */
 
-import type { CoreService, CoreServiceMeta, ServiceContext } from "./service-kernel.js";
+import {
+  classifyCoreEffect,
+  type CoreService,
+  type CoreServiceMeta,
+  type Effect,
+  type ServiceContext,
+  type ServiceToolEntry,
+} from "./service-kernel.js";
 
-import type { ServiceToolEntry } from "./service-kernel.js";
-
-type ToolEntry = ServiceToolEntry & { provider: string };
+type ToolEntry = ServiceToolEntry & { provider: string; effect: Effect };
 
 /** Re-export the service contract under the plugin name used by stream 6. */
 export type PlatformPlugin = CoreService;
@@ -71,7 +76,12 @@ export function getPlatformPlugin(namespace: string): PlatformPlugin | undefined
 export function platformToolEntries(): ToolEntry[] {
   if (!installed) return [];
   return Object.entries(installed).flatMap(([provider, plugin]) =>
-    plugin.tools.map((tool) => ({ ...tool, provider })),
+    plugin.tools.map((tool) => ({
+      ...tool,
+      provider,
+      // Explicit annotation wins; otherwise classify the operation leaf.
+      effect: tool.effect ?? classifyCoreEffect(tool.operation),
+    })),
   );
 }
 

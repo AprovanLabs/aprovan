@@ -119,6 +119,69 @@ export type { StreamingMode } from "@utdk/common/streaming";
 import type { StreamingMode } from "@utdk/common/streaming";
 
 /**
+ * Dispatch effect (IW-9 C / tech-plan D1). Local alias — published
+ * `@utdk/clients` `client.d.ts` does not yet export the named `Effect` type
+ * (stream 6 deviation); runtime metadata still carries `"effect"` strings.
+ */
+export type Effect = "observation" | "action";
+
+/**
+ * Classify a core-service / native-interface operation when it has no
+ * explicit `effect` annotation. Read/list/get-style leaves → observation;
+ * everything else → action (fail closed).
+ */
+export function classifyCoreEffect(operation: string): Effect {
+  const leaf = (operation.split(".").pop() ?? operation).toLowerCase();
+  if (
+    leaf === "list" ||
+    leaf === "get" ||
+    leaf === "read" ||
+    leaf === "show" ||
+    leaf === "summary" ||
+    leaf === "search" ||
+    leaf === "providers" ||
+    leaf === "query" ||
+    leaf === "traces" ||
+    leaf === "tree" ||
+    leaf === "stat" ||
+    leaf === "log" ||
+    leaf === "diff" ||
+    leaf === "branches" ||
+    leaf === "directory" ||
+    leaf === "installed" ||
+    leaf === "shares" ||
+    leaf === "channels" ||
+    leaf === "releases" ||
+    leaf === "capabilities" ||
+    leaf === "messages" ||
+    leaf === "hosts" ||
+    leaf === "runs" ||
+    leaf === "version" ||
+    leaf === "versions" ||
+    leaf === "sdk" ||
+    leaf === "updatecheck" ||
+    leaf === "getrun" ||
+    leaf === "getdefaults" ||
+    leaf === "datausers" ||
+    leaf === "datakeys" ||
+    leaf === "dataget" ||
+    leaf === "dataread" ||
+    leaf === "trace" ||
+    leaf === "resolve" ||
+    leaf === "received" ||
+    /^(get|list|read|show|search)/.test(leaf)
+  ) {
+    return "observation";
+  }
+  return "action";
+}
+
+/** Parse a wire/metadata effect string; unknown values are absent. */
+export function parseEffect(value: unknown): Effect | undefined {
+  return value === "observation" || value === "action" ? value : undefined;
+}
+
+/**
  * Map a legacy boolean or already-widened mode onto {@link StreamingMode}.
  * `true` → `"response"` so existing declarations keep today's wire behavior.
  * Absent stays absent (semantically ≡ false).
@@ -140,6 +203,12 @@ export interface ServiceToolEntry {
   outputSchema?: unknown;
   passthrough?: boolean;
   streaming?: StreamingMode;
+  /**
+   * Explicit effect annotation (required for handwritten core tools).
+   * Absent → {@link classifyCoreEffect} at discovery; dispatch fail-closes
+   * to `action` when still unresolved (stream 8).
+   */
+  effect?: Effect;
 }
 
 export interface CoreService {
