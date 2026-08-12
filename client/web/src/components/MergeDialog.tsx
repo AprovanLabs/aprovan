@@ -6,17 +6,17 @@
  * workspace changed this. Which should win?" — with three answers:
  *
  *   Keep my draft        → the draft's version overwrites on apply
- *   Keep workspace       → the draft drops its change (sessions.discard)
+ *   Keep workspace       → the draft drops its change
  *   Combine with AI      → the model merges both versions; anything it had
  *                          to decide is surfaced as short plain notes
  *
- * No Git vocabulary anywhere: no "conflict markers", no ours/theirs, no
- * hashes. Resolutions are written back into the draft's overlay, so the
- * caller can then apply cleanly (or just keep working).
+ * Both versions are visible via DiffViewer before choosing. Confirm submits
+ * through `sessions.resolve` (server applies atomically). No Git vocabulary.
  */
 
-import { AlertCircle, Check, Loader2, Sparkles } from "lucide-react";
-import { useCallback, useState } from "react";
+import { DiffViewer } from "@aprovan/editor";
+import { AlertCircle, Check, ChevronDown, ChevronRight, Loader2, Sparkles } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -25,7 +25,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { discardSessionChanges } from "@/lib/chat-sessions";
+import {
+  discardSessionChanges,
+  resolveChatSession,
+  syncChatSession,
+} from "@/lib/chat-sessions";
 import { readFile, readWorkspaceFileUnscoped, writeFile } from "@/lib/workspace-vfs";
 import type { ChatCompletionMessage } from "@/lib/llm";
 
@@ -39,6 +43,12 @@ interface FileResolution {
   aiError?: string;
 }
 
+type PaneLoad =
+  | { status: "loading" }
+  | { status: "ready"; content: string }
+  | { status: "missing" }
+  | { status: "error"; error: string };
+
 interface MergeDialogProps {
   open: boolean;
   sessionId: string;
@@ -46,10 +56,13 @@ interface MergeDialogProps {
   conflicts: string[];
   /** What happens after resolutions land ("apply" continues the apply). */
   finalizeLabel: string;
+  /** When true, `sessions.resolve` applies the draft after settling. */
+  applyOnConfirm: boolean;
   busy: boolean;
   runCompletion: (messages: ChatCompletionMessage[]) => Promise<string>;
   onCancel: () => void;
-  onResolved: () => void;
+  /** Fired after resolve succeeds. `applied` mirrors applyOnConfirm. */
+  onResolved: (result: { applied: boolean }) => void;
 }
 
 function extractFencedBlock(text: string): { content: string; notes: string } | null {
@@ -62,19 +75,102 @@ function extractFencedBlock(text: string): { content: string; notes: string } | 
   return { content: match[1], notes };
 }
 
+function ConflictDiff({
+  path,
+  afterContent,
+  afterLabel,
+}: {
+  path: string;
+  afterContent?: string;
+  afterLabel: string;
+}) {
+  const [draft, setDraft] = useState<PaneLoad>({ status: "loading" });
+  const [workspace, setWorkspace] = useState<PaneLoad>({ status: "loading" });
+  const [tick, setTick] = useState(0);
+
+  const load = useCallback(() => {
+    setDraft({ status: "loading" });
+    setWorkspace({ status: "loading" });
+    void readFile(path)
+      .then((content) => setDraft({ status: "ready", content }))
+      .catch((err) =>
+        setDraft({
+          status: "error",
+          error: err instanceof Error ? err.message : "Couldn't load this version.",
+        }),
+      );
+    void readWorkspaceFileUnscoped(path)
+      .then((content) => setWorkspace({ status: "ready", content }))
+      .catch((err) =>
+        setWorkspace({
+          status: "error",
+          error: err instanceof Error ? err.message : "Couldn't load this version.",
+        }),
+      );
+  }, [path]);
+
+  useEffect(() => {
+    load();
+  }, [load, tick]);
+
+  const before =
+    workspace.status === "ready"
+      ? { label: "Workspace version", content: workspace.content, status: "ready" as const }
+      : workspace.status === "loading"
+        ? { label: "Workspace version", status: "loading" as const }
+        : workspace.status === "error"
+          ? {
+              label: "Workspace version",
+              status: "error" as const,
+              error: workspace.error,
+              onRetry: () => setTick((n) => n + 1),
+            }
+          : { label: "Workspace version", status: "missing" as const };
+
+  const after =
+    afterContent !== undefined
+      ? { label: afterLabel, content: afterContent, status: "ready" as const }
+      : draft.status === "ready"
+        ? { label: afterLabel, content: draft.content, status: "ready" as const }
+        : draft.status === "loading"
+          ? { label: afterLabel, status: "loading" as const }
+          : draft.status === "error"
+            ? {
+                label: afterLabel,
+                status: "error" as const,
+                error: draft.error,
+                onRetry: () => setTick((n) => n + 1),
+              }
+            : { label: afterLabel, status: "missing" as const };
+
+  return <DiffViewer before={before} after={after} className="mt-1" />;
+}
+
 export function MergeDialog({
   open,
   sessionId,
-  conflicts,
+  conflicts: conflictsProp,
   finalizeLabel,
+  applyOnConfirm,
   busy,
   runCompletion,
   onCancel,
   onResolved,
 }: MergeDialogProps) {
+  const [conflicts, setConflicts] = useState(conflictsProp);
   const [resolutions, setResolutions] = useState<Map<string, FileResolution>>(new Map());
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set(conflictsProp));
   const [applying, setApplying] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [staleBanner, setStaleBanner] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setConflicts(conflictsProp);
+    setExpanded(new Set(conflictsProp));
+    setStaleBanner(false);
+    setError(null);
+  }, [open, conflictsProp]);
 
   const setResolution = useCallback((path: string, patch: Partial<FileResolution>) => {
     setResolutions((prev) => {
@@ -84,12 +180,21 @@ export function MergeDialog({
     });
   }, []);
 
+  const toggleExpanded = useCallback((path: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
+      return next;
+    });
+  }, []);
+
   const combineWithAI = useCallback(
     async (path: string) => {
       setResolution(path, { choice: "ai", aiBusy: true, aiError: undefined });
+      setExpanded((prev) => new Set(prev).add(path));
       try {
-        // The active VFS scope is this draft, so a plain read is the draft's
-        // version; the unscoped read is what the workspace has now.
+        // Active VFS scope is this draft → plain read is draft; unscoped is workspace.
         const [draft, workspace] = await Promise.all([
           readFile(path).catch(() => ""),
           readWorkspaceFileUnscoped(path).catch(() => ""),
@@ -136,38 +241,89 @@ export function MergeDialog({
   );
 
   const applyResolutions = useCallback(
-    async (choices: Map<string, FileResolution>) => {
+    async (choices: Map<string, FileResolution>, paths: string[]) => {
       setApplying(true);
       setError(null);
       try {
+        // Re-sync: if the workspace moved again, refresh the conflict set.
+        const { conflicts: fresh } = await syncChatSession(sessionId);
+        const freshPaths = fresh.map((c) => c.path).sort();
+        const prior = [...paths].sort();
+        const same =
+          freshPaths.length === prior.length &&
+          freshPaths.every((path, i) => path === prior[i]);
+        if (!same) {
+          setConflicts(freshPaths);
+          setExpanded((prev) => {
+            const next = new Set(prev);
+            for (const path of freshPaths) next.add(path);
+            return next;
+          });
+          setStaleBanner(true);
+          setResolutions((prev) => {
+            const next = new Map<string, FileResolution>();
+            for (const path of freshPaths) {
+              const kept = prev.get(path);
+              if (kept) next.set(path, kept);
+            }
+            return next;
+          });
+          return;
+        }
+
         const keepWorkspace: string[] = [];
-        for (const path of conflicts) {
+        let anyAiOrDraft = false;
+        for (const path of paths) {
           const resolution = choices.get(path) ?? { choice: "draft" as const };
           if (resolution.choice === "workspace") keepWorkspace.push(path);
-          else if (resolution.choice === "ai") {
-            if (resolution.aiContent === undefined) {
-              throw new Error(`“${path}” is set to Combine but hasn't been combined yet.`);
+          else {
+            anyAiOrDraft = true;
+            if (resolution.choice === "ai") {
+              if (resolution.aiContent === undefined) {
+                throw new Error(`“${path}” is set to Combine but hasn't been combined yet.`);
+              }
+              await writeFile(path, resolution.aiContent);
             }
-            await writeFile(path, resolution.aiContent); // session-scoped write
           }
-          // "draft" needs nothing — the draft already holds that version.
         }
-        if (keepWorkspace.length > 0) {
-          await discardSessionChanges(sessionId, keepWorkspace);
+
+        // Server resolve is bulk-strategy today (stream 1); prepare the overlay
+        // for mixed/AI choices, then settle via keep-draft / keep-workspace.
+        if (keepWorkspace.length > 0 && keepWorkspace.length === paths.length) {
+          await resolveChatSession(sessionId, {
+            strategy: "keep-workspace",
+            apply: applyOnConfirm,
+          });
+        } else {
+          if (keepWorkspace.length > 0) {
+            await discardSessionChanges(sessionId, keepWorkspace);
+          }
+          if (anyAiOrDraft || keepWorkspace.length < paths.length) {
+            await resolveChatSession(sessionId, {
+              strategy: "keep-draft",
+              apply: applyOnConfirm,
+            });
+          } else if (applyOnConfirm) {
+            await resolveChatSession(sessionId, {
+              strategy: "keep-draft",
+              apply: true,
+            });
+          }
         }
-        onResolved();
+
+        onResolved({ applied: applyOnConfirm });
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
       } finally {
         setApplying(false);
       }
     },
-    [conflicts, sessionId, onResolved],
+    [sessionId, applyOnConfirm, onResolved],
   );
 
   const confirm = useCallback(async () => {
-    await applyResolutions(resolutions);
-  }, [applyResolutions, resolutions]);
+    await applyResolutions(resolutions, conflicts);
+  }, [applyResolutions, resolutions, conflicts]);
 
   /** Bulk keep-all — only surface that executes bulk resolutions (tech-plan D6). */
   const resolveAll = useCallback(
@@ -175,7 +331,7 @@ export function MergeDialog({
       const next = new Map<string, FileResolution>();
       for (const path of conflicts) next.set(path, { choice });
       setResolutions(next);
-      await applyResolutions(next);
+      await applyResolutions(next, conflicts);
     },
     [conflicts, applyResolutions],
   );
@@ -190,11 +346,24 @@ export function MergeDialog({
         </DialogTitle>
         <DialogClose onClose={onCancel} />
       </DialogHeader>
-      <DialogContent className="space-y-4">
+      <DialogContent className="space-y-4 max-h-[85vh] overflow-y-auto">
         <p className="text-sm text-muted-foreground">
           While this draft was open, your workspace changed too. For each file, choose which
           version to keep — or let AI combine them and tell you what it decided.
         </p>
+
+        {staleBanner && (
+          <div
+            role="alert"
+            className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-900 dark:text-amber-200"
+          >
+            <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+            <span>
+              The workspace changed while you were deciding — review again. Prior choices are
+              kept where paths still conflict.
+            </span>
+          </div>
+        )}
 
         <div className="flex flex-wrap gap-2">
           <Button
@@ -219,16 +388,33 @@ export function MergeDialog({
 
         {conflicts.map((path) => {
           const resolution = resolutions.get(path) ?? { choice: "draft" as const };
+          const isOpen = expanded.has(path);
+          const afterLabel =
+            resolution.choice === "ai" && resolution.aiContent !== undefined
+              ? "Combined version"
+              : "This draft's version";
           return (
             <div key={path} className="rounded-md border p-3 space-y-2">
-              <div className="font-mono text-xs truncate" title={path}>
-                {path}
-              </div>
+              <button
+                type="button"
+                onClick={() => toggleExpanded(path)}
+                className="flex w-full items-center gap-1.5 text-left"
+              >
+                {isOpen ? (
+                  <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                ) : (
+                  <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                )}
+                <span className="font-mono text-xs truncate" title={path}>
+                  {path}
+                </span>
+              </button>
               <div className="flex flex-wrap gap-2">
                 <Button
                   size="sm"
                   variant={resolution.choice === "draft" ? "default" : "outline"}
                   className="h-7 text-xs"
+                  disabled={applying || busy || resolution.aiBusy}
                   onClick={() => setResolution(path, { choice: "draft" })}
                 >
                   Keep my draft's version
@@ -237,6 +423,7 @@ export function MergeDialog({
                   size="sm"
                   variant={resolution.choice === "workspace" ? "default" : "outline"}
                   className="h-7 text-xs"
+                  disabled={applying || busy || resolution.aiBusy}
                   onClick={() => setResolution(path, { choice: "workspace" })}
                 >
                   Keep the workspace version
@@ -245,7 +432,7 @@ export function MergeDialog({
                   size="sm"
                   variant={resolution.choice === "ai" ? "default" : "outline"}
                   className="h-7 text-xs gap-1"
-                  disabled={resolution.aiBusy}
+                  disabled={applying || busy || resolution.aiBusy}
                   onClick={() => void combineWithAI(path)}
                 >
                   {resolution.aiBusy ? (
@@ -271,11 +458,16 @@ export function MergeDialog({
                       {resolution.aiNotes}
                     </div>
                   )}
-                  <pre className="max-h-32 overflow-auto rounded bg-muted p-2 text-[11px]">
-                    {resolution.aiContent.slice(0, 2000)}
-                    {resolution.aiContent.length > 2000 ? "\n…" : ""}
-                  </pre>
                 </div>
+              )}
+              {isOpen && (
+                <ConflictDiff
+                  path={path}
+                  afterLabel={afterLabel}
+                  afterContent={
+                    resolution.choice === "ai" ? resolution.aiContent : undefined
+                  }
+                />
               )}
             </div>
           );

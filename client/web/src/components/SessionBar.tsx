@@ -27,6 +27,7 @@ import {
   X,
 } from "lucide-react";
 import { useState } from "react";
+import { ChangeList } from "@/components/ChangeList";
 import { CommitMountedContent } from "@/components/CommitMountedContent";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -69,6 +70,8 @@ interface SessionBarProps {
   onOpenWindow: () => void;
   onOpenFile: (path: string) => void;
   onRefreshSessions: () => void;
+  /** Undo auto-session file changes (restore listed paths to base). */
+  onUndoChanges?: () => void;
 }
 
 /** One quiet signal for "is my work saved" — the whole save-state story
@@ -117,7 +120,7 @@ function statusBadge(session: ChatSessionInfo) {
 
 function changesLabel(session: ChatSessionInfo): string {
   const count = changedFileCount(session);
-  return count === 0 ? "" : `${count} file${count === 1 ? "" : "s"} changed`;
+  return count === 0 ? "" : `Changed ${count} file${count === 1 ? "" : "s"}`;
 }
 
 export function SessionBar({
@@ -136,6 +139,7 @@ export function SessionBar({
   onOpenWindow,
   onOpenFile,
   onRefreshSessions,
+  onUndoChanges,
 }: SessionBarProps) {
   const [listOpen, setListOpen] = useState(false);
   const [changesOpen, setChangesOpen] = useState(false);
@@ -145,17 +149,11 @@ export function SessionBar({
   const changed = session ? changedFileCount(session) : 0;
   const isOpen = session?.status === "open";
   const isDraft = session?.mode === "staged";
+  const isAuto = session?.mode === "auto";
   // Versioning vocabulary (base-age) is staged-only — never on direct-edit / auto chats.
   const baseAge = isDraft ? relativeTime(session?.baseAt ?? session?.createdAt) : "";
-
-  const changeRows =
-    isDraft && session?.changes
-      ? [
-          ...session.changes.added.map((path) => ({ path, label: "new" as const })),
-          ...session.changes.modified.map((path) => ({ path, label: "edited" as const })),
-          ...session.changes.removed.map((path) => ({ path, label: "removed" as const })),
-        ].sort((a, b) => a.path.localeCompare(b.path))
-      : [];
+  const showChangeStrip = !!session && isOpen && changed > 0 && (isDraft || isAuto);
+  const includesOther = session?.changes?.includesOtherActivity === true;
 
   return (
     <div className="shrink-0 border-b bg-muted/30 text-xs">
@@ -206,11 +204,15 @@ export function SessionBar({
                 Draft changes — apply to publish
               </span>
             )}
-            {isDraft && changed > 0 && (
+            {showChangeStrip && (
               <button
                 type="button"
                 onClick={() => setChangesOpen((open) => !open)}
-                className="flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-muted text-violet-700 dark:text-violet-400 font-medium"
+                className={`flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-muted font-medium ${
+                  isDraft
+                    ? "text-violet-700 dark:text-violet-400"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
                 title="Files this chat changed — click to see them"
               >
                 <FileDiff className="h-3 w-3" />
@@ -257,6 +259,11 @@ export function SessionBar({
                   <RefreshCw className="h-3 w-3" /> Get latest changes
                 </DropdownMenuItem>
               )}
+              {isOpen && isAuto && changed > 0 && onUndoChanges && (
+                <DropdownMenuItem disabled={busy} onSelect={onUndoChanges}>
+                  <RotateCcw className="h-3 w-3" /> Undo these changes
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem disabled={busy} onSelect={onReset}>
                 <RotateCcw className="h-3 w-3" /> Start over
               </DropdownMenuItem>
@@ -282,29 +289,25 @@ export function SessionBar({
         </span>
       </div>
 
-      {changesOpen && changeRows.length > 0 && (
-        <div className="border-t px-2 py-1 max-h-40 overflow-y-auto">
-          {changeRows.map((row) => (
-            <button
-              key={row.path}
-              type="button"
-              onClick={() => onOpenFile(row.path)}
-              className="flex w-full items-center gap-2 rounded px-1.5 py-0.5 text-left hover:bg-muted"
+      {changesOpen && showChangeStrip && session?.changes && (
+        <div className="border-t px-2 py-1 max-h-40 overflow-y-auto space-y-1">
+          {includesOther && (
+            <p className="px-1 text-[11px] text-muted-foreground">
+              All changes since this chat started (may include other activity)
+            </p>
+          )}
+          <ChangeList changes={session.changes} onOpen={onOpenFile} collapseAfter={8} />
+          {isAuto && onUndoChanges && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 px-1.5 text-xs gap-1"
+              disabled={busy}
+              onClick={onUndoChanges}
             >
-              <span
-                className={`w-14 shrink-0 text-[10px] uppercase tracking-wide ${
-                  row.label === "new"
-                    ? "text-emerald-600 dark:text-emerald-400"
-                    : row.label === "edited"
-                      ? "text-amber-600 dark:text-amber-400"
-                      : "text-red-600 dark:text-red-400"
-                }`}
-              >
-                {row.label}
-              </span>
-              <span className="truncate font-mono">{row.path}</span>
-            </button>
-          ))}
+              <RotateCcw className="h-3 w-3" /> Undo these changes
+            </Button>
+          )}
         </div>
       )}
 

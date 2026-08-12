@@ -137,22 +137,22 @@
 
 > Repo: aprovan | Depends-on: 1, 4 | Touches: aprovan/client/web/src/components/MergeDialog.tsx, aprovan/client/web/src/components/SessionBar.tsx, aprovan/client/web/src/features/chat/ChatDock.tsx, aprovan/client/web/src/components/panels/SessionsPanel.tsx, aprovan/client/web/src/components/panels/SandboxesPanel.tsx | Verify: cd aprovan/client/web && pnpm typecheck && pnpm test && grep -rn "GitBranch\|uncommitted\|[Ss]taged" src/components/panels/SessionsPanel.tsx src/components/panels/SandboxesPanel.tsx | grep -v node_modules; test $? -ne 0
 
-- [ ] 6.1 Rewire `MergeDialog.tsx:220-282`: per-conflict embedded
+- [x] 6.1 Rewire `MergeDialog.tsx:220-282`: per-conflict embedded
       DiffViewer ("Workspace version" vs "This draft's version"), choices
       submitted through `sessions.resolve` (server applies atomically,
       `vcs/sessions-service.ts:175`), stale-conflict refresh banner, per-row
       AI states (spec session-answerability "Merge conflicts resolved with
       eyes open"; ux.md flow).
-- [ ] 6.2 Replace the five change-list renderings (`SessionBar.tsx:151-158`,
+- [x] 6.2 Replace the five change-list renderings (`SessionBar.tsx:151-158`,
       `ChatDock.tsx:216-222`, `SaveAffordance.tsx:301-307` via stream 4's
       render prop, `SessionsPanel.tsx:119-148`,
       `SandboxesPanel.tsx:201-217`) with the shared ChangeList; delete the
       local row-mapping logic in each (scenario "Single implementation").
-- [ ] 6.3 Show the change strip on auto chats in SessionBar/ChatDock (was
+- [x] 6.3 Show the change strip on auto chats in SessionBar/ChatDock (was
       draft-only) fed by the now-populated `changeSummary`, plus the "Undo
       these changes" action calling `vcs.restore` for the listed paths
       (scenario "Auto session undo"; ux.md flow).
-- [ ] 6.4 Vocabulary sweep per ux.md table: SessionsPanel drops `GitBranch`
+- [x] 6.4 Vocabulary sweep per ux.md table: SessionsPanel drops `GitBranch`
       (History/Clock icon), "staged" copy, and Open/Merged/Closed tabs →
       Active/Applied/Archived; SandboxesPanel "uncommitted" → "unsaved
       changes". Verify greps gate the jargon.

@@ -8,10 +8,12 @@ import {
   MessageSquare,
   Pin,
   PinOff,
+  RotateCcw,
   Send,
   X,
 } from "lucide-react";
 import type { UIMessage } from "ai";
+import { ChangeList } from "@/components/ChangeList";
 import { MergeDialog } from "@/components/MergeDialog";
 import { ProviderModelControls } from "@/components/ProviderPicker";
 import {
@@ -23,8 +25,14 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { publishConflictNotification } from "@/features/sessions/conflict-notify";
-import { changedFileCount, type ChatSessionInfo } from "@/lib/chat-sessions";
+import {
+  changedFileCount,
+  getChatSession,
+  relativeTime,
+  type ChatSessionInfo,
+} from "@/lib/chat-sessions";
 import { fetchLlmModels } from "@/lib/llm";
+import { invokeNamespaceTool } from "@/lib/tools";
 import type { useSessionOrchestration } from "@/features/sessions/useSessionOrchestration";
 import { Badge } from "@/components/ui/badge";
 import { ChatComposer } from "./ChatComposer";
@@ -196,82 +204,92 @@ export function useChatPanelLayout(getSplitRowWidth: () => number) {
 
 export type ChatDockLayoutApi = ReturnType<typeof useChatPanelLayout>;
 
-/** Proposed-changes review block: AI edits always ride a staged overlay. */
+/** Proposed / recent changes review block for draft and auto chats. */
 function ProposedChangesReview({
   session,
   busy,
   onApply,
   onDismiss,
   onOpenFile,
+  onUndoChanges,
 }: {
   session: ChatSessionInfo;
   busy: boolean;
   onApply: () => void;
   onDismiss: () => void;
   onOpenFile: (path: string) => void;
+  onUndoChanges?: () => void;
 }) {
   const count = changedFileCount(session);
-  if (session.mode !== "staged" || session.status !== "open" || count === 0) return null;
+  if (session.status !== "open" || count === 0 || !session.changes) return null;
 
-  const changeRows = session.changes
-    ? [
-        ...session.changes.added.map((path) => ({ path, label: "new" as const })),
-        ...session.changes.modified.map((path) => ({ path, label: "edited" as const })),
-        ...session.changes.removed.map((path) => ({ path, label: "removed" as const })),
-      ].sort((a, b) => a.path.localeCompare(b.path))
-    : [];
+  const isDraft = session.mode === "staged";
+  const includesOther = session.changes.includesOtherActivity === true;
 
   return (
-    <div className="shrink-0 border-b bg-violet-500/5 px-3 py-2 space-y-2">
-      <div className="flex items-center gap-2 text-xs font-medium text-violet-800 dark:text-violet-300">
+    <div
+      className={`shrink-0 border-b px-3 py-2 space-y-2 ${
+        isDraft ? "bg-violet-500/5" : "bg-muted/20"
+      }`}
+    >
+      <div
+        className={`flex items-center gap-2 text-xs font-medium ${
+          isDraft
+            ? "text-violet-800 dark:text-violet-300"
+            : "text-muted-foreground"
+        }`}
+      >
         <FileDiff className="h-3.5 w-3.5 shrink-0" />
         <span>
-          Proposed changes — {count} file{count === 1 ? "" : "s"}
+          {isDraft ? "Proposed changes" : "Changed"} — {count} file
+          {count === 1 ? "" : "s"}
         </span>
         <span className="ml-auto flex items-center gap-1">
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-6 px-2 text-xs"
-            disabled={busy}
-            onClick={onDismiss}
-            title="Drop these proposed changes"
-          >
-            Dismiss
-          </Button>
-          <Button
-            size="sm"
-            className="h-6 px-2 text-xs gap-1"
-            disabled={busy}
-            onClick={onApply}
-            title="Apply proposed changes to your workspace"
-          >
-            <Check className="h-3 w-3" /> Apply
-          </Button>
+          {isDraft ? (
+            <>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 px-2 text-xs"
+                disabled={busy}
+                onClick={onDismiss}
+                title="Drop these proposed changes"
+              >
+                Dismiss
+              </Button>
+              <Button
+                size="sm"
+                className="h-6 px-2 text-xs gap-1"
+                disabled={busy}
+                onClick={onApply}
+                title="Apply proposed changes to your workspace"
+              >
+                <Check className="h-3 w-3" /> Apply
+              </Button>
+            </>
+          ) : (
+            onUndoChanges && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 px-2 text-xs gap-1"
+                disabled={busy}
+                onClick={onUndoChanges}
+                title="Put these files back the way they were when this chat started"
+              >
+                <RotateCcw className="h-3 w-3" /> Undo these changes
+              </Button>
+            )
+          )}
         </span>
       </div>
-      <div className="max-h-28 overflow-y-auto space-y-0.5">
-        {changeRows.map((row) => (
-          <button
-            key={row.path}
-            type="button"
-            onClick={() => onOpenFile(row.path)}
-            className="flex w-full items-center gap-2 rounded px-1.5 py-0.5 text-left text-xs hover:bg-muted"
-          >
-            <span
-              className={`w-14 shrink-0 text-[10px] uppercase tracking-wide ${
-                row.label === "new"
-                  ? "text-emerald-600 dark:text-emerald-400"
-                  : row.label === "edited"
-                    ? "text-amber-600 dark:text-amber-400"
-                    : "text-red-600 dark:text-red-400"
-              }`}
-            >
-              {row.label}
-            </span>
-            <span className="truncate font-mono text-muted-foreground">{row.path}</span>
-          </button>
-        ))}
+      {includesOther && (
+        <p className="text-[11px] text-muted-foreground">
+          All changes since this chat started (may include other activity)
+        </p>
+      )}
+      <div className="max-h-28 overflow-y-auto">
+        <ChangeList changes={session.changes} onOpen={onOpenFile} collapseAfter={8} />
       </div>
     </div>
   );
@@ -399,6 +417,37 @@ export function ChatDock({
 
   const handleApplyProposal = useCallback(() => {
     session.handleApplySession();
+  }, [session]);
+
+  const handleUndoChanges = useCallback(() => {
+    const active = session.activeSession;
+    if (!active?.changes || active.mode !== "auto") return;
+    const paths = [
+      ...active.changes.added,
+      ...active.changes.modified,
+      ...active.changes.removed,
+    ];
+    if (paths.length === 0) return;
+    const when = relativeTime(active.baseAt ?? active.createdAt) || "when this chat started";
+    if (
+      !window.confirm(
+        `Puts these ${paths.length} file${paths.length === 1 ? "" : "s"} back the way they were ${when}. This adds to history; nothing is lost.`,
+      )
+    ) {
+      return;
+    }
+    session.runSessionAction(async () => {
+      const invokeVcs = invokeNamespaceTool("vcs");
+      for (const path of paths) {
+        await invokeVcs("restore", { commit: active.base, path });
+      }
+      const updated = await getChatSession(active.id);
+      session.applySession(updated);
+      session.refreshSessions();
+      session.setSessionNotice(
+        `Restored ${paths.length} file${paths.length === 1 ? "" : "s"} to how they were ${when}.`,
+      );
+    });
   }, [session]);
 
   const composerPlaceholder = filePath
@@ -529,6 +578,7 @@ export function ChatDock({
         onOpenWindow={session.handleOpenSessionWindow}
         onOpenFile={(path) => void openWorkspacePreview(path)}
         onRefreshSessions={session.refreshSessions}
+        onUndoChanges={handleUndoChanges}
       />
 
       {session.activeSession && (
@@ -538,6 +588,7 @@ export function ChatDock({
           onApply={handleApplyProposal}
           onDismiss={session.handleDiscardSession}
           onOpenFile={(path) => void openWorkspacePreview(path)}
+          onUndoChanges={handleUndoChanges}
         />
       )}
 
@@ -551,6 +602,7 @@ export function ChatDock({
               ? "Use these choices and apply"
               : "Use these choices"
           }
+          applyOnConfirm={session.mergeState.finalize === "apply"}
           busy={session.sessionBusy}
           runCompletion={session.runMergeCompletion}
           onCancel={() => session.setMergeState(null)}

@@ -194,26 +194,9 @@ export function useSessionOrchestration(args: {
     [runSessionAction, openSession]
   );
 
-  /** Finish an apply: put the draft's changes into the workspace. */
-  const finalizeApply = useCallback(
-    () =>
-      runSessionAction(async () => {
-        if (!activeSession) return;
-        setMergeState(null);
-        await closeChatSession(activeSession.id, { stage: true });
-        setSessionNotice("Applied to your workspace.");
-        enterMainState();
-        refreshSessions();
-        resetStore();
-        void refreshWorkspace();
-      }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [runSessionAction, activeSession, startSession]
-  );
-
   // Apply = refresh from the workspace first; if any file changed in both
   // places, the merge dialog asks one plain question per file before the
-  // apply continues.
+  // apply continues. MergeDialog settles via sessions.resolve (with apply).
   const handleApplySession = useCallback(
     () =>
       runSessionAction(async () => {
@@ -292,20 +275,30 @@ export function useSessionOrchestration(args: {
     [runSessionAction, activeSession, applySession]
   );
 
-  // Merge-dialog completion: resolutions are already written into the draft;
-  // either continue the apply or just refresh the summary.
-  const handleMergeResolved = useCallback(() => {
-    const finalize = mergeState?.finalize;
-    setMergeState(null);
-    if (finalize === "apply") {
-      void finalizeApply();
-    } else if (activeSession) {
-      getChatSession(activeSession.id)
-        .then((updated) => applySession(updated))
-        .catch(() => {});
-      setSessionNotice("Sorted — the draft now has your chosen versions.");
-    }
-  }, [mergeState, finalizeApply, activeSession, applySession]);
+  // Merge-dialog completion: MergeDialog already called sessions.resolve
+  // (with apply when finalize was "apply"). Refresh UI; do not re-apply.
+  const handleMergeResolved = useCallback(
+    (result?: { applied: boolean }) => {
+      const applied = result?.applied ?? mergeState?.finalize === "apply";
+      setMergeState(null);
+      if (applied) {
+        setSessionNotice("Applied to your workspace.");
+        enterMainState();
+        refreshSessions();
+        resetStore();
+        void refreshWorkspace();
+        return;
+      }
+      if (activeSession) {
+        getChatSession(activeSession.id)
+          .then((updated) => applySession(updated))
+          .catch(() => {});
+        setSessionNotice("Sorted — the draft now has your chosen versions.");
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [mergeState, activeSession, applySession, enterMainState, refreshSessions],
+  );
 
   /** Provider-bound completion runner for the merge dialog's AI combine. */
   const runMergeCompletion = useCallback(

@@ -18,7 +18,15 @@ export {
   type DirectSaveState,
   type DraftAffordanceState,
   type SaveConfirmDialogProps,
+  type RenderChangeList,
+  type SaveAffordanceChanges,
 } from "./components/SaveAffordance";
+export {
+  DiffViewer,
+  type DiffViewerProps,
+  type DiffViewerMode,
+  type DiffPane,
+} from "./components/DiffViewer";
 export { staleFileAction, type StaleFileAction } from "./components/staleFile";
 export { ViewModeToggle, type ViewModeToggleProps } from "./components/ViewModeToggle";
 export { WidgetPreview, type WidgetPreviewProps } from "./components/WidgetPreview";

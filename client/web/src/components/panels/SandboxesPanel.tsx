@@ -8,9 +8,9 @@
  * reaches the workspace until someone commits, so this panel exists to answer
  * three questions the API can only answer if you ask it:
  *
- *   1. **What is uncommitted right now?** Change counts are on the row, not
- *      behind an expand, because "this sandbox has 3 uncommitted files" is the
- *      one thing you need before closing a laptop.
+ *   1. **What has unsaved changes right now?** Change counts are on the row,
+ *      not behind an expand, because "this sandbox has 3 unsaved changes" is
+ *      the one thing you need before closing a laptop.
  *   2. **Did the command work?** The Console is the "did the tests pass" view.
  *   3. **Why is nothing running?** A machine that lost its toolchain silently
  *      stops taking scheduled work, and the only symptom is a queue that never
@@ -35,6 +35,7 @@ import {
   useScopeFilter,
   type NativePanelProps,
 } from "./shell";
+import { ChangeList } from "@/components/ChangeList";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -197,25 +198,18 @@ function FilterChip({
   );
 }
 
-/** Paths that changed, grouped by what happened to them. */
+/** Paths that changed — shared ChangeList (new / edited / removed words). */
 function DiffList({ changes }: { changes: MountChanges }) {
-  const groups: Array<{ label: string; className: string; paths: string[] }> = [
-    { label: "+", className: "text-emerald-500", paths: changes.added ?? [] },
-    { label: "~", className: "text-amber-500", paths: changes.modified ?? [] },
-    { label: "−", className: "text-red-500", paths: changes.removed ?? [] },
-  ];
   return (
-    <div className="mt-1 space-y-0.5">
-      {groups.flatMap((group) =>
-        group.paths.map((path) => (
-          <div key={`${group.label}${path}`} className="flex items-baseline gap-1.5 text-xs">
-            <span className={`w-2 shrink-0 font-mono ${group.className}`}>{group.label}</span>
-            <code className="min-w-0 truncate font-mono text-muted-foreground" title={path}>
-              {path}
-            </code>
-          </div>
-        )),
-      )}
+    <div className="mt-1">
+      <ChangeList
+        changes={{
+          added: changes.added ?? [],
+          modified: changes.modified ?? [],
+          removed: changes.removed ?? [],
+        }}
+        collapseAfter={8}
+      />
     </div>
   );
 }
@@ -229,7 +223,7 @@ type ChangeState =
   | { kind: "ready"; changes: MountChanges[] }
   | { kind: "error"; message: string };
 
-/** Uncommitted files across a sandbox's tracked mounts. */
+/** Unsaved changes across a sandbox's tracked mounts. */
 function pendingCount(state: ChangeState | undefined): number | undefined {
   if (state?.kind !== "ready") return undefined;
   return state.changes.reduce((total, mount) => total + (mount.total ?? 0), 0);
@@ -317,7 +311,9 @@ function SandboxRow({
               unknown
             </span>
           ) : dirty ? (
-            <span className="font-medium text-amber-500">{pending} uncommitted</span>
+            <span className="font-medium text-amber-500">
+              {pending} unsaved change{pending === 1 ? "" : "s"}
+            </span>
           ) : (
             <span className="text-muted-foreground">no changes</span>
           )}
