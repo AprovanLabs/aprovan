@@ -942,6 +942,53 @@ toolsRouter.get("/", async (c) => {
 });
 
 // ---------------------------------------------------------------------------
+// catalogForNamespace — compact op signatures for the runner's `describe`
+// ---------------------------------------------------------------------------
+//
+// Same discovery catalog as GET /tools (`discoverTools`), filtered to one
+// namespace and reduced to the on-demand describe shape (operation path +
+// compact params + one-line description). Shared so the native runner does
+// not grow a second catalog implementation.
+
+/** One operation as returned by {@link catalogForNamespace} / `describe`. */
+export interface CatalogOperation {
+  operation: string;
+  /** Compact param list, e.g. `"message, prefix?, ref?"`. */
+  params: string;
+  description?: string;
+}
+
+function compactParams(inputSchema: unknown): string {
+  const schema = inputSchema as
+    | { properties?: Record<string, unknown>; required?: string[] }
+    | undefined;
+  if (!schema || typeof schema !== "object") return "";
+  const required = Array.isArray(schema.required) ? schema.required : [];
+  const optional = Object.keys(schema.properties ?? {}).filter(
+    (key) => !required.includes(key),
+  );
+  return [...required, ...optional.map((key) => `${key}?`)].slice(0, 8).join(", ");
+}
+
+/**
+ * Compact operation signatures for one namespace from the workspace tool
+ * catalog (identical source to `GET /tools`).
+ */
+export async function catalogForNamespace(
+  workspaceId: string,
+  namespace: string,
+): Promise<CatalogOperation[]> {
+  const tools = await discoverTools(workspaceId);
+  return tools
+    .filter((tool) => tool.provider === namespace && tool.operation !== "*")
+    .map((tool) => ({
+      operation: tool.operation,
+      params: compactParams(tool.inputSchema),
+      ...(tool.description ? { description: tool.description } : {}),
+    }));
+}
+
+// ---------------------------------------------------------------------------
 // GET /tools/namespaces — what *kind* each namespace is
 // ---------------------------------------------------------------------------
 //
