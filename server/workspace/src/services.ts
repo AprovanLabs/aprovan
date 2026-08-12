@@ -817,14 +817,20 @@ export async function catalogToolEntries(provider: string): Promise<ToolEntry[]>
   );
   const entries: ToolEntry[] = (detail.operations ?? [])
     .filter((op) => typeof op.sdkPath === "string" && op.sdkPath)
-    .map((op) => ({
-      provider,
-      name: `${provider}.${op.sdkPath}`,
-      operation: op.sdkPath,
-      description: op.summary ?? op.description ?? undefined,
-      inputSchema: schemaFromCatalogOp(op),
-      outputSchema: outputSchemaFromCatalogOp(op),
-    }));
+    .map((op) => {
+      const method = typeof op.httpMethod === "string" ? op.httpMethod.toUpperCase() : "";
+      const effect =
+        method === "GET" || method === "HEAD" ? ("observation" as const) : ("action" as const);
+      return {
+        provider,
+        name: `${provider}.${op.sdkPath}`,
+        operation: op.sdkPath,
+        description: op.summary ?? op.description ?? undefined,
+        inputSchema: schemaFromCatalogOp(op),
+        outputSchema: outputSchemaFromCatalogOp(op),
+        effect,
+      };
+    });
   providerDetailCache.set(provider, {
     entries,
     expiresAt: now + CATALOG_TTL_MS,

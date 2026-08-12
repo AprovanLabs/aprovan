@@ -40,6 +40,9 @@ import { OAuthExchangeError, resolveToInjectable } from "../oauthTokens.js";
 import {
   normalizeStreamingMode,
   ServiceError,
+  classifyCoreEffect,
+  parseEffect,
+  type Effect,
   type StreamingMode,
 } from "../service-kernel.js";
 import { parseTelemetrySourceHeader, recordTelemetry } from "../telemetry/service.js";
@@ -93,7 +96,16 @@ export interface ToolEntry {
   passthrough?: boolean;
   /** Streaming call shape. Absent ≡ false. Surfaced on GET /tools. */
   streaming?: StreamingMode;
+  /**
+   * Observation vs action (IW-9 C). Always set on the wire by discovery;
+   * generated providers pass through package metadata; core services use
+   * explicit annotations or {@link classifyCoreEffect}.
+   */
+  effect: Effect;
 }
+
+/** Re-export for callers that type against the tool list. */
+export type { Effect };
 
 interface CachedToolList {
   tools: ToolEntry[];
@@ -125,13 +137,15 @@ export function resetToolListCache(): void {
  * Derive tool entries for a provider from its cached module.
  *
  * Primary source: the static `tools` export (APR-304). Each entry is expected
- * to look like `{ name, description?, inputSchema?, outputSchema? }` where
- * `name` follows the `provider.operation` convention.
+ * to look like `{ name, description?, inputSchema?, outputSchema?, effect? }`
+ * where `name` follows the `provider.operation` convention.
  *
  * Transitional fallback: when a `tools` export is not present but the module
  * re-exports `toolMetadata`, entries are derived from the runtime metadata
  * map (best-effort input schema from the parameter keys). This keeps
  * discovery useful before every provider package ships a `tools` export.
+ * Effect is passed through from metadata when present; otherwise absent
+ * entries are filled by {@link ensureEntryEffect} before they hit the wire.
  */
 function deriveToolEntries(provider: string, mod: ProviderModule): ToolEntry[] {
   const entries: ToolEntry[] = [];
@@ -149,15 +163,23 @@ function deriveToolEntries(provider: string, mod: ProviderModule): ToolEntry[] {
       const streaming = normalizeStreamingMode(
         entry["streaming"] as boolean | StreamingMode | undefined,
       );
-      entries.push({
-        provider,
-        name,
-        operation,
-        description: typeof entry["description"] === "string" ? entry["description"] : undefined,
-        inputSchema: entry["inputSchema"],
-        outputSchema: entry["outputSchema"],
-        ...(streaming !== undefined ? { streaming } : {}),
-      });
+      const effect =
+        parseEffect(entry["effect"]) ??
+        effectFromHttpMethod(
+          typeof entry["method"] === "string" ? entry["method"] : undefined,
+        );
+      entries.push(
+        ensureEntryEffect({
+          provider,
+          name,
+          operation,
+          description: typeof entry["description"] === "string" ? entry["description"] : undefined,
+          inputSchema: entry["inputSchema"],
+          outputSchema: entry["outputSchema"],
+          ...(streaming !== undefined ? { streaming } : {}),
+          ...(effect !== undefined ? { effect } : {}),
+        }),
+      );
     }
     return entries;
   }
@@ -172,18 +194,45 @@ function deriveToolEntries(provider: string, mod: ProviderModule): ToolEntry[] {
         : [];
       if (accessPath.length === 0) continue;
       const operation = accessPath.join(".");
-      entries.push({
-        provider,
-        name: `${provider}.${operation}`,
-        operation,
-        description: typeof m["description"] === "string" ? m["description"] : undefined,
-        inputSchema: synthesizeInputSchema(m),
-        outputSchema: undefined,
-      });
+      const effect =
+        parseEffect(m["effect"]) ??
+        effectFromHttpMethod(typeof m["method"] === "string" ? m["method"] : undefined);
+      entries.push(
+        ensureEntryEffect({
+          provider,
+          name: `${provider}.${operation}`,
+          operation,
+          description: typeof m["description"] === "string" ? m["description"] : undefined,
+          inputSchema: synthesizeInputSchema(m),
+          outputSchema: undefined,
+          ...(effect !== undefined ? { effect } : {}),
+        }),
+      );
     }
   }
 
   return entries;
+}
+
+/** GET/HEAD → observation; anything else (including missing) → action. */
+function effectFromHttpMethod(method: string | undefined): Effect | undefined {
+  if (method === undefined || method === "") return undefined;
+  const upper = method.toUpperCase();
+  return upper === "GET" || upper === "HEAD" ? "observation" : "action";
+}
+
+/**
+ * Guarantee `effect` on a discovery entry. Prefer an existing annotation /
+ * method-derived value; otherwise classify the operation leaf (core/native)
+ * or fail closed to `action`.
+ */
+function ensureEntryEffect(
+  entry: Omit<ToolEntry, "effect"> & { effect?: Effect },
+): ToolEntry {
+  return {
+    ...entry,
+    effect: entry.effect ?? classifyCoreEffect(entry.operation),
+  };
 }
 
 /** Best-effort JSON schema for a tool derived from runtime metadata. */
@@ -224,18 +273,21 @@ function toLlmToolEntries(
   provider: string,
   entries: ReturnType<typeof llmDiscoveryEntries>,
 ): ToolEntry[] {
-  return entries.map((entry) => ({
-    provider,
-    name: entry.name,
-    // Strip the namespace by length, not by the first dot: provider ids
-    // contain dots of their own (`synthetic.new.createChatCompletion` would
-    // otherwise yield the operation `new.createChatCompletion`).
-    operation: entry.name.startsWith(`${provider}.`)
-      ? entry.name.slice(provider.length + 1)
-      : entry.name.slice(entry.name.indexOf(".") + 1),
-    description: entry.description,
-    inputSchema: entry.inputSchema,
-  }));
+  return entries.map((entry) =>
+    ensureEntryEffect({
+      provider,
+      name: entry.name,
+      // Strip the namespace by length, not by the first dot: provider ids
+      // contain dots of their own (`synthetic.new.createChatCompletion` would
+      // otherwise yield the operation `new.createChatCompletion`).
+      operation: entry.name.startsWith(`${provider}.`)
+        ? entry.name.slice(provider.length + 1)
+        : entry.name.slice(entry.name.indexOf(".") + 1),
+      description: entry.description,
+      inputSchema: entry.inputSchema,
+      effect: parseEffect((entry as { effect?: unknown }).effect),
+    }),
+  );
 }
 
 /** Re-label a contract package's own entries onto an interface namespace. */
@@ -248,23 +300,26 @@ function toContractToolEntries(
     outputSchema?: unknown;
     /** Legacy boolean or widened mode; `true` maps to `"response"`. */
     streaming?: boolean | StreamingMode;
+    effect?: Effect;
   }>,
 ): ToolEntry[] {
   return entries.map((entry) => {
     const streaming = normalizeStreamingMode(entry.streaming);
-    return {
+    const operation = entry.name.startsWith(`${namespace}.`)
+      ? entry.name.slice(namespace.length + 1)
+      : entry.name.slice(entry.name.indexOf(".") + 1);
+    return ensureEntryEffect({
       provider: namespace,
       name: entry.name,
       // Strip the namespace by length, not by the first dot: namespaces contain
       // dots and colons of their own (`synthetic.new`, `agent:reviewer`).
-      operation: entry.name.startsWith(`${namespace}.`)
-        ? entry.name.slice(namespace.length + 1)
-        : entry.name.slice(entry.name.indexOf(".") + 1),
+      operation,
       description: entry.description,
       inputSchema: entry.inputSchema,
       ...(entry.outputSchema !== undefined ? { outputSchema: entry.outputSchema } : {}),
       ...(streaming !== undefined ? { streaming } : {}),
-    };
+      effect: parseEffect(entry.effect),
+    });
   });
 }
 
@@ -539,14 +594,16 @@ function nativeVcsDiscoveryEntries(namespace: string): ToolEntry[] {
       },
     },
   ];
-  return ops.map((op) => ({
-    provider: namespace,
-    name: `${namespace}.${op.operation}`,
-    operation: op.operation,
-    description: op.description,
-    inputSchema: op.inputSchema,
-    outputSchema: op.outputSchema,
-  }));
+  return ops.map((op) =>
+    ensureEntryEffect({
+      provider: namespace,
+      name: `${namespace}.${op.operation}`,
+      operation: op.operation,
+      description: op.description,
+      inputSchema: op.inputSchema,
+      outputSchema: op.outputSchema,
+    }),
+  );
 }
 
 /** Person/link artifact shares (iw9-b) — additive on top of the vfs contract. */
@@ -592,14 +649,16 @@ function nativeVfsShareDiscoveryEntries(namespace: string): ToolEntry[] {
       },
     },
   ];
-  return ops.map((op) => ({
-    provider: namespace,
-    name: `${namespace}.${op.operation}`,
-    operation: op.operation,
-    description: op.description,
-    inputSchema: op.inputSchema,
-    ...(op.outputSchema !== undefined ? { outputSchema: op.outputSchema } : {}),
-  }));
+  return ops.map((op) =>
+    ensureEntryEffect({
+      provider: namespace,
+      name: `${namespace}.${op.operation}`,
+      operation: op.operation,
+      description: op.description,
+      inputSchema: op.inputSchema,
+      ...(op.outputSchema !== undefined ? { outputSchema: op.outputSchema } : {}),
+    }),
+  );
 }
 
 /**
@@ -668,14 +727,17 @@ async function interfaceToolEntries(
     const { telemetryService } = await import("../telemetry/service.js");
     const product = telemetryService.tools
       .filter((t) => t.operation !== "export")
-      .map((t) => ({
-        provider: namespace,
-        name: `${namespace}.${t.operation}`,
-        operation: t.operation,
-        description: t.description,
-        inputSchema: t.inputSchema,
-        ...(t.outputSchema !== undefined ? { outputSchema: t.outputSchema } : {}),
-      }));
+      .map((t) =>
+        ensureEntryEffect({
+          provider: namespace,
+          name: `${namespace}.${t.operation}`,
+          operation: t.operation,
+          description: t.description,
+          inputSchema: t.inputSchema,
+          ...(t.outputSchema !== undefined ? { outputSchema: t.outputSchema } : {}),
+          effect: t.effect,
+        }),
+      );
     return [...product, ...exportEntries];
   }
   if (parsed.interfaceId === "vfs") {
@@ -780,6 +842,53 @@ export function shouldListCredentialAsProvider(provider: string): boolean {
   return true;
 }
 
+/**
+ * Load bundler-published effect strings from `@utdk/clients/<provider>/metadata.js`
+ * (sibling of the package entry; not on the public exports map). Used to fill
+ * catalog-fallback entries without re-deriving from HTTP method at the consumer.
+ */
+async function loadProviderEffectMap(provider: string): Promise<Map<string, Effect>> {
+  const map = new Map<string, Effect>();
+  try {
+    const { createRequire } = await import("node:module");
+    const { dirname, join } = await import("node:path");
+    const { pathToFileURL } = await import("node:url");
+    const require = createRequire(import.meta.url);
+    const resolved = require.resolve(`@utdk/clients/${provider}`);
+    const metaUrl = pathToFileURL(join(dirname(resolved), "metadata.js")).href;
+    const mod = (await import(metaUrl)) as { toolMetadata?: Record<string, unknown> };
+    const toolMetadata = mod.toolMetadata ?? {};
+    for (const value of Object.values(toolMetadata)) {
+      if (!value || typeof value !== "object") continue;
+      const m = value as Record<string, unknown>;
+      const accessPath = Array.isArray(m["accessPath"])
+        ? (m["accessPath"] as unknown[]).map(String)
+        : [];
+      if (accessPath.length === 0) continue;
+      const effect = parseEffect(m["effect"]);
+      if (effect) map.set(accessPath.join("."), effect);
+    }
+  } catch {
+    // No metadata beside the module (non-catalogue provider, etc.).
+  }
+  return map;
+}
+
+/** Fill `effect` on catalog rows from published metadata, else fail closed. */
+async function ensureCatalogEffects(
+  provider: string,
+  entries: Array<Omit<ToolEntry, "effect"> & { effect?: Effect }>,
+): Promise<ToolEntry[]> {
+  const effects = await loadProviderEffectMap(provider);
+  return entries.map((entry) =>
+    ensureEntryEffect({
+      ...entry,
+      // Prefer bundler-published metadata when present; catalog httpMethod is fallback.
+      effect: effects.get(entry.operation) ?? entry.effect,
+    }),
+  );
+}
+
 function llmToolEntries(providerId: string): ToolEntry[] {
   const alias = resolveLlmProvider(providerId);
   return toLlmToolEntries(
@@ -839,7 +948,7 @@ async function discoverTools(workspaceId: string): Promise<ToolEntry[]> {
     // of operation schemas.
     if (entries.length === 0) {
       try {
-        entries = await catalogToolEntries(provider);
+        entries = await ensureCatalogEffects(provider, await catalogToolEntries(provider));
       } catch (err) {
         // A single unresolvable provider should not break discovery.
         process.stderr.write(
@@ -915,7 +1024,7 @@ async function discoverConfiguredTools(workspaceId: string): Promise<ToolEntry[]
     // (as this branch originally did) made GitHub vanish from chat's
     // services panel.
     try {
-      tools.push(...(await catalogToolEntries(provider)));
+      tools.push(...(await ensureCatalogEffects(provider, await catalogToolEntries(provider))));
     } catch {
       // Catalog unreachable — surface the namespace at least, so the
       // provider is visibly connected even without per-tool metadata.
@@ -924,6 +1033,7 @@ async function discoverConfiguredTools(workspaceId: string): Promise<ToolEntry[]
         name: `${provider}.*`,
         operation: "*",
         description: `${provider} (connected — tool metadata unavailable)`,
+        effect: "action",
       });
     }
   }
