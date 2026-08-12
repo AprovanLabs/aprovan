@@ -700,15 +700,49 @@ export class CredentialStoreRegistry implements ICredentialStore {
 
 let _store: ICredentialStore | undefined;
 
+/**
+ * Wrap delete so credential revocation invalidates the tool-list cache on the
+ * same event (IW-9 C derived-authority / invariant 3). Dynamic import avoids a
+ * credentials → derived-authority → tools → credentials cycle at module init.
+ */
+function withAuthorityRevokeHook(inner: ICredentialStore): ICredentialStore {
+  return {
+    create: (workspaceId, input) => inner.create(workspaceId, input),
+    list: (workspaceId) => inner.list(workspaceId),
+    get: (workspaceId, id) => inner.get(workspaceId, id),
+    delete: async (workspaceId, id) => {
+      const ok = await inner.delete(workspaceId, id);
+      if (ok) {
+        // Load tools first so setToolListCacheInvalidator has run, then cascade.
+        await import("./routes/tools.js");
+        const { onCredentialRevoked } = await import("./derived-authority.js");
+        onCredentialRevoked(workspaceId);
+      }
+      return ok;
+    },
+    getPayload: (workspaceId, id) => inner.getPayload(workspaceId, id),
+    resolveForProvider: (workspaceId, provider) =>
+      inner.resolveForProvider(workspaceId, provider),
+    resolveRecordForProvider: (workspaceId, provider) =>
+      inner.resolveRecordForProvider(workspaceId, provider),
+    resolveRecordById: (workspaceId, credentialId) =>
+      inner.resolveRecordById(workspaceId, credentialId),
+    updatePayload: (workspaceId, id, payload) =>
+      inner.updatePayload(workspaceId, id, payload),
+  };
+}
+
 export function getCredentialStore(): ICredentialStore {
-  _store ??= (() => {
-    switch (storeBackend()) {
-      case "dsql":
-        return new CredentialStoreRegistry();
-      case "sqlite":
-        return new CredentialStoreSqlite();
-    }
-  })();
+  _store ??= withAuthorityRevokeHook(
+    (() => {
+      switch (storeBackend()) {
+        case "dsql":
+          return new CredentialStoreRegistry();
+        case "sqlite":
+          return new CredentialStoreSqlite();
+      }
+    })(),
+  );
   return _store;
 }
 

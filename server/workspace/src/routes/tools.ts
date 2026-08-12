@@ -23,8 +23,9 @@ import { telemetryToolEntries as telemetryDiscoveryEntries } from "@utdk/telemet
 import { vfsToolEntries as vfsDiscoveryEntries } from "@utdk/vfs";
 import { Hono } from "hono";
 import { getAuditStore } from "../audit.js";
-import { evaluateDispatch, denyMessage } from "../grants.js";
 import { getCredentialStore, resolveCredentialRecord } from "../credentials.js";
+import { setToolListCacheInvalidator } from "../derived-authority.js";
+import { evaluateDispatch, denyMessage } from "../grants.js";
 import {
   isInterface,
   listInterfaces,
@@ -121,7 +122,11 @@ function getToolListTtlMs(): number {
 
 const toolListCache = new Map<string, CachedToolList>();
 
-/** Drop the cached tool list for a workspace (call when credentials change). */
+/**
+ * Drop the cached tool list for a workspace.
+ * Call when credentials **or grants** change (IW-9 C derived-authority) so
+ * the next dispatch — not the next cache TTL — sees the narrowed authority.
+ */
 export function invalidateToolListCache(workspaceId: string): void {
   toolListCache.delete(workspaceId);
   configuredToolListCache.delete(workspaceId);
@@ -132,6 +137,10 @@ export function resetToolListCache(): void {
   toolListCache.clear();
   configuredToolListCache.clear();
 }
+
+// Wire derived-authority grant/credential cascades to this cache (stream 11).
+setToolListCacheInvalidator(invalidateToolListCache);
+
 
 /**
  * Derive tool entries for a provider from its cached module.
