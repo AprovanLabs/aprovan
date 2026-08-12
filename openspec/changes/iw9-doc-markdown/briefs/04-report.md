@@ -1,5 +1,7 @@
 # Report: Server — join auth + quiesce materialization (Stream 4)
 
+**PR:** https://github.com/AprovanLabs/aprovan/pull/261
+
 ## What was built
 
 | Piece | Role |
