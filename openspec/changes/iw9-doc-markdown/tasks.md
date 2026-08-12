@@ -281,7 +281,7 @@
 
 > Depends-on: 5, 9 | Repo: aprovan | Touches: aprovan/Apps/document/**, aprovan/server/workspace/tests/doc-fix-typos.test.ts | Verify: pnpm --filter @aprovan/workspace exec vitest run tests/doc-fix-typos.test.ts
 
-- [ ] 10.0 **Do not start until `iw9-d-agent-loop-server` stream 10
+- [x] 10.0 **Do not start until `iw9-d-agent-loop-server` stream 10
       ("App-scoped agent profiles (CF-5)") has landed** — that stream is the
       assigned owner of the CF-5 finding (`IW-9-EXECUTION-OVERVIEW.md`
       finding 1) and covers declaration, resolution, and execution together.
@@ -290,17 +290,17 @@
       block, before writing any code in this stream (mirrors
       `iw9-chat-flagship`'s identical stream-5 gate on the same finding; the
       contract is D's `specs/app-scoped-agent-profiles/spec.md`).
-- [ ] 10.1 Declare `doc/fix-typos` in `Apps/document/app.yaml`'s `agents:`
+- [x] 10.1 Declare `doc/fix-typos` in `Apps/document/app.yaml`'s `agents:`
       block per iw9-d task 10.1's grammar — grants: `vfs.read`/
       `vfs.write` scoped to the invoker's accessible paths, no wider ceiling
       (spec document-app "Profile runs within app grants"; invariant 2).
-- [ ] 10.2 Prompt: read the target document via `vfs.read`, propose a
+- [x] 10.2 Prompt: read the target document via `vfs.read`, propose a
       typo-corrected version, write back via `vfs.write` — exercising
       stream 5's reconciliation path end to end when the target is a live
       document (spec "Profile runs within app grants": "its `vfs.write`
       lands through reconciliation without clobbering concurrent human
       edits").
-- [ ] 10.3 Tests: run against a live document with a concurrent human edit
+- [x] 10.3 Tests: run against a live document with a concurrent human edit
       elsewhere in the file — both survive (integration-level repeat of
       5.5's unit case, this time through the real `agents.run` path);
       run against a document with no live session — ordinary `vfs.write`,
