@@ -45,6 +45,7 @@
  * against `ctx.grants` — a model-chosen namespace can bypass neither.
  */
 
+import type { RunEvent } from "@aprovan/agent-protocol";
 import {
   AGENT_EFFORTS,
   assertRunSupported,
@@ -74,6 +75,7 @@ import {
 import { toolGranted } from "../grants.js";
 import { ServiceError, type ServiceContext } from "../service-kernel.js";
 import { dispatchInterface, invokeTool } from "../workflows/invoke.js";
+import { appendRunEvents, type RunEventInput } from "./run-events.js";
 
 export const NATIVE_AGENT_CAPABILITIES: AgentCapabilities = {
   locality: "in-gateway",
@@ -88,7 +90,9 @@ export const NATIVE_AGENT_CAPABILITIES: AgentCapabilities = {
   // Run records persist, so `get` still answers after `run` returned.
   resumable: true,
   cancellable: true,
-  streaming: false,
+  // Event log + in-process fan-out exist (agents/run-events.ts); clients
+  // discover attachability via this flag (stream endpoint lands in stream 3).
+  streaming: true,
   modelSelectable: true,
   setupCommand: false,
   effortLevels: [...AGENT_EFFORTS],
@@ -106,6 +110,19 @@ export interface StoredAgentRun extends AgentRun {
   agent?: string;
   /** The sandbox this run's tool calls executed against, when it had one. */
   sandboxId?: string;
+  /** Gapless run-event log (assigned `seq` by appendRunEvents). */
+  events?: RunEvent[];
+  /** `events.at(-1).seq` — cheap resume answer for stream reattach. */
+  lastSeq?: number;
+  /** What started the run; defaults to `"api"` inside the runner lifecycle. */
+  origin?: "chat" | "self-heal" | "api";
+  /** Chat session this run belongs to, when any. */
+  sessionId?: string;
+}
+
+/** Optional live sink; persistence always goes through appendRunEvents. */
+export interface RunNativeAgentOptions {
+  emit?: (event: RunEvent) => void;
 }
 
 /** Time-prefixed and path-safe, like workflow run ids. */
@@ -290,6 +307,7 @@ function decodeToolCall(
 async function runNativeAgent(
   ctx: ServiceContext,
   args: AgentRunArgs,
+  options?: RunNativeAgentOptions,
 ): Promise<StoredAgentRun> {
   // Pre-flight refusals throw (nothing was spent); loop failures are
   // recorded on the run resource instead — the contract's split.
@@ -305,6 +323,13 @@ async function runNativeAgent(
   // with agent Y" from the run record alone.
   const sandboxId =
     typeof args.metadata?.["sandboxId"] === "string" ? args.metadata["sandboxId"] : undefined;
+  const sessionId =
+    typeof args.metadata?.["sessionId"] === "string" ? args.metadata["sessionId"] : undefined;
+  const originMeta = args.metadata?.["origin"];
+  const origin: StoredAgentRun["origin"] =
+    originMeta === "chat" || originMeta === "self-heal" || originMeta === "api"
+      ? originMeta
+      : "api";
   const llmPin = ctx.interfaceInstances?.["llm"];
   const llmInstance =
     typeof llmPin === "object" && llmPin !== null
@@ -319,13 +344,25 @@ async function runNativeAgent(
     id,
     status: "running",
     startedAt,
+    origin,
     ...(agentName ? { agent: agentName } : {}),
     ...(sandboxId ? { sandboxId } : {}),
+    ...(sessionId ? { sessionId } : {}),
     ...(args.metadata ? { meta: { ...args.metadata } } : {}),
   };
   await saveRunRecord(ctx.workspaceId, record);
   const handle = { cancelled: false };
   activeRuns.set(id, handle);
+
+  // Persist + optional live sink. Persistence is unconditional; `options.emit`
+  // is an additional sink (tests / future callers), never the record decision.
+  const emit = async (input: RunEventInput): Promise<RunEvent> => {
+    const [event] = await appendRunEvents(ctx.workspaceId, id, [input]);
+    record.events = [...(record.events ?? []), event!];
+    record.lastSeq = event!.seq;
+    options?.emit?.(event!);
+    return event!;
+  };
 
   // The tool list is patterns (the grant projection `agents.run` computes,
   // or a raw caller's own list); it bounds the loop even when ctx.grants is
@@ -351,6 +388,15 @@ async function runNativeAgent(
   let output: string | undefined;
   let errorMessage: string | undefined;
 
+  await emit({
+    type: "run_started",
+    runId: id,
+    at: startedAt,
+    ...(agentName ? { agent: agentName } : {}),
+    ...(args.model ? { model: args.model } : {}),
+    ...(sessionId ? { sessionId } : {}),
+  });
+
   try {
     loop: for (let turn = 0; ; turn += 1) {
       if (handle.cancelled) {
@@ -369,8 +415,14 @@ async function runNativeAgent(
         break;
       }
 
+      await emit({ type: "turn_started", turn, at: new Date().toISOString() });
+
       let message: ChatMessage;
       try {
+        // Buffered completion: `llm.createChatCompletion` returns one full
+        // choice per turn today (no token stream). Emit a single
+        // `assistant_delta` with the full turn text rather than fabricating
+        // a fake stream — see briefs/deviations.md (stream 2 / task 2.3).
         const response = (await dispatchInterface(ctx, "llm", "createChatCompletion", {
           messages,
           ...(toolSchemas ? { tools: toolSchemas, tool_choice: "auto" } : {}),
@@ -383,14 +435,21 @@ async function runNativeAgent(
       } catch (err) {
         stopReason = "error";
         errorMessage = err instanceof Error ? err.message : String(err);
+        await emit({ type: "turn_finished", turn });
+        await emit({ type: "error", message: errorMessage });
         break;
       }
       usage.turns = turn + 1;
       const at = new Date().toISOString();
 
+      const assistantText = typeof message.content === "string" ? message.content : "";
+      if (assistantText) {
+        await emit({ type: "assistant_delta", turn, text: assistantText });
+      }
+
       const requested = Array.isArray(message.tool_calls) ? message.tool_calls : [];
       if (requested.length === 0) {
-        output = typeof message.content === "string" ? message.content : "";
+        output = assistantText;
         turns.push({
           index: turn,
           at,
@@ -399,6 +458,7 @@ async function runNativeAgent(
         });
         status = "succeeded";
         stopReason = "completed";
+        await emit({ type: "turn_finished", turn });
         break;
       }
 
@@ -418,6 +478,7 @@ async function runNativeAgent(
           stopReason = "max_tool_calls";
           errorMessage = `Run hit its ${toolCap}-tool-call cap`;
           turns.push({ index: turn, at, kind: "tool", toolCalls: recorded });
+          await emit({ type: "turn_finished", turn });
           break loop;
         }
         usage.toolCalls = (usage.toolCalls ?? 0) + 1;
@@ -429,6 +490,14 @@ async function runNativeAgent(
           continue;
         }
         const name = `${decoded.namespace}.${decoded.operation}`;
+        await emit({
+          type: "tool_call_started",
+          turn,
+          callId,
+          namespace: decoded.namespace,
+          operation: decoded.operation,
+          args: decoded.args,
+        });
         // The security boundary, both halves: the run's own tool list here,
         // the profile grants inside invokeTool. A model-chosen namespace
         // outside the list ends the run — retrying a policy is not a thing
@@ -438,12 +507,22 @@ async function runNativeAgent(
           errorMessage = `The model asked for ${name}, which the run's tool list (${allowed.join(", ")}) does not allow`;
           recorded.push({ id: callId, name, error: "denied" });
           turns.push({ index: turn, at, kind: "tool", toolCalls: recorded });
+          await emit({
+            type: "tool_call_finished",
+            turn,
+            callId,
+            ok: false,
+            error: "denied",
+            durationMs: 0,
+          });
+          await emit({ type: "turn_finished", turn });
           break loop;
         }
         const callStart = performance.now();
         try {
           const result = await invokeTool(ctx, decoded.namespace, decoded.operation, decoded.args);
           const body = jsonish(result);
+          const durationMs = Math.round(performance.now() - callStart);
           messages.push({
             role: "tool",
             tool_call_id: callId,
@@ -454,12 +533,21 @@ async function runNativeAgent(
             name,
             arguments: decoded.args,
             result: truncate(body, MAX_RECORDED_RESULT_BYTES),
-            durationMs: Math.round(performance.now() - callStart),
+            durationMs,
+          });
+          await emit({
+            type: "tool_call_finished",
+            turn,
+            callId,
+            ok: true,
+            resultPreview: truncate(body, MAX_RECORDED_RESULT_BYTES),
+            durationMs,
           });
         } catch (err) {
           // Ordinary tool failures (a 404 repo, a validation error) go back
           // to the model — it may recover with a corrected call.
           const messageText = err instanceof Error ? err.message : String(err);
+          const durationMs = Math.round(performance.now() - callStart);
           messages.push({
             role: "tool",
             tool_call_id: callId,
@@ -470,7 +558,15 @@ async function runNativeAgent(
             name,
             arguments: decoded.args,
             error: messageText,
-            durationMs: Math.round(performance.now() - callStart),
+            durationMs,
+          });
+          await emit({
+            type: "tool_call_finished",
+            turn,
+            callId,
+            ok: false,
+            error: messageText,
+            durationMs,
           });
         }
       }
@@ -483,6 +579,7 @@ async function runNativeAgent(
           : {}),
         toolCalls: recorded,
       });
+      await emit({ type: "turn_finished", turn });
     }
   } finally {
     activeRuns.delete(id);
@@ -502,6 +599,19 @@ async function runNativeAgent(
   // native loop has no reasoning knob, so effort's whole effect is which
   // instance the policy selected before dispatch.
   if (args.effort) record.effortApplied = `effort=${args.effort} llm=${llmInstance}`;
+
+  // Terminal event: thrown model failures already emitted `error` inside the
+  // loop; every other stop (including tool_denied) closes with `run_finished`.
+  if (!(record.events ?? []).some((e) => e.type === "error")) {
+    await emit({
+      type: "run_finished",
+      status,
+      stopReason,
+      usage,
+      ...(clamped.text ? { output: clamped.text } : {}),
+    });
+  }
+
   await saveRunRecord(ctx.workspaceId, record);
   return record;
 }
