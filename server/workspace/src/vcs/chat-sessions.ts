@@ -79,6 +79,18 @@ export interface ChatSessionRecord {
   touchedPaths?: string[];
   /** Opaque client layout state (open tabs, active path). */
   tabs?: unknown;
+  /**
+   * Named agent profile for chat turns (iw9-chat / D15). When set,
+   * `POST /agents/chat-turn` resolves this profile instead of building an
+   * ephemeral provider/model profile.
+   */
+  agent?: string;
+  /**
+   * Live agent run for this session, set when chat-turn starts a run and
+   * cleared when that run reaches a terminal event — lets a reload find and
+   * reattach (iw9-d stream 5).
+   */
+  activeRunId?: string;
   messageCount: number;
   createdBy: string;
   createdAt: string;
@@ -192,6 +204,39 @@ export async function updateSession(
     ...(patch.title !== undefined ? { title: patch.title.trim() || session.title } : {}),
     ...(patch.mode !== undefined ? { mode: patch.mode } : {}),
     ...(patch.tabs !== undefined ? { tabs: patch.tabs } : {}),
+    updatedAt: new Date().toISOString(),
+  };
+  await save(workspaceId, next);
+  return next;
+}
+
+/**
+ * Record or clear the live run id on a session. Clear is a no-op when the
+ * stored id does not match `runId` (a newer turn may have already replaced it).
+ */
+export async function setSessionActiveRun(
+  workspaceId: string,
+  id: string,
+  runId: string | null,
+  opts?: { onlyIfRunId?: string },
+): Promise<ChatSessionRecord> {
+  const session = await requireSession(workspaceId, id);
+  if (runId === null) {
+    if (opts?.onlyIfRunId && session.activeRunId !== opts.onlyIfRunId) {
+      return session;
+    }
+    if (session.activeRunId === undefined) return session;
+    const { activeRunId: _cleared, ...rest } = session;
+    const next: ChatSessionRecord = {
+      ...rest,
+      updatedAt: new Date().toISOString(),
+    };
+    await save(workspaceId, next);
+    return next;
+  }
+  const next: ChatSessionRecord = {
+    ...session,
+    activeRunId: runId,
     updatedAt: new Date().toISOString(),
   };
   await save(workspaceId, next);

@@ -390,8 +390,11 @@ function renderSandboxLayer(sandbox: RunSandboxContext): string {
  * bound the sandbox held `sandboxes.*` reach himself, and the projection
  * gives the run a place to *work*, not a way to land changes — commit stays
  * with the caller.
+ *
+ * Exported for the chat-turn route (iw9-d stream 5 / D4) — one rendering
+ * path for `agents.run` and `POST /agents/chat-turn`.
  */
-async function renderAgentRun(
+export async function renderAgentRun(
   ctx: ServiceContext,
   profile: AgentProfile,
   args: Record<string, unknown>,
@@ -485,6 +488,92 @@ async function renderAgentRun(
       : {}),
   };
   return { runArgs, runCtx };
+}
+
+/** Ephemeral profile name when a chat session stores no agent (D4). */
+export const CHAT_EPHEMERAL_AGENT = "chat";
+
+/**
+ * Build the in-memory profile used when `POST /agents/chat-turn` has no
+ * session-stored agent name — provider/model from the send, grants from the
+ * caller. Never persisted.
+ */
+export function buildEphemeralChatProfile(args: {
+  userId: string;
+  provider?: string;
+  model?: string;
+  grants?: CapabilityGrants;
+}): AgentProfile {
+  const now = new Date().toISOString();
+  return {
+    name: CHAT_EPHEMERAL_AGENT,
+    title: "Chat",
+    ...(args.provider ? { provider: args.provider } : {}),
+    ...(args.model ? { model: args.model } : {}),
+    ...(args.grants ? { grants: args.grants } : {}),
+    createdBy: args.userId,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+/**
+ * Render + dispatch a chat-origin run. Returns the run id as soon as the
+ * runner persists the `running` record (or when the run finishes, for very
+ * fast scripted completions), so `POST /agents/chat-turn` can answer with
+ * `streamUrl` while the loop continues.
+ */
+export async function startChatAgentRun(
+  ctx: ServiceContext,
+  profile: AgentProfile,
+  args: Record<string, unknown>,
+  meta: { origin: "chat" | "self-heal"; sessionId: string },
+): Promise<{ runId: string; done: Promise<{ id: string; status: string; output?: string }> }> {
+  const { runArgs, runCtx } = await renderAgentRun(ctx, profile, {
+    ...args,
+    session: meta.sessionId,
+  });
+  const correlationId = crypto.randomUUID();
+  const priorMeta =
+    runArgs["metadata"] && typeof runArgs["metadata"] === "object" && !Array.isArray(runArgs["metadata"])
+      ? (runArgs["metadata"] as Record<string, unknown>)
+      : {};
+  const withMeta = {
+    ...runArgs,
+    metadata: {
+      ...priorMeta,
+      agent: profile.name,
+      origin: meta.origin,
+      sessionId: meta.sessionId,
+      correlationId,
+    },
+  };
+
+  const { dispatchInterface } = await import("../workflows/invoke.js");
+  const { listNativeAgentRuns } = await import("./runner.js");
+  const done = dispatchInterface(runCtx, "agent", "run", withMeta) as Promise<{
+    id: string;
+    status: string;
+    output?: string;
+  }>;
+
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline) {
+    const settled = await Promise.race([
+      done.then((run) => run),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 15)),
+    ]);
+    if (settled) return { runId: settled.id, done };
+    const runs = await listNativeAgentRuns(ctx.workspaceId, undefined, 40);
+    for (const run of runs) {
+      const stamp = (run as { meta?: Record<string, unknown> }).meta;
+      if (stamp?.["correlationId"] === correlationId) {
+        return { runId: run.id, done };
+      }
+    }
+  }
+  const run = await done;
+  return { runId: run.id, done };
 }
 
 export const agentsService: CoreService = {
