@@ -705,3 +705,77 @@ export async function closeSession(
   await save(workspaceId, session);
   return { session, commit };
 }
+
+// ---------------------------------------------------------------------------
+// Widget self-heal transcript helpers (iw9-d stream 7)
+// ---------------------------------------------------------------------------
+
+/**
+ * Mirror of client `MAX_WIDGET_AUTOFIXES` — consecutive heal turns allowed
+ * since the last non-heal user message. Kept here so the route and tests
+ * share one server-side constant without importing client code.
+ */
+export const MAX_WIDGET_AUTOFIXES = 2;
+
+/** Metadata stamped onto heal-origin user messages in the transcript. */
+export type HealMessageMetadata = {
+  origin: "self-heal";
+  failureMessageId: string;
+};
+
+function messageMeta(raw: unknown): Record<string, unknown> | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const meta = (raw as { metadata?: unknown }).metadata;
+  if (!meta || typeof meta !== "object" || Array.isArray(meta)) return undefined;
+  return meta as Record<string, unknown>;
+}
+
+/** True when a stored transcript row is a self-heal user turn. */
+export function isHealUserMessage(raw: unknown): boolean {
+  if (!raw || typeof raw !== "object") return false;
+  if ((raw as { role?: unknown }).role !== "user") return false;
+  const meta = messageMeta(raw);
+  return meta?.["origin"] === "self-heal";
+}
+
+/** Assistant message id this heal was filed against, if any. */
+export function healFailureMessageId(raw: unknown): string | undefined {
+  const meta = messageMeta(raw);
+  const id = meta?.["failureMessageId"];
+  return typeof id === "string" && id ? id : undefined;
+}
+
+/**
+ * Count consecutive heal-origin user messages at the tail of the transcript,
+ * walking backward past assistants until a non-heal user message (or the
+ * start). That non-heal user message is the chain reset — matching the
+ * client's `armSendWindow` / `autoFixChainRef` semantics.
+ */
+export function consecutiveHealCount(messages: unknown[]): number {
+  let count = 0;
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const raw = messages[i];
+    if (!raw || typeof raw !== "object") continue;
+    const role = (raw as { role?: unknown }).role;
+    if (role === "assistant" || role === "system") continue;
+    if (role !== "user") continue;
+    if (isHealUserMessage(raw)) {
+      count += 1;
+      continue;
+    }
+    break;
+  }
+  return count;
+}
+
+/** Whether the transcript already contains a heal for this assistant message. */
+export function hasHealForAssistantMessage(
+  messages: unknown[],
+  assistantMessageId: string,
+): boolean {
+  for (const raw of messages) {
+    if (!isHealUserMessage(raw)) continue;
+    if (healFailureMessageId(raw) === assistantMessageId) return true;
+  }
+  return false;
+}
