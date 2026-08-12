@@ -208,7 +208,7 @@
 
 ## 7. Client: realtime doc store + presence UI
 
-> Depends-on: 1, 3 | Repo: aprovan | Touches: aprovan/client/web/src/features/document/store.ts, aprovan/client/web/src/features/document/useDocumentSession.ts, aprovan/client/web/src/features/document/DocPresenceCluster.tsx, aprovan/client/web/src/features/document/index.ts, aprovan/client/web/src/features/tabs/**, aprovan/client/web/src/features/document/__tests__/store.test.ts | Verify: pnpm --filter @aprovan/patchwork-web test && pnpm --filter @aprovan/patchwork-web typecheck
+> Depends-on: 1, 3, 6 | Repo: aprovan | Touches: aprovan/client/web/src/features/document/store.ts, aprovan/client/web/src/features/document/useDocumentSession.ts, aprovan/client/web/src/features/document/DocPresenceCluster.tsx, aprovan/client/web/src/features/document/index.ts, aprovan/client/web/src/features/tabs/**, aprovan/client/web/src/features/document/__tests__/store.test.ts | Verify: pnpm --filter @aprovan/patchwork-web test && pnpm --filter @aprovan/patchwork-web typecheck
 
 - [ ] 7.1 `features/document/store.ts`: WS client modeled on
       `features/presence/store.ts` — subscribe `doc:<path>`, decode
@@ -279,7 +279,7 @@
 
 ## 10. App: `doc/fix-typos` bundled agent profile (gated on iw9-d stream 10 / CF-5)
 
-> Depends-on: 9 | Repo: aprovan | Touches: aprovan/Apps/document/**, aprovan/server/workspace/tests/doc-fix-typos.test.ts | Verify: pnpm --filter @aprovan/workspace exec vitest run tests/doc-fix-typos.test.ts
+> Depends-on: 5, 9 | Repo: aprovan | Touches: aprovan/Apps/document/**, aprovan/server/workspace/tests/doc-fix-typos.test.ts | Verify: pnpm --filter @aprovan/workspace exec vitest run tests/doc-fix-typos.test.ts
 
 - [ ] 10.0 **Do not start until `iw9-d-agent-loop-server` stream 10
       ("App-scoped agent profiles (CF-5)") has landed** — that stream is the
