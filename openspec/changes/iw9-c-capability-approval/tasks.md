@@ -415,25 +415,25 @@ cross-repo rule 4).
 
 > Depends-on: 12 | Repo: aprovan | Touches: aprovan/client/web/src/features/review-surface/**, aprovan/client/web/src/features/capability-cards/**, aprovan/client/web/src/features/notifications/** | Verify: cd /Users/jacob/Documents/Code/AprovanLabs/aprovan && pnpm --filter @aprovan/patchwork-web test -- review-surface
 
-- [ ] 13.1 `PayloadWidgetHost`: sandboxed iframe host reused by review
+- [x] 13.1 `PayloadWidgetHost`: sandboxed iframe host reused by review
       items and notifications (extends, does not duplicate, the existing
       notification widget sandbox); on widget failure to mount/compile,
       falls back to the generic payload card silently — the decision
       buttons stay live either way. ux.md "JIT card" states
       "widget-failed", "Notification card" states "widget-failed".
-- [ ] 13.2 `ReviewItemShell`: renders only from server-supplied
+- [x] 13.2 `ReviewItemShell`: renders only from server-supplied
       `ReviewItem.shell` (who/capability/resource/effect/credential +
       decision buttons); re-renders on a widget payload-edit event before
       any decision button is enabled to act (invariant 6 structural
       enforcement on the client). ux.md "Review surface" screen.
-- [ ] 13.3 `CredentialLevelBadge` + shell sentence: implement the three
+- [x] 13.3 `CredentialLevelBadge` + shell sentence: implement the three
       fixed strings and distinct badge treatment from ux.md "Credential-
       level copy rules" (`workspace-token`/`workspace-oauth` = "Workspace
       bot"/"Workspace secret"; `user-oauth` = "Your account"); a
       `CredentialNotConnectedError` from the server renders the "Connect
       your account to let this continue as you" prompt, never a bare
       "connect a credential".
-- [ ] 13.4 Install card: capability rows with effect + credential-level
+- [x] 13.4 Install card: capability rows with effect + credential-level
       badges, undeclared/unused flags, "Send to admins" path when the
       confirming user cannot approve a workspace-level credential, and
       the "resources come later" note (ux.md "Install card"). JIT card:
@@ -441,12 +441,12 @@ cross-repo rule 4).
       duplicate, Allow once / Allow pattern (with matcher-validated
       coverage preview via the published `matchesResourcePattern`) / Deny
       (ux.md "JIT card").
-- [ ] 13.5 Review surface panel: kind filter tabs with counts, item
+- [x] 13.5 Review surface panel: kind filter tabs with counts, item
       list/detail, bulk release/discard restricted to a single (app,
       capability) group, expiry countdown under 24h, revocation
       blast-radius confirm dialog (ux.md "Review surface", "Revocation
       cascade visibility").
-- [ ] 13.6 Component/integration tests covering: shell summary re-render
+- [x] 13.6 Component/integration tests covering: shell summary re-render
       on widget edit before the approve action fires; generic-card
       fallback on widget mount failure; credential badge renders the
       correct fixed string per level; bulk actions disabled across mixed
