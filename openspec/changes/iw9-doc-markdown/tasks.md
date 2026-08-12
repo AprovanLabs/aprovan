@@ -210,23 +210,23 @@
 
 > Depends-on: 1, 3, 6 | Repo: aprovan | Touches: aprovan/client/web/src/features/document/store.ts, aprovan/client/web/src/features/document/useDocumentSession.ts, aprovan/client/web/src/features/document/DocPresenceCluster.tsx, aprovan/client/web/src/features/document/index.ts, aprovan/client/web/src/features/tabs/**, aprovan/client/web/src/features/document/__tests__/store.test.ts | Verify: pnpm --filter @aprovan/patchwork-web test && pnpm --filter @aprovan/patchwork-web typecheck
 
-- [ ] 7.1 `features/document/store.ts`: WS client modeled on
+- [x] 7.1 `features/document/store.ts`: WS client modeled on
       `features/presence/store.ts` — subscribe `doc:<path>`, decode
       `DocSyncFrame`/`DocAwarenessFrame` (base64 ↔ Yjs binary, tech-plan D1),
       apply to a local `Y.Doc`/`Awareness`, publish local update/awareness
       changes back over the same connection.
-- [ ] 7.2 `useDocumentSession.ts`: hook wiring `store.ts` to
+- [x] 7.2 `useDocumentSession.ts`: hook wiring `store.ts` to
       `CollabMarkdownEditor` (stream 6) for a given path — reconnect state
       exposed for the UI (ux.md "reconnecting…" indicator).
-- [ ] 7.3 `DocPresenceCluster.tsx`: avatar cluster modeled visually on
+- [x] 7.3 `DocPresenceCluster.tsx`: avatar cluster modeled visually on
       `features/presence/PresenceAvatars.tsx` (shadcn `Avatar`, `Tooltip`)
       but sourced from doc awareness state, not the file-presence roster;
       empty state hides the cluster entirely (ux.md "Presence cluster").
-- [ ] 7.4 Wire `.md` file tabs (`features/tabs`) to open
+- [x] 7.4 Wire `.md` file tabs (`features/tabs`) to open
       `CollabMarkdownEditor` instead of the plain file editor for any
       workspace `.md` path (PRD Open Question 1 resolution; existing
       non-`.md` file types unchanged).
-- [ ] 7.5 Tests: store applies an incoming sync frame and updates the local
+- [x] 7.5 Tests: store applies an incoming sync frame and updates the local
       `Y.Doc`; awareness join/leave deltas update the exposed peer list;
       reconnect-after-drop resyncs without replaying individual missed
       events (spec "Client recovers by resync" — mock the WS reconnect and

@@ -1,7 +1,11 @@
 import { useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { AppsPanel } from "@aprovan/registry-ui/apps-panel";
 import type { AppsSelection } from "@aprovan/registry-ui/apps-panel";
-import { getFileType, type UnifiedCodeEditorProps } from "@aprovan/editor";
+import {
+  getFileType,
+  isMarkdownFile,
+  type UnifiedCodeEditorProps,
+} from "@aprovan/editor";
 import { AlertCircle, Loader2 } from "lucide-react";
 import { PanelTabs } from "@/components/panels/shell";
 import { useCompiler, useServices, useSharedEditSession } from "@/contexts";
@@ -10,6 +14,7 @@ import { useCompileChecker } from "@/features/editing/useCompileChecker";
 import { NATIVE_SURFACES, parseNativeTabPath } from "@/lib/native-surfaces";
 import { invokeAppsTool, invokeWorkflowsTool } from "@/lib/tools";
 import { createSingleWorkspaceFileProject } from "@/lib/workspace-vfs";
+import { DocumentCollabTab } from "./DocumentCollabTab";
 import { appsTabPath, parseAppsTabPath, type OpenTab } from "./tab-routing";
 import { isNativeTabPath, UnknownNativeSurface } from "./UnknownNativeSurface";
 
@@ -157,6 +162,11 @@ export function TabContent({
               <AlertCircle className="h-4 w-4 shrink-0" />
               <span>{tab.error}</span>
             </div>
+          ) : isMarkdownFile(activeTabPath) ? (
+            <DocumentCollabTab
+              path={activeTabPath}
+              initialContent={tab.code}
+            />
           ) : (
             <FileEditorPane
               path={activeTabPath}
