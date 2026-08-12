@@ -31,18 +31,16 @@
  * under `.services/agents/_runs/` so `get`/`cancel` work from other requests
  * and `agents.runs` can list executions, mirroring the workflow run store.
  *
- * ## One generic tool, not a generated schema per operation
+ * ## Two built-ins, not a generated schema per operation
  *
- * The model is offered a single documented `call_tool` function taking
- * `{ namespace, operation, args }`, plus the run's allowed patterns in its
- * description — NOT one JSON schema per granted operation. A grant like
- * `vcs.*` covers dozens of operations and `github.*` thousands; generating
- * schemas for them would mean loading provider catalogs into every run's
- * prompt for marginal steering. The tool list handed to the run is a
- * *projection* of the grants (the pattern list itself, one direction, no
- * authority), and the real boundary is the dispatch path: the runner checks
- * every requested call against that list, and `invokeTool` re-checks it
- * against `ctx.grants` — a model-chosen namespace can bypass neither.
+ * The model is offered `call_tool { namespace, operation, args }` and
+ * `describe { namespace, query?, cursor? }`, plus the run's allowed patterns —
+ * NOT one JSON schema per granted operation. A grant like `vcs.*` covers
+ * dozens of operations and `github.*` thousands; pasting signatures into
+ * every prompt is wasteful. Prompts carry the pattern list; the model asks
+ * `describe` for compact signatures on demand. Describing never widens
+ * authority: the runner still checks every `call_tool` against the pattern
+ * list, and `invokeTool` re-checks against `ctx.grants`.
  */
 
 import type { RunEvent } from "@aprovan/agent-protocol";
@@ -73,9 +71,13 @@ import {
   writeSvcRecord,
 } from "../svc-records.js";
 import { toolGranted } from "../grants.js";
+import * as toolCatalog from "../routes/tools.js";
 import { ServiceError, type ServiceContext } from "../service-kernel.js";
 import { dispatchInterface, invokeTool } from "../workflows/invoke.js";
 import { appendRunEvents, type RunEventInput } from "./run-events.js";
+
+/** Per-response cap for the built-in `describe` tool (~40). */
+export const DESCRIBE_PAGE_SIZE = 40;
 
 export const NATIVE_AGENT_CAPABILITIES: AgentCapabilities = {
   locality: "in-gateway",
@@ -222,7 +224,7 @@ interface ChatResponse {
   };
 }
 
-/** The one tool the model sees; `allowed` is the grant projection. */
+/** The call_tool the model sees; `allowed` is the grant projection. */
 function callToolSchema(allowed: string[]): Record<string, unknown> {
   return {
     type: "function",
@@ -232,7 +234,8 @@ function callToolSchema(allowed: string[]): Record<string, unknown> {
         "Call one workspace tool and get its JSON result. " +
         `Allowed calls (namespace.operation patterns): ${allowed.join(", ")}. ` +
         'namespace is the tool namespace (e.g. "vcs"), operation the dot-path ' +
-        'within it (e.g. "pullRequests.diff"), args the operation\'s named arguments.',
+        'within it (e.g. "pullRequests.diff"), args the operation\'s named arguments. ' +
+        "Use describe first when you need operation signatures.",
       parameters: {
         type: "object",
         properties: {
@@ -244,6 +247,60 @@ function callToolSchema(allowed: string[]): Record<string, unknown> {
       },
     },
   };
+}
+
+/** On-demand compact signatures; never widens call_tool authority. */
+function describeToolSchema(allowed: string[]): Record<string, unknown> {
+  return {
+    type: "function",
+    function: {
+      name: "describe",
+      description:
+        "List compact operation signatures for one granted namespace " +
+        "(operation path, parameter names with required/optional markers, " +
+        "one-line description). Use before call_tool when you need details. " +
+        `Allowed patterns: ${allowed.join(", ")}. ` +
+        "Describing does not make an operation callable — call_tool still " +
+        "checks the same pattern list. Large namespaces paginate via cursor.",
+      parameters: {
+        type: "object",
+        properties: {
+          namespace: { type: "string", description: 'Tool namespace to describe, e.g. "vcs"' },
+          query: {
+            type: "string",
+            description: "Optional case-insensitive filter on operation name or description",
+          },
+          cursor: {
+            type: "string",
+            description: "Opaque pagination cursor from a previous describe result",
+          },
+        },
+        required: ["namespace"],
+      },
+    },
+  };
+}
+
+/**
+ * Whether any allowed pattern covers some operation under `namespace`
+ * (exact, prefix, or wildcard). Used to refuse describe before loading a
+ * catalog the run cannot call into.
+ */
+function namespaceInProjection(allowed: string[], namespace: string): boolean {
+  return allowed.some((pattern) => {
+    if (pattern === "*") return true;
+    if (pattern === namespace) return true;
+    if (pattern.startsWith(`${namespace}.`)) return true;
+    if (pattern.endsWith(".*")) {
+      const base = pattern.slice(0, -2);
+      return (
+        namespace === base ||
+        namespace.startsWith(`${base}.`) ||
+        base.startsWith(`${namespace}.`)
+      );
+    }
+    return false;
+  });
 }
 
 function truncate(text: string, cap: number): string {
@@ -271,27 +328,57 @@ function addUsage(total: AgentUsage, reported: ChatResponse["usage"]): void {
   }
 }
 
+type DecodedCallTool = {
+  kind: "call_tool";
+  namespace: string;
+  operation: string;
+  args: Record<string, unknown>;
+};
+type DecodedDescribe = {
+  kind: "describe";
+  namespace: string;
+  query?: string;
+  cursor?: string;
+};
+
 /**
- * One requested `call_tool` invocation, decoded. A malformed request is fed
+ * One requested built-in invocation, decoded. A malformed request is fed
  * back to the model as a tool error rather than killing the run — models
  * recover from a bad argument; a run does not recover from being failed.
  */
 function decodeToolCall(
   call: ChatToolCall,
-): { namespace: string; operation: string; args: Record<string, unknown> } | { error: string } {
-  if (call.function?.name !== "call_tool") {
-    return { error: `Unknown tool "${call.function?.name ?? ""}" — the only tool is call_tool` };
-  }
+): DecodedCallTool | DecodedDescribe | { error: string } {
+  const name = call.function?.name ?? "";
   let parsed: unknown;
   try {
-    parsed = JSON.parse(call.function.arguments || "{}");
+    parsed = JSON.parse(call.function?.arguments || "{}");
   } catch {
-    return { error: "call_tool arguments were not valid JSON" };
+    return { error: `${name || "tool"} arguments were not valid JSON` };
   }
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    return { error: "call_tool arguments must be an object { namespace, operation, args? }" };
+    return { error: `${name || "tool"} arguments must be an object` };
   }
   const record = parsed as Record<string, unknown>;
+
+  if (name === "describe") {
+    const namespace = typeof record["namespace"] === "string" ? record["namespace"] : "";
+    if (!namespace) return { error: "describe needs { namespace }" };
+    const query = typeof record["query"] === "string" ? record["query"] : undefined;
+    const cursor = typeof record["cursor"] === "string" ? record["cursor"] : undefined;
+    return {
+      kind: "describe",
+      namespace,
+      ...(query ? { query } : {}),
+      ...(cursor ? { cursor } : {}),
+    };
+  }
+
+  if (name !== "call_tool") {
+    return {
+      error: `Unknown tool "${name}" — built-ins are call_tool and describe`,
+    };
+  }
   const namespace = typeof record["namespace"] === "string" ? record["namespace"] : "";
   const operation = typeof record["operation"] === "string" ? record["operation"] : "";
   if (!namespace || !operation) {
@@ -301,7 +388,54 @@ function decodeToolCall(
     record["args"] && typeof record["args"] === "object" && !Array.isArray(record["args"])
       ? (record["args"] as Record<string, unknown>)
       : {};
-  return { namespace, operation, args };
+  return { kind: "call_tool", namespace, operation, args };
+}
+
+/**
+ * Run the built-in describe tool. Ungranted namespaces refuse without
+ * loading a catalog; granted ones page at {@link DESCRIBE_PAGE_SIZE}.
+ */
+async function runDescribe(
+  workspaceId: string,
+  allowed: string[],
+  request: DecodedDescribe,
+): Promise<unknown> {
+  if (!namespaceInProjection(allowed, request.namespace)) {
+    return {
+      error: `Namespace "${request.namespace}" is outside this run's tool projection`,
+      allowed: [...allowed],
+    };
+  }
+
+  let ops = await toolCatalog.catalogForNamespace(workspaceId, request.namespace);
+  ops = ops.filter((op) => toolGranted(allowed, request.namespace, op.operation));
+  if (request.query) {
+    const q = request.query.toLowerCase();
+    ops = ops.filter(
+      (op) =>
+        op.operation.toLowerCase().includes(q) ||
+        (op.description?.toLowerCase().includes(q) ?? false),
+    );
+  }
+
+  let offset = 0;
+  if (request.cursor) {
+    const parsed = Number.parseInt(request.cursor, 10);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      return { error: `Invalid describe cursor "${request.cursor}"` };
+    }
+    offset = parsed;
+  }
+
+  const page = ops.slice(offset, offset + DESCRIBE_PAGE_SIZE);
+  const remaining = Math.max(0, ops.length - offset - page.length);
+  return {
+    namespace: request.namespace,
+    operations: page,
+    ...(remaining > 0
+      ? { cursor: String(offset + page.length), remaining }
+      : {}),
+  };
 }
 
 async function runNativeAgent(
@@ -367,8 +501,10 @@ async function runNativeAgent(
   // The tool list is patterns (the grant projection `agents.run` computes,
   // or a raw caller's own list); it bounds the loop even when ctx.grants is
   // absent, and invokeTool's assertToolGranted re-checks underneath.
+  // Prompt carries patterns only — signatures come from `describe` on demand.
   const allowed = (args.tools ?? []).map((tool) => tool.name);
-  const toolSchemas = allowed.length > 0 ? [callToolSchema(allowed)] : undefined;
+  const toolSchemas =
+    allowed.length > 0 ? [callToolSchema(allowed), describeToolSchema(allowed)] : undefined;
 
   const messages: Array<Record<string, unknown>> = [];
   if (args.instructions) messages.push({ role: "system", content: args.instructions });
@@ -489,6 +625,53 @@ async function runNativeAgent(
           recorded.push({ id: callId, name: call.function?.name ?? "call_tool", error: decoded.error });
           continue;
         }
+
+        if (decoded.kind === "describe") {
+          await emit({
+            type: "tool_call_started",
+            turn,
+            callId,
+            namespace: decoded.namespace,
+            operation: "describe",
+            args: {
+              namespace: decoded.namespace,
+              ...(decoded.query ? { query: decoded.query } : {}),
+              ...(decoded.cursor ? { cursor: decoded.cursor } : {}),
+            },
+          });
+          const callStart = performance.now();
+          // Describe is read-only metadata: refusal is recoverable (no
+          // tool_denied), and never widens call_tool authority.
+          const result = await runDescribe(ctx.workspaceId, allowed, decoded);
+          const body = jsonish(result);
+          const durationMs = Math.round(performance.now() - callStart);
+          messages.push({
+            role: "tool",
+            tool_call_id: callId,
+            content: truncate(body, MAX_TOOL_RESULT_BYTES),
+          });
+          recorded.push({
+            id: callId,
+            name: "describe",
+            arguments: {
+              namespace: decoded.namespace,
+              ...(decoded.query ? { query: decoded.query } : {}),
+              ...(decoded.cursor ? { cursor: decoded.cursor } : {}),
+            },
+            result: truncate(body, MAX_RECORDED_RESULT_BYTES),
+            durationMs,
+          });
+          await emit({
+            type: "tool_call_finished",
+            turn,
+            callId,
+            ok: true,
+            resultPreview: truncate(body, MAX_RECORDED_RESULT_BYTES),
+            durationMs,
+          });
+          continue;
+        }
+
         const name = `${decoded.namespace}.${decoded.operation}`;
         await emit({
           type: "tool_call_started",
