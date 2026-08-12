@@ -197,34 +197,34 @@ names below are `openspec/changes/iw9-chat-flagship/specs/<capability>/spec.md`.
 
 > Depends-on: 1, 2, 6 | Repo: aprovan | Touches: aprovan/client/web/src/features/messaging/**, aprovan/client/web/src/lib/__tests__/chat-timeline-adapter.test.ts | Verify: pnpm --filter @aprovan/patchwork-web exec vitest run src/features/messaging && pnpm --filter @aprovan/patchwork-web typecheck
 
-- [ ] 7.1 Implement `ChatTimelineAdapter` (`features/messaging/adapter.ts`)
+- [x] 7.1 Implement `ChatTimelineAdapter` (`features/messaging/adapter.ts`)
       exactly to the interface in tech-plan.md "Interfaces & Data"
       (`fetchWindow`, `fetchOlder`, `send`, `onEvent`, `connectionState`,
       `presence`, `signalTyping`) — the ONLY module that talks to
       `records.*`/the realtime broker; everything else in `features/
       messaging/` consumes the adapter, never the platform surfaces
       directly (tech-plan Architecture).
-- [ ] 7.2 Reconciliation per T4: `onEvent` hints trigger a re-fetch of the
+- [x] 7.2 Reconciliation per T4: `onEvent` hints trigger a re-fetch of the
       canonical window via `fetchWindow`/`fetchOlder`, never trusting the
       event payload as source of truth; `connectionState()` surfaces
       `live`/`reconnecting`/`reconciling` per iw9-f5's disconnect/resubscribe
       contract (spec `chat-realtime` "Backpressure conformance", "Slow
       client reconciles after disconnect").
-- [ ] 7.3 Build channel rail, timeline pane (wraps vendored
+- [x] 7.3 Build channel rail, timeline pane (wraps vendored
       `MessageTimeline` from stream 6 — styling only, no fork), thread pane
       (opens on demand, one level, no reply-to-reply affordance per ux.md),
       and the thin composer (T7: plain textarea, Enter sends, Shift+Enter
       newline, typing signal on keystroke — no rich text, no buzz composer
       per D24).
-- [ ] 7.4 Presence/typing UI: rail presence dots, roster tooltip, "{n}
+- [x] 7.4 Presence/typing UI: rail presence dots, roster tooltip, "{n}
       people are typing…" with ~4s client-side expiry (ux.md "Presence and
       typing" flow) — reads `adapter.presence()`/`onEvent` only, no direct
       store access.
-- [ ] 7.5 Reconnect/reconcile/over-cap/access-revoked/deleted-instance UI
+- [x] 7.5 Reconnect/reconcile/over-cap/access-revoked/deleted-instance UI
       states exactly as enumerated in ux.md "Instance view" States list (no
       blank flash, no duplicate messages, distinguishable over-cap error,
       revoked-channel swap without reconnect).
-- [ ] 7.6 New test file `client/web/src/lib/__tests__/chat-timeline-adapter.test.ts`:
+- [x] 7.6 New test file `client/web/src/lib/__tests__/chat-timeline-adapter.test.ts`:
       hint-triggers-refetch reconciliation, reconnect state transitions,
       send failure surfaces the over-cap error distinguishably, typing
       signal is fire-and-forget (adapter never blocks composer on it).
