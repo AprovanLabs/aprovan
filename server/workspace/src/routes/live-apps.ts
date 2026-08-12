@@ -30,7 +30,13 @@ function errorResponse(c: { json: (body: unknown, status?: number) => Response }
 
 function requestPath(c: { req: { url: string } }): { pathname: string; search: string } {
   const url = new URL(c.req.url, "http://local");
-  return { pathname: url.pathname, search: url.search };
+  // Hono keeps the full request pathname even under `app.route("/apps", …)`.
+  // Direct `liveAppsRouter.request("/local/…")` calls are already mount-relative.
+  let pathname = url.pathname;
+  if (pathname === "/apps" || pathname.startsWith("/apps/")) {
+    pathname = pathname.slice("/apps".length) || "/";
+  }
+  return { pathname, search: url.search };
 }
 
 /**
