@@ -72,7 +72,7 @@ describe("apps service (owner management)", () => {
   });
 
   it("lists, reads, and restores entrypoint versions", async () => {
-    // Per-file apps.versions/version/restore removed (IW-9 A stream 3) —
+    // Per-file entry version tool ops removed (IW-9 A stream 3) —
     // release tags + History view own versioning. Smoke that the procedures 404.
     await manage("apps/publish", {
       name: "edit",

@@ -44,8 +44,9 @@ fork → published-package edge first (or in the same change).
   rendered verbatim by the Access tab.
 - `apps.install` exists but is a data-scope escape hatch (`apps/install.ts`): only
   `dataScope:"workspace"` apps, no UI, no deps, no update flow.
-- Releases/channels exist (`apps/releases.ts`). Partition enforcement is one rule
-  (`appPathAllowed`, `store.ts:346`).
+- Releases/channels exist as VCS tags (`apps/release-tags.ts`; `apps/releases.ts`
+  deleted). Partition enforcement is one rule (`appPathAllowed`).
+
 - `.personal` is a synthesized never-stored app (`apps/personal.ts`) whose prefix literal is
   triplicated (`personal.ts:36`, `store.ts:250`, `client/web/src/lib/private-partition.ts:17`);
   it conflates "per-user private partition" with "bucket for unbundled workflows."

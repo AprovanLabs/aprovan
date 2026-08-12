@@ -161,13 +161,13 @@
 
 > Repo: aprovan | Depends-on: 3, 5, 6 | Touches: aprovan/server/workspace/tests/app-integration.test.ts, aprovan/docs/** | Verify: cd aprovan/server/workspace && pnpm test && cd ../../client/web && pnpm typecheck && pnpm test && grep -rn "apps\.versions\|apps\.version\b\|apps\.restore" /Users/jacob/Documents/Code/AprovanLabs/aprovan/server /Users/jacob/Documents/Code/AprovanLabs/aprovan/client /Users/jacob/Documents/Code/AprovanLabs/aprovan/packages /Users/jacob/Documents/Code/AprovanLabs/registry --include='*.ts' --include='*.tsx' | grep -v node_modules | grep -v openspec; test $? -ne 0
 
-- [ ] 7.1 End-to-end integration test: create app → edit → app-scoped
+- [x] 7.1 End-to-end integration test: create app → edit → app-scoped
       commit → cut release (tag) → serve pinned via live-apps → restore →
       history shows both, `main` untouched.
-- [ ] 7.2 Session round-trip test: staged session with conflict → resolve
+- [x] 7.2 Session round-trip test: staged session with conflict → resolve
       via `sessions.resolve` wire → two-parent merge commit → history
       lineage; auto session → summary → one-click restore.
-- [ ] 7.3 Final grep gates across BOTH repos (aprovan + registry) for every
+- [x] 7.3 Final grep gates across BOTH repos (aprovan + registry) for every
       deleted symbol (`apps/releases`, `listEntryVersions`,
       `readEntryVersion`, `restoreEntryVersion`, `apps.versions` tool
       names); if `registry/docs/vcs-and-sessions.md` still describes the
