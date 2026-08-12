@@ -76,7 +76,12 @@ export async function streamChatCompletion(
   providerId: string,
   args: { messages: ChatCompletionMessage[]; model?: string },
   onDelta?: (delta: string, full: string) => void,
-  options: { connectTimeoutMs?: number; idleTimeoutMs?: number } = {},
+  options: {
+    connectTimeoutMs?: number;
+    idleTimeoutMs?: number;
+    /** Reasoning-model thinking deltas (streamed, never in the result). */
+    onReasoning?: (delta: string) => void;
+  } = {},
 ): Promise<string> {
   const connectTimeoutMs = options.connectTimeoutMs ?? DEFAULT_CONNECT_TIMEOUT_MS;
   const controller = new AbortController();
@@ -124,21 +129,22 @@ export async function streamChatCompletion(
 
   const full = await readChatCompletionStream(response.body, onDelta, {
     idleTimeoutMs: options.idleTimeoutMs,
+    onReasoning: options.onReasoning,
   });
   if (!full) throw new Error("Chat completion returned no content");
   return full;
 }
 
 // ---------------------------------------------------------------------------
-// Job-backed completions (`/llm/:provider/completions`)
+// Completions used by non-edit callers (session auto-title, merge combine).
 // ---------------------------------------------------------------------------
 //
-// Widget edits are 1-2 minute completions. Streaming (above) gets the first
-// token on the wire fast, but a mobile browser kills the fetch the moment the
-// screen locks or the tab backgrounds — even though the gateway and the
-// upstream model keep going. The job endpoint persists the completion
-// server-side as it streams, so a dropped client can pick the result back up
-// by polling instead of losing it.
+// Formerly job-backed (`POST /llm/:provider/completions` + poll
+// `GET /llm/jobs/:id`). IW-9 D stream 9 moved durability for chat onto run
+// records; remaining short completions share {@link streamChatCompletion}
+// (tools-proxy stream, no job splice). `pollJobUntilTerminal` stays exported
+// only while `resilientChatFetch` / the server job store remain for the
+// evidence-gated deletion in task 9.5.
 
 interface LlmJobRecord {
   id: string;
@@ -160,6 +166,9 @@ const JOB_POLL_TIMEOUT_MS = 5 * 60_000;
  * Poll a job to a terminal state, feeding `onDelta` with text growth (not
  * raw upstream deltas — the job record only ever holds the accumulated
  * text) so the UI keeps counting blocks the same way it does mid-stream.
+ *
+ * @deprecated Retained for `resilientChatFetch` until llm-jobs deletion (9.5).
+ * New callers must use {@link streamChatCompletion}.
  */
 export async function pollJobUntilTerminal(
   jobId: string,
@@ -195,17 +204,9 @@ export async function pollJobUntilTerminal(
 }
 
 /**
- * Job-aware counterpart to {@link streamChatCompletion}: same streaming leg
- * (first token fast, connection stays warm), but a mid-stream failure — a
- * network error or a stall, which is exactly what a backgrounded mobile tab
- * looks like from here — does not fail the call. Instead it falls back to
- * polling `GET /llm/jobs/:id` (own cadence, independent of the streaming
- * leg's timeouts) until the job reaches a terminal state or five minutes
- * pass. The gateway keeps the job running server-side regardless of whether
- * this fetch is still attached, so the result usually is not actually lost.
- *
- * Only throws when the job itself failed, or polling exhausted its window —
- * never merely because the streaming leg dropped.
+ * Streaming completion for leftover non-edit callers (session title, merge).
+ * Delegates to {@link streamChatCompletion}; no longer creates or polls
+ * llm-jobs. Prefer calling {@link streamChatCompletion} directly.
  */
 export async function runChatCompletionJob(
   providerId: string,
@@ -218,61 +219,7 @@ export async function runChatCompletionJob(
     onReasoning?: (delta: string) => void;
   } = {},
 ): Promise<string> {
-  const connectTimeoutMs = options.connectTimeoutMs ?? DEFAULT_CONNECT_TIMEOUT_MS;
-  const controller = new AbortController();
-  const connectTimer = setTimeout(() => controller.abort(), connectTimeoutMs);
-
-  let response: Response;
-  try {
-    response = await gatewayFetch(
-      `${GATEWAY_BASE}/llm/${encodeURIComponent(providerId)}/completions`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...args, job: true }),
-        signal: controller.signal,
-      },
-    );
-  } catch (err) {
-    if (controller.signal.aborted) {
-      throw new Error(
-        `Chat completion request timed out after ${connectTimeoutMs / 1000}s waiting for a response`,
-      );
-    }
-    throw err;
-  } finally {
-    clearTimeout(connectTimer);
-  }
-
-  if (!response.ok) {
-    const body = (await response.json().catch(() => ({}))) as { error?: string };
-    throw new Error(body.error ?? `Chat completion failed (${response.status})`);
-  }
-  if (!response.body) throw new Error("Chat completion returned no content");
-
-  let jobId: string | undefined;
-  let text = "";
-  try {
-    text = await readChatCompletionStream(
-      response.body,
-      (delta, full) => {
-        text = full;
-        onDelta?.(delta, full);
-      },
-      {
-        idleTimeoutMs: options.idleTimeoutMs,
-        onJobId: (id) => (jobId = id),
-        onReasoning: options.onReasoning,
-      },
-    );
-    return text;
-  } catch (err) {
-    // No jobId means the request never got far enough to start a job (e.g.
-    // the connect timeout above, or a rejection before the first byte) —
-    // there's nothing server-side to resume, so this is a real failure.
-    if (!jobId) throw err;
-    return pollJobUntilTerminal(jobId, text, onDelta);
-  }
+  return streamChatCompletion(providerId, args, onDelta, options);
 }
 
 /** Per-provider chat model preference ("" = provider default). */

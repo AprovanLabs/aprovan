@@ -219,3 +219,23 @@ match.
 **UX consequence.** `ux.md`'s "assistant text streams token-wise" is **not** met by this change. Streams 6 (run transport) and 8 (parity/flip) must write delta-granularity tests against **one delta per turn**, not token-wise chunks, until a later change adds real streaming to the runner's LLM call.
 
 ---
+
+### 7. llm-jobs deletion blocked by out-of-Touches residual refs (execution, stream 9 / task 9.5)
+
+**Finding.** Tasks 9.1–9.4 completed: chat no longer reads `x-llm-job` outside dead `resilientChatFetch`; `useEditTransport` migrated to `streamChatCompletion`; `GET /llm/jobs/:id` carries an evidence-gated deprecation notice; evidence (a) zero callers of the listed symbols beyond defs+tests, (b) patchwork-web 125/125 + llm suites green, (c) compatibility assessment recorded in `briefs/09-report.md`.
+
+**Why deletion did not proceed.** Task 9.5's post-delete grep
+`llm-jobs|x-llm-job|readLlmJob|writeLlmJob` across `$AAP/client`, `$AAP/server`, and `$REG` would still match files **outside stream 9 Touches**:
+
+1. `server/workspace/scripts/migrate-services-to-records.ts` — `"llm-jobs"` CLI flag / `svcScope("llm-jobs")`
+2. `registry/docs/local-mode.md` — storage table cell listing `llm-jobs`
+
+Deleting only the Touched store/call sites would leave those hits and fail the spec/AGENTS.md delete gate. Expanding Touches is a planning call, not an improvisation.
+
+**Branch taken.** Do not delete. Leave `llm-jobs.ts`, job writes in `routes/llm.ts`, `/jobs/:id` (with 9.3 notice), `resilientChatFetch`, and `pollJobUntilTerminal` in place. Task 9.5 left unchecked; recorded blocker is the completed outcome.
+
+**Unblock.** A follow-up (Touches expansion or hygiene stream) must remove/rewrite those two residual references (registry docs via a registry PR if needed), then re-run 9.5 deletion until the grep returns nothing in both checkouts.
+
+**Related deviation (9.2).** Widget-edit used the tools-proxy stream (`streamChatCompletion`), not `POST /agents/chat-turn` + run SSE: a chat-turn agent run would tool-loop instead of emitting search/replace blocks. Brief allows "or an equivalent resumable run stream."
+
+---
