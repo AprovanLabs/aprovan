@@ -24,6 +24,7 @@ import {
   GitBranch,
   GitCompareArrows,
   HardDrive,
+  History,
   KeyRound,
   LayoutGrid,
   Plug,
@@ -34,6 +35,7 @@ import { AdminPermissionsPanel } from "../components/panels/AdminPermissionsPane
 import { AgentsPanel } from "../components/panels/AgentsPanel";
 import { AppsPanel } from "../components/panels/AppsPanel";
 import { CredentialsPanel } from "../components/panels/CredentialsPanel";
+import { HistoryPanel } from "../components/panels/HistoryPanel";
 import { InterfacesPanel } from "../components/panels/InterfacesPanel";
 import { KeyValuePanel } from "../components/panels/KeyValuePanel";
 import { LlmPanel } from "../components/panels/LlmPanel";
@@ -105,8 +107,16 @@ export const NATIVE_SURFACES: NativeSurfaceDef[] = [
     Panel: RuntimePanel,
   },
   {
+    id: "history",
+    title: "History",
+    icon: History,
+    description: "Browse versions and restore the workspace or an app as of any point",
+    Panel: HistoryPanel,
+    appTab: true,
+  },
+  {
     id: "vcs",
-    title: "VCS",
+    title: "Code host",
     icon: FolderGit,
     description: "Choose which git host powers code review and repo tools",
     Panel: VcsPanel,

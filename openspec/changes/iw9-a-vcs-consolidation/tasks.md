@@ -111,22 +111,22 @@
 
 > Repo: aprovan | Depends-on: 2, 4 | Touches: aprovan/client/web/src/components/panels/VcsPanel.tsx, aprovan/client/web/src/components/panels/HistoryPanel.tsx, aprovan/client/web/src/lib/vfs-commits.ts, aprovan/client/web/src/components/CommitMountedContent.tsx, aprovan/packages/registry-ui/src/apps/versions.tsx | Verify: cd aprovan/client/web && pnpm typecheck && pnpm test && for v in commit log show diff restore branches; do grep -rq "\"$v\"\|vcs\.$v" src --include='*.ts' --include='*.tsx' || exit 1; done && grep -rn "hash.slice\|shortToken" src/components/CommitMountedContent.tsx | grep -v node_modules; test $? -ne 0
 
-- [ ] 5.1 Fix `lib/vfs-commits.ts` to return the `changes` payload it
+- [x] 5.1 Fix `lib/vfs-commits.ts` to return the `changes` payload it
       fetches and discards (:42-55), typed with per-path hashes for the diff
       viewer (scenario "Change data no longer discarded"; also listed as an
       F6 bug — coordinate: whoever lands first wins, the other rebases).
-- [ ] 5.2 Build History view (workspace + app scope) per ux.md: timeline
+- [x] 5.2 Build History view (workspace + app scope) per ux.md: timeline
       over `vcs.log`/`vcs.branches`, entry expand → ChangeList →
       DiffViewer via `vcs.show`/`vcs.diff` hashes; merge entries render
       chat-title lineage from two-parent commits (scenario "History renders
       true lineage").
-- [ ] 5.3 One-click "Restore this version" via `vcs.restore` with the
+- [x] 5.3 One-click "Restore this version" via `vcs.restore` with the
       non-destructive confirmation copy from ux.md; workspace and app
       scopes; toast + new timeline entry.
-- [ ] 5.4 Add `vcs.commit` caller: manual "Save a version now" action in the
+- [x] 5.4 Add `vcs.commit` caller: manual "Save a version now" action in the
       History view header (scoped), completing six-of-six verb coverage
       (scenario "No orphan verbs"; Verify greps all six).
-- [ ] 5.5 Retitle/rename `VcsPanel` → "Code host" for its provider-config
+- [x] 5.5 Retitle/rename `VcsPanel` → "Code host" for its provider-config
       role; user-facing history moves to the History view. Kill hash
       renderings: `CommitMountedContent.tsx:58` short token → time-based
       label ("version from <when>"); `packages/registry-ui/src/apps/versions.tsx`
