@@ -1,7 +1,7 @@
 # Report: stream 12 — review surface API + notifications retrofit
 
 **Status:** done  
-**PR:** (see PR URL after open)  
+**PR:** https://github.com/AprovanLabs/aprovan/pull/248  
 **Branch:** `feat/iw9-c-review-surface`  
 **Verify:** `pnpm --filter @aprovan/workspace test -- review-surface` — 8 passed
 
