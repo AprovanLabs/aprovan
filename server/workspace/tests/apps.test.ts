@@ -60,8 +60,8 @@ describe("apps service (owner management)", () => {
     });
     expect(publish.status).toBe(200);
     const published = await data<{ url: string; apiBase: string; appId: string }>(publish);
-    expect(published.url).toBe("/apps/local/tracker");
-    expect(published.apiBase).toBe("/api/gateway/apps/local/tracker");
+    expect(published.url).toBe(`/a/${published.appId}`);
+    expect(published.apiBase).toBe(`/api/gateway/apps/id/${published.appId}`);
     expect(published.appId).toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/);
 
     const list = await data<{ apps: Array<{ name: string }> }>(await manage("apps/list", {}));

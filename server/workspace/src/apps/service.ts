@@ -98,6 +98,10 @@ import { generateAppSdk } from "./sdk.js";
 import { loadAppYaml } from "./manifest.js";
 import { assertRootAvailable } from "./roots.js";
 import {
+  canonicalLiveUrl,
+  publicAppApiBase,
+} from "./url-bases.js";
+import {
   ENTRY_CANDIDATES,
   appDataDir,
   appName,
@@ -120,8 +124,8 @@ import {
   type WorkspaceShare,
 } from "./store.js";
 
-function livePath(workspaceId: string, name: string): string {
-  return `/apps/${workspaceId}/${name}`;
+function livePath(appId: string): string {
+  return canonicalLiveUrl(appId);
 }
 
 /**
@@ -156,8 +160,8 @@ async function withExecutingProfiles(
   }
 }
 
-function apiBase(workspaceId: string, name: string): string {
-  return `/api/gateway/apps/${workspaceId}/${name}`;
+function apiBase(appId: string): string {
+  return publicAppApiBase(appId);
 }
 
 function parseAllowedTools(
@@ -316,12 +320,12 @@ async function describeApp(
     paths: manifest.paths,
     /** Last reconcile outcome for authors (`app.yaml` validation). */
     reconcile: manifest.reconcile,
-    /** Live page URL (aprovan.com/apps/<workspace>/<name>). */
-    url: livePath(workspaceId, manifest.name),
-    /** Durable id permalink that survives renames. */
-    permalink: `/apps/id/${manifest.appId}`,
-    /** API surface base (tools + workflow runs). */
-    apiBase: apiBase(workspaceId, manifest.name),
+    /** Live page URL (`/a/<appId>`). */
+    url: livePath(manifest.appId),
+    /** Durable id permalink that survives renames (same as live for public apps). */
+    permalink: livePath(manifest.appId),
+    /** API surface base (tools + workflow runs), appId-keyed. */
+    apiBase: apiBase(manifest.appId),
     /** Channel → release id. `apps.channels` resolves them to release records. */
     channels: manifest.channels ?? {},
     requires: manifest.requires ?? [],
@@ -371,8 +375,8 @@ async function summarizeInstall(
     name: origin?.name ?? install.manifest?.name,
     title: origin?.title ?? install.manifest?.title,
     description: origin?.description ?? install.manifest?.description,
-    url: origin ? livePath(install.originWorkspaceId, origin.name) : undefined,
-    permalink: `/apps/id/${install.originAppId}`,
+    url: origin ? livePath(origin.appId) : undefined,
+    permalink: livePath(install.originAppId),
     dataPrefix: appDataDir(install.installId, userId),
     available: Boolean(origin),
     requires: origin?.requires ?? install.manifest?.requires ?? [],
@@ -1225,8 +1229,8 @@ export const appsService: CoreService = {
             title: manifest.title,
             description: manifest.description,
             visibility: manifest.visibility ?? "private",
-            url: livePath(ctx.workspaceId, manifest.name),
-            permalink: `/apps/id/${manifest.appId}`,
+            url: livePath(manifest.appId),
+            permalink: livePath(manifest.appId),
             workflowCount: (manifest.workflows ?? []).length,
             channels: manifest.channels ?? {},
             updatedAt: manifest.updatedAt,
@@ -1281,7 +1285,7 @@ export const appsService: CoreService = {
           ).map((workflow) => ({
             ...workflow,
             namespace: APP_WORKFLOW_NAMESPACE,
-            toolPath: `${apiBase(ctx.workspaceId, manifest.name)}/tools/${APP_WORKFLOW_NAMESPACE}/${workflow.procedure}`,
+            toolPath: `${apiBase(manifest.appId)}/tools/${APP_WORKFLOW_NAMESPACE}/${workflow.procedure}`,
           })),
         };
       }
@@ -1417,8 +1421,8 @@ export const appsService: CoreService = {
           js: sdk.js,
           dts: sdk.dts,
           urls: {
-            js: `${livePath(ctx.workspaceId, manifest.name)}/__sdk__.js`,
-            dts: `${livePath(ctx.workspaceId, manifest.name)}/__sdk__.d.ts`,
+            js: `${livePath(manifest.appId)}/__sdk__.js`,
+            dts: `${livePath(manifest.appId)}/__sdk__.d.ts`,
           },
         };
       }
@@ -1790,8 +1794,8 @@ export const appsService: CoreService = {
         return {
           apps: entries.map((entry) => ({
             ...entry,
-            url: livePath(entry.workspaceId, entry.name),
-            permalink: `/apps/id/${entry.appId}`,
+            url: livePath(entry.appId),
+            permalink: livePath(entry.appId),
             installable:
               entry.workspaceId === ctx.workspaceId ||
               /* public index entries are installable */ true,

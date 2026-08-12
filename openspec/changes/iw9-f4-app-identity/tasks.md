@@ -63,7 +63,7 @@ External dependencies (declare before any stream starts):
 
 > Depends-on: 1, 2, 3, 4, 5 | Repo: aprovan | Touches: aprovan/openspec/changes/iw9-f4-app-identity/tasks.md | Verify: pnpm --filter @aprovan/workspace test && pnpm --filter @aprovan/ui test && ! grep -rn 'apps/${workspaceId}' server/workspace/src/routes/ && ! grep -rn '/apps/id/' server/workspace/src/routes/app-urls.ts && ! grep -rn 'apps/${workspaceId}' /Users/jacob/Documents/Code/AprovanLabs/registry/packages --include='*.ts'
 
-- [ ] 6.1 Grep gate (MIGRATION-DEBT definition of done, run in BOTH repos per Cross-repo rule 4): no route or shell template emits a `/apps/<workspaceId>/…` link — `grep -rn 'apps/${workspaceId}' server/workspace/src/routes/` returns nothing in aprovan, and the same pattern returns nothing under `registry/packages`.
-- [ ] 6.2 Region gate: `grep -rn 'region' server/workspace/src/routes/app-urls.ts` shows no region path segment construction (D5/D21: no region in URLs).
-- [ ] 6.3 Run the full `@aprovan/workspace` and `@aprovan/ui` suites; fix any regression introduced by streams 1-5 in the stream that owns the touched path.
-- [ ] 6.4 Run `openspec validate iw9-f4-app-identity` (if the installed CLI provides it) and resolve any artifact issues; tick all boxes.
+- [x] 6.1 Grep gate (MIGRATION-DEBT definition of done, run in BOTH repos per Cross-repo rule 4): no route or shell template emits a `/apps/<workspaceId>/…` link — `grep -rn 'apps/${workspaceId}' server/workspace/src/routes/` returns nothing in aprovan, and the same pattern returns nothing under `registry/packages`.
+- [x] 6.2 Region gate: `grep -rn 'region' server/workspace/src/routes/app-urls.ts` shows no region path segment construction (D5/D21: no region in URLs).
+- [x] 6.3 Run the full `@aprovan/workspace` and `@aprovan/ui` suites; fix any regression introduced by streams 1-5 in the stream that owns the touched path.
+- [x] 6.4 Run `openspec validate iw9-f4-app-identity` (if the installed CLI provides it) and resolve any artifact issues; tick all boxes.

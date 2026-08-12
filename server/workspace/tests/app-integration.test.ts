@@ -188,7 +188,10 @@ describe("6.1 e2e publish → directory → install → partitions → rename", 
 
     const live = createWorkspaceApp();
     const page = await live.request(`/apps/${WS_B}/${install.installId}`);
-    expect(page.status).toBe(200);
+    expect(page.status).toBe(302);
+    expect(page.headers.get("Location")).toBe(`/w/${WS_B}/a/${install.installId}`);
+    const canonical = await live.request(`/w/${WS_B}/a/${install.installId}`);
+    expect(canonical.status).toBe(200);
 
     // Prior session data still readable after rename + update.
     const again = await createApp().request(

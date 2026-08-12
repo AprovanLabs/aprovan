@@ -11,7 +11,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
 import { resetRateLimiters } from "../src/middleware/rateLimitMiddleware.js";
 import { resetAppRateLimiters } from "../src/routes/apps.js";
-import { liveAppsRouter } from "../src/routes/live-apps.js";
+import { appUrlsRouter } from "../src/routes/app-urls.js";
 
 let dataDir: string;
 
@@ -179,12 +179,14 @@ describe("workflows as namespace procedures", () => {
 describe("releases and channels", () => {
   it("pins the live page to a release and rolls back", async () => {
     await putFile("apps/rel/index.tsx", "export default () => 'v1';");
-    await manage("apps/publish", {
-      name: "rel",
-      dir: "apps/rel",
-      visibility: "public",
-      allowed_tools: ["keyvalue.*"],
-    });
+    const published = await data<{ appId: string }>(
+      await manage("apps/publish", {
+        name: "rel",
+        dir: "apps/rel",
+        visibility: "public",
+        allowed_tools: ["keyvalue.*"],
+      }),
+    );
 
     const first = await data<{ id: string; entryHash: string }>(
       await manage("apps/release", { name: "rel", notes: "first" }),
@@ -194,7 +196,7 @@ describe("releases and channels", () => {
     // The entry moves on; the live channel keeps serving the pinned content.
     await putFile("apps/rel/index.tsx", "export default () => 'v2';");
     const pinned = (await (
-      await liveAppsRouter.request("/local/rel/__project__")
+      await appUrlsRouter.request(`/a/${published.appId}/__project__`)
     ).json()) as { files: Array<{ path: string; content: string }>; release: { id: string } };
     expect(pinned.release.id).toBe(first.id);
     expect(pinned.files.find((f) => f.path === "apps/rel/index.tsx")?.content).toContain("v1");
@@ -202,7 +204,7 @@ describe("releases and channels", () => {
     // A second release picks up the new content...
     const second = await data<{ id: string }>(await manage("apps/release", { name: "rel" }));
     const live = (await (
-      await liveAppsRouter.request("/local/rel/__project__")
+      await appUrlsRouter.request(`/a/${published.appId}/__project__`)
     ).json()) as { files: Array<{ path: string; content: string }> };
     expect(live.files.find((f) => f.path === "apps/rel/index.tsx")?.content).toContain("v2");
 
@@ -223,21 +225,23 @@ describe("releases and channels", () => {
 
   it("serves a non-default channel to admins only", async () => {
     await putFile("apps/chan/index.tsx", "export default () => 'preview';");
-    await manage("apps/publish", {
-      name: "chan",
-      dir: "apps/chan",
-      visibility: "public",
-      allowed_tools: ["keyvalue.*"],
-      roles: { admins: ["carol"] },
-    });
+    const published = await data<{ appId: string }>(
+      await manage("apps/publish", {
+        name: "chan",
+        dir: "apps/chan",
+        visibility: "public",
+        allowed_tools: ["keyvalue.*"],
+        roles: { admins: ["carol"] },
+      }),
+    );
     await manage("apps/release", { name: "chan", channel: "preview" });
 
-    const admin = await liveAppsRouter.request("/local/chan/__project__?channel=preview", {
+    const admin = await appUrlsRouter.request(`/a/${published.appId}/__project__?channel=preview`, {
       headers: { "X-App-User": "carol" },
     });
     expect(admin.status).toBe(200);
 
-    const stranger = await liveAppsRouter.request("/local/chan/__project__?channel=preview", {
+    const stranger = await appUrlsRouter.request(`/a/${published.appId}/__project__?channel=preview`, {
       headers: { "X-App-User": "mallory" },
     });
     expect(stranger.status).toBe(403);
@@ -254,15 +258,17 @@ describe("generated SDK", () => {
       output: { type: "object", properties: { headline: { type: "string" } } },
     });
     await putFile("apps/sdk/index.tsx", "export default () => null;");
-    await manage("apps/publish", {
-      name: "sdk",
-      dir: "apps/sdk",
-      visibility: "public",
-      allowed_tools: ["keyvalue.*", "vfs.*"],
-      workflows: ["weekly-report"],
-    });
+    const published = await data<{ appId: string }>(
+      await manage("apps/publish", {
+        name: "sdk",
+        dir: "apps/sdk",
+        visibility: "public",
+        allowed_tools: ["keyvalue.*", "vfs.*"],
+        workflows: ["weekly-report"],
+      }),
+    );
 
-    const js = await liveAppsRouter.request("/local/sdk/__sdk__.js");
+    const js = await appUrlsRouter.request(`/a/${published.appId}/__sdk__.js`);
     expect(js.headers.get("content-type")).toContain("javascript");
     const shim = await js.text();
     expect(shim).toContain("__APP_CONFIG__");
@@ -270,7 +276,7 @@ describe("generated SDK", () => {
     expect(shim).toContain("export const keyvalue");
     expect(shim).toContain("export const app");
 
-    const dts = await liveAppsRouter.request("/local/sdk/__sdk__.d.ts");
+    const dts = await appUrlsRouter.request(`/a/${published.appId}/__sdk__.d.ts`);
     expect(dts.headers.get("content-type")).toContain("typescript");
     const types = await dts.text();
     expect(types).toContain("export interface AppNamespace");
@@ -364,7 +370,7 @@ describe("apps.list composition", () => {
 
     const app = list.apps.find((a) => a.name === "listing");
     expect(app?.appId).toBeTruthy();
-    expect(app?.url).toBe("/apps/local/listing");
+    expect(app?.url).toBe(`/a/${app!.appId}`);
     expect(app?.workflows[0]).toMatchObject({
       name: "listed-wf",
       procedure: "listedWf",

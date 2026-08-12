@@ -39,6 +39,7 @@ import {
 } from "../apps/install.js";
 import { isAppId, resolveAppLocation, resolveAppRef } from "../apps/identity.js";
 import { resolveGlobalSlug, resolveWorkspaceSlug } from "../apps/slugs.js";
+import { installAppApiBase, publicAppApiBase } from "../apps/url-bases.js";
 import {
   appPathServable,
   callerRole,
@@ -410,7 +411,7 @@ function buildAppShell(app: LiveApp, channel = DEFAULT_CHANNEL): string {
         appId: manifest.appId,
         workspaceId,
         title,
-        appBase: `/api/gateway/apps/${workspaceId}/${installId}`,
+        appBase: installAppApiBase(workspaceId, installId),
         liveBase,
         permalinkBase: liveBase,
         channel,
@@ -420,7 +421,7 @@ function buildAppShell(app: LiveApp, channel = DEFAULT_CHANNEL): string {
         app: manifest.name,
         appId: manifest.appId,
         title,
-        appBase: `/api/gateway/apps/id/${manifest.appId}`,
+        appBase: publicAppApiBase(manifest.appId),
         liveBase,
         permalinkBase: liveBase,
         channel,

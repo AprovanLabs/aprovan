@@ -27,6 +27,7 @@ import { getFsStore } from "../src/fs-store.js";
 import { resetRateLimiters } from "../src/middleware/rateLimitMiddleware.js";
 import { resetAppRateLimiters } from "../src/routes/apps.js";
 import { liveAppsRouter } from "../src/routes/live-apps.js";
+import { appUrlsRouter } from "../src/routes/app-urls.js";
 import { ServiceError } from "../src/service-kernel.js";
 import { writeSvcRecord, svcScope, deleteSvcRecord } from "../src/svc-records.js";
 
@@ -164,14 +165,21 @@ describe("No request-time origin reads", () => {
     await deleteSvcRecord(ORIGIN, svcScope("apps"), origin.appId);
     await getFsStore().removePrefix(ORIGIN, "apps/survive");
 
-    const project = await liveAppsRouter.request(
-      `/${INSTALLER}/${install.installId}/__project__`,
+    const project = await appUrlsRouter.request(
+      `/w/${INSTALLER}/a/${install.installId}/__project__`,
       { headers: { "X-App-User": "alice" } },
     );
     expect(project.status).toBe(200);
     const body = (await project.json()) as { entry: string; files: { path: string }[] };
     expect(body.entry).toBe("apps/survive/index.tsx");
     expect(body.files.some((f) => f.path === "apps/survive/index.tsx")).toBe(true);
+
+    // Legacy live path 302s; gateway API by install-id still serves the local copy.
+    const legacy = await liveAppsRouter.request(`/${INSTALLER}/${install.installId}/__project__`);
+    expect(legacy.status).toBe(302);
+    expect(legacy.headers.get("Location")).toBe(
+      `/w/${INSTALLER}/a/${install.installId}/__project__`,
+    );
 
     const api = await createApp().request(`/apps/${INSTALLER}/${install.installId}`, {
       headers: { "X-App-User": "alice", "X-Aprovan-Workspace": INSTALLER },

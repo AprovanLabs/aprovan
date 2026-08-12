@@ -383,7 +383,7 @@ export interface AppSummary {
   appId?: string;
   /** Set when this app was forked from another. */
   originAppId?: string;
-  /** Durable live URL that survives renames (`/apps/id/<appId>`). */
+  /** Durable live URL that survives renames (`/a/<appId>`). */
   permalink?: string;
   title?: string;
   description?: string;
@@ -457,7 +457,7 @@ export function normalizeApp(raw: unknown): AppSummary | null {
   if (originAppId) app.originAppId = originAppId;
   const permalink = asString(pick(record, "permalink", "idUrl", "id_url"));
   if (permalink) app.permalink = permalink;
-  else if (appId) app.permalink = `/apps/id/${appId}`;
+  else if (appId) app.permalink = `/a/${appId}`;
 
   const title = asString(pick(record, "title"));
   if (title) app.title = title;
@@ -614,7 +614,7 @@ export function normalizeInstall(raw: unknown): InstallSummary | null {
   if (liveUrl) install.liveUrl = liveUrl;
   const permalink = asString(pick(record, "permalink"));
   if (permalink) install.permalink = permalink;
-  else install.permalink = `/apps/id/${originAppId}`;
+  else install.permalink = `/a/${originAppId}`;
   return install;
 }
 

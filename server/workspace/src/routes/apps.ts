@@ -37,6 +37,12 @@ import {
 import { isAppId, resolveAppLocation, resolveAppRef } from "../apps/identity.js";
 import { callerRole, readApp, toolAllowed, type AppManifest, type AppPaths } from "../apps/store.js";
 import { countDailyCall } from "../apps/usage.js";
+import {
+  canonicalInstallLiveUrl,
+  canonicalLiveUrl,
+  installAppApiBase,
+  publicAppApiBase,
+} from "../apps/url-bases.js";
 import { getAuditStore } from "../audit.js";
 import { isInterface } from "../interfaces.js";
 import { getAuthMode, readBearerToken, verifyAccessToken } from "../middleware/auth.js";
@@ -317,7 +323,13 @@ async function handleGetManifest(c: {
 }): Promise<Response> {
   try {
     const session = await resolveAppSession(c);
-    const { manifest, workspaceId } = session;
+    const { manifest } = session;
+    const live = session.install
+      ? canonicalInstallLiveUrl(session.executionWorkspaceId, session.install.installId)
+      : canonicalLiveUrl(manifest.appId);
+    const apiBase = session.install
+      ? installAppApiBase(session.executionWorkspaceId, session.install.installId)
+      : publicAppApiBase(manifest.appId);
     return c.json({
       appId: manifest.appId,
       name: manifest.name,
@@ -328,10 +340,10 @@ async function handleGetManifest(c: {
       allowedTools: manifest.allowedTools,
       channels: manifest.channels ?? {},
       role: session.role,
-      url: `/apps/${workspaceId}/${manifest.name}`,
-      liveUrl: `/apps/${workspaceId}/${manifest.name}`,
-      permalink: `/apps/id/${manifest.appId}`,
-      apiBase: `/api/gateway/apps/${workspaceId}/${manifest.name}`,
+      url: live,
+      liveUrl: live,
+      permalink: canonicalLiveUrl(manifest.appId),
+      apiBase,
       install: session.install
         ? {
             installId: session.install.installId,

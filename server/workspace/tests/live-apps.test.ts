@@ -10,6 +10,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
 import { claimGlobalSlug } from "../src/apps/slugs.js";
 import { liveAppsRouter } from "../src/routes/live-apps.js";
+import { createWorkspaceApp } from "../src/server.js";
 
 let dataDir: string;
 
@@ -231,6 +232,17 @@ describe("legacy live paths redirect to canonical", () => {
     const res = await liveAppsRouter.request("/local/noleak");
     expectRedirect(res, `/a/${appId}`);
     expect(res.headers.get("location")).not.toContain("local");
+  });
+
+  it("createWorkspaceApp mount strips /apps before resolving (not mount-relative path)", async () => {
+    const { appId } = await publishFolderApp("mounted", { visibility: "public" });
+    const live = createWorkspaceApp();
+    expectRedirect(await live.request("/apps/local/mounted"), `/a/${appId}`);
+    expectRedirect(await live.request(`/apps/id/${appId}`), `/a/${appId}`);
+    expectRedirect(
+      await live.request(`/apps/id/${appId}/__project__`),
+      `/a/${appId}/__project__`,
+    );
   });
 });
 

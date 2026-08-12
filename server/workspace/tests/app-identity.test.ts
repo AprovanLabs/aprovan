@@ -214,10 +214,15 @@ describe("publish / rename / storage keys", () => {
     expect(oldUrl.status).toBe(404);
 
     const newUrl = await live.request("/apps/local/live-new");
-    expect(newUrl.status).toBe(200);
+    expect(newUrl.status).toBe(302);
+    expect(newUrl.headers.get("Location")).toBe(`/a/${published.appId}`);
 
     const permalink = await live.request(`/apps/id/${published.appId}`);
-    expect(permalink.status).toBe(200);
+    expect(permalink.status).toBe(302);
+    expect(permalink.headers.get("Location")).toBe(`/a/${published.appId}`);
+
+    const canonical = await live.request(`/a/${published.appId}/__project__`);
+    expect(canonical.status).toBe(200);
 
     const api = await createApp().request(`/apps/id/${published.appId}`, {
       headers: { "X-App-User": "local" },
@@ -226,6 +231,8 @@ describe("publish / rename / storage keys", () => {
     const body = (await api.json()) as { appId: string; name: string };
     expect(body.appId).toBe(published.appId);
     expect(body.name).toBe("live-new");
+    expect((body as { permalink?: string }).permalink).toBe(`/a/${published.appId}`);
+    expect((body as { url?: string }).url).toBe(`/a/${published.appId}`);
   });
 
   it("writes no name-keyed manifest or release scopes", async () => {
