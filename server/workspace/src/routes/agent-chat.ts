@@ -36,11 +36,15 @@ import { requireAuth } from "../middleware/auth.js";
 import { ServiceError } from "../service-kernel.js";
 import {
   appendMessages,
+  consecutiveHealCount,
   createSession,
+  hasHealForAssistantMessage,
+  MAX_WIDGET_AUTOFIXES,
   readMessages,
   requireSession,
   setSessionActiveRun,
   type ChatSessionRecord,
+  type HealMessageMetadata,
 } from "../vcs/chat-sessions.js";
 
 export const agentChatRouter = new Hono();
@@ -62,13 +66,31 @@ const TERMINAL_STATUSES = new Set([
 ]);
 
 /**
- * Reserved 429 body for stream 7 (self-heal cap). Not wired here — callers
- * that need to refuse a heal turn should return this shape.
+ * 429 body when a self-heal request exceeds the per-message or consecutive
+ * cap (stream 5 reserved; stream 7 enforces).
  */
 export const SELF_HEAL_CAP_EXCEEDED = {
   error: "self-heal cap exceeded",
   code: "self_heal_cap",
 } as const;
+
+/**
+ * Explicit budget for heal-origin runs. Mutable so tests can tighten
+ * `maxTurns` to exercise limit stop reasons; production values are the
+ * defaults below. `maxTokens` is the token/cost ceiling (AgentLimits);
+ * the native runner enforces maxTurns / maxToolCalls / wallClockMs today.
+ */
+export const SELF_HEAL_LIMITS: {
+  maxTurns: number;
+  maxToolCalls: number;
+  wallClockMs: number;
+  maxTokens: number;
+} = {
+  maxTurns: 4,
+  maxToolCalls: 8,
+  wallClockMs: 60_000,
+  maxTokens: 8_000,
+};
 
 /** Byte-stable with client `formatContextFilesPrefix` (chat-file-context.ts). */
 function formatContextFilesPrefix(contextFiles: string[]): string {
@@ -269,11 +291,15 @@ agentChatRouter.post("/chat-turn", async (c) => {
     return c.json({ error: parsed.error.message }, 400);
   }
   const req = parsed.data;
+  const isSelfHeal = req.origin === "self-heal";
 
-  // Stream 7 owns self-heal cap enforcement; reserve the 429 shape only.
-  if (req.origin === "self-heal") {
-    // Cap check lands in stream 7 — until then, heal turns proceed like chat.
-    void SELF_HEAL_CAP_EXCEEDED;
+  if (isSelfHeal) {
+    if (!req.sessionId) {
+      return c.json({ error: "self-heal requires sessionId" }, 400);
+    }
+    if (!req.failure) {
+      return c.json({ error: "self-heal requires failure" }, 400);
+    }
   }
 
   let session: ChatSessionRecord;
@@ -297,17 +323,35 @@ agentChatRouter.post("/chat-turn", async (c) => {
     return c.json({ error: "Session is read-only" }, 409);
   }
 
+  const prior = await readMessages(workspaceId, session.id);
+
+  // Server-side heal caps (additive to client arming). Reconstruct consecutive
+  // count from heal-marked user rows since the last non-heal user message.
+  if (isSelfHeal && req.failure) {
+    if (hasHealForAssistantMessage(prior, req.failure.messageId)) {
+      return c.json(SELF_HEAL_CAP_EXCEEDED, 429);
+    }
+    if (consecutiveHealCount(prior) >= MAX_WIDGET_AUTOFIXES) {
+      return c.json(SELF_HEAL_CAP_EXCEEDED, 429);
+    }
+  }
+
   const messageId = crypto.randomUUID();
   const contextFiles = req.contextFiles ?? [];
   const userContent = formatContextFilesPrefix(contextFiles) + req.text;
 
+  const healMeta: HealMessageMetadata | undefined =
+    isSelfHeal && req.failure
+      ? { origin: "self-heal", failureMessageId: req.failure.messageId }
+      : undefined;
+
   // Server-owned transcript write (see file header). Idempotent per message id.
-  const prior = await readMessages(workspaceId, session.id);
   await appendMessages(workspaceId, session.id, [
     {
       id: messageId,
       role: "user",
       parts: [{ type: "text", text: req.text }],
+      ...(healMeta ? { metadata: healMeta } : {}),
     },
   ]);
 
@@ -330,8 +374,12 @@ agentChatRouter.post("/chat-turn", async (c) => {
     { role: "user" as const, content: userContent },
   ];
 
-  const origin = req.origin === "self-heal" ? "self-heal" : "chat";
+  const origin = isSelfHeal ? "self-heal" : "chat";
   const ctx = { workspaceId, userId };
+  const runArgs: Record<string, unknown> = {
+    input,
+    ...(isSelfHeal ? { limits: { ...SELF_HEAL_LIMITS } } : {}),
+  };
 
   let runId: string;
   let done: Promise<{ id: string; status: string; output?: string }>;
@@ -339,7 +387,7 @@ agentChatRouter.post("/chat-turn", async (c) => {
     const started = await startChatAgentRun(
       ctx,
       profile,
-      { input },
+      runArgs,
       { origin, sessionId: session.id },
     );
     runId = started.runId;
