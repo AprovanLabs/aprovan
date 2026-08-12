@@ -39,3 +39,41 @@ canReadChannel(principal, installId, channelId, {
 Stream 2's sync `authorize` should close over / cache those coordinates
 from subscribe state and call this same function (or a membership snapshot
 derived from it). Do not fork a second predicate.
+
+## Stream 3 (CF-2 guest invites)
+
+### D3 — Touches listed `identity/store.ts`; persistence is sql/dynamo
+
+**Task Touches:** `invites.ts`, `identity/types.ts`, `identity/store.ts`,
+`routes/invites.ts`, `tests/invites-app-instance-target.test.ts`.
+
+**Reality:** `store.ts` is only the backend factory + principal-cache wrap.
+Invite rows are written in `identity/sql.ts` (and `identity/dynamo.ts` for
+`IIdentityStore` parity). Persisting optional `target` required a JSON
+`target` column (DDL + additive ALTER) and the matching dsql-schema line.
+
+**Adaptation:** edited sql/dynamo/dsql-schema; left `store.ts` untouched.
+
+### D4 — F2 participant shape vs tech-plan `{ sub, role, channelIds? }`
+
+**Task / tech-plan:** consume mints `{ sub, role: "guest", channelIds? }`.
+
+**Reality:** F2 `AppInstanceRecord.participants` is `string[]`;
+`addParticipant(workspaceId, instanceId, sub, actor)` has no role or
+channel grant args (frozen).
+
+**Adaptation:** call `addParticipant` with `target.installId` as the
+instance id; keep `role: "guest"` and optional `channelIds` on the
+`InviteRecord` / accept response for Chat (stream 1 channel members /
+stream 8 UX). No fork of invite machinery; no change to `instances.ts`.
+
+### D5 — `tests/invites.test.ts` was missing
+
+**Verify / task 3.4:** run `tests/invites.test.ts` as the absent-target
+regression gate.
+
+**Reality:** file did not exist on `origin/main` (non-targeted coverage
+lived only inside `identity-relational.test.ts`).
+
+**Adaptation:** added a minimal `tests/invites.test.ts` that asserts
+create/get/list/consume/revoke with **no** `target` field.

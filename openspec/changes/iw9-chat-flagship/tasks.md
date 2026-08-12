@@ -92,21 +92,21 @@ names below are `openspec/changes/iw9-chat-flagship/specs/<capability>/spec.md`.
 
 > Depends-on: - | Repo: aprovan | Touches: aprovan/server/workspace/src/invites.ts, aprovan/server/workspace/src/identity/types.ts, aprovan/server/workspace/src/identity/store.ts, aprovan/server/workspace/src/routes/invites.ts, aprovan/server/workspace/tests/invites-app-instance-target.test.ts | Verify: pnpm --filter @aprovan/workspace exec vitest run tests/invites-app-instance-target.test.ts tests/invites.test.ts && pnpm --filter @aprovan/workspace typecheck
 
-- [ ] 3.1 Extend `InviteRecord` (`identity/types.ts`) with optional
+- [x] 3.1 Extend `InviteRecord` (`identity/types.ts`) with optional
       `target?: { kind: "app-instance"; installId: string; channelIds?:
       string[] }` (tech-plan CF-2 shape). Absent target ⇒ byte-identical
       existing behavior — no change to any call site that doesn't pass one.
-- [ ] 3.2 Extend `createInvite`/the identity store's invite `create` to
+- [x] 3.2 Extend `createInvite`/the identity store's invite `create` to
       accept the optional `target`, and `consumeInvite`'s consume path: when
       `target.kind === "app-instance"`, mint an F2 participant entry
       (`apps/instances.ts` `addParticipant`, role `guest`, scoped to
       `channelIds` if given) instead of a workspace membership (spec
       `chat-guest-access` "Guest invites via existing invite machinery").
       When absent, today's `consume → membership` path is untouched.
-- [ ] 3.3 `routes/invites.ts`: accept the optional target on invite-create,
+- [x] 3.3 `routes/invites.ts`: accept the optional target on invite-create,
       keep the 7-day TTL and single-use-on-consume semantics unchanged
       (spec "Invite is single-use and expiring").
-- [ ] 3.4 New test file `tests/invites-app-instance-target.test.ts`: targeted
+- [x] 3.4 New test file `tests/invites-app-instance-target.test.ts`: targeted
       invite consume mints exactly one F2 participant entry with role
       `guest` and zero workspace membership rows; consumed/expired token
       fails distinguishably with no participation created; revoke makes the

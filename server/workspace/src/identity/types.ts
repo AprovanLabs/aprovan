@@ -44,6 +44,14 @@ export interface MembershipRecord {
   createdAt?: string;
 }
 
+/** Optional consume target — absent keeps today's membership mint (CF-2). */
+export type InviteTarget = {
+  kind: "app-instance";
+  /** F2 instance id (tech-plan names this installId). */
+  installId: string;
+  channelIds?: string[];
+};
+
 export interface InviteRecord {
   inviteToken: string;
   workspaceId: string;
@@ -54,6 +62,12 @@ export interface InviteRecord {
   createdAt: string;
   /** Unix epoch seconds. */
   expiresAt: number;
+  /**
+   * When set to `{ kind: "app-instance", ... }`, consume mints an F2
+   * participant instead of a workspace membership. Absent ⇒ byte-identical
+   * prior behavior.
+   */
+  target?: InviteTarget;
 }
 
 export interface GroupRecord {
@@ -134,6 +148,7 @@ export interface IIdentityStore {
       role: string,
       groupIds: string[],
       invitedBy: string,
+      target?: InviteTarget,
     ): Promise<InviteRecord>;
     get(inviteToken: string): Promise<InviteRecord | undefined>;
     listByWorkspace(workspaceId: string): Promise<InviteRecord[]>;
