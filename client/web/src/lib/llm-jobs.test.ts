@@ -1,17 +1,14 @@
 /**
- * `runChatCompletionJob`'s resume-to-poll fallback.
+ * Post-migration coverage for completion helpers after llm-jobs was removed
+ * from the widget-edit / leftover completion path (IW-9 D stream 9).
  *
- * Widget edits are 1-2 minute completions; mobile browsers kill the fetch on
- * screen-lock or backgrounding well before that. These tests exercise the
- * client side of the fix: when the streaming leg drops mid-completion, the
- * call must not fail outright — it should fall back to polling
- * `GET /llm/jobs/:id` and resolve with the eventual result (or the eventual
- * failure), using only the text the job accrues, never re-fetching the
- * stream itself.
+ * `runChatCompletionJob` is now a thin alias of `streamChatCompletion`
+ * (tools-proxy stream). It must not open `/llm/.../completions` or poll
+ * `/llm/jobs/:id`.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { gatewayFetch } from "./gateway-fetch";
-import { runChatCompletionJob } from "./llm";
+import { runChatCompletionJob, streamChatCompletion } from "./llm";
 
 vi.mock("./gateway-fetch", () => ({ gatewayFetch: vi.fn() }));
 vi.mock("./gateway", () => ({
@@ -41,8 +38,7 @@ function sseBody(chunks: string[]): ReadableStream<Uint8Array> {
   });
 }
 
-/** Delivers `events` then hangs forever — simulates a dropped connection
- *  (mobile tab backgrounded / screen locked) after those events landed. */
+/** Delivers `events` then hangs forever — simulates a dropped connection. */
 function stalledSseBody(events: unknown[]): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
   let i = 0;
@@ -62,16 +58,11 @@ function streamResponse(body: ReadableStream<Uint8Array>): Response {
   return new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } });
 }
 
-function jobResponse(job: Record<string, unknown>): Response {
-  return new Response(JSON.stringify(job), { status: 200, headers: { "content-type": "application/json" } });
-}
-
-describe("runChatCompletionJob", () => {
-  it("resolves from the stream alone when nothing drops", async () => {
+describe("streamChatCompletion / runChatCompletionJob (post llm-jobs)", () => {
+  it("resolves from the tools-proxy stream alone", async () => {
     mockFetch.mockResolvedValueOnce(
       streamResponse(
         sseBody([
-          sse({ jobId: "job-clean" }),
           sse({ choices: [{ delta: { content: "Hel" } }] }),
           sse({ choices: [{ delta: { content: "lo" } }] }),
           "data: [DONE]\n\n",
@@ -84,90 +75,57 @@ describe("runChatCompletionJob", () => {
 
     expect(text).toBe("Hello");
     expect(deltas).toEqual(["Hel", "lo"]);
-    expect(mockFetch).toHaveBeenCalledTimes(1); // never touched /llm/jobs/:id
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(String(mockFetch.mock.calls[0]?.[0])).toContain(
+      "/tools/openai/createChatCompletion",
+    );
+    expect(String(mockFetch.mock.calls[0]?.[0])).not.toContain("/llm/");
   });
 
-  it("falls back to polling when the stream stalls, resuming from the job's accumulated text", async () => {
-    vi.useFakeTimers();
-    mockFetch
-      .mockResolvedValueOnce(
-        streamResponse(
-          stalledSseBody([{ jobId: "job-2" }, { choices: [{ delta: { content: "Once " } }] }]),
-        ),
-      )
-      .mockResolvedValueOnce(
-        jobResponse({
-          id: "job-2",
-          status: "running",
-          provider: "openai",
-          text: "Once upon ",
-          createdAt: "t0",
-          updatedAt: "t1",
-        }),
-      )
-      .mockResolvedValueOnce(
-        jobResponse({
-          id: "job-2",
-          status: "succeeded",
-          provider: "openai",
-          text: "Once upon a time",
-          createdAt: "t0",
-          updatedAt: "t2",
-        }),
-      );
-
-    const deltas: string[] = [];
-    const promise = runChatCompletionJob(
-      "openai",
-      { messages: [] },
-      (d) => deltas.push(d),
-      { idleTimeoutMs: 50 },
+  it("forwards onReasoning deltas without including them in the result", async () => {
+    mockFetch.mockResolvedValueOnce(
+      streamResponse(
+        sseBody([
+          sse({ choices: [{ delta: { reasoning_content: "plan…" } }] }),
+          sse({ choices: [{ delta: { content: "done" } }] }),
+          "data: [DONE]\n\n",
+        ]),
+      ),
     );
 
-    await vi.advanceTimersByTimeAsync(60); // idle timeout trips -> falls back to polling
-    await vi.advanceTimersByTimeAsync(3_000); // first poll (still running)
-    await vi.advanceTimersByTimeAsync(3_000); // second poll (terminal)
+    const reasoning: string[] = [];
+    const text = await streamChatCompletion(
+      "openai",
+      { messages: [] },
+      undefined,
+      { onReasoning: (d) => reasoning.push(d) },
+    );
 
-    await expect(promise).resolves.toBe("Once upon a time");
-    // Deltas from the stream, then only the *growth* the job reports —
-    // never a re-send of text already seen.
-    expect(deltas).toEqual(["Once ", "upon ", "a time"]);
-    expect(mockFetch).toHaveBeenCalledTimes(3);
-    expect(String(mockFetch.mock.calls[1]?.[0])).toContain("/llm/jobs/job-2");
-    expect(String(mockFetch.mock.calls[2]?.[0])).toContain("/llm/jobs/job-2");
+    expect(text).toBe("done");
+    expect(reasoning).toEqual(["plan…"]);
   });
 
-  it("rejects with the job's own error once polling reaches a failed terminal state", async () => {
+  it("rejects on mid-stream stall instead of polling /llm/jobs/:id", async () => {
     vi.useFakeTimers();
-    mockFetch
-      .mockResolvedValueOnce(streamResponse(stalledSseBody([{ jobId: "job-3" }])))
-      .mockResolvedValueOnce(
-        jobResponse({
-          id: "job-3",
-          status: "failed",
-          provider: "openai",
-          text: "",
-          error: "upstream disconnected",
-          createdAt: "t0",
-          updatedAt: "t1",
-        }),
-      );
+    mockFetch.mockResolvedValueOnce(
+      streamResponse(stalledSseBody([{ choices: [{ delta: { content: "Once " } }] }])),
+    );
 
-    const promise = runChatCompletionJob("openai", { messages: [] }, undefined, { idleTimeoutMs: 50 });
-    // Attach the rejection assertion before advancing fake time, so the
-    // rejection (which fires mid-advance) never has a tick without a handler.
-    const assertion = expect(promise).rejects.toThrow("upstream disconnected");
+    const promise = runChatCompletionJob("openai", { messages: [] }, undefined, {
+      idleTimeoutMs: 50,
+    });
+    const assertion = expect(promise).rejects.toThrow(/stalled/i);
 
     await vi.advanceTimersByTimeAsync(60);
-    await vi.advanceTimersByTimeAsync(3_000);
-
     await assertion;
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(String(mockFetch.mock.calls[0]?.[0])).not.toContain("/llm/jobs/");
   });
 
-  it("does not fall back to polling when no jobId was ever issued (fails outright)", async () => {
+  it("does not fall back to job polling when the connect request fails", async () => {
     mockFetch.mockRejectedValueOnce(new Error("network down"));
 
     await expect(runChatCompletionJob("openai", { messages: [] })).rejects.toThrow("network down");
-    expect(mockFetch).toHaveBeenCalledTimes(1); // no poll attempts — nothing to resume
+    expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 });

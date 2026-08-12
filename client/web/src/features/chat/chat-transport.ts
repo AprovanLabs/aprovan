@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { buildEditMessages, type EditTransport } from "@aprovan/editor";
-import { runChatCompletionJob } from "@/lib/llm";
+import { streamChatCompletion } from "@/lib/llm";
 import { recentProblemsDigest } from "@/lib/telemetry";
 
 /**
@@ -14,8 +14,11 @@ import { recentProblemsDigest } from "@/lib/telemetry";
  * came back as a 504 — big widgets hit that routinely. Streaming also lets
  * the edit panel count off blocks as they land instead of sitting idle.
  *
- * IW-9 D stream 9 migrates this off `runChatCompletionJob` / llm-jobs;
- * stream 8 leaves it untouched.
+ * Durability: previously job-backed (`runChatCompletionJob` + `GET
+ * /llm/jobs/:id` poll). Chat durability now lives on run records; this path
+ * uses the plain tools-proxy stream (`streamChatCompletion`) — an equivalent
+ * non-job stream — because a chat-turn agent run would tool-loop rather than
+ * emit search/replace blocks. Staged `onProgress` strings are unchanged.
  */
 export function useEditTransport(args: {
   chatProviderRef: React.MutableRefObject<string>;
@@ -33,7 +36,7 @@ export function useEditTransport(args: {
     let announcedThinking = false;
     let announcedWriting = false;
     onProgress?.(`Asking ${provider}${model ? ` (${model})` : ""}…`);
-    return runChatCompletionJob(
+    return streamChatCompletion(
       provider,
       {
         messages: buildEditMessages(

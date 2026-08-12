@@ -1,15 +1,15 @@
 /**
- * Resilient fetch for the main chat's UI message stream.
+ * Resilient fetch for the legacy main chat's UI message stream.
  *
- * The gateway's /llm/:provider/chat is job-backed: it answers with UI-stream
- * bytes immediately (keepalives while the model thinks) and mirrors the
- * accumulated text into an LLM job record named by the `x-llm-job` response
- * header. This wrapper is the client half of that contract — it passes the
- * stream through untouched while watching it, and if the stream dies before
- * a `finish` frame (network drop, CloudFront cut, backgrounded tab, silent
- * stall), it polls the job to its terminal state and splices the missing
- * tail into the stream as synthesized UI frames. `useChat` never learns the
- * connection broke; it just sees the message complete.
+ * @deprecated Post stream 8, chat uses RunTransport + run records; nothing
+ * in `client/web/src` imports this. Kept only until the llm-jobs evidence
+ * gate (IW-9 D 9.4/9.5) authorizes deleting the job poll splice together
+ * with `pollJobUntilTerminal` and the server job store.
+ *
+ * The gateway's /llm/:provider/chat is still job-backed server-side: it
+ * answers with UI-stream bytes immediately and mirrors accumulated text into
+ * an LLM job named by `x-llm-job`. This wrapper polls that job if the stream
+ * dies mid-message.
  */
 
 import { gatewayFetch } from "./gateway-fetch";

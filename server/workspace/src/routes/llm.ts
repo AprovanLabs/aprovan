@@ -838,12 +838,24 @@ function createJobResponseStream(
 }
 
 // ---------------------------------------------------------------------------
-// GET /llm/jobs/:id — poll a completion job
+// GET /llm/jobs/:id — poll a completion job (DEPRECATED)
 // ---------------------------------------------------------------------------
+//
+// Removal condition (evidence gate, not a calendar window — IW-9 D task 9.4):
+// this route and the llm-jobs store may be deleted only when (a) grep across
+// both checkouts shows no in-repo callers of x-llm-job / readLlmJob /
+// writeLlmJob / pollJobUntilTerminal / resilientChatFetch beyond the
+// definitions about to be deleted and their tests, (b) parity/E2E (stream 8
+// suite + llm.test.ts + widget-edit path tests) is green with the job path
+// unused, and (c) a written compatibility assessment for clients holding a
+// job id across the deploy is recorded. Until then this endpoint stays.
 
 /** Long-poll ceiling for `?wait=1`. */
 const JOB_WAIT_MS = 20_000;
 const JOB_WAIT_POLL_MS = 1_000;
+
+const LLM_JOBS_DEPRECATION =
+  "Deprecated. Removal when: (a) no in-repo callers of x-llm-job/readLlmJob/writeLlmJob/pollJobUntilTerminal/resilientChatFetch beyond definitions+tests in both checkouts, (b) parity/E2E green without the job path, (c) compatibility assessment for in-flight job ids recorded. Not calendar-gated.";
 
 llmRouter.get("/jobs/:id", async (c) => {
   const workspaceId = c.get("principal").workspaceId;
@@ -851,7 +863,13 @@ llmRouter.get("/jobs/:id", async (c) => {
   const wait = c.req.query("wait") === "1";
 
   let job = await readLlmJob(workspaceId, id);
-  if (!job) return c.json({ error: `Unknown job: ${id}` }, 404);
+  if (!job) {
+    return c.json(
+      { error: `Unknown job: ${id}`, deprecated: true, deprecation: LLM_JOBS_DEPRECATION },
+      404,
+      { Deprecation: "true", Sunset: "evidence-gate" },
+    );
+  }
 
   if (wait && job.status === "running") {
     const deadline = Date.now() + JOB_WAIT_MS;
@@ -864,5 +882,9 @@ llmRouter.get("/jobs/:id", async (c) => {
     }
   }
 
-  return c.json(job);
+  return c.json(
+    { ...job, deprecated: true, deprecation: LLM_JOBS_DEPRECATION },
+    200,
+    { Deprecation: "true", Sunset: "evidence-gate" },
+  );
 });
