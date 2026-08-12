@@ -1,7 +1,7 @@
 # Report: stream 14 — grep-gate cleanup + definition of done
 
 **Status:** done  
-**PRs:** (filled after open)  
+**PRs:** https://github.com/AprovanLabs/aprovan/pull/251 · https://github.com/AprovanLabs/registry/pull/167  
 **Branches:** `feat/iw9-c-grep-dod` (aprovan + registry)  
 **Base:** `origin/main` @ aprovan `baae6ed` / registry `bf64a16`
 
