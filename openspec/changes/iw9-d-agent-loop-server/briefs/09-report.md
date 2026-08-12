@@ -1,6 +1,6 @@
 # Report — Stream 9: `llm-jobs` dissolution
 
-**PR:** (filled after open)
+**PR:** https://github.com/AprovanLabs/aprovan/pull/224
 **Base:** `origin/main` @ `bbfc3f3` (`feat(web): IW-9 D stream 8 — RunTransport default, delete legacy loop` / #223)
 **Outcome:** complete-with-blocker (9.5 does not delete)
 
