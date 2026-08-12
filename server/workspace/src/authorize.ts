@@ -1,38 +1,48 @@
 /**
- * Tool-invocation authorization.
+ * Tool-invocation authorization — thin facade over {@link evaluateDispatch}.
  *
- * A caller may invoke `provider:operation` when any of:
- *   1. They hold a direct grant in the Permissions table (callerId match,
- *      exact op or provider `*` wildcard) — APR-320
- *   2. A profile targeting the namespace is granted to them or to any of
- *      their groups (specs group-profile-grants; the WS-3 single auth-time
- *      join — replacing the retired per-request UserGroups query + N+1
- *      per-group grant gets)
- *   3. They are a workspace admin (admins manage grants and need to be able
- *      to exercise tools without a bootstrap grant)
+ * Legacy `mayInvokeTool` remains as a boolean adapter for out-of-Touches
+ * callers (e.g. workflows/invoke.ts) until those sites call evaluateDispatch
+ * directly. Direct permission-store checks are gone: legacy APR-320 rows
+ * resolve through the unified predicate as capability-only patterns.
  */
 
+import {
+  denyMessage,
+  evaluateDispatch,
+  type DispatchDecision,
+  type DispatchRequest,
+  type Effect,
+} from "./grants.js";
 import type { Principal } from "./middleware/auth.js";
-import { getPermissionStore } from "./permissions.js";
-import { profileGrantAllows } from "./profile-grants.js";
+import { ServiceError } from "./service-kernel.js";
 
+export type { DispatchDecision };
+
+/**
+ * Boolean adapter over {@link evaluateDispatch} (capability axis only —
+ * no resource). Prefer `evaluateDispatch` at new call sites.
+ */
 export async function mayInvokeTool(
   principal: Principal,
   provider: string,
   operation: string,
+  effect: Effect = "action",
 ): Promise<boolean> {
-  if (principal.role === "admin") return true;
+  const decision = await evaluateDispatch({
+    principal,
+    tool: { namespace: provider, operation, effect },
+  });
+  return decision.kind === "allow";
+}
 
-  if (
-    await getPermissionStore().check(
-      principal.workspaceId,
-      principal.sub,
-      provider,
-      operation,
-    )
-  ) {
-    return true;
+/** Run evaluateDispatch; throw 403 on deny. queue/ask returned to the caller. */
+export async function assertDispatchAllowed(
+  req: DispatchRequest,
+): Promise<DispatchDecision> {
+  const decision = await evaluateDispatch(req);
+  if (decision.kind === "deny") {
+    throw new ServiceError(denyMessage(decision), 403);
   }
-
-  return profileGrantAllows(principal.workspaceId, principal.sub, principal.groupIds, provider);
+  return decision;
 }

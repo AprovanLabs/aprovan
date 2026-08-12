@@ -147,15 +147,44 @@ export async function listWorkspaceProfiles(
 }
 
 /**
- * The auth-time join (tech-plan D6/D12): does any profile granted to this
- * caller — as the user or through any of their groups — target `namespace`?
- * A granted profile grants its target's full surface; the profile's own
- * options/limits narrow execution, not the allow decision. `provider:*`
- * wildcard rows are subsumed structurally.
+ * Invoker's matched tool-pattern set from profile grants (IW-9 C stream 8).
+ * Each granted profile targeting a namespace contributes `namespace.*` so
+ * `evaluateDispatch` can intersect invoker ∩ app ceiling ∩ profile narrowing.
  *
  * Exactly ONE grant query (`grantedProfileIds` over all subjects) plus one
- * profile listing to map ids → targets — never a per-group per-grant N+1.
- * On the interim dynamo backend this resolves to false (no profile storage).
+ * profile listing — never a per-group per-grant N+1.
+ */
+export async function invokerMatchedToolPatterns(
+  workspaceId: string,
+  sub: string,
+  groupIds: readonly string[],
+): Promise<string[]> {
+  if (!profileGrantsAvailable()) return [];
+  try {
+    const store = await getRegistryStorage();
+    await store.tenants.ensure(workspaceId);
+    const subjects: GrantSubject[] = [
+      { kind: "user", id: sub },
+      ...groupIds.map((id): GrantSubject => ({ kind: "group", id })),
+    ];
+    const granted = await store.grants.grantedProfileIds(workspaceId, subjects);
+    if (granted.size === 0) return [];
+    const rows = await store.profiles.list(workspaceId);
+    const patterns = new Set<string>();
+    for (const row of rows) {
+      if (!granted.has(row.id)) continue;
+      patterns.add(`${row.targetId}.*`);
+    }
+    return [...patterns];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * The auth-time join (tech-plan D6/D12): does any profile granted to this
+ * caller — as the user or through any of their groups — target `namespace`?
+ * Thin wrapper over {@link invokerMatchedToolPatterns}.
  */
 export async function profileGrantAllows(
   workspaceId: string,
@@ -163,17 +192,18 @@ export async function profileGrantAllows(
   groupIds: readonly string[],
   namespace: string,
 ): Promise<boolean> {
-  if (!profileGrantsAvailable()) return false;
-  const store = await getRegistryStorage();
-  await store.tenants.ensure(workspaceId);
-  const subjects: GrantSubject[] = [
-    { kind: "user", id: sub },
-    ...groupIds.map((id): GrantSubject => ({ kind: "group", id })),
-  ];
-  const granted = await store.grants.grantedProfileIds(workspaceId, subjects);
-  if (granted.size === 0) return false;
-  const rows = await store.profiles.list(workspaceId, { targetId: namespace });
-  return rows.some((row) => granted.has(row.id));
+  const patterns = await invokerMatchedToolPatterns(workspaceId, sub, groupIds);
+  const callPrefix = `${namespace}.`;
+  return patterns.some(
+    (pattern) =>
+      pattern === "*" ||
+      pattern === `${namespace}.*` ||
+      pattern === namespace ||
+      (pattern.endsWith(".*") &&
+        (namespace === pattern.slice(0, -2) ||
+          namespace.startsWith(`${pattern.slice(0, -2)}.`))) ||
+      pattern.startsWith(callPrefix),
+  );
 }
 
 // ---------------------------------------------------------------------------

@@ -29,6 +29,12 @@ import {
   type VfsStat,
 } from "@utdk/vfs";
 import { getFsStore, listAll, type IFsStore } from "./fs-store.js";
+import {
+  denyMessage,
+  evaluateDispatch,
+  type Effect,
+} from "./grants.js";
+import { getAuthMode } from "./middleware/auth.js";
 import { getRecordStore, type IRecordStore } from "./records.js";
 import { ServiceError, type ServiceContext } from "./service-kernel.js";
 import {
@@ -453,6 +459,54 @@ export async function dispatchAprovanNativeOp(
   if (!isNativeInterface(interfaceId)) {
     throw new ServiceError(`Not a native interface: ${interfaceId}`, 404);
   }
+
+  // Dispatch chokepoint (IW-9 C): every native op passes evaluateDispatch.
+  // Workspace membership is the capability grant for first-party natives;
+  // resource grants still apply for actions. Auth-off (local) skips the gate.
+  if (getAuthMode() === "oidc") {
+    const effect: Effect =
+      /^(list|get|read|stat|log|show|diff|branches|query|traces|runs)$/u.test(operation) ||
+      operation.startsWith("shares.list")
+        ? "observation"
+        : "action";
+    const resource =
+      typeof args["resource"] === "string"
+        ? args["resource"]
+        : typeof args["path"] === "string"
+          ? args["path"]
+          : typeof args["url"] === "string"
+            ? args["url"]
+            : undefined;
+    const decision = await evaluateDispatch(
+      {
+        principal: {
+          sub: ctx.userId,
+          workspaceId: ctx.workspaceId,
+          role: "member",
+          groupIds: [],
+        },
+        ...(ctx.appScope ? { via: { appId: ctx.appScope.id } } : {}),
+        tool: { namespace: interfaceId, operation, effect },
+        ...(resource ? { resource } : {}),
+      },
+      {
+        // Membership ⇒ native capability; app ceiling looked up when via.appId set.
+        invokerPatterns: [`${interfaceId}.*`],
+      },
+    );
+    if (decision.kind === "deny") {
+      throw new ServiceError(denyMessage(decision), 403);
+    }
+    if (decision.kind === "queue" || decision.kind === "ask") {
+      throw new ServiceError(
+        decision.kind === "queue"
+          ? `Action queued for approval (${decision.queuedActionId})`
+          : `Approval required (${decision.cardId})`,
+        403,
+      );
+    }
+  }
+
   try {
     // Telemetry product ops (emit/query/traces) stay on the activity store;
     // only `export` is the rebindable contract surface.

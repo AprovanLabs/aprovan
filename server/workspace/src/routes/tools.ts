@@ -6,7 +6,7 @@
  * Authentication: Cognito access token (verified by `requireAuth`), which sets
  * `c.var.principal` with the caller's `sub`, active `workspaceId`, `role`, and
  * `groupIds`. The route:
- * - Authorizes via `mayInvokeTool` (direct grant, group tool grant, or admin)
+ * - Authorizes via `evaluateDispatch` (capability ∩ resource ∩ credential)
  * - Resolves credentials for the provider from the credential store
  * - Applies rate limiting per user id
  * - Executes the operation in the Isolate runtime (APR-15)
@@ -23,7 +23,7 @@ import { telemetryToolEntries as telemetryDiscoveryEntries } from "@utdk/telemet
 import { vfsToolEntries as vfsDiscoveryEntries } from "@utdk/vfs";
 import { Hono } from "hono";
 import { getAuditStore } from "../audit.js";
-import { mayInvokeTool } from "../authorize.js";
+import { evaluateDispatch, denyMessage } from "../grants.js";
 import { getCredentialStore, resolveCredentialRecord } from "../credentials.js";
 import {
   isInterface,
@@ -1421,14 +1421,62 @@ toolsRouter.post("/:provider/:operation{.*}", rateLimitByUserId, async (c) => {
     interfaceDefaults = callSiteOptions;
   }
 
-  if (
-    getAuthMode() === "oidc" &&
-    !(await mayInvokeTool(principal, requestNamespace!, operation!))
-  ) {
-    logMetadata({ requestId, workspaceId, callerId, provider: requestNamespace!, operation: operation!, status: 403 });
-    getAuditStore().append({ requestId, workspaceId, callerId, provider: requestNamespace!, operation: operation!, status: 403 });
-    recordDispatch(403, 0, "Forbidden: caller does not have permission for this operation");
-    return c.json({ error: "Forbidden: caller does not have permission for this operation" }, 403);
+  if (getAuthMode() === "oidc") {
+    const effectMap = await loadProviderEffectMap(requestNamespace!);
+    const effect = effectMap.get(operation!) ?? "action";
+    const resource =
+      typeof body.args["resource"] === "string"
+        ? body.args["resource"]
+        : typeof body.args["to"] === "string"
+          ? body.args["to"]
+          : typeof body.args["url"] === "string"
+            ? body.args["url"]
+            : undefined;
+    const decision = await evaluateDispatch({
+      principal,
+      ...(requestProfile ? { via: { profileId: requestProfile } } : {}),
+      tool: { namespace: requestNamespace!, operation: operation!, effect },
+      ...(resource ? { resource } : {}),
+    });
+    if (decision.kind === "deny") {
+      const message = denyMessage(decision);
+      logMetadata({
+        requestId,
+        workspaceId,
+        callerId,
+        provider: requestNamespace!,
+        operation: operation!,
+        status: 403,
+      });
+      getAuditStore().append({
+        requestId,
+        workspaceId,
+        callerId,
+        provider: requestNamespace!,
+        operation: operation!,
+        status: 403,
+      });
+      recordDispatch(403, 0, message);
+      return c.json({ error: message }, 403);
+    }
+    if (decision.kind === "queue" || decision.kind === "ask") {
+      // Streams 9/10 persist queue rows and JIT cards — return the decision.
+      const status = 202;
+      const payload =
+        decision.kind === "queue"
+          ? { decision: "queue", queuedActionId: decision.queuedActionId }
+          : { decision: "ask", cardId: decision.cardId };
+      getAuditStore().append({
+        requestId,
+        workspaceId,
+        callerId,
+        provider: requestNamespace!,
+        operation: operation!,
+        status,
+      });
+      recordDispatch(status, 0, decision.kind);
+      return c.json(payload, status);
+    }
   }
 
   if (!provider || !operation) {
