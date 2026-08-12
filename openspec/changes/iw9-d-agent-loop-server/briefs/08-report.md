@@ -1,6 +1,6 @@
 # Report — Stream 8: Parity checklist, flag flip, legacy-loop deletion
 
-**PR:** (filled after `gh pr create`)
+**PR:** https://github.com/AprovanLabs/aprovan/pull/223
 **Base:** `origin/main` @ `c8c5159` (`fix(web): type self-heal test mock for ChatTurnRequest` / #222)
 
 ## Verify
