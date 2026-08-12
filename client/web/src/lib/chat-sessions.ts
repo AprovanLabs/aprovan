@@ -41,6 +41,8 @@ export interface ChatSessionInfo {
   changes?: SessionChanges;
   mergeCommit?: string;
   tabs?: unknown;
+  /** Live agent run id when a chat-turn is in flight (server-owned). */
+  activeRunId?: string;
 }
 
 export interface SessionConflict {
