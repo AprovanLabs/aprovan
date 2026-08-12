@@ -5,8 +5,10 @@
  * without binding to a port.
  */
 
+import { AGENTS_ROUTE_PREFIX } from "@aprovan/agent-protocol";
 import { Hono } from "hono";
 import { getAuthMode } from "./middleware/auth.js";
+import { agentChatRouter } from "./routes/agent-chat.js";
 import { auditRouter } from "./routes/audit.js";
 import { authRouter } from "./routes/auth.js";
 import { credentialsRouter } from "./routes/credentials.js";
@@ -166,6 +168,9 @@ export function createApp(): Hono {
   app.route("/members", membersRouter);
   app.route("/permissions", permissionsRouter);
   app.route("/tools", toolsRouter);
+  // Frozen client contract (stream 1.5) — streams 5/6/7 build URLs from the
+  // same AGENTS_ROUTE_PREFIX helpers. Does not shadow /tools/agents/*.
+  app.route(AGENTS_ROUTE_PREFIX, agentChatRouter);
   app.route("/llm", llmRouter);
   app.route("/audit", auditRouter);
   app.route("/fs", fsRouter);
