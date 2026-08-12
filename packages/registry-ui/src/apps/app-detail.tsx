@@ -10,7 +10,6 @@
  *    physically lives*, rendered from the "three ways data is reached" model.
  *  - **Releases**  the channel pins (live / preview / custom), the release
  *    history, and promote / rollback.
- *  - **Versions**  the workspace FS content-version log for the app's entry.
  *
  * Every section degrades on its own: a gateway without `apps.capabilities`
  * falls back to the model derived from the manifest, and one without
@@ -44,7 +43,6 @@ import {
   useLoader,
 } from "./ui";
 import { useLastRun, useRecordRun } from "./last-runs";
-import { VersionsSection } from "./versions";
 import {
   asRecord,
   asString,
@@ -74,7 +72,6 @@ export type AppDetailTab =
   | "workflows"
   | "access"
   | "releases"
-  | "versions"
   | "install";
 
 const OWNER_TABS: ReadonlyArray<{ id: AppDetailTab; label: string }> = [
@@ -82,7 +79,6 @@ const OWNER_TABS: ReadonlyArray<{ id: AppDetailTab; label: string }> = [
   { id: "workflows", label: "Workflows" },
   { id: "access", label: "Access" },
   { id: "releases", label: "Releases" },
-  { id: "versions", label: "Versions" },
 ];
 
 const INSTALL_TABS: ReadonlyArray<{ id: AppDetailTab; label: string }> = [
@@ -1665,14 +1661,6 @@ export function AppDetail({
         />
       )}
       {active === "releases" && !install && <ReleasesTab app={app} invoke={invokeApps} />}
-      {active === "versions" && !install && (
-        <VersionsSection
-          invoke={invokeApps}
-          name={app.name}
-          onRestored={() => onChanged?.()}
-          open
-        />
-      )}
       {active === "install" && install && (
         <InstallSettingsTab install={install} invoke={invokeApps} onChanged={() => onChanged?.()} />
       )}

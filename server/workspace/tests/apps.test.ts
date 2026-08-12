@@ -72,55 +72,40 @@ describe("apps service (owner management)", () => {
   });
 
   it("lists, reads, and restores entrypoint versions", async () => {
-    const tick = () => new Promise((resolve) => setTimeout(resolve, 2));
-    const writeEntry = (content: string) =>
-      createApp().request("/fs/apps/edit/index.tsx", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content, mimeType: "text/plain" }),
-      });
-    const hashOf = async (res: Response) =>
-      ((await res.json()) as { hash: string }).hash;
-
-    const v1 = await hashOf(await writeEntry("<h1>one</h1>"));
-    await tick();
-    await writeEntry("<h1>two</h1>");
-    await tick();
-    const v3 = await hashOf(await writeEntry("<h1>three</h1>"));
+    // Per-file apps.versions/version/restore removed (IW-9 A stream 3) —
+    // release tags + History view own versioning. Smoke that the procedures 404.
     await manage("apps/publish", {
       name: "edit",
       allowed_tools: ["keyvalue.*"],
       entry: "apps/edit/index.tsx",
     });
+    expect((await manage("apps/versions", { name: "edit" })).status).toBe(404);
+    expect((await manage("apps/version", { name: "edit", hash: "0".repeat(64) })).status).toBe(404);
+    expect((await manage("apps/restore", { name: "edit", hash: "0".repeat(64) })).status).toBe(404);
+  });
 
-    const listed = await data<{
-      path: string;
-      versions: Array<{ hash: string; current: boolean }>;
-    }>(await manage("apps/versions", { name: "edit" }));
-    expect(listed.path).toBe("apps/edit/index.tsx");
-    expect(listed.versions).toHaveLength(3);
-    expect(listed.versions[0]).toMatchObject({ hash: v3, current: true });
-
-    const old = await data<{ content: string }>(
-      await manage("apps/version", { name: "edit", hash: v1 }),
+  it("cuts a release tag and lists it", async () => {
+    await createApp().request("/fs/apps/reltag/index.tsx", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content: "export default () => null;", mimeType: "text/plain" }),
+    });
+    await manage("apps/publish", {
+      name: "reltag",
+      allowed_tools: ["keyvalue.*"],
+      entry: "apps/reltag/index.tsx",
+    });
+    const cut = await data<{ id: string; commitId: string; snapshotId: string }>(
+      await manage("apps/release", { name: "reltag", notes: "first" }),
     );
-    expect(old.content).toBe("<h1>one</h1>");
+    expect(cut.id).toBeTruthy();
+    expect(cut.commitId).toBeTruthy();
+    expect(cut.snapshotId).toBeTruthy();
 
-    const restored = await data<{ name: string; entry: string }>(
-      await manage("apps/restore", { name: "edit", hash: v1 }),
+    const listed = await data<{ releases: Array<{ id: string; commitId: string }> }>(
+      await manage(`apps/${"releases"}`, { name: "reltag" }),
     );
-    expect(restored.name).toBe("edit");
-    const live = await createApp().request("/fs/apps/edit/index.tsx");
-    expect(((await live.json()) as { content: string }).content).toBe("<h1>one</h1>");
-    const afterRestore = await data<{ versions: Array<{ hash: string; current: boolean }> }>(
-      await manage("apps/versions", { name: "edit" }),
-    );
-    expect(afterRestore.versions[0]).toMatchObject({ hash: v1, current: true });
-
-    expect(
-      (await manage("apps/version", { name: "edit", hash: "0".repeat(64) })).status,
-    ).toBe(404);
-    expect((await manage("apps/versions", { name: "ghost" })).status).toBe(404);
+    expect(listed.releases.map((r) => r.id)).toContain(cut.id);
   });
 
   it("rejects publishing with unknown workflows or empty allow-list", async () => {
@@ -181,7 +166,7 @@ describe("app consumption surface", () => {
     const aliceKeys = await data<{ keys: string[] }>(
       await appCall("alice", "tracker/tools/keyvalue/list", { args: {} }),
     );
-    expect(aliceKeys.keys).toEqual(["state"]);
+    expect(aliceKeys.keys).toEqual([{ key: "state" }]);
 
     // The owner workspace's own keyvalue namespace is untouched.
     const owner = await data<{ value: unknown }>(await manage("keyvalue/get", { key: "state" }));

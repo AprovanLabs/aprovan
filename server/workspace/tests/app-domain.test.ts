@@ -188,10 +188,10 @@ describe("releases and channels", () => {
       }),
     );
 
-    const first = await data<{ id: string; entryHash: string }>(
+    const first = await data<{ id: string; commitId: string }>(
       await manage("apps/release", { name: "rel", notes: "first" }),
     );
-    expect(first.entryHash).toBeTruthy();
+    expect(first.commitId).toBeTruthy();
 
     // The entry moves on; the live channel keeps serving the pinned content.
     await putFile("apps/rel/index.tsx", "export default () => 'v2';");

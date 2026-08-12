@@ -8,7 +8,7 @@
  * The domain in one paragraph: an **app** is a bundle (pages + exported
  * workflows + an allow-list + a data scope + roles); a **workflow** is one
  * published capability, callable through the app as `app.<workflow>`; a
- * **release** is an immutable pin of the content hashes the live page serves,
+ * **release** is an immutable tag over an app-scoped commit the live page serves,
  * and a **channel** is a named pointer at one. This service is where all four
  * are edited:
  *
@@ -18,7 +18,6 @@
  *   install/update/configure/uninstall/installed/directory — install lifecycle
  *   rename                       — mutable alias move (storage keys unchanged)
  *   sdk                       — generated bindings (js + d.ts) for the manifest
- *   versions/version/restore  — the entrypoint's FS content history
  *
  * `apps.list` composes everything a directory UI needs (workflows, triggers,
  * last run, channels) into a single call — a directory should never need N+1
@@ -60,7 +59,9 @@ import {
   findInstallByOrigin,
   installAsCopy,
   installPrefix,
+  installRoot,
   isChannelPin,
+  isCommitPin,
   listInstalls,
   materializeFork,
   parseInstallPin,
@@ -73,6 +74,7 @@ import {
   saveInstall,
   updateCheck,
   type AppInstallation,
+  type InstallPin,
 } from "./install.js";
 import {
   dropAlias,
@@ -86,14 +88,14 @@ import { promoteApp } from "./personal.js";
 import {
   DEFAULT_CHANNEL,
   channelName,
+  cutRelease,
   listReleases,
+  pointChannel,
   previousRelease,
-  readRelease,
-  saveRelease,
-  setChannel,
-  snapshotRelease,
-  type AppRelease,
-} from "./releases.js";
+  resolveRelease,
+  type ListedRelease,
+  type ResolvedRelease,
+} from "./release-tags.js";
 import { generateAppSdk } from "./sdk.js";
 import { loadAppYaml } from "./manifest.js";
 import { assertRootAvailable } from "./roots.js";
@@ -107,14 +109,11 @@ import {
   appName,
   hydrateAppRecord,
   listApps,
-  listEntryVersions,
   pathDir,
   readApp,
-  readEntryVersion,
   readWorkspaceConfig,
   removeApp,
   resolveAppEntry,
-  restoreEntryVersion,
   saveApp,
   workspacePath,
   writeWorkspaceConfig,
@@ -469,17 +468,24 @@ async function requireApp(workspaceId: string, args: Record<string, unknown>): P
   return manifest;
 }
 
-function summarizeRelease(release: AppRelease) {
+function summarizeRelease(release: ResolvedRelease | ListedRelease) {
+  if ("channels" in release && !("snapshotId" in release)) {
+    return {
+      id: release.releaseId,
+      commitId: release.commitId,
+      channels: release.channels,
+      notes: release.notes,
+      createdAt: release.createdAt,
+    };
+  }
+  const resolved = release as ResolvedRelease;
   return {
-    id: release.id,
-    channel: release.channel,
-    notes: release.notes,
-    manifestHash: release.manifestHash,
-    entry: release.entry,
-    entryHash: release.entryHash,
-    workflows: release.workflows,
-    createdBy: release.createdBy,
-    createdAt: release.createdAt,
+    id: resolved.releaseId,
+    commitId: resolved.commitId,
+    snapshotId: resolved.snapshotId,
+    channel: resolved.channel,
+    notes: resolved.notes,
+    createdAt: resolved.createdAt,
   };
 }
 
@@ -778,7 +784,7 @@ export const appsService: CoreService = {
       name: "apps.release",
       operation: "release",
       description:
-        "Cut a release: snapshot the manifest hash, the entrypoint's content hash, and each exported workflow's script hash, then point a channel (default 'live') at it. Releases are free to create and instant to roll back because they pin content the FS already versions.",
+        "Cut a release: commit the app scope if dirty, write an immutable tag, and point a channel (default 'live') at it. Releases are free to create and instant to roll back because they pin an app-scoped commit.",
       inputSchema: {
         type: "object",
         properties: {
@@ -1030,45 +1036,6 @@ export const appsService: CoreService = {
           name: { type: "string" },
           purge_data: { type: "boolean", description: "Also delete .apps/<appId> per-user data" },
         },
-      },
-    },
-    {
-      name: "apps.versions",
-      operation: "versions",
-      description:
-        "List the content versions of an app's UI entrypoint (its entry), newest first. The newest version is the live one (current: true).",
-      inputSchema: {
-        type: "object",
-        properties: { app: { type: "string" }, name: { type: "string" } },
-      },
-    },
-    {
-      name: "apps.version",
-      operation: "version",
-      description: "Read one past version of an app's UI entrypoint by content hash.",
-      inputSchema: {
-        type: "object",
-        properties: {
-          app: { type: "string" },
-          name: { type: "string" },
-          hash: { type: "string" },
-        },
-        required: ["hash"],
-      },
-    },
-    {
-      name: "apps.restore",
-      operation: "restore",
-      description:
-        "Restore a past version of an app's UI entrypoint: re-writes that version's content as the new latest. Non-destructive — history is preserved and the old content becomes live again. Returns the updated app.",
-      inputSchema: {
-        type: "object",
-        properties: {
-          app: { type: "string" },
-          name: { type: "string" },
-          hash: { type: "string" },
-        },
-        required: ["hash"],
       },
     },
   ],
@@ -1430,14 +1397,16 @@ export const appsService: CoreService = {
         const manifest = await requireApp(ctx.workspaceId, args);
         const channel = channelName(args["channel"]);
         const notes = typeof args["notes"] === "string" ? args["notes"] : undefined;
-        const release = await snapshotRelease(ctx.workspaceId, manifest, {
+        const release = await cutRelease(ctx.workspaceId, manifest.appId, {
           channel,
           notes,
           createdBy: ctx.userId,
         });
-        await saveRelease(ctx.workspaceId, manifest.appId, release);
-        const updated = await setChannel(ctx.workspaceId, manifest, channel, release.id);
-        return { ...summarizeRelease(release), channels: updated.channels ?? {} };
+        const updated = await readApp(ctx.workspaceId, manifest.appId);
+        return {
+          ...summarizeRelease(release),
+          channels: updated?.channels ?? {},
+        };
       }
       case "releases": {
         const manifest = await requireApp(ctx.workspaceId, args);
@@ -1454,14 +1423,14 @@ export const appsService: CoreService = {
         const pointers = Object.entries(manifest.channels ?? {});
         const channels = await Promise.all(
           pointers.map(async ([channel, releaseId]) => {
-            const release = await readRelease(ctx.workspaceId, manifest.appId, releaseId);
+            const release = await resolveRelease(ctx.workspaceId, manifest.appId, releaseId);
             return {
               channel,
               release: releaseId,
               releasedAt: release?.createdAt,
               notes: release?.notes,
-              entryHash: release?.entryHash,
-              workflows: release?.workflows ?? {},
+              commitId: release?.commitId,
+              snapshotId: release?.snapshotId,
               resolved: Boolean(release),
             };
           }),
@@ -1496,15 +1465,22 @@ export const appsService: CoreService = {
             400,
           );
         }
-        const releaseId = manifest.channels?.[from];
-        if (!releaseId) throw new ServiceError(`Channel ${from} has no release to promote`, 404);
-        const updated = await setChannel(ctx.workspaceId, manifest, to, releaseId);
+        const fromResolved = await resolveRelease(ctx.workspaceId, manifest.appId, from);
+        if (!fromResolved) throw new ServiceError(`Channel ${from} has no release to promote`, 404);
+        const updated = await pointChannel(
+          ctx.workspaceId,
+          manifest,
+          to,
+          fromResolved.releaseId,
+          fromResolved.commitId,
+          ctx.userId,
+        );
         return {
           appId: manifest.appId,
           name: manifest.name,
           from,
           to,
-          release: releaseId,
+          release: fromResolved.releaseId,
           channels: updated.channels ?? {},
         };
       }
@@ -1512,16 +1488,24 @@ export const appsService: CoreService = {
         const manifest = await requireApp(ctx.workspaceId, args);
         const channel = channelName(args["channel"]);
         const releases = await listReleases(ctx.workspaceId, manifest.appId);
-        const target = previousRelease(releases, manifest.channels?.[channel], channel);
+        const current = await resolveRelease(ctx.workspaceId, manifest.appId, channel);
+        const target = previousRelease(releases, current?.releaseId ?? manifest.channels?.[channel], channel);
         if (!target) {
           throw new ServiceError(`No earlier release to roll ${channel} back to`, 404);
         }
-        const updated = await setChannel(ctx.workspaceId, manifest, channel, target.id);
+        const updated = await pointChannel(
+          ctx.workspaceId,
+          manifest,
+          channel,
+          target.releaseId,
+          target.commitId,
+          ctx.userId,
+        );
         return {
           appId: manifest.appId,
           name: manifest.name,
           channel,
-          release: target.id,
+          release: target.releaseId,
           rolledBackFrom: manifest.channels?.[channel] ?? null,
           channels: updated.channels ?? {},
         };
@@ -1597,6 +1581,24 @@ export const appsService: CoreService = {
         const installId = typeof args["install"] === "string" ? args["install"] : "";
         if (!installId) throw new ServiceError("install is required", 400);
         const install = await requireInstall(ctx.workspaceId, installId);
+
+        // Copy-model installs (have a local root): re-resolve live + re-copy.
+        // Legacy editing forks keep the force-to-overwrite path below.
+        const root = installRoot(install);
+        if (root && !install.editing && args["release"] === undefined) {
+          const result = await applyUpdate(ctx.workspaceId, installId, {
+            confirmOverwrite: args["force"] === true,
+          });
+          return {
+            installId: result.install.installId,
+            from: result.from.tag ?? result.from.commit,
+            to: result.to.tag ?? result.to.commit,
+            pin: result.install.pin,
+            config: result.install.config,
+            editing: result.install.editing,
+          };
+        }
+
         const originManifest = await readApp(install.originWorkspaceId, install.originAppId).catch(
           () => undefined,
         );
@@ -1606,9 +1608,12 @@ export const appsService: CoreService = {
             404,
           );
         }
-        let pin = install.pin;
+        let pin: InstallPin = install.pin;
         if (typeof args["release"] === "string" && args["release"]) {
           pin = { release: args["release"] };
+        } else if (isCommitPin(install.pin) || isChannelPin(install.pin)) {
+          // Re-point at the origin's current live channel rather than the old tag.
+          pin = { channel: DEFAULT_CHANNEL };
         }
         const release = await resolvePinRelease(
           install.originWorkspaceId,
@@ -1619,7 +1624,7 @@ export const appsService: CoreService = {
           throw new ServiceError(
             isChannelPin(pin)
               ? `Origin channel "${pin.channel}" has no release`
-              : `Unknown origin release: ${pin.release}`,
+              : `Unknown origin release: ${"release" in pin ? pin.release : "pin"}`,
             404,
           );
         }
@@ -1630,19 +1635,21 @@ export const appsService: CoreService = {
           );
         }
         const from = install.resolvedRelease;
-        const to = release.id;
+        const to = release.releaseId;
         const next: AppInstallation = {
           ...install,
-          pin,
+          pin: { tag: release.releaseId, commit: release.commitId },
           resolvedRelease: to,
           updatedAt: new Date().toISOString(),
         };
-        if (install.editing && install.prefix && args["force"] === true) {
+        const materializeTarget =
+          (install.editing && install.prefix) || root || undefined;
+        if (materializeTarget && (!install.editing || args["force"] === true)) {
           await materializeFork(
             ctx.workspaceId,
             install.originWorkspaceId,
             release,
-            install.prefix,
+            materializeTarget,
           );
         }
         await saveInstall(ctx.workspaceId, next);
@@ -1708,31 +1715,20 @@ export const appsService: CoreService = {
               ? installPrefix(args["prefix"], originManifest?.name ?? "app")
               : install.prefix ??
                 installPrefix(undefined, originManifest?.name ?? "app");
-          const release = install.resolvedRelease
-            ? await resolvePinRelease(
-                install.originWorkspaceId,
-                originManifest ?? {
-                  appId: install.originAppId,
-                  name: "app",
-                  entry: "",
-                  paths: [],
-                  allowedTools: [],
-                  createdBy: install.installedBy,
-                  createdAt: install.installedAt,
-                  updatedAt: install.updatedAt,
-                },
-                install.pin,
-              )
-            : undefined;
-          const pinned =
-            release ??
-            (install.resolvedRelease
-              ? await readRelease(
-                  install.originWorkspaceId,
-                  install.originAppId,
-                  install.resolvedRelease,
-                )
-              : undefined);
+          const pinned = await resolvePinRelease(
+            install.originWorkspaceId,
+            originManifest ?? {
+              appId: install.originAppId,
+              name: "app",
+              entry: "",
+              paths: [],
+              allowedTools: [],
+              createdBy: install.installedBy,
+              createdAt: install.installedAt,
+              updatedAt: install.updatedAt,
+            },
+            install.pin,
+          );
           if (!pinned) {
             throw new ServiceError(
               "Cannot enable editing: no resolved release to materialize",
@@ -1846,44 +1842,6 @@ export const appsService: CoreService = {
         const shares = (config.shares ?? []).filter((s) => s.prefix !== prefix);
         await writeWorkspaceConfig(ctx.workspaceId, { ...config, shares });
         return { prefix, removed: true };
-      }
-      case "versions": {
-        const manifest = await requireApp(ctx.workspaceId, args);
-        const versions = await listEntryVersions(ctx.workspaceId, manifest.entry);
-        return {
-          path: manifest.entry,
-          versions: versions.map((version, index) => ({
-            hash: version.hash,
-            updatedAt: version.updatedAt,
-            size: version.size,
-            current: index === 0,
-          })),
-        };
-      }
-      case "version": {
-        const manifest = await requireApp(ctx.workspaceId, args);
-        const hash = typeof args["hash"] === "string" ? args["hash"] : "";
-        const file = await readEntryVersion(ctx.workspaceId, manifest.entry, hash);
-        if (!file) throw new ServiceError(`Unknown version: ${manifest.name}@${hash}`, 404);
-        return {
-          path: file.path,
-          hash: file.hash,
-          content: file.content,
-          mimeType: file.mimeType,
-          updatedAt: file.updatedAt,
-        };
-      }
-      case "restore": {
-        const manifest = await requireApp(ctx.workspaceId, args);
-        const hash = typeof args["hash"] === "string" ? args["hash"] : "";
-        const restored = await restoreEntryVersion(ctx.workspaceId, manifest.entry, hash);
-        if (!restored) throw new ServiceError(`Unknown version: ${manifest.name}@${hash}`, 404);
-        return describeApp(
-          ctx.workspaceId,
-          manifest,
-          await registrationIndex(ctx.workspaceId),
-          { withRuns: false },
-        );
       }
       default:
         throw new ServiceError(`Unknown apps procedure: ${procedure}`, 404);

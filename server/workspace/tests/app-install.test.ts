@@ -85,6 +85,7 @@ describe("install lifecycle", () => {
     }>(
       await manage("apps/install", {
         app: "up",
+        slug: "up-copy",
         config: { theme: "dark" },
       }),
     );
@@ -152,8 +153,12 @@ describe("install lifecycle", () => {
     });
     await manage("apps/release", { app: "fork" });
 
-    const a = await data<{ installId: string }>(await manage("apps/install", { app: "fork" }));
-    const b = await data<{ installId: string }>(await manage("apps/install", { app: "fork" }));
+    const a = await data<{ installId: string }>(
+      await manage("apps/install", { app: "fork", slug: "fork-a" }),
+    );
+    const b = await data<{ installId: string }>(
+      await manage("apps/install", { app: "fork", slug: "fork-b" }),
+    );
     expect(a.installId).not.toBe(b.installId);
 
     const forked = await data<{ editing: boolean; prefix: string }>(

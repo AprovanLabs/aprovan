@@ -160,7 +160,7 @@ export async function migrateInstallsToCopy(
   } = installMod;
   type AppInstallation = installMod.AppInstallation;
   type CommitPin = installMod.CommitPin;
-  const { readRelease } = await import("../src/apps/releases.js");
+  const { resolveRelease } = await import("../src/apps/release-tags.js");
 
   const INSTALLS_SCOPE = svcScope("installs");
   const store = getFsStore();
@@ -310,7 +310,7 @@ export async function migrateInstallsToCopy(
         if (origin && !hasMaterialized) {
           const release =
             (typeof raw.resolvedRelease === "string" && raw.resolvedRelease
-              ? await readRelease(raw.originWorkspaceId, origin.appId, raw.resolvedRelease).catch(
+              ? await resolveRelease(raw.originWorkspaceId, origin.appId, raw.resolvedRelease).catch(
                   () => undefined,
                 )
               : undefined) ??

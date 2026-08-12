@@ -22,9 +22,14 @@ import {
   svcScope,
   writeSvcRecord,
 } from "../svc-records.js";
-import { MAIN_REF, readRef } from "../vcs/store.js";
+import { readCommit, readSnapshot } from "../vcs/store.js";
 import { mintInstallId, type AppId, type InstallId } from "./identity.js";
-import { DEFAULT_CHANNEL, readRelease, type AppRelease } from "./releases.js";
+import {
+  DEFAULT_CHANNEL,
+  resolveRelease,
+  resolveReleaseTag,
+  type ResolvedRelease,
+} from "./release-tags.js";
 import { assertRootAvailable } from "./roots.js";
 import {
   APP_DATA_ROOT,
@@ -251,25 +256,33 @@ export function parseInstallPin(raw: unknown): InstallPin {
 
 /**
  * Resolve a legacy pin against the origin: channel → current channel release;
- * release pin → that release id (must exist).
+ * release/tag pin → that release id (must exist).
  */
 export async function resolvePinRelease(
   originWorkspaceId: string,
   manifest: AppManifest,
   pin: InstallPin,
-): Promise<AppRelease | undefined> {
+): Promise<ResolvedRelease | undefined> {
   if (isCommitPin(pin)) {
     if (pin.tag) {
-      return readRelease(originWorkspaceId, manifest.appId, pin.tag);
+      return resolveRelease(originWorkspaceId, manifest.appId, pin.tag);
+    }
+    if (pin.commit) {
+      const commit = await readCommit(originWorkspaceId, pin.commit);
+      if (!commit) return undefined;
+      return {
+        releaseId: pin.tag ?? pin.commit,
+        commitId: commit.id,
+        snapshotId: commit.snapshot,
+        createdAt: commit.createdAt,
+      };
     }
     return undefined;
   }
   if (isChannelPin(pin)) {
-    const releaseId = manifest.channels?.[pin.channel];
-    if (!releaseId) return undefined;
-    return readRelease(originWorkspaceId, manifest.appId, releaseId);
+    return resolveRelease(originWorkspaceId, manifest.appId, pin.channel);
   }
-  return readRelease(originWorkspaceId, manifest.appId, pin.release);
+  return resolveRelease(originWorkspaceId, manifest.appId, pin.release);
 }
 
 /** @deprecated No-op retained so older tests that imported the cache reset still compile. */
@@ -391,23 +404,54 @@ export async function copyArchivePaths(
 }
 
 /**
+ * Copy a release commit's snapshot into `destRoot`. Prefer this over live-tree
+ * {@link copyArchivePaths} when a commit pin is known.
+ */
+export async function materializeCommit(
+  installWorkspaceId: string,
+  originWorkspaceId: string,
+  commitId: string,
+  destRoot: string,
+): Promise<void> {
+  const commit = await readCommit(originWorkspaceId, commitId);
+  if (!commit) throw new ServiceError(`Unknown commit: ${commitId}`, 404);
+  const snapshot = await readSnapshot(originWorkspaceId, commit.snapshot);
+  if (!snapshot) throw new ServiceError(`Snapshot missing for commit ${commitId}`, 404);
+
+  const store = getFsStore();
+  const originRoot = snapshot.prefix;
+  for (const entry of snapshot.entries) {
+    const relative =
+      !originRoot || entry.path === originRoot
+        ? originRoot
+          ? ""
+          : entry.path
+        : entry.path.startsWith(`${originRoot}/`)
+          ? entry.path.slice(originRoot.length + 1)
+          : entry.path;
+    const dest = relative ? `${destRoot}/${relative}` : destRoot;
+    const file = await store.read(originWorkspaceId, entry.path, entry.hash);
+    if (!file) continue;
+    await store.write(installWorkspaceId, dest, file.content, file.mimeType);
+  }
+}
+
+/**
  * Copy the pinned release's authored files from the origin workspace into
- * `prefix` in the installing workspace. Thin wrapper over
- * {@link copyArchivePaths} — keep for stream 7 migration seed + service.ts.
+ * `prefix` in the installing workspace. Tag-backed: materializes the release
+ * commit snapshot (stream 7 migration + service.ts editing path).
  */
 export async function materializeFork(
   installWorkspaceId: string,
   originWorkspaceId: string,
-  release: AppRelease,
+  release: ResolvedRelease,
   prefix: string,
 ): Promise<void> {
-  const manifest = release.manifest;
-  await copyArchivePaths(
+  await materializeCommit(
     installWorkspaceId,
     originWorkspaceId,
-    manifest.paths,
+    release.commitId,
     prefix,
-    { entry: release.entry, entryHash: release.entryHash },
   );
 }
 
@@ -541,57 +585,44 @@ function finalizeHosting(
 // ---------------------------------------------------------------------------
 
 /**
- * Resolve `{tag?, commit}` for an install/update. Prefers iw9-a's
- * `resolveReleaseTag` when exported from releases.ts; otherwise falls back
- * to the workspace VCS `main` head, then the channel/release id as a
- * commit-floor so B works before A lands.
+ * Resolve `{tag?, commit}` for an install/update via release-as-tag.
  */
 export async function resolveCommitPin(
   originWorkspaceId: string,
   manifest: AppManifest,
   legacyPin?: InstallPin,
 ): Promise<CommitPin> {
-  const releaseMod = await import("./releases.js");
-  const resolveReleaseTag = (
-    releaseMod as {
-      resolveReleaseTag?: (
-        workspaceId: string,
-        appId: string,
-        tag?: string,
-      ) => Promise<CommitPin>;
-    }
-  ).resolveReleaseTag;
-  if (typeof resolveReleaseTag === "function") {
-    const tag =
-      legacyPin && !isCommitPin(legacyPin) && !isChannelPin(legacyPin)
+  const tag =
+    legacyPin && isCommitPin(legacyPin)
+      ? legacyPin.tag
+      : legacyPin && !isChannelPin(legacyPin)
         ? legacyPin.release
-        : legacyPin && isCommitPin(legacyPin)
-          ? legacyPin.tag
+        : legacyPin && isChannelPin(legacyPin)
+          ? legacyPin.channel
           : undefined;
-    return resolveReleaseTag(originWorkspaceId, manifest.appId, tag);
+
+  try {
+    if (legacyPin && isChannelPin(legacyPin)) {
+      const resolved = await resolveRelease(
+        originWorkspaceId,
+        manifest.appId,
+        legacyPin.channel,
+      );
+      if (resolved) return { tag: resolved.releaseId, commit: resolved.commitId };
+    }
+    return await resolveReleaseTag(originWorkspaceId, manifest.appId, tag);
+  } catch (err) {
+    if (legacyPin && isCommitPin(legacyPin) && legacyPin.commit) {
+      return { commit: legacyPin.commit, ...(legacyPin.tag ? { tag: legacyPin.tag } : {}) };
+    }
+    // No release yet — fingerprint the app root as a commit floor.
+    const root = manifest.root ?? manifest.paths[0] ?? `apps/${manifest.name}`;
+    const fp = await fingerprintRoot(originWorkspaceId, root);
+    if (err instanceof ServiceError && err.status === 404) {
+      return { commit: fp, ...(tag ? { tag } : {}) };
+    }
+    return { commit: fp };
   }
-
-  const release = legacyPin
-    ? await resolvePinRelease(originWorkspaceId, manifest, legacyPin)
-    : await resolvePinRelease(originWorkspaceId, manifest, { channel: DEFAULT_CHANNEL });
-
-  const ref = await readRef(originWorkspaceId, MAIN_REF).catch(() => undefined);
-  if (ref?.commit) {
-    return {
-      commit: ref.commit,
-      ...(release?.id ? { tag: release.id } : {}),
-    };
-  }
-
-  if (release) {
-    return { tag: release.id, commit: release.manifestHash || release.id };
-  }
-
-  // No release and no VCS head — content fingerprint of the app root is the
-  // commit floor so update-check sees archive changes before iw9-a lands.
-  const root = manifest.root ?? manifest.paths[0] ?? `apps/${manifest.name}`;
-  const fp = await fingerprintRoot(originWorkspaceId, root);
-  return { commit: fp };
 }
 
 export async function resolveOriginHeadPin(
@@ -699,7 +730,13 @@ export async function installAsCopy(input: InstallAsCopyInput): Promise<AppInsta
   const release = await resolvePinRelease(
     input.originWorkspaceId,
     input.manifest,
-    input.pin && !isCommitPin(input.pin) ? input.pin : pin.tag ? { release: pin.tag } : { channel: DEFAULT_CHANNEL },
+    input.pin && !isCommitPin(input.pin)
+      ? input.pin
+      : pin.tag
+        ? { release: pin.tag }
+        : pin.commit
+          ? pin
+          : { channel: DEFAULT_CHANNEL },
   );
 
   const originPaths =
@@ -716,6 +753,22 @@ export async function installAsCopy(input: InstallAsCopyInput): Promise<AppInsta
       release,
       root,
     );
+  } else if (pin.commit) {
+    try {
+      await materializeCommit(
+        input.installerWorkspaceId,
+        input.originWorkspaceId,
+        pin.commit,
+        root,
+      );
+    } catch {
+      await copyArchivePaths(
+        input.installerWorkspaceId,
+        input.originWorkspaceId,
+        originPaths,
+        root,
+      );
+    }
   } else {
     await copyArchivePaths(
       input.installerWorkspaceId,
@@ -725,9 +778,9 @@ export async function installAsCopy(input: InstallAsCopyInput): Promise<AppInsta
     );
   }
 
-  // Prefer release-embedded manifest fields when present.
+  // Remap origin manifest into the local copy root.
   const serving = remapManifestToRoot(
-    release?.manifest ?? input.manifest,
+    input.manifest,
     root,
     input.manifest.appId,
   );
@@ -738,7 +791,7 @@ export async function installAsCopy(input: InstallAsCopyInput): Promise<AppInsta
     originAppId: input.manifest.appId,
     originWorkspaceId: input.originWorkspaceId,
     pin,
-    resolvedRelease: pin.tag ?? release?.id ?? null,
+    resolvedRelease: pin.tag ?? release?.releaseId ?? null,
     bindings: input.bindings ?? {},
     config: input.config ?? {},
     root,
@@ -881,7 +934,7 @@ export async function applyUpdate(
   }
 
   const serving = remapManifestToRoot(
-    release?.manifest ?? originManifest,
+    originManifest,
     root,
     install.originAppId,
   );
@@ -889,7 +942,7 @@ export async function applyUpdate(
   const next: AppInstallation = {
     ...install,
     pin: to,
-    resolvedRelease: to.tag ?? release?.id ?? install.resolvedRelease ?? null,
+    resolvedRelease: to.tag ?? release?.releaseId ?? install.resolvedRelease ?? null,
     manifest: serving,
     contentFingerprint: fingerprint,
     updatedAt: new Date().toISOString(),

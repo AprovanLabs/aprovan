@@ -2,7 +2,7 @@
  * Deployment-wide app directory — write-through index in the reserved
  * `__deployment__` tenant (`svc#directory / <appId>`).
  *
- * Synced from saveApp / removeApp / setChannel / visibility changes.
+ * Synced from saveApp / removeApp / channel pointer changes / visibility changes.
  * `apps.directory` merges this index with the caller's own private apps.
  * The registry is never consulted.
  */
@@ -16,7 +16,7 @@ import {
   writeSvcRecord,
 } from "../svc-records.js";
 import { DEPLOYMENT_TENANT } from "./identity.js";
-import { DEFAULT_CHANNEL } from "./releases.js";
+import { DEFAULT_CHANNEL, resolveRelease } from "./release-tags.js";
 import { releaseGlobalSlug } from "./slugs.js";
 import { listApps, type AppManifest, type AppRequirement } from "./store.js";
 
@@ -69,7 +69,7 @@ async function releaseAppGlobalClaim(manifest: AppManifest): Promise<void> {
   await releaseGlobalSlug(slug, manifest.appId);
 }
 
-/** Upsert or drop the directory row to match current visibility. */
+/** Sync directory row; prefer VCS channel resolution when available. */
 export async function syncDirectoryEntry(
   workspaceId: string,
   manifest: AppManifest,
@@ -81,12 +81,14 @@ export async function syncDirectoryEntry(
     await releaseAppGlobalClaim(manifest);
     return;
   }
-  await writeSvcRecord(
-    DEPLOYMENT_TENANT,
-    DIRECTORY_SCOPE,
-    manifest.appId,
-    toEntry(workspaceId, manifest),
+  const live = await resolveRelease(workspaceId, manifest.appId, DEFAULT_CHANNEL).catch(
+    () => undefined,
   );
+  const entry: DirectoryEntry = {
+    ...toEntry(workspaceId, manifest),
+    liveRelease: live?.releaseId ?? manifest.channels?.[DEFAULT_CHANNEL],
+  };
+  await writeSvcRecord(DEPLOYMENT_TENANT, DIRECTORY_SCOPE, manifest.appId, entry);
 }
 
 export async function dropDirectoryEntry(appId: string): Promise<void> {

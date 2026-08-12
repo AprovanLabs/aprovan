@@ -37,7 +37,6 @@ import {
   formatWhen,
   useLoader,
 } from "./ui";
-import { VersionsSection } from "./versions";
 import {
   attempt,
   normalizeApp,
@@ -542,7 +541,6 @@ export function WorkflowDetail({
   fill = false,
   className,
 }: WorkflowDetailProps) {
-  const [versionsOpen, setVersionsOpen] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
   const controller = useWorkflowRun({ invoke, workflow, loadScript, active: true });
   const { runs, trace, script, running, error, setError, triggerRun, openTrace } = controller;
@@ -550,7 +548,6 @@ export function WorkflowDetail({
   // Stable across renders that don't actually change the run being viewed —
   // `openTrace` itself is already a stable `useCallback` — so `RunsSection`'s
   // `React.memo` only re-renders on a real `runs`/`trace` change, not e.g. a
-  // `versionsOpen` toggle up here.
   const selectRun = React.useCallback(
     (runId: string, workflowName?: string) => void openTrace(runId, workflowName),
     [openTrace],
@@ -595,14 +592,6 @@ export function WorkflowDetail({
             </button>
           )}
           <button
-            className={`${SMALL_BUTTON} ${versionsOpen ? "bg-muted text-foreground" : ""}`}
-            onClick={() => setVersionsOpen((open) => !open)}
-            title="Version history for this workflow's script"
-            type="button"
-          >
-            versions
-          </button>
-          <button
             className="rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
             disabled={running}
             onClick={() => {
@@ -632,16 +621,6 @@ export function WorkflowDetail({
 
       <ErrorLine error={error} />
 
-      {versionsOpen && (
-        <div className="rounded-md border p-2">
-          <VersionsSection
-            invoke={invoke}
-            name={workflow.name}
-            onRestored={() => onChanged?.()}
-            open
-          />
-        </div>
-      )}
 
       <RunSurface
         // A real canvas, not a letterbox: a 420px floor on desktop, growing
