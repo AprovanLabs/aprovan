@@ -42,13 +42,13 @@ import {
 import { getRegistryStorage } from "../registry-storage.js";
 import {
   APP_WORKFLOW_NAMESPACE,
-  assertAllowedTools,
   camelCase,
   dependencyCapabilities,
   effectiveRateLimit,
   nativeCapabilities,
   parseRequires,
   providerGrantCapabilities,
+  validateAllowedToolsEntries,
   type ProviderGrant,
   type ProviderGrantCapability,
 } from "./capabilities.js";
@@ -177,7 +177,7 @@ function parseAllowedTools(
   if (tools.length === 0) {
     throw new ServiceError("allowed_tools must contain at least one entry", 400);
   }
-  const grants = assertAllowedTools(tools, context);
+  const grants = validateAllowedToolsEntries(tools, context);
   return { tools, grants };
 }
 

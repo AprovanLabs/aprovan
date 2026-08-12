@@ -10,7 +10,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
-import { pathAccess, toolGranted } from "../src/grants.js";
+import { pathAccess, matchesCapabilityPattern } from "../src/grants.js";
 import { resetRateLimiters } from "../src/middleware/rateLimitMiddleware.js";
 
 let dataDir: string;
@@ -50,13 +50,13 @@ async function data<T>(res: Response): Promise<T> {
 
 describe("grant matchers", () => {
   it("matches tool patterns: exact, namespace, subtree, star", () => {
-    expect(toolGranted(["keyvalue.set"], "keyvalue", "set")).toBe(true);
-    expect(toolGranted(["keyvalue.set"], "keyvalue", "get")).toBe(false);
-    expect(toolGranted(["keyvalue.*"], "keyvalue", "get")).toBe(true);
-    expect(toolGranted(["github.repos.*"], "github", "repos.listForUser")).toBe(true);
-    expect(toolGranted(["github.repos.*"], "github", "issues.create")).toBe(false);
-    expect(toolGranted(["*"], "anything", "at.all")).toBe(true);
-    expect(toolGranted([], "keyvalue", "set")).toBe(false);
+    expect(matchesCapabilityPattern(["keyvalue.set"], "keyvalue", "set")).toBe(true);
+    expect(matchesCapabilityPattern(["keyvalue.set"], "keyvalue", "get")).toBe(false);
+    expect(matchesCapabilityPattern(["keyvalue.*"], "keyvalue", "get")).toBe(true);
+    expect(matchesCapabilityPattern(["github.repos.*"], "github", "repos.listForUser")).toBe(true);
+    expect(matchesCapabilityPattern(["github.repos.*"], "github", "issues.create")).toBe(false);
+    expect(matchesCapabilityPattern(["*"], "anything", "at.all")).toBe(true);
+    expect(matchesCapabilityPattern([], "keyvalue", "set")).toBe(false);
   });
 
   it("path access: longest prefix wins, deny by default", () => {

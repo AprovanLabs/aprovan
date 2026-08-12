@@ -456,18 +456,18 @@ cross-repo rule 4).
 
 > Depends-on: 8, 9, 10, 11, 12, 13 | Repo: both | Touches: aprovan/server/workspace/src/**, registry/packages/registry-server/src/** | Verify: cd /Users/jacob/Documents/Code/AprovanLabs/aprovan && ! grep -rn "mayInvokeTool\|assertAllowedTools\b" server/workspace/src --include="*.ts" | grep -v "\.test\.ts" && cd /Users/jacob/Documents/Code/AprovanLabs/registry && ! grep -rn "legacyDispatch\|bypassResourceCheck" packages/registry-server/src --include="*.ts"
 
-- [ ] 14.1 aprovan: confirm zero remaining callers of `mayInvokeTool`,
+- [x] 14.1 aprovan: confirm zero remaining callers of `mayInvokeTool`,
       `assertAllowedTools` as a standalone authorization gate, and
       `getPermissionStore().check` outside the migrated `evaluateDispatch`
       path (MIGRATION-DEBT rule — "delete X is not done until grep
       returns nothing").
-- [ ] 14.2 registry: confirm registry-server's own MCP/sandbox dispatch
+- [x] 14.2 registry: confirm registry-server's own MCP/sandbox dispatch
       has no remaining resource-check bypass predating stream 3's single
       predicate.
-- [ ] 14.3 Update `AGENTS.md` (both repos, if not already covered by F6)
+- [x] 14.3 Update `AGENTS.md` (both repos, if not already covered by F6)
       to note the one-predicate rule for capability + resource dispatch,
       so a future addition does not reintroduce a fifth gate.
-- [ ] 14.4 Full-suite run in both repos
+- [x] 14.4 Full-suite run in both repos
       (`pnpm --filter @aprovan/workspace test`, `pnpm --filter
       @aprovan/patchwork-web test`, `pnpm --filter @aprovan/registry-server
       test`) as the final gate before `openspec archive`.

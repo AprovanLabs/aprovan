@@ -79,3 +79,13 @@ startup update script, so it is not repeated here.
 - Husk test: a workspace-glob directory with zero git-tracked files
   (`git ls-files <dir> | wc -l` = 0) is build residue, not a package — delete
   it, don't deprecate it.
+
+### Capability + resource dispatch (one predicate)
+- Tool invocation authorization is a single predicate:
+  `evaluateDispatch` in `server/workspace/src/grants.ts` (HTTP tools route,
+  agent `call_tool`, app workflow proxy, native ops, in-process workflow
+  invoke). Do not add parallel gates (`mayInvokeTool`, permission-store
+  `.check`, ad-hoc allow-lists) beside it.
+- Registry-server mirrors this: resource-pattern checks ride the shared
+  Dispatcher (`assertResourceAccess` / `matchesResourcePattern`) — extend
+  that path, do not add a second bypass.

@@ -13,13 +13,27 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/app.js";
-import { mayInvokeTool } from "../src/authorize.js";
+import { evaluateDispatch } from "../src/grants.js";
 import { getIdentityStore, resetIdentityStore } from "../src/identity/store.js";
 import { putMembership } from "../src/memberships.js";
+import type { Principal } from "../src/middleware/auth.js";
 import { resetCognitoVerifier, setCognitoVerifier } from "../src/middleware/auth.js";
 import { getRegistryStorage, resetRegistryStorage } from "../src/registry-storage.js";
 import { setCurrentWorkspace } from "../src/sessions.js";
 import { setActiveWorkspaceId } from "../src/users.js";
+
+/** Test helper — capability allow via the one predicate (no resource). */
+async function dispatchAllows(
+  principal: Principal,
+  provider: string,
+  operation: string,
+): Promise<boolean> {
+  const decision = await evaluateDispatch({
+    principal,
+    tool: { namespace: provider, operation, effect: "action" },
+  });
+  return decision.kind === "allow";
+}
 
 let dataDir: string;
 
@@ -147,28 +161,28 @@ describe("tool authorization through the profile join", () => {
       groupIds: [groupId],
     };
 
-    expect(await mayInvokeTool(member, "linear", "issues.create")).toBe(false);
+    expect(await dispatchAllows(member, "linear", "issues.create")).toBe(false);
 
     await req(`/groups/${groupId}/profiles`, {
       method: "POST",
       body: JSON.stringify({ profile: profileId }),
     });
-    expect(await mayInvokeTool(member, "linear", "issues.create")).toBe(true);
+    expect(await dispatchAllows(member, "linear", "issues.create")).toBe(true);
     // A granted provider-target profile covers the provider's full surface
     // (D6: `provider:*` wildcard rows are subsumed structurally)…
-    expect(await mayInvokeTool(member, "linear", "anything.else")).toBe(true);
+    expect(await dispatchAllows(member, "linear", "anything.else")).toBe(true);
     // …but only that target's namespace.
-    expect(await mayInvokeTool(member, "github", "repos.get")).toBe(false);
+    expect(await dispatchAllows(member, "github", "repos.get")).toBe(false);
     // Losing the group membership loses the capability.
     expect(
-      await mayInvokeTool({ ...member, groupIds: [] }, "linear", "issues.create"),
+      await dispatchAllows({ ...member, groupIds: [] }, "linear", "issues.create"),
     ).toBe(false);
 
     await req(`/groups/${groupId}/profiles`, {
       method: "DELETE",
       body: JSON.stringify({ profile: profileId }),
     });
-    expect(await mayInvokeTool(member, "linear", "issues.create")).toBe(false);
+    expect(await dispatchAllows(member, "linear", "issues.create")).toBe(false);
   });
 
   it("resolves grants with ONE joined query across all of the caller's groups", async () => {
@@ -183,7 +197,7 @@ describe("tool authorization through the profile join", () => {
 
     const storage = await getRegistryStorage();
     const joinSpy = vi.spyOn(storage.grants, "grantedProfileIds");
-    const allowed = await mayInvokeTool(
+    const allowed = await dispatchAllows(
       { sub: "bob", workspaceId: "local", role: "member", groupIds: groups },
       "postgres",
       "query",

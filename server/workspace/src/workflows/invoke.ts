@@ -6,13 +6,12 @@
  * backend keeps the legacy bespoke path until `STORE_BACKEND=dsql`.
  */
 
-import { mayInvokeTool } from "../authorize.js";
 import {
   answerAskCard,
   raiseAskCard,
   type CapabilityCard,
 } from "../capability-cards.js";
-import { assertToolGranted } from "../grants.js";
+import { assertToolGranted, denyMessage, evaluateDispatch } from "../grants.js";
 import {
   getCredentialStore,
   resolveCredentialRecord,
@@ -52,12 +51,15 @@ export function usesEmbedInterfaceDispatch(locus?: WorkspaceLocusKind): boolean 
 }
 
 /**
- * Per-user tool authorization for in-process dispatch — the same gate the
- * HTTP tools route applies (`mayInvokeTool`), so a workflow script cannot
- * exercise provider credentials its runner's user was never granted. App
- * sessions skip this: the app manifest's role model + workflow allow-list
- * are their boundary, and executions deliberately run with the owning
- * workspace's reach (the owner audited the workflow when publishing).
+ * Per-user tool authorization for in-process dispatch — the same
+ * {@link evaluateDispatch} gate the HTTP tools route applies, so a workflow
+ * script cannot exercise provider credentials its runner's user was never
+ * granted. App sessions skip this: the app manifest's role model + workflow
+ * allow-list are their boundary, and executions deliberately run with the
+ * owning workspace's reach (the owner audited the workflow when publishing).
+ *
+ * Only `allow` proceeds here: queue/ask need HTTP/agent turn machinery that
+ * this in-process path does not own, so they fail closed like deny.
  */
 async function assertProviderAllowed(
   ctx: ServiceContext,
@@ -72,12 +74,17 @@ async function assertProviderAllowed(
     role: membership?.role ?? "member",
     groupIds: await listUserGroupIds(ctx.workspaceId, ctx.userId).catch(() => []),
   };
-  if (!(await mayInvokeTool(principal, provider, operation))) {
-    throw new ServiceError(
-      `Forbidden: ${ctx.userId} has no grant for ${provider}.${operation}`,
-      403,
-    );
-  }
+  const decision = await evaluateDispatch({
+    principal,
+    tool: { namespace: provider, operation, effect: "action" },
+  });
+  if (decision.kind === "allow") return;
+  throw new ServiceError(
+    decision.kind === "deny"
+      ? denyMessage(decision)
+      : `Forbidden: ${ctx.userId} has no standing grant for ${provider}.${operation}`,
+    403,
+  );
 }
 
 /**
