@@ -54,31 +54,31 @@ names below are `openspec/changes/iw9-chat-flagship/specs/<capability>/spec.md`.
 
 > Depends-on: 1 | Repo: aprovan | Touches: aprovan/server/workspace/src/realtime/app-topics.ts, aprovan/server/workspace/tests/realtime-app-topics.test.ts | Verify: pnpm --filter @aprovan/workspace exec vitest run tests/realtime-app-topics.test.ts && pnpm --filter @aprovan/workspace typecheck
 
-- [ ] 2.1 Create `realtime/app-topics.ts`: one generic `NamespaceHandler`
+- [x] 2.1 Create `realtime/app-topics.ts`: one generic `NamespaceHandler`
       registered at boot, namespace `app`, topic grammar `app:<installId>`
       (tech-plan Architecture, finding CF-1). `onSubscribe` (async, per
       iw9-f5's frozen contract) calls `assertInstanceAccess` and returns the
       channel list + presence roster snapshot as the subscribe body.
-- [ ] 2.2 Implement the sync `authorize?(conn, topic)` hook (iw9-f5 D4) by
+- [x] 2.2 Implement the sync `authorize?(conn, topic)` hook (iw9-f5 D4) by
       resolving the event's `channelId` from the topic's per-connection
       cached subscribe state and calling stream 1's `canReadChannel` —
       **the same function**, not a reimplementation (spec `chat-realtime`
       "Authorization re-applied at fan-out"). Cache only what F5's D4
       requires to answer synchronously (channel membership snapshot in the
       handler's `NamespaceStore`, invalidated on channel-membership events).
-- [ ] 2.3 Wire `onPublish` for message posts (persists via stream 1's
+- [x] 2.3 Wire `onPublish` for message posts (persists via stream 1's
       `postMessage`, then `publishToTopic` with `{kind:"message", channelId,
       recordId, seq}` — payload is a hint per T4, not the message body) and
       `{kind:"channel-membership"}` events on the priority class (iw9-f5 D5:
       control-channel path, undroppable).
-- [ ] 2.4 Ephemeral presence/typing sub-protocol (T5) inside the same
+- [x] 2.4 Ephemeral presence/typing sub-protocol (T5) inside the same
       handler, modeled on `realtime/presence.ts`'s pattern but reached via
       `broker.storeFor(workspaceId, "app")` (iw9-f5 D2 — broker-owned store,
       no handler-closure state): instance roster + channel-scoped typing,
       typing events on the droppable/non-priority class. No write to
       `records.*`/`vfs.*` anywhere in this file — grep-verifiable (PRD
       "Presence visible" goal).
-- [ ] 2.5 New test file `tests/realtime-app-topics.test.ts`: subscribe
+- [x] 2.5 New test file `tests/realtime-app-topics.test.ts`: subscribe
       returns channel+presence snapshot for a participant, 404-equivalent
       rejection for a non-participant, guest never receives an event for a
       restricted channel they're not a member of (flip `canReadChannel` mid-

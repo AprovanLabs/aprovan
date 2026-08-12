@@ -39,3 +39,63 @@ canReadChannel(principal, installId, channelId, {
 Stream 2's sync `authorize` should close over / cache those coordinates
 from subscribe state and call this same function (or a membership snapshot
 derived from it). Do not fork a second predicate.
+
+## Stream 2 (CF-1 app-topics)
+
+### D3 — Sync authorize cache vs async `NamespaceStore`
+
+**Task:** 2.2 says cache channel membership in the handler's `NamespaceStore`
+for sync `authorize?(conn, topic)`.
+
+**Reality:** F5's `NamespaceStore` API is async-only (`get`/`set` return
+Promises). Broker `authorize` must return `boolean` synchronously and is
+not passed the event body — only `(conn, topic)`.
+
+**Adaptation:** keep a sync `authByConn` Map (channel-id set + instance
+coords) populated/refreshed by calling stream 1's `canReadChannel` on
+subscribe and on `{action:"channel-membership"}`. Mirror the same snapshot
+into `broker.storeFor(workspaceId, "app")` under `auth:<connId>`. Fan-out
+sets a short-lived `pending.channelId` around `publishToTopic` so authorize
+can filter by channel without changing the frozen F5 hook signature.
+
+### D4 — Boot registration outside Touches
+
+**Task:** 2.1 "registered at boot".
+
+**Reality:** Touches allow only `realtime/app-topics.ts` + its test.
+Production registration lives in `realtime/socket.ts` (where presence is
+registered today).
+
+**Adaptation:** export `createAppTopicsHandler` / `appTopic`; tests register
+the handler on a broker. Follow-up one-liner for streams 7/12 / boot:
+
+```ts
+broker.registerNamespace(createAppTopicsHandler(broker));
+```
+
+in `attachRealtime` next to the presence registration.
+
+### D5 — Priority path not on main (F5 stream 3)
+
+**Task:** 2.3/2.5 channel-membership on F5 D5 priority/control path under
+saturation.
+
+**Reality:** `OutboundChannel` / bounded event queue is not on `origin/main`
+(`iw9-f5` stream 3 still open). All `event` frames share `Conn.send` today.
+
+**Adaptation:** handler publishes `{kind:"channel-membership"}` like other
+events; the unit test uses a Conn that treats that kind as undroppable while
+saturating a drop-oldest event queue — standing in for the future socket
+priority classifier.
+
+### D6 — Instance id from install-scoped topic
+
+**Task / topic grammar:** `app:<installId>` only.
+
+**Reality:** `canReadChannel` / `assertInstanceAccess` need `instanceId`
+(stream 1 D2).
+
+**Adaptation:** on subscribe, `listInstances` + newest-first accessible
+instance via `assertInstanceAccess`; cache `instanceId` in auth state and
+return it on the subscribe body for clients/streams 7/12.
+
