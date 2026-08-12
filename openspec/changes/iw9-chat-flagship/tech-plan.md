@@ -111,6 +111,25 @@ core endpoints silently.
   dependency; Chat's stream 5 gate (tasks.md 5.1) now names iw9-d stream 10
   as the thing to verify has landed.
 
+### Findings close-out (stream 12, 2026-08-12)
+
+Re-checked against `origin/main` after streams 1–11:
+
+| Finding | Status on main |
+|---|---|
+| CF-1 | Landed — `realtime/app-topics.ts` + boot register (#233, #234) |
+| CF-2 | Landed — instance-targeted invites (#231) |
+| CF-3 | Interim held — guest authority via F2 participant + `canReadChannel`; invariant-7 E2E (stream 12) gates delivery |
+| CF-4 | Interim held — restricted-channel members list + delivery filter; raw `records.*` participant reads still accepted for Wave 2 |
+| CF-5 | Landed by owner — iw9-d stream 10 (#220); Chat summarize profile (#236) |
+
+No unanticipated platform gap discovered in stream 12 beyond already-documented
+auth-none dual-principal limits (streams 10–11 reports: in-process broker fake
+Conns + invite facade). Attribution: `client/web/NOTICE` +
+`src/vendor/buzz-timeline/LICENSE` present (stream 6). Stream 12 itself adds
+**zero** files under `server/workspace/src/` (core-touch claim unchanged:
+only CF-1 `app-topics.ts` and CF-2 invite/identity paths).
+
 (Playwright harness absence is an infra gap, not a platform primitive; Chat
 bootstraps it — see T6.)
 
