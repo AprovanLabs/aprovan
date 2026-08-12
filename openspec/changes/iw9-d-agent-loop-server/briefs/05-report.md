@@ -1,6 +1,6 @@
 # Report — Stream 5: Chat-turn route and session bookkeeping
 
-**PR:** (filled after `gh pr create`)
+**PR:** https://github.com/AprovanLabs/aprovan/pull/218
 
 ## What was built
 
