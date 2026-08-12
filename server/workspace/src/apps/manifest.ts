@@ -43,6 +43,49 @@ function isEscapingIconPath(icon: string): boolean {
   return icon.split(/[\\/]/u).includes("..");
 }
 
+/** Same lowercase-slug rule as agent profile names (`agents/service.ts` NAME_RE). */
+const AGENT_NAME_RE = /^[a-z0-9][a-z0-9-]{0,63}$/u;
+
+const TOOL_PATTERN_RE = /^[\w.*-]{1,200}$/u;
+
+/**
+ * Does `wider` cover every call that `narrower` would allow?
+ * Used so a declaration may only narrow the app's capability ceiling.
+ */
+export function patternCoversPattern(wider: string, narrower: string): boolean {
+  if (wider === "*") return true;
+  if (wider === narrower) return true;
+  if (!wider.endsWith(".*")) return false;
+  const base = wider.slice(0, -2);
+  if (narrower === base || narrower.startsWith(`${base}.`)) return true;
+  if (narrower.endsWith(".*")) {
+    const nBase = narrower.slice(0, -2);
+    return nBase === base || nBase.startsWith(`${base}.`);
+  }
+  return false;
+}
+
+/** True when some ceiling entry covers `pattern` (declaration ⊆ ceiling). */
+export function patternCoveredByCeiling(pattern: string, ceiling: readonly string[]): boolean {
+  return ceiling.some((entry) => patternCoversPattern(entry, pattern));
+}
+
+const AppAgentDeclSchema = z.object({
+  name: z
+    .string()
+    .regex(AGENT_NAME_RE, "name must be lowercase letters/digits/hyphens (max 64 chars)"),
+  description: z.string().optional(),
+  prompt: z.string().optional(),
+  llm: z
+    .object({
+      interface: z.literal("llm"),
+      profile: z.string().optional(),
+    })
+    .strict()
+    .optional(),
+  tools: z.array(z.string().regex(TOOL_PATTERN_RE, "invalid tool pattern")),
+});
+
 export const AppYamlSchema = z
   .object({
     // T2: when present, must equal the app-root basename — enforced by
@@ -71,6 +114,10 @@ export const AppYamlSchema = z
       .array(z.enum(["managed", "creator-hosted", "publisher-hosted"]))
       .nonempty()
       .default(["managed"]),
+    // iw9-d stream 10 / CF-5: optional app-declared agent profiles. The only
+    // additive key on this schema; each entry's tools must fall inside
+    // `capabilities` (invariant 2 — declaration may narrow, never exceed).
+    agents: z.array(AppAgentDeclSchema).optional(),
     // Platform-owned — accepted into the object only so superRefine can name
     // them distinctly from ordinary unknown keys; never appear on AppYaml.
     appId: z.unknown().optional(),
@@ -100,6 +147,24 @@ export const AppYamlSchema = z
           `icon "${val.icon}" escapes the app root — icon paths must be app-root-relative ` +
           `(no leading "/" and no ".." segments)`,
       });
+    }
+    if (val.agents) {
+      const ceiling = val.capabilities ?? [];
+      const ceilingLabel = ceiling.length > 0 ? JSON.stringify(ceiling) : "[]";
+      for (let i = 0; i < val.agents.length; i += 1) {
+        const agent = val.agents[i]!;
+        for (let t = 0; t < agent.tools.length; t += 1) {
+          const pattern = agent.tools[t]!;
+          if (!patternCoveredByCeiling(pattern, ceiling)) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ["agents", i, "tools", t],
+              message:
+                `agents[].tools pattern "${pattern}" exceeds the app capability ceiling ${ceilingLabel}`,
+            });
+          }
+        }
+      }
     }
   })
   .transform((val) => {
