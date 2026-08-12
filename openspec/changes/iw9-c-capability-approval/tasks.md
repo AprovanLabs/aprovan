@@ -105,16 +105,16 @@ cross-repo rule 4).
 
 > Depends-on: 1 | Repo: registry | Touches: registry/packages/utdk/**/metadata.ts, registry/packages/utdk/**/package.json, registry/packages/utdk/**/CHANGELOG.md | Verify: cd /Users/jacob/Documents/Code/AprovanLabs/registry && pnpm --filter @aprovan/utdk-bundler generate && pnpm --filter @utdk/clients build && grep -L '"effect"' packages/utdk/github/metadata.ts packages/utdk/anthropic/metadata.ts packages/utdk/asana/metadata.ts | wc -l | grep -qx 0
 
-- [ ] 4.1 Run the bundler regen across every OpenAPI-generated provider
+- [x] 4.1 Run the bundler regen across every OpenAPI-generated provider
       under `packages/utdk/*` so published tool metadata carries `effect`
       from stream 1's derivation — no per-provider hand edits (spec:
       "the derivation happens in the registry bundler at generation time
       so the published package carries the effect; consumers SHALL NOT
       re-derive it").
-- [ ] 4.2 Spot-check a representative sample (a GET-heavy provider like
+- [x] 4.2 Spot-check a representative sample (a GET-heavy provider like
       `github`, a POST-heavy one, and one with mixed methods) for effect
       correctness against their OpenAPI operations.
-- [ ] 4.3 Regen tooling's own version-bump/CHANGELOG output stands as the
+- [x] 4.3 Regen tooling's own version-bump/CHANGELOG output stands as the
       per-provider changelog entry; no manual authorship needed.
 
 ## 5. Registry — publish @utdk/* and @aprovan/registry-server
