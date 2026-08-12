@@ -1,7 +1,7 @@
 # Report: stream 8 — evaluateDispatch + four dispatch paths
 
 **Status:** done  
-**PR:** (filled after open)  
+**PR:** https://github.com/AprovanLabs/aprovan/pull/242  
 **Branch:** `feat/iw9-c-evaluate-dispatch`  
 **Base:** `origin/main` @ `305e14b` (stream 7 #239)
 
