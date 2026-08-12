@@ -1,9 +1,9 @@
 # Report: stream 7 — effect wiring + CI gate
 
 **Status:** done  
-**PR:** (filled after open)  
+**PR:** https://github.com/AprovanLabs/aprovan/pull/239  
 **Branch:** `feat/iw9-c-effect-wiring`  
-**Base:** `feat/iw9-c-pin-bump` (#237) fast-forwarded onto this branch (stream 6 not yet on `main` at start)
+**Base:** `origin/main` (includes stream 6 pin #237)
 
 ## What landed
 
@@ -59,7 +59,7 @@ pnpm --filter @aprovan/workspace exec tsc -p tsconfig.json --noEmit
 
 4. **Named `Effect` type** — local alias; did not block on clients republish.
 
-5. **Prerequisite pin** — branched from `origin/main` then fast-forwarded `feat/iw9-c-pin-bump` (#237 still open). Merge/rebase onto main after #237 lands.
+5. **Prerequisite pin** — #237 merged to `main` before this PR; branch rebased onto `origin/main`.
 
 ## Unblocks
 
