@@ -1,7 +1,7 @@
 # Chat flagship app — single manifest, two host modes (D2 / invariant 5).
 # Capability ceiling is exact: own-partition records, own realtime topic
 # (app:<installId>), instance invites, and agents.run for chat/summarize.
-# Agent profile declaration lands in stream 5.
+# Agent profile: chat/summarize (stream 5) — tools ⊆ capabilities (invariant 2).
 
 slug: chat
 title: Chat
@@ -18,3 +18,19 @@ capabilities:
   - realtime.publish
   - invites.create
   - agents.run
+
+agents:
+  - name: summarize
+    description: Summarize a channel or thread into an attributed reply
+    prompt: >-
+      You are chat/summarize. Summarize only the Chat channel or thread named
+      in the user input. Read messages from that channel alone — never list,
+      read, or mention other channels. Prefer the recent window; stay concise.
+      Return the summary as your final assistant message (markdown-lite).
+      The host posts it as an agent-attributed reply on behalf of the invoker.
+    llm:
+      interface: llm
+      profile: fast
+    tools:
+      - records.get
+      - records.list
