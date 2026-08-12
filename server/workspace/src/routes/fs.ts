@@ -44,6 +44,7 @@ import {
   sessionWrite,
   type ChatSessionRecord,
 } from "../vcs/chat-sessions.js";
+import { reconcileOrPassThrough } from "../doc/reconcile.js";
 import { assertNotMounted, mountEntries, mountRead } from "../vcs/mounts.js";
 
 export const fsRouter = new Hono();
@@ -266,13 +267,44 @@ fsRouter.put("/:path{.+}", async (c) => {
   }
   const denied = await foreignPartitionResponse(c, path);
   if (denied) return denied;
-  const body = await c.req.json<{ content?: string; mimeType?: string }>();
+  const body = await c.req.json<{ content?: string; mimeType?: string; base?: string }>();
   if (typeof body.content !== "string") {
     return c.json({ error: "content must be a string" }, 400);
   }
-  const workspaceId = c.get("principal").workspaceId;
+  const principal = c.get("principal");
+  const workspaceId = principal.workspaceId;
   try {
     await assertNotMounted(workspaceId, path);
+    // Live-doc reconcile (D7) after mount/partition checks — fall through on not-live.
+    const reconciled = await reconcileOrPassThrough({
+      workspaceId,
+      path,
+      content: body.content,
+      base: typeof body.base === "string" ? body.base : undefined,
+      actor: { userId: principal.sub },
+      explicitSessionId: c.req.query("session") || undefined,
+    });
+    if (reconciled.kind === "applied") {
+      recordChange(workspaceId, "", path, "update");
+      return c.json(
+        { path, reconciled: true, appliedBlocks: reconciled.appliedBlocks },
+        201,
+      );
+    }
+    if (reconciled.kind === "conflict") {
+      recordChange(workspaceId, reconciled.sessionId, path, "update");
+      return c.json(
+        {
+          path,
+          reconciled: true,
+          conflict: true,
+          sessionId: reconciled.sessionId,
+          appliedBlocks: reconciled.appliedBlocks,
+          failed: reconciled.failed,
+        },
+        201,
+      );
+    }
     const session = await stagedSessionParam(c, true);
     if (session) {
       const meta = await sessionWrite(workspaceId, session, path, body.content, body.mimeType);

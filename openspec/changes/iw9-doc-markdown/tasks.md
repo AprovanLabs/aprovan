@@ -144,7 +144,7 @@
 
 > Depends-on: 2 | Repo: aprovan | Touches: aprovan/server/workspace/src/doc/reconcile.ts, aprovan/server/workspace/src/services.ts, aprovan/server/workspace/src/routes/fs.ts, aprovan/server/workspace/tests/doc-reconcile.test.ts | Verify: pnpm --filter @aprovan/workspace exec vitest run tests/doc-reconcile.test.ts tests/vfs.test.ts && pnpm --filter @aprovan/workspace typecheck
 
-- [ ] 5.1 `doc/reconcile.ts`: `reconcileOrPassThrough` per tech-plan
+- [x] 5.1 `doc/reconcile.ts`: `reconcileOrPassThrough` per tech-plan
       "Interfaces & Data" — `{kind: "not-live"}` when `hasLiveDoc` is false
       (no behavior change, spec "Write to a doc without a live session is
       ordinary"); otherwise derive SEARCH/REPLACE blocks between `base` and
@@ -153,7 +153,7 @@
       matched blocks to the live `Y.Text` in one `Y.Doc.transact(fn, origin)`
       call with `origin` carrying the writing principal (spec
       document-agent-reconciliation "Audit names the agent").
-- [ ] 5.2 Conflict path (tech-plan D3): unmatched blocks → resolve a staged
+- [x] 5.2 Conflict path (tech-plan D3): unmatched blocks → resolve a staged
       session (caller-supplied `explicitSessionId` if present and staged,
       else `createSession(ws, actor.userId, {mode: "staged"})`), stage the
       failed content via `sessionWrite` (`chat-sessions.ts:335-353`), return
@@ -162,17 +162,17 @@
       draft"); if the resolved session was `auto`, flip it via
       `updateSession(ws, id, {mode: "staged"})`
       (`chat-sessions.ts:158-182`).
-- [ ] 5.3 Wire `reconcileOrPassThrough` into `services.ts`'s `vfs` write
+- [x] 5.3 Wire `reconcileOrPassThrough` into `services.ts`'s `vfs` write
       case (`services.ts:607-627`, before the existing `staged`/`store.write`
       branch — tech-plan D7) and `routes/fs.ts`'s `PUT` handler
       (`routes/fs.ts:261-288`, same position); both fall through to today's
       exact code when the result is `{kind: "not-live"}` (regression guard:
       existing `tests/vfs.test.ts` must stay green unmodified).
-- [ ] 5.4 Standard access checks apply before reconciliation runs — no
+- [x] 5.4 Standard access checks apply before reconciliation runs — no
       widened authority (spec "Reconciled transactions are attributed":
       "reconciliation never widens authority", invariant 2); reuse the same
       grant/partition checks already present at both call sites.
-- [ ] 5.5 Tests: agent edit merges with concurrent typing (spec "Agent edit
+- [x] 5.5 Tests: agent edit merges with concurrent typing (spec "Agent edit
       merges with concurrent typing" — apply a matched block via reconcile
       while a separate `Y.Doc.transact` simulates concurrent human typing
       elsewhere in the text; assert both survive); conflict produces a
