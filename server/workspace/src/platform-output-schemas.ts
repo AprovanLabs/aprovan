@@ -193,6 +193,77 @@ const SCHEMAS: Record<string, Record<string, unknown>> = {
   "sandboxes.read": obj({ path: { type: "string" }, content: { type: "string" } }),
   "sandboxes.write": obj({ path: { type: "string" }, ok: { type: "boolean" } }),
   "sandboxes.expose": obj({ url: { type: "string" }, port: { type: "number" } }),
+  // Native vcs.* advisory shapes (discovery lives in routes/tools.ts;
+  // parents + hash-bearing diff/show + tag/channel refs documented here too).
+  "vcs.commit": obj(
+    {
+      commit: obj({
+        id: { type: "string" },
+        parents: arr({ type: "string" }),
+        snapshot: { type: "string" },
+        createdAt: { type: "string" },
+      }),
+      created: { type: "boolean" },
+    },
+    ["commit", "created"],
+  ),
+  "vcs.log": obj({ commits: arr() }, ["commits"]),
+  "vcs.show": obj(
+    {
+      commit: obj({
+        id: { type: "string" },
+        parents: arr({ type: "string" }),
+      }),
+      files: arr({ type: "string" }),
+      changes: obj({
+        added: arr(obj({ path: { type: "string" }, hash: { type: "string" } })),
+        modified: arr(
+          obj({
+            path: { type: "string" },
+            from: { type: "string" },
+            to: { type: "string" },
+          }),
+        ),
+        removed: arr(obj({ path: { type: "string" }, hash: { type: "string" } })),
+      }),
+    },
+    ["commit", "files", "changes"],
+  ),
+  "vcs.diff": obj(
+    {
+      from: { type: "string" },
+      to: { type: "string" },
+      added: arr(obj({ path: { type: "string" }, hash: { type: "string" } })),
+      modified: arr(
+        obj({
+          path: { type: "string" },
+          from: { type: "string" },
+          to: { type: "string" },
+        }),
+      ),
+      removed: arr(obj({ path: { type: "string" }, hash: { type: "string" } })),
+    },
+    ["from", "to", "added", "modified", "removed"],
+  ),
+  "vcs.branches": obj(
+    {
+      branches: arr(
+        obj({
+          name: {
+            type: "string",
+            description:
+              "main | app/<id> | tag/app/<id>/<releaseId> | channel/app/<id>/<channel>",
+          },
+          commit: { type: "string" },
+        }),
+      ),
+    },
+    ["branches"],
+  ),
+  "vcs.restore": obj(
+    { commit: { type: "string" }, restored: arr({ type: "string" }) },
+    ["commit", "restored"],
+  ),
 };
 
 function sealTool(tool: ServiceToolEntry): ServiceToolEntry {

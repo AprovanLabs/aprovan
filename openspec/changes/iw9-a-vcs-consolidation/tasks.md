@@ -53,13 +53,13 @@
 
 > Repo: aprovan | Depends-on: 1 | Touches: aprovan/server/workspace/src/routes/tools.ts, aprovan/server/workspace/src/platform-output-schemas.ts, aprovan/packages/native/src/dispatch.ts | Verify: cd aprovan/server/workspace && pnpm typecheck && pnpm vitest run tests/tools-discovery.test.ts && cd ../../packages/native && pnpm typecheck
 
-- [ ] 2.1 Extend `nativeVcsDiscoveryEntries` (routes/tools.ts) input/output
+- [x] 2.1 Extend `nativeVcsDiscoveryEntries` (routes/tools.ts) input/output
       schemas: `scope` argument on all six verbs, `parents` in commit
       output, tag/channel refs in `vcs.branches` output. THIS LANDS BEFORE
       IW9-C touches routes/tools.ts.
-- [ ] 2.2 Thread `scope` through `packages/native/src/dispatch.ts:66-92`'s
+- [x] 2.2 Thread `scope` through `packages/native/src/dispatch.ts:66-92`'s
       vcs case (client-side native dispatch mirrors the server mapping).
-- [ ] 2.3 Verify (do not re-implement) F1's wire behaviors this change relies
+- [x] 2.3 Verify (do not re-implement) F1's wire behaviors this change relies
       on: hashes present in `vcs.diff`/`vcs.show` responses; `vcs.branches`
       not hardcoding main. Add discovery-shape assertions to
       tests/tools-discovery.test.ts (or nearest discovery suite).
