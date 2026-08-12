@@ -135,16 +135,16 @@ cross-repo rule 4).
 
 > Depends-on: 5 | Repo: aprovan | Touches: aprovan/server/workspace/package.json, aprovan/pnpm-lock.yaml | Verify: cd /Users/jacob/Documents/Code/AprovanLabs/aprovan && grep -n "@aprovan/registry-server" server/workspace/package.json && pnpm --filter @aprovan/workspace check-types
 
-- [ ] 6.1 Bump `@aprovan/registry-server` to the version published in 5.2
+- [x] 6.1 Bump `@aprovan/registry-server` to the version published in 5.2
       (must stay `^0.2.7`-or-later) in its own commit, no behavior
       change; add `@utdk/remote` (already published at `0.1.4`, used
       today by `packages/editor`/`packages/compiler`) as a new
       `server/workspace` dependency — it supplies `scanToolsAccess` for
       the install-card static analysis in stream 10.
-- [ ] 6.2 Bump the regenerated `@utdk/*` provider packages actually used
+- [x] 6.2 Bump the regenerated `@utdk/*` provider packages actually used
       by `server/workspace` (github, anthropic, etc. — whichever the
       workspace already pins) to their stream-4/5 versions.
-- [ ] 6.3 `pnpm install`; confirm the workspace typechecks against the new
+- [x] 6.3 `pnpm install`; confirm the workspace typechecks against the new
       exports (`Effect`, `ResourceGrantRow`, `matchesResourcePattern`)
       before any aprovan C code lands. Until this pin lands, `evaluateDispatch`
       does not exist yet — no behavior changes in this commit.
