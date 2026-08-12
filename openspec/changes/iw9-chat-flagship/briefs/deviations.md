@@ -168,3 +168,32 @@ not on main; keyvalue still scopes to `ws` / per-user app partitions.
 
 **Adaptation:** `createKeyvalueRecordsClient` passes `{ instance }` for
 forward-compat; tests inject an in-memory records client.
+
+## Stream 8 (guest UX + host admin)
+
+### D13 — F2 `apps.instanceUsage` / `instanceCap` / `instanceDelete` not on main
+
+**Task 8.4:** Manage panel reads/writes metering only through frozen
+`apps.instance*` procedures.
+
+**Reality:** iw9-f2 stream 5 (`apps/service.ts` host procedures) is still
+unchecked on `origin/main`; only `apps/instances.ts` module APIs exist.
+Grep finds no `instanceUsage` / `instanceCap` / `instanceDelete` handlers.
+
+**Adaptation:** `createInstanceHostClient` calls
+`invokeAppsTool("instanceUsage"|"instanceCap"|"instanceDelete", …)` — the
+frozen names — and is injectable for tests. Runtime success needs F2
+stream 5; Chat UI/contract is ready.
+
+### D14 — No frozen `apps.*` for `removeParticipant`
+
+**Task 8.3:** wire host remove-guest / guest leave to the platform call.
+
+**Reality:** F2 exposes `removeParticipant` as a module function in
+`apps/instances.ts`, not as an `apps.instance*` procedure in the frozen
+service table (Usage / Cap / Delete only).
+
+**Adaptation:** default host client calls
+`invokeAppsTool("instanceRemoveParticipant", { instanceId, sub })` as the
+intended host-gated seam when F2 exposes it; UI accepts an injectable
+`InstanceHostClient` so stream 12 E2E can mock today.
