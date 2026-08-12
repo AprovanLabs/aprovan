@@ -37,13 +37,13 @@
 
 > Depends-on: - | Repo: aprovan | Touches: aprovan/packages/editor/package.json, aprovan/pnpm-lock.yaml | Verify: cd aprovan && pnpm install --frozen-lockfile && pnpm --filter @aprovan/editor typecheck
 
-- [ ] 1.1 Add `yjs`, `y-protocols`, and `y-codemirror.next` to
+- [x] 1.1 Add `yjs`, `y-protocols`, and `y-codemirror.next` to
       `packages/editor/package.json` `dependencies` (tech-plan Context:
       verified absent from both repos today; `@codemirror/state@^6.7.1` and
       `@codemirror/view@^6.43.6` are already present and satisfy
       `y-codemirror.next`'s CM6 peer requirement — confirm the installed
       versions resolve without a peer-dep warning).
-- [ ] 1.2 Run `pnpm install` at the repo root to regenerate
+- [x] 1.2 Run `pnpm install` at the repo root to regenerate
       `pnpm-lock.yaml`; commit the lockfile diff. Verify command re-installs
       with `--frozen-lockfile` (fails if the lockfile and manifest disagree)
       and typechecks `packages/editor` with the new imports available
