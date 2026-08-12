@@ -841,9 +841,15 @@ importers:
       ws:
         specifier: ^8.18.0
         version: 8.21.1
+      y-protocols:
+        specifier: 1.0.7
+        version: 1.0.7(yjs@13.6.32)
       yaml:
         specifier: ^2.9.0
         version: 2.9.0
+      yjs:
+        specifier: 13.6.32
+        version: 13.6.32
       zod:
         specifier: 3.25.76
         version: 3.25.76
@@ -14500,6 +14506,14 @@ snapshots:
       chai: 5.3.3
       tinyrainbow: 2.0.0
 
+  '@vitest/mocker@2.1.5(vite@5.4.21(@types/node@22.19.11)(lightningcss@1.32.0)(terser@5.49.2))':
+    dependencies:
+      '@vitest/spy': 2.1.5
+      estree-walker: 3.0.3
+      magic-string: 0.30.21
+    optionalDependencies:
+      vite: 5.4.21(@types/node@22.19.11)(lightningcss@1.32.0)(terser@5.49.2)
+
   '@vitest/mocker@2.1.5(vite@5.4.21(@types/node@25.9.5)(lightningcss@1.32.0)(terser@5.49.2))':
     dependencies:
       '@vitest/spy': 2.1.5
@@ -18904,7 +18918,7 @@ snapshots:
   vitest@2.1.5(@types/node@22.19.11)(happy-dom@20.11.1)(jsdom@30.0.1(@noble/hashes@2.3.0))(lightningcss@1.32.0)(terser@5.49.2):
     dependencies:
       '@vitest/expect': 2.1.5
-      '@vitest/mocker': 2.1.5(vite@5.4.21(@types/node@25.9.5)(lightningcss@1.32.0)(terser@5.49.2))
+      '@vitest/mocker': 2.1.5(vite@5.4.21(@types/node@22.19.11)(lightningcss@1.32.0)(terser@5.49.2))
       '@vitest/pretty-format': 2.1.9
       '@vitest/runner': 2.1.5
       '@vitest/snapshot': 2.1.5
