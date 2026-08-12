@@ -40,6 +40,12 @@ export function useSessionOrchestration(args: {
   setInput: (value: string) => void;
   chatProviderRef: React.MutableRefObject<string>;
   chatModelRef: React.MutableRefObject<string>;
+  /**
+   * Optional: kept in sync with the active session so RunTransport (dev toggle
+   * `USE_RUN_TRANSPORT`) can post `sessionId` on chat-turn. Legacy transport
+   * ignores it. Stream 8 removes the dual-path once RunTransport is default.
+   */
+  sessionIdRef?: React.MutableRefObject<string | undefined>;
 }) {
   const {
     transport,
@@ -49,6 +55,7 @@ export function useSessionOrchestration(args: {
     setInput,
     chatProviderRef,
     chatModelRef,
+    sessionIdRef,
   } = args;
 
   const [sessions, setSessions] = useState<ChatSessionInfo[]>([]);
@@ -57,6 +64,9 @@ export function useSessionOrchestration(args: {
   // re-arming (edit-draft flow, notification actions).
   const activeSessionRef = useRef<ChatSessionInfo | null>(null);
   activeSessionRef.current = activeSession;
+  if (sessionIdRef) {
+    sessionIdRef.current = activeSession?.id;
+  }
   const [sessionChat, setSessionChat] = useState<Chat<UIMessage> | null>(null);
   const [sessionBusy, setSessionBusy] = useState(false);
   const [sessionNotice, setSessionNotice] = useState<string | null>(null);

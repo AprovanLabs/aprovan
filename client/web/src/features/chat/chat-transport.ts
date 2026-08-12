@@ -52,6 +52,10 @@ export function formatToolSignatures(services: ServiceInfo[]): string {
  * the prompt-composition inputs are read via refs at send time, so switches
  * apply to the next send even though useChat holds on to the transport
  * instance.
+ *
+ * IW-9 D: this is the legacy transport. `USE_RUN_TRANSPORT` in
+ * `run-transport.ts` (dev-only, default off) selects the run-protocol
+ * transport instead; stream 8 flips the default and deletes this path.
  */
 export function useChatTransport(args: {
   chatProviderRef: React.MutableRefObject<string>;
