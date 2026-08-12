@@ -261,21 +261,28 @@ names below are `openspec/changes/iw9-chat-flagship/specs/<capability>/spec.md`.
 
 ## 9. Playwright harness bootstrap
 
-> Depends-on: - | Repo: aprovan | Touches: aprovan/client/web/playwright.config.ts, aprovan/client/web/e2e/fixtures/**, aprovan/client/web/package.json | Verify: pnpm --filter @aprovan/patchwork-web exec playwright install --with-deps chromium && pnpm --filter @aprovan/patchwork-web exec playwright test --list
+> Depends-on: - | Repo: aprovan | Touches: aprovan/client/web/playwright.config.ts, aprovan/client/web/e2e/fixtures/**, aprovan/client/web/e2e/README.md, aprovan/client/web/e2e/harness-bootstrap.spec.ts | Verify: pnpm --filter @aprovan/patchwork-web exec playwright install --with-deps chromium && pnpm --filter @aprovan/patchwork-web exec playwright test --list
+>
+> Parallel-wave note: `@playwright/test` and the `e2e` script in
+> `client/web/package.json` are owned by stream 6 (Touches-disjoint with
+> this stream). If the dep is missing when you start, stop and report —
+> do not edit package.json here.
 
-- [ ] 9.1 Add `@playwright/test` to `client/web`, `playwright.config.ts` with
-      `webServer` starting a local-locus `@aprovan/workspace` instance plus
-      `vite preview`/`vite dev` (tech-plan T6); add an `e2e` script to
-      `client/web/package.json`.
-- [ ] 9.2 Two-user browser-context fixture (`e2e/fixtures/two-users.ts`):
+- [x] 9.1 Confirm `@playwright/test` is already a `client/web` devDependency
+      (added by stream 6). Author `playwright.config.ts` with `webServer`
+      starting a local-locus `@aprovan/workspace` instance plus
+      `vite preview`/`vite dev` (tech-plan T6). Confirm the `e2e` script
+      exists in `client/web/package.json` (stream 6); if missing, stop and
+      report — do not edit package.json in this stream.
+- [x] 9.2 Two-user browser-context fixture (`e2e/fixtures/two-users.ts`):
       spins up two authenticated `BrowserContext`s against one server
       instance, tears down workspace/instance state after each test (fresh
       workspace per test — tech-plan Risks, flake mitigation).
-- [ ] 9.3 Raw WebSocket frame capture helper (`e2e/fixtures/ws-capture.ts`)
+- [x] 9.3 Raw WebSocket frame capture helper (`e2e/fixtures/ws-capture.ts`)
       using Playwright's `page.on("websocket")`, exposing "assert zero
       frames matching predicate over the test window" — the primitive
       stream 12's invariant-7 test needs.
-- [ ] 9.4 Tag convention: every Chat E2E spec carries `@chat` in its title
+- [x] 9.4 Tag convention: every Chat E2E spec carries `@chat` in its title
       (tech-plan Architecture); confirm `playwright test --grep @chat` lists
       only Chat specs (empty until streams 10-12 land specs — this task
       just proves the harness runs).
