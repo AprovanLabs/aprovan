@@ -1,7 +1,7 @@
 # Report: stream 10 — capability approval flow
 
 **Status:** done  
-**PR:** (fill after open)  
+**PR:** https://github.com/AprovanLabs/aprovan/pull/247  
 **Branch:** `feat/iw9-c-approval-flow`  
 **Verify:** `pnpm --filter @aprovan/workspace test -- capability-cards` — 8 passed  
 Also confirmed: `evaluate-dispatch` (11) + `action-queue` (9) still green.
