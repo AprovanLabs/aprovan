@@ -182,12 +182,12 @@ cross-repo rule 4).
 
 > Depends-on: 7 | Repo: aprovan | Touches: aprovan/server/workspace/src/grants.ts, aprovan/server/workspace/src/profile-grants.ts, aprovan/server/workspace/src/authorize.ts, aprovan/server/workspace/src/routes/tools.ts (invoke handler region only, :850-1340 — after iw9-a's schema edits there), aprovan/server/workspace/src/agents/runner.ts, aprovan/server/workspace/src/apps/capabilities.ts, aprovan/server/workspace/src/native-dispatch.ts, aprovan/server/workspace/src/permissions.ts, aprovan/server/workspace/tests/evaluate-dispatch.test.ts | Verify: cd /Users/jacob/Documents/Code/AprovanLabs/aprovan && pnpm --filter @aprovan/workspace test -- evaluate-dispatch && grep -rn "mayInvokeTool\|assertAllowedTools\|toolGranted" server/workspace/src --include="*.ts" | grep -v "\.test\.ts"
 
-- [ ] 8.1 Confirm iw9-a's `routes/tools.ts` VCS tool-schema edits
+- [x] 8.1 Confirm iw9-a's `routes/tools.ts` VCS tool-schema edits
       (`vcs.commit/log/diff` scope args, ~lines 278-380) are already
       landed on the branch before touching the dispatch/audit region of
       this file (serialization rule) — this task is a no-op check, not
       code.
-- [ ] 8.2 Rewrite `grants.ts` around `evaluateDispatch(req:
+- [x] 8.2 Rewrite `grants.ts` around `evaluateDispatch(req:
       DispatchRequest): Promise<DispatchDecision>` per tech-plan
       "Interfaces & Data": inputs `(principal, appOrProfile, tool+effect,
       resource, credentialLevel)`; outputs `allow | deny | queue | ask`.
@@ -195,14 +195,14 @@ cross-repo rule 4).
       effect-classification "Observations never require action
       approval"). Spec: resource-grants "One dispatch chokepoint",
       "Grants intersect, never union", "Approval follows the credential".
-- [ ] 8.3 `profile-grants.ts` grows an export that returns the invoker's
+- [x] 8.3 `profile-grants.ts` grows an export that returns the invoker's
       matched tool-pattern set for a profile (not just
       `profileGrantAllows`'s boolean) so `evaluateDispatch` can compose
       it into the three-way intersection (invoker grants ∩ app ceiling ∩
       profile narrowing — invariant 2); `authorize.ts`'s
       `profileGrantAllows` becomes a thin wrapper over the new export or
       is inlined into `evaluateDispatch`.
-- [ ] 8.4 Wire all four dispatch paths to call `evaluateDispatch` and
+- [x] 8.4 Wire all four dispatch paths to call `evaluateDispatch` and
       delete/inline their old gates: `routes/tools.ts` invoke handler
       (replaces `mayInvokeTool` at :1052), `agents/runner.ts` (replaces
       `toolGranted` import at :74), `apps/capabilities.ts`
@@ -211,14 +211,14 @@ cross-repo rule 4).
       predicate), `native-dispatch.ts` (`dispatchAprovanNativeOp` :402).
       Spec scenario: "Hidden namespace unreachable from every path",
       "Admin is not exempt from resource grants for apps".
-- [ ] 8.5 Migrate `permissions.ts` (APR-320 direct grant rows) into the
+- [x] 8.5 Migrate `permissions.ts` (APR-320 direct grant rows) into the
       unified model: existing direct grants resolve through
       `evaluateDispatch` (as capability-only, any-resource grants written
       once at migration, never as a parallel system); `authorize.ts`'s
       `getPermissionStore().check` call is deleted once the migration
       path is proven. Spec: resource-grants "Direct permission rows
       migrate into the grant model", scenario "Legacy grant still works".
-- [ ] 8.6 New test file `tests/evaluate-dispatch.test.ts`: an
+- [x] 8.6 New test file `tests/evaluate-dispatch.test.ts`: an
       `email.send` call inside a granted resource pattern executes with
       no card/queue (spec "Action within granted resource"); outside the
       pattern it queues, not fails (spec "Action outside granted
@@ -235,7 +235,7 @@ cross-repo rule 4).
       a connect prompt, not a queue entry (spec "User credential, first
       use"); a migrated legacy `keyvalue.*` permission still resolves
       (spec "Legacy grant still works").
-- [ ] 8.7 Grep gate (both repos): no remaining callers of
+- [x] 8.7 Grep gate (both repos): no remaining callers of
       `mayInvokeTool`, `assertAllowedTools` as a standalone gate, or
       `toolGranted` outside `evaluateDispatch`'s own implementation and
       its tests, in aprovan `server/workspace/src`; no equivalent

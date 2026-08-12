@@ -1,21 +1,29 @@
 /**
- * The unified capability-grant model (docs/telemetry-and-agents.md): one
- * shape for "what may this principal touch", shared by agent profiles today
- * and extensible to apps. Two axes:
+ * Unified capability + resource grants (IW-9 C / invariant 2).
  *
- *   - `tools`    — tool patterns: exact (`keyvalue.set`), namespace-wide
- *                  (`keyvalue.*`), subtree (`github.repos.*`), or `*`.
- *   - `paths`    — workspace-VFS prefix grants with `ro`/`rw` access,
- *                  longest-matching-prefix wins, deny by default once any
- *                  path grant exists.
- *
- * Absent axes are permissive (no `tools` list = every tool the executing
- * user could call; no `paths` list = the whole workspace): a grant narrows,
- * the absence of one changes nothing — matching how app `allowed_tools`
- * always behaved.
+ * `evaluateDispatch` is the one server-side predicate every tool execution
+ * path must call. Observations skip resource/queue checks. Actions intersect
+ * invoker grants ∩ app ceiling ∩ profile narrowing, then match the resource
+ * against standing resource-grant rows (or queue on a miss).
  */
 
+import { randomUUID } from "node:crypto";
+import {
+  matchesResourcePattern,
+  type CredentialLevel,
+  type ResourceGrantRow,
+  type ResourceGrantSubject,
+} from "@aprovan/registry-server";
+import type { Principal } from "./middleware/auth.js";
+import { getPermissionStore } from "./permissions.js";
+import {
+  invokerMatchedToolPatterns,
+  profileGrantAllows,
+} from "./profile-grants.js";
+import { getRegistryStorage } from "./registry-storage.js";
 import { ServiceError } from "./service-kernel.js";
+
+export type Effect = "observation" | "action";
 
 export interface PathGrant {
   /** Workspace path prefix, no leading slash (e.g. "docs/"). */
@@ -28,6 +36,33 @@ export interface CapabilityGrants {
   paths?: PathGrant[];
 }
 
+export interface DispatchRequest {
+  principal: Principal;
+  via?: { appId?: string; profileId?: string };
+  tool: { namespace: string; operation: string; effect: Effect };
+  resource?: string;
+  credential?: { level: CredentialLevel; id: string };
+  runContext?: { runId: string; resultDependent: boolean };
+}
+
+export type DispatchDecision =
+  | { kind: "allow" }
+  | { kind: "deny"; reason: "capability" | "credential-unconnected" }
+  | { kind: "queue"; queuedActionId: string }
+  | { kind: "ask"; cardId: string };
+
+/** Optional ceilings / overrides for tests and app-session callers. */
+export interface EvaluateDispatchOptions {
+  /** App install allow-list (`allowedTools`) when `via.appId` is set. */
+  appCeiling?: string[];
+  /** Agent-run tool projection (patterns) — intersected when present. */
+  runTools?: string[];
+  /** Skip storage lookups; supply resource grants directly (tests). */
+  resourceGrants?: ResourceGrantRow[];
+  /** Skip legacy permission / profile resolution; supply invoker patterns. */
+  invokerPatterns?: string[];
+}
+
 /** Does `pattern` cover the call `namespace.procedure`? */
 function patternMatches(pattern: string, call: string): boolean {
   if (pattern === "*") return true;
@@ -38,13 +73,31 @@ function patternMatches(pattern: string, call: string): boolean {
   return call === pattern;
 }
 
-export function toolGranted(
+/**
+ * Capability-pattern matcher (exact / `ns.*` / `*`). Used by
+ * {@link evaluateDispatch} and path-adjacent helpers; kept as the shared
+ * vocabulary for grant rows and run projections.
+ */
+export function matchesCapabilityPattern(
   patterns: string[],
   namespace: string,
   procedure: string,
 ): boolean {
   const call = `${namespace}.${procedure}`;
   return patterns.some((pattern) => patternMatches(pattern, call));
+}
+
+/**
+ * @deprecated Prefer {@link matchesCapabilityPattern}. Retained name for
+ * in-tree callers that still import the old helper; evaluateDispatch is the
+ * enforcement chokepoint.
+ */
+export function toolGranted(
+  patterns: string[],
+  namespace: string,
+  procedure: string,
+): boolean {
+  return matchesCapabilityPattern(patterns, namespace, procedure);
 }
 
 /**
@@ -72,7 +125,7 @@ export function assertToolGranted(
   procedure: string,
 ): void {
   if (!grants?.tools) return;
-  if (!toolGranted(grants.tools, namespace, procedure)) {
+  if (!matchesCapabilityPattern(grants.tools, namespace, procedure)) {
     throw new ServiceError(
       `Agent grant denies ${namespace}.${procedure} (granted: ${grants.tools.join(", ") || "nothing"})`,
       403,
@@ -136,4 +189,245 @@ export function parseGrants(raw: unknown): CapabilityGrants | undefined {
     grants.paths = paths;
   }
   return grants.tools || grants.paths ? grants : undefined;
+}
+
+// ---------------------------------------------------------------------------
+// evaluateDispatch
+// ---------------------------------------------------------------------------
+
+function capabilityCovered(
+  patterns: string[] | undefined,
+  namespace: string,
+  operation: string,
+): boolean {
+  if (!patterns || patterns.length === 0) return false;
+  return matchesCapabilityPattern(patterns, namespace, operation);
+}
+
+/**
+ * Resolve the invoker's capability patterns: legacy APR-320 permission rows
+ * (as `provider.operation` / `provider.*`) unioned with profile-grant targets
+ * (`namespace.*`). Admins without an app ceiling get a synthetic `*` so
+ * direct admin invoke still works; apps remain a separate principal (no
+ * admin bypass of the app ceiling — invariant 4).
+ */
+async function resolveInvokerPatterns(
+  req: DispatchRequest,
+  options?: EvaluateDispatchOptions,
+): Promise<string[]> {
+  if (options?.invokerPatterns) return options.invokerPatterns;
+
+  const { principal } = req;
+  const patterns = new Set<string>();
+
+  // Legacy direct permission rows → capability-only patterns (any-resource).
+  const legacy = await getPermissionStore().list(principal.workspaceId, principal.sub);
+  for (const row of legacy) {
+    patterns.add(row.operation === "*" ? `${row.provider}.*` : `${row.provider}.${row.operation}`);
+  }
+
+  const profilePatterns = await invokerMatchedToolPatterns(
+    principal.workspaceId,
+    principal.sub,
+    principal.groupIds,
+  );
+  for (const pattern of profilePatterns) patterns.add(pattern);
+
+  // Direct (non-app) admin invoke: capability axis open. App ceilings still
+  // intersect below — admin is not exempt for apps.
+  if (principal.role === "admin" && !req.via?.appId) {
+    patterns.add("*");
+  }
+
+  return [...patterns];
+}
+
+async function resolveAppCeiling(
+  req: DispatchRequest,
+  options?: EvaluateDispatchOptions,
+): Promise<string[] | undefined> {
+  if (options?.appCeiling) return options.appCeiling;
+  if (!req.via?.appId) return undefined;
+  try {
+    const { getApp } = await import("./apps/store.js");
+    const app = await getApp(req.principal.workspaceId, req.via.appId);
+    return app?.allowedTools;
+  } catch {
+    return undefined;
+  }
+}
+
+function resourceGrantSubjectsFor(req: DispatchRequest): ResourceGrantSubject[] {
+  const subjects: ResourceGrantSubject[] = [
+    { kind: "user", id: req.principal.sub },
+    ...req.principal.groupIds.map(
+      (id): ResourceGrantSubject => ({ kind: "group", id }),
+    ),
+  ];
+  if (req.via?.appId) {
+    subjects.push({ kind: "app-install", id: req.via.appId });
+  }
+  return subjects;
+}
+
+function resourceMatchesGrant(grant: ResourceGrantRow, resource: string | undefined): boolean {
+  if (grant.resourcePattern === null) return true;
+  if (resource === undefined) return false;
+  return matchesResourcePattern(grant.resourcePattern, resource);
+}
+
+function grantsForCapability(
+  rows: ResourceGrantRow[],
+  namespace: string,
+  operation: string,
+): ResourceGrantRow[] {
+  return rows.filter((row) =>
+    matchesCapabilityPattern([row.capability], namespace, operation),
+  );
+}
+
+/**
+ * The one dispatch chokepoint. Returns allow | deny | queue | ask.
+ * Queue/ask ids are provisional here — persistence is stream 9 / cards stream 10.
+ */
+export async function evaluateDispatch(
+  req: DispatchRequest,
+  options?: EvaluateDispatchOptions,
+): Promise<DispatchDecision> {
+  const { namespace, operation, effect } = req.tool;
+  const call = `${namespace}.${operation}`;
+
+  // User-oauth: each member must connect; unconnected fails closed (no queue).
+  if (req.credential?.level === "user-oauth") {
+    const connected = await isUserOauthConnected(req);
+    if (!connected) {
+      return { kind: "deny", reason: "credential-unconnected" };
+    }
+  }
+
+  const invokerPatterns = await resolveInvokerPatterns(req, options);
+  const invokerOk = capabilityCovered(invokerPatterns, namespace, operation);
+
+  const appCeiling = await resolveAppCeiling(req, options);
+  const appOk =
+    appCeiling === undefined
+      ? true
+      : capabilityCovered(appCeiling, namespace, operation);
+
+  // Profile narrowing (via.profileId): the profile's target must cover the call.
+  let profileOk = true;
+  if (req.via?.profileId) {
+    profileOk = await profileGrantAllows(
+      req.principal.workspaceId,
+      req.principal.sub,
+      req.principal.groupIds,
+      namespace,
+    );
+    // Also require the named profile to target this namespace when resolvable.
+    try {
+      const store = await getRegistryStorage();
+      const profile = await store.profiles.getById(
+        req.principal.workspaceId,
+        req.via.profileId,
+      );
+      if (profile && profile.targetId !== namespace && profile.targetId !== "*") {
+        profileOk = false;
+      }
+    } catch {
+      // Storage unavailable — fail closed on explicit profile pin.
+      profileOk = false;
+    }
+  }
+
+  const runOk =
+    options?.runTools === undefined
+      ? true
+      : capabilityCovered(options.runTools, namespace, operation);
+
+  // Intersection — any layer denying → capability miss.
+  if (!invokerOk || !appOk || !profileOk || !runOk) {
+    if (req.runContext) {
+      return { kind: "ask", cardId: randomUUID() };
+    }
+    return { kind: "deny", reason: "capability" };
+  }
+
+  // Observations: capability gate only — never resource / queue / card.
+  if (effect === "observation") {
+    return { kind: "allow" };
+  }
+
+  // Actions: resource grants. No rows for this capability ⇒ unconstrained on
+  // the resource axis (capability already decided). Rows present ⇒ must match.
+  let rows = options?.resourceGrants;
+  if (rows === undefined) {
+    try {
+      const store = await getRegistryStorage();
+      await store.tenants.ensure(req.principal.workspaceId);
+      rows = await store.resourceGrants.listForSubjects(
+        req.principal.workspaceId,
+        resourceGrantSubjectsFor(req),
+      );
+    } catch {
+      rows = [];
+    }
+  }
+
+  const forCap = grantsForCapability(rows, namespace, operation);
+  if (forCap.length === 0) {
+    // Capability-only authority (legacy permissions / profile grants with no
+    // resource dimension yet) — allow the action.
+    return { kind: "allow" };
+  }
+
+  const matched = forCap.filter((g) => resourceMatchesGrant(g, req.resource));
+  if (matched.length === 0) {
+    return { kind: "queue", queuedActionId: randomUUID() };
+  }
+
+  // Credential-level routing: when the request names a level, prefer grants
+  // at that level (workspace-* shared; user-oauth already gated above).
+  if (req.credential?.level) {
+    const levelHits = matched.filter((g) => g.credentialLevel === req.credential!.level);
+    if (levelHits.length === 0 && matched.some((g) => g.credentialLevel === "user-oauth")) {
+      // Standing grants are user-oauth but request didn't prove connection path.
+      return { kind: "deny", reason: "credential-unconnected" };
+    }
+  }
+
+  void call; // kept for future audit attribution
+  return { kind: "allow" };
+}
+
+/**
+ * Whether the principal has a connected user-oauth credential for the
+ * request. When `credential.id` is present we trust the caller resolved it;
+ * otherwise look up a user-owned credential for the tool's namespace.
+ */
+async function isUserOauthConnected(req: DispatchRequest): Promise<boolean> {
+  if (req.credential?.id) return true;
+  try {
+    const store = await getRegistryStorage();
+    const creds = await store.credentials.list(req.principal.workspaceId);
+    return creds.some(
+      (c) =>
+        c.level === "user-oauth" &&
+        c.createdBy === req.principal.sub &&
+        (c.provider === req.tool.namespace || !req.tool.namespace),
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Map a {@link DispatchDecision} to HTTP/agent denial semantics.
+ * `queue` / `ask` are returned to the caller as structured decisions — they
+ * do not throw (streams 9–10 persist and surface them).
+ */
+export function denyMessage(decision: Extract<DispatchDecision, { kind: "deny" }>): string {
+  if (decision.reason === "credential-unconnected") {
+    return "Connect and approve this user-oauth credential before invoking";
+  }
+  return "Forbidden: caller does not have permission for this operation";
 }

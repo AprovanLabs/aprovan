@@ -70,7 +70,10 @@ import {
   svcScope,
   writeSvcRecord,
 } from "../svc-records.js";
-import { toolGranted } from "../grants.js";
+import {
+  evaluateDispatch,
+  matchesCapabilityPattern,
+} from "../grants.js";
 import * as toolCatalog from "../routes/tools.js";
 import { ServiceError, type ServiceContext } from "../service-kernel.js";
 import { dispatchInterface, invokeTool } from "../workflows/invoke.js";
@@ -408,7 +411,7 @@ async function runDescribe(
   }
 
   let ops = await toolCatalog.catalogForNamespace(workspaceId, request.namespace);
-  ops = ops.filter((op) => toolGranted(allowed, request.namespace, op.operation));
+  ops = ops.filter((op) => matchesCapabilityPattern(allowed, request.namespace, op.operation));
   if (request.query) {
     const q = request.query.toLowerCase();
     ops = ops.filter(
@@ -681,21 +684,57 @@ async function runNativeAgent(
           operation: decoded.operation,
           args: decoded.args,
         });
-        // The security boundary, both halves: the run's own tool list here,
-        // the profile grants inside invokeTool. A model-chosen namespace
+        // The security boundary: evaluateDispatch with the run's tool
+        // projection as an intersection layer. A model-chosen namespace
         // outside the list ends the run — retrying a policy is not a thing
         // more turns can fix.
-        if (!toolGranted(allowed, decoded.namespace, decoded.operation)) {
+        const principal = {
+          sub: ctx.userId,
+          workspaceId: ctx.workspaceId,
+          role: "member",
+          groupIds: [] as string[],
+        };
+        const resource =
+          typeof decoded.args["resource"] === "string"
+            ? decoded.args["resource"]
+            : typeof decoded.args["to"] === "string"
+              ? decoded.args["to"]
+              : typeof decoded.args["url"] === "string"
+                ? decoded.args["url"]
+                : undefined;
+        const decision = await evaluateDispatch(
+          {
+            principal,
+            tool: {
+              namespace: decoded.namespace,
+              operation: decoded.operation,
+              effect: "action",
+            },
+            ...(resource ? { resource } : {}),
+            runContext: { runId: id, resultDependent: true },
+          },
+          { runTools: allowed, invokerPatterns: allowed },
+        );
+        if (decision.kind !== "allow") {
           stopReason = "tool_denied";
-          errorMessage = `The model asked for ${name}, which the run's tool list (${allowed.join(", ")}) does not allow`;
-          recorded.push({ id: callId, name, error: "denied" });
+          errorMessage =
+            decision.kind === "deny"
+              ? `The model asked for ${name}, which the run's tool list (${allowed.join(", ")}) does not allow`
+              : decision.kind === "queue"
+                ? `Queued out-of-grant action ${name} (${decision.queuedActionId})`
+                : `Approval required for ${name} (${decision.cardId})`;
+          recorded.push({
+            id: callId,
+            name,
+            error: decision.kind === "deny" ? "denied" : decision.kind,
+          });
           turns.push({ index: turn, at, kind: "tool", toolCalls: recorded });
           await emit({
             type: "tool_call_finished",
             turn,
             callId,
             ok: false,
-            error: "denied",
+            error: decision.kind === "deny" ? "denied" : decision.kind,
             durationMs: 0,
           });
           await emit({ type: "turn_finished", turn });

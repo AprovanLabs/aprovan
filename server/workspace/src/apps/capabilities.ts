@@ -21,15 +21,23 @@
  *     procedure are indistinguishable (capability = namespace).
  *
  * `allowedTools` may therefore name (1), the app's own workflow namespace, and
- * exact provider procedures (2); {@link assertAllowedTools} rejects everything
- * else — a provider *wildcard* in particular — with a message pointing at (3).
+ * exact provider procedures (2); {@link validateAllowedToolsEntries} (formerly
+ * assertAllowedTools) rejects everything else — a provider *wildcard* in
+ * particular — with a message pointing at (3). Runtime dispatch goes through
+ * {@link evaluateAppToolDispatch} → `evaluateDispatch`.
  */
 
 import {
   NATIVE_APP_NAMESPACES,
   type NativeAppNamespace,
 } from "@aprovan/patchwork/namespace-core";
+import {
+  evaluateDispatch,
+  type DispatchDecision,
+  type Effect,
+} from "../grants.js";
 import { isInterface } from "../interfaces.js";
+import type { Principal } from "../middleware/auth.js";
 import { isCoreServiceName, ServiceError } from "../service-kernel.js";
 import { DEFAULT_DAILY_CALLS } from "./usage.js";
 import type { AppManifest, AppRequirement } from "./store.js";
@@ -251,9 +259,9 @@ function declaredContracts(requires: readonly AppRequirement[] | undefined): Set
 }
 
 /**
- * Validate an `allowed_tools` list against the three-ways-to-reach-data rule
- * and return the provider credential grants it contains (tier 2 — the caller
- * must still verify the workspace holds a credential for each provider).
+ * Publish-time validation of an `allowed_tools` list against the
+ * three-ways-to-reach-data rule. Not a runtime dispatch gate — that is
+ * {@link evaluateAppToolDispatch}.
  *
  * Declared interface contracts (from `requires`) are a fourth acceptable form:
  * exact `contract.procedure` entries, same no-wildcard rule as providers.
@@ -264,7 +272,7 @@ function declaredContracts(requires: readonly AppRequirement[] | undefined): Set
  * boundary. An exact procedure is a deliberate, narrow credential grant; a
  * workflow is the boundary for anything broader.
  */
-export function assertAllowedTools(
+export function validateAllowedToolsEntries(
   entries: string[],
   context: {
     app: string;
@@ -334,6 +342,12 @@ export function assertAllowedTools(
   }
   return grants;
 }
+
+/**
+ * @deprecated Use {@link validateAllowedToolsEntries}. Kept as a name alias
+ * for publish-path callers outside this stream's Touches list.
+ */
+export const assertAllowedTools = validateAllowedToolsEntries;
 
 /**
  * Parse and validate a publish-time `requires` array. Unknown contracts → 400.
@@ -411,8 +425,8 @@ export function dependencyCapabilities(
 }
 
 /**
- * May an app session call `namespace.procedure` as a declared-contract grant?
- * Exact allow-list entry only; wildcards never qualify.
+ * App-ceiling fragment: may this manifest's allow-list call the contract
+ * procedure? Runtime enforcement is {@link evaluateAppToolDispatch}.
  */
 export function contractGrantCallable(
   manifest: AppManifest,
@@ -440,10 +454,8 @@ export function providerGrantEntries(allowedTools: readonly string[]): ProviderG
 }
 
 /**
- * May an app session call `namespace.procedure` as a provider credential
- * grant? Call-time re-validation of the tier rules: only an *exact* allow-list
- * entry on a non-native, non-core provider namespace qualifies — a wildcard
- * never does, even if a manifest predating validation carried one.
+ * App-ceiling fragment: may this manifest call the provider procedure as a
+ * tier-2 credential grant? Runtime enforcement is {@link evaluateAppToolDispatch}.
  */
 export function providerGrantCallable(
   manifest: AppManifest,
@@ -454,6 +466,35 @@ export function providerGrantCallable(
   if (isCoreServiceName(namespace)) return false;
   if (isInterface(namespace)) return false;
   return manifest.allowedTools.includes(`${namespace}.${procedure}`);
+}
+
+/**
+ * App-session dispatch chokepoint: invoker grants ∩ app `allowedTools` ceiling
+ * via {@link evaluateDispatch}. Admin callers are not exempt (invariant 4).
+ */
+export async function evaluateAppToolDispatch(input: {
+  principal: Principal;
+  manifest: AppManifest;
+  namespace: string;
+  procedure: string;
+  effect?: Effect;
+  resource?: string;
+  credential?: { level: "workspace-token" | "workspace-oauth" | "user-oauth"; id: string };
+}): Promise<DispatchDecision> {
+  return evaluateDispatch(
+    {
+      principal: input.principal,
+      via: { appId: input.manifest.appId },
+      tool: {
+        namespace: input.namespace,
+        operation: input.procedure,
+        effect: input.effect ?? "action",
+      },
+      ...(input.resource ? { resource: input.resource } : {}),
+      ...(input.credential ? { credential: input.credential } : {}),
+    },
+    { appCeiling: input.manifest.allowedTools },
+  );
 }
 
 /** One tier-2 entry of `apps.capabilities`: a provider's granted procedures. */
