@@ -1,0 +1,20 @@
+# Chat flagship app — single manifest, two host modes (D2 / invariant 5).
+# Capability ceiling is exact: own-partition records, own realtime topic
+# (app:<installId>), instance invites, and agents.run for chat/summarize.
+# Agent profile declaration lands in stream 5.
+
+slug: chat
+title: Chat
+description: Channels, threads, and messages on the shared partition — managed or hosted.
+icon: messages
+
+hostModes:
+  - managed
+  - creator-hosted
+
+capabilities:
+  - records.*
+  - realtime.subscribe
+  - realtime.publish
+  - invites.create
+  - agents.run
