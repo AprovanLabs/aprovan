@@ -1,6 +1,7 @@
 # Document flagship app — managed-only (D2 / invariant 5).
-# Capability ceiling: VFS + sessions + agents.run for doc/fix-typos (stream 10).
-# Agent profile is NOT declared here — stream 10 owns doc/fix-typos.
+# Capability ceiling: VFS + sessions + agents.run for document/fix-typos.
+# Agent profile: document/fix-typos (stream 10) — tools ⊆ capabilities (invariant 2).
+# Colloquial PRD name "doc/fix-typos" maps to <slug>/<agent> = document/fix-typos.
 
 slug: document
 title: Document
@@ -14,3 +15,22 @@ capabilities:
   - vfs.*
   - sessions.*
   - agents.run
+
+agents:
+  - name: fix-typos
+    description: Fix typos in a Markdown document via vfs.read / vfs.write
+    prompt: >-
+      You are document/fix-typos. Fix typos in only the Markdown document
+      named in the user input. Read that file with vfs.read, propose a
+      typo-corrected version of the same document, and write it back with
+      vfs.write using the full corrected content. Do not touch other paths.
+      Prefer minimal edits that correct spelling and obvious typos; keep
+      structure and meaning intact. When the document is open in a live
+      session, your write lands through platform reconciliation — do not
+      attempt to clobber concurrent human edits.
+    llm:
+      interface: llm
+      profile: fast
+    tools:
+      - vfs.read
+      - vfs.write
