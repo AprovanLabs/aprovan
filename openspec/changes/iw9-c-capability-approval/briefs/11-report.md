@@ -1,9 +1,9 @@
 # Report: stream 11 — derived authority
 
 **Status:** done  
-**PR:** (filled after open)  
+**PR:** https://github.com/AprovanLabs/aprovan/pull/245  
 **Branch:** `feat/iw9-c-derived-authority`  
-**Base:** `origin/main` @ stream 8 `#242`
+**Base:** `origin/main` @ stream 8 `#242` (rebased past stream 9 `#243`)
 
 ## What landed
 
