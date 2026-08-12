@@ -1,6 +1,6 @@
 # Stream 3 report — CF-2 instance-targeted guest invites
 
-**PR:** (filled after open)  
+**PR:** https://github.com/AprovanLabs/aprovan/pull/231  
 **Branch:** `feat/iw9-chat-cf2-invites`  
 **Base:** `origin/main`
 
