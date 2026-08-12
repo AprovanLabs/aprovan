@@ -7,6 +7,11 @@
  */
 
 import { mayInvokeTool } from "../authorize.js";
+import {
+  answerAskCard,
+  raiseAskCard,
+  type CapabilityCard,
+} from "../capability-cards.js";
 import { assertToolGranted } from "../grants.js";
 import {
   getCredentialStore,
@@ -419,4 +424,51 @@ async function dispatchProviderLegacy(
     );
   }
   return result.data;
+}
+
+// ---------------------------------------------------------------------------
+// Explicit workflow `ask` step (iw9-c stream 10 / D15)
+// ---------------------------------------------------------------------------
+
+export class AskPendingError extends Error {
+  readonly cardId: string;
+  readonly card: CapabilityCard;
+
+  constructor(card: CapabilityCard) {
+    super(`Workflow ask pending (${card.id}) — turn ended`);
+    this.name = "AskPendingError";
+    this.cardId = card.id;
+    this.card = card;
+  }
+}
+
+/**
+ * Explicit `ask` workflow step: surfaces a question/approval to the
+ * invoker's review queue and ends the turn (no held connection). Resume
+ * with {@link answerWorkflowAsk}.
+ */
+export async function askStep(
+  ctx: ServiceContext,
+  input: { question: unknown; payload?: unknown; runId?: string },
+): Promise<never> {
+  const card = await raiseAskCard({
+    workspaceId: ctx.workspaceId,
+    invokerId: ctx.userId,
+    question: input.question,
+    ...(input.payload !== undefined ? { payload: input.payload } : {}),
+    ...(input.runId ? { runId: input.runId } : {}),
+  });
+  throw new AskPendingError(card);
+}
+
+/**
+ * Resume a workflow ask with the invoker's answer.
+ */
+export async function answerWorkflowAsk(
+  workspaceId: string,
+  cardId: string,
+  reviewerId: string,
+  answer: unknown,
+): Promise<CapabilityCard> {
+  return answerAskCard(workspaceId, cardId, reviewerId, answer);
 }

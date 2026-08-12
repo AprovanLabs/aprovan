@@ -70,6 +70,12 @@ import {
   svcScope,
   writeSvcRecord,
 } from "../svc-records.js";
+import { countQueuedForRun, queueForChain } from "../action-queue.js";
+import {
+  isAlwaysAsk,
+  queuedActionsMessage,
+  raiseJitCard,
+} from "../capability-cards.js";
 import {
   evaluateDispatch,
   matchesCapabilityPattern,
@@ -123,6 +129,17 @@ export interface StoredAgentRun extends AgentRun {
   origin?: "chat" | "self-heal" | "api";
   /** Chat session this run belongs to, when any. */
   sessionId?: string;
+  /**
+   * Suspended mid-turn awaiting a capability card (iw9-c stream 10).
+   * Resume reattaches through {@link resumeNativeAgentAfterApproval}.
+   */
+  pendingApproval?: {
+    cardId: string;
+    turn: number;
+    messages: Array<Record<string, unknown>>;
+    args: AgentRunArgs;
+    allowed: string[];
+  };
 }
 
 /** Optional live sink; persistence always goes through appendRunEvents. */
@@ -702,42 +719,162 @@ async function runNativeAgent(
               : typeof decoded.args["url"] === "string"
                 ? decoded.args["url"]
                 : undefined;
-        const decision = await evaluateDispatch(
-          {
-            principal,
-            tool: {
-              namespace: decoded.namespace,
-              operation: decoded.operation,
-              effect: "action",
-            },
-            ...(resource ? { resource } : {}),
-            runContext: { runId: id, resultDependent: true },
+        const dispatchReq = {
+          principal,
+          tool: {
+            namespace: decoded.namespace,
+            operation: decoded.operation,
+            effect: "action" as const,
           },
-          { runTools: allowed, invokerPatterns: allowed },
-        );
-        if (decision.kind !== "allow") {
+          ...(resource ? { resource } : {}),
+          runContext: { runId: id, resultDependent: true as const },
+        };
+        const decision = await evaluateDispatch(dispatchReq, {
+          runTools: allowed,
+          invokerPatterns: allowed,
+        });
+
+        const appId =
+          typeof args.metadata?.["appId"] === "string"
+            ? args.metadata["appId"]
+            : undefined;
+        const alwaysAskHit =
+          decision.kind === "allow" &&
+          (await isAlwaysAsk(ctx.workspaceId, appId, name));
+
+        if (decision.kind === "deny") {
           stopReason = "tool_denied";
-          errorMessage =
-            decision.kind === "deny"
-              ? `The model asked for ${name}, which the run's tool list (${allowed.join(", ")}) does not allow`
-              : decision.kind === "queue"
-                ? `Queued out-of-grant action ${name} (${decision.queuedActionId})`
-                : `Approval required for ${name} (${decision.cardId})`;
-          recorded.push({
-            id: callId,
-            name,
-            error: decision.kind === "deny" ? "denied" : decision.kind,
-          });
+          errorMessage = `The model asked for ${name}, which the run's tool list (${allowed.join(", ")}) does not allow`;
+          recorded.push({ id: callId, name, error: "denied" });
           turns.push({ index: turn, at, kind: "tool", toolCalls: recorded });
           await emit({
             type: "tool_call_finished",
             turn,
             callId,
             ok: false,
-            error: decision.kind === "deny" ? "denied" : decision.kind,
+            error: "denied",
             durationMs: 0,
           });
           await emit({ type: "turn_finished", turn });
+          break loop;
+        }
+
+        if (decision.kind === "queue") {
+          const queuedActionId = decision.queuedActionId;
+          const continueTurn = !dispatchReq.runContext.resultDependent;
+          if (continueTurn) {
+            const note = `Queued out-of-grant action ${name} (${queuedActionId})`;
+            messages.push({
+              role: "tool",
+              tool_call_id: callId,
+              content: jsonish({ queued: true, queuedActionId, message: note }),
+            });
+            recorded.push({ id: callId, name, error: "queue" });
+            await emit({
+              type: "tool_call_finished",
+              turn,
+              callId,
+              ok: false,
+              error: "queue",
+              durationMs: 0,
+            });
+            // Keep the process-local chain index warm for callers that use it.
+            void queueForChain(id, false).catch(() => undefined);
+            continue;
+          }
+          const queuedCount = await countQueuedForRun(ctx.workspaceId, id);
+          const card = await raiseJitCard({
+            workspaceId: ctx.workspaceId,
+            invokerId: ctx.userId,
+            request: dispatchReq,
+            runId: id,
+            turn,
+            queuedActionIds: [queuedActionId],
+          });
+          recorded.push({ id: callId, name, error: "pending_action" });
+          turns.push({ index: turn, at, kind: "tool", toolCalls: recorded });
+          await emit({
+            type: "tool_call_finished",
+            turn,
+            callId,
+            ok: false,
+            error: "pending_action",
+            durationMs: 0,
+          });
+          await emit({
+            type: "pending_action",
+            turn,
+            actionId: card.id,
+            capability: name,
+            ...(resource ? { resource } : {}),
+            payload: { queuedCount, message: queuedActionsMessage(queuedCount) },
+          });
+          await emit({ type: "turn_finished", turn });
+          status = "awaiting_tools";
+          stopReason = "tool_denied";
+          errorMessage = queuedActionsMessage(queuedCount);
+          record.pendingApproval = {
+            cardId: card.id,
+            turn,
+            messages: [...messages],
+            args,
+            allowed,
+          };
+          break loop;
+        }
+
+        if (decision.kind === "ask" || alwaysAskHit) {
+          const card = await raiseJitCard({
+            workspaceId: ctx.workspaceId,
+            invokerId: ctx.userId,
+            request: {
+              ...dispatchReq,
+              ...(appId ? { via: { appId } } : {}),
+            },
+            runId: id,
+            turn,
+            ...(decision.kind === "ask" ? { cardId: decision.cardId } : {}),
+            ...(alwaysAskHit ? { alwaysAsk: true } : {}),
+          });
+          const queuedCount = await countQueuedForRun(ctx.workspaceId, id);
+          recorded.push({ id: callId, name, error: "pending_action" });
+          turns.push({ index: turn, at, kind: "tool", toolCalls: recorded });
+          await emit({
+            type: "tool_call_finished",
+            turn,
+            callId,
+            ok: false,
+            error: "pending_action",
+            durationMs: 0,
+          });
+          await emit({
+            type: "pending_action",
+            turn,
+            actionId: card.id,
+            capability: name,
+            ...(resource ? { resource } : {}),
+            payload: {
+              ...(alwaysAskHit ? { alwaysAsk: true } : {}),
+              queuedCount,
+              ...(queuedCount > 0
+                ? { message: queuedActionsMessage(queuedCount) }
+                : {}),
+            },
+          });
+          await emit({ type: "turn_finished", turn });
+          status = "awaiting_tools";
+          stopReason = "tool_denied";
+          errorMessage =
+            queuedCount > 0
+              ? queuedActionsMessage(queuedCount)
+              : `Approval required for ${name}`;
+          record.pendingApproval = {
+            cardId: card.id,
+            turn,
+            messages: [...messages],
+            args,
+            allowed,
+          };
           break loop;
         }
         const callStart = performance.now();
@@ -809,7 +946,10 @@ async function runNativeAgent(
 
   const clamped = clampOutput(output, args.limits);
   record.status = status;
-  record.finishedAt = new Date().toISOString();
+  // Awaiting approval is not a finished run — no finishedAt / run_finished.
+  if (status !== "awaiting_tools") {
+    record.finishedAt = new Date().toISOString();
+  }
   record.durationMs = Math.round(performance.now() - startMs);
   record.stopReason = stopReason;
   record.turns = turns;
@@ -824,7 +964,12 @@ async function runNativeAgent(
 
   // Terminal event: thrown model failures already emitted `error` inside the
   // loop; every other stop (including tool_denied) closes with `run_finished`.
-  if (!(record.events ?? []).some((e) => e.type === "error")) {
+  // pending_action / awaiting_tools deliberately omit run_finished so clients
+  // can reattach after accept (iw9-c / D5).
+  if (
+    status !== "awaiting_tools" &&
+    !(record.events ?? []).some((e) => e.type === "error")
+  ) {
     await emit({
       type: "run_finished",
       status,
@@ -836,6 +981,34 @@ async function runNativeAgent(
 
   await saveRunRecord(ctx.workspaceId, record);
   return record;
+}
+
+/**
+ * Resume a run suspended on a capability card (iw9-d reattach extension).
+ * Persists `running` and clears `pendingApproval` after the card was accepted
+ * and covered queued actions released — no held connection (D5).
+ */
+export async function resumeNativeAgentAfterApproval(
+  workspaceId: string,
+  runId: string,
+): Promise<StoredAgentRun> {
+  const record = await readNativeAgentRun(workspaceId, runId);
+  if (!record) throw new ServiceError(`Unknown agent run: ${runId}`, 404);
+  if (record.status !== "awaiting_tools" || !record.pendingApproval) {
+    throw new ServiceError(
+      `Agent run ${runId} is not awaiting approval (status=${record.status})`,
+      409,
+    );
+  }
+  const next: StoredAgentRun = {
+    ...record,
+    status: "running",
+    pendingApproval: undefined,
+    error: undefined,
+    stopReason: undefined,
+  };
+  await saveRunRecord(workspaceId, next);
+  return next;
 }
 
 // ---------------------------------------------------------------------------
