@@ -236,20 +236,20 @@
 
 > Depends-on: 5, 7 | Repo: aprovan | Touches: aprovan/client/web/src/features/document/DraftBanner.tsx, aprovan/client/web/src/features/document/useDocumentSession.ts | Verify: pnpm --filter @aprovan/patchwork-web test && pnpm --filter @aprovan/patchwork-web typecheck
 
-- [ ] 8.1 `DraftBanner.tsx`: persistent banner shown when the document's
+- [x] 8.1 `DraftBanner.tsx`: persistent banner shown when the document's
       session is `staged` (poll or push via `sessions.get`/existing
       notification surface), "Review" opens iw9-a's `MergeDialog` with the
       live doc text and the draft session's staged content as the two sides
       (ux.md "An agent edit conflicts — resolve the draft").
-- [ ] 8.2 Wire `MergeDialog`'s resolution (iw9-a's `sessions.resolve`) to
+- [x] 8.2 Wire `MergeDialog`'s resolution (iw9-a's `sessions.resolve`) to
       apply the chosen content to the live doc as one transaction (so
       remote participants see it as a normal live edit) and trigger
       `forceMaterializeAndCommit` (tech-plan "Interfaces & Data") for the
       attributable commit (spec "Manual save resolves the draft").
-- [ ] 8.3 Discard path calls the existing discard-session flow and clears
+- [x] 8.3 Discard path calls the existing discard-session flow and clears
       the banner without touching the live doc (spec "Discarding the draft
       SHALL restore `auto`").
-- [ ] 8.4 Tests: banner appears/disappears with session mode transitions;
+- [x] 8.4 Tests: banner appears/disappears with session mode transitions;
       resolve path calls the expected `sessions.resolve` shape with the two
       versions; discard clears the banner without a doc mutation.
 
