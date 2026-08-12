@@ -37,17 +37,17 @@ cross-repo rule 4).
 
 > Depends-on: - | Repo: registry | Touches: registry/packages/bundler/src/client-api.ts, registry/packages/bundler/src/openapi.ts, registry/packages/bundler/src/client-api.test.ts, registry/packages/bundler/src/openapi.test.ts | Verify: cd /Users/jacob/Documents/Code/AprovanLabs/registry && pnpm --filter @aprovan/utdk-bundler test
 
-- [ ] 1.1 Add `export type Effect = "observation" | "action"` and a pure
+- [x] 1.1 Add `export type Effect = "observation" | "action"` and a pure
       `effectFromHttpMethod(method: string | undefined): Effect` to
       `client-api.ts` (GET/HEAD → `observation`; everything else,
       including an unrecognized/missing method, → `action` — fail closed).
       Spec: effect-classification "Generated providers derive effect from
       HTTP method", "Missing method fails closed" (tech-plan D1).
-- [ ] 1.2 Add `effect: Effect` to `ToolRuntimeMetadata`
+- [x] 1.2 Add `effect: Effect` to `ToolRuntimeMetadata`
       (`client-api.ts:15`) and populate it at both derivation sites
       (`client-api.ts:154-155` and the render path `:708-709`); mirror the
       same extraction in `openapi.ts:138-139`.
-- [ ] 1.3 Tests: GET operation → `observation`; POST/PUT/PATCH/DELETE →
+- [x] 1.3 Tests: GET operation → `observation`; POST/PUT/PATCH/DELETE →
       `action`; a template with no `http_method` → `action` (spec
       scenarios "GET tool is an observation", "POST tool is an action",
       "Missing method fails closed").
