@@ -8,37 +8,33 @@
  *
  *   tenant = workspaceId, scope = "notify", key = <time-prefixed id>
  *
- * The contract (mirrored by patchwork's drawer):
+ * The contract (mirrored by patchwork's drawer) — IW-9 C invariant 6
+ * shell / widget split (same sandbox host as review-surface):
  *
  * - `category` — "decision" (someone must act), "warning", "activity".
- * - `choices[]` — typed actions: each is a tool call
- *   `{ namespace, procedure, args }`. capability = namespace all the way
- *   down: a choice on a workflow-emitted notification can call any
- *   namespace, including the app's own exported workflows.
- * - `widget` — `{ path, data }`: a patchwork widget that renders the body
- *   ("builtin:" ids are client-side renderers; workspace paths compile in
- *   the sandbox).
+ * - `choices[]` — typed actions rendered in the **shell** (not the widget):
+ *   each is a tool call `{ namespace, procedure, args }`.
+ * - `widget` — `{ path, data }`: payload body only ("builtin:" ids are
+ *   client-side renderers; workspace paths compile in the shared sandbox).
  * - `seenBy` — per-user; a seen notification hides by default and gets a
  *   10-day TTL (DynamoDB reclaims it via the table's `expiresAt`).
  *
- * **App permission model** (the confused-deputy guard): a notification
- * emitted through an app session is stamped `source.app` server-side, and
- * every choice is validated AT EMIT TIME against the app's own callable
- * surface — native allow-list, exported workflows, provider grants. An app
- * cannot embed a call it could not make itself. Clients complete the story
- * by dispatching app-sourced choices through the app's tool surface
- * (`/apps/:ws/:name/tools/…`), so the allow-list is enforced again at
- * click time by construction.
+ * **App permission model** (confused-deputy guard): `source.app` is stamped
+ * server-side. Apps may only embed calls they can make themselves — enforced
+ * by {@link evaluateDispatch} / {@link evaluateAppToolDispatch} on emit and
+ * on widget-originated calls (not a separate allow-list check).
  */
 
 import {
+  evaluateAppToolDispatch,
   isNativeNamespace,
   isWorkflowNamespace,
-  providerGrantCallable,
   resolveExportedWorkflow,
   workflowCallable,
 } from "../apps/capabilities.js";
 import { readApp, resolveAppPath, toolAllowed, type AppManifest } from "../apps/store.js";
+import type { DispatchDecision, Effect } from "../grants.js";
+import type { Principal } from "../middleware/auth.js";
 import { getRecordStore } from "../records.js";
 import { ServiceError, type CoreService, type ServiceContext } from "../service-kernel.js";
 
@@ -84,19 +80,97 @@ function category(value: unknown): NotificationCategory {
   return value === "decision" || value === "warning" ? value : "activity";
 }
 
-/** Would the emitting app itself be allowed to make this call? */
-function choiceCallableByApp(
-  manifest: AppManifest,
-  call: NotificationChoice["call"],
-): boolean {
-  if (isWorkflowNamespace(call.namespace)) {
-    const workflow = resolveExportedWorkflow(manifest.workflows ?? [], call.procedure);
-    return Boolean(workflow && workflowCallable(manifest, workflow));
+/**
+ * Trusted notification chrome — source app + choices live here; widget is
+ * payload-only (same rule as {@link ReviewItem.shell}).
+ */
+export interface NotificationShell {
+  who: { user: string; app?: string };
+  title: string;
+  body?: string;
+  category: NotificationCategory;
+  /** Shell buttons — never rendered inside the widget. */
+  choices?: NotificationChoice[];
+}
+
+export interface NotificationProjection {
+  id: string;
+  shell: NotificationShell;
+  widget?: { path: string; data?: unknown };
+  payloadFallback: unknown;
+}
+
+/** Project a notification onto the shared shell/widget split. */
+export function projectNotification(record: NotificationRecord): NotificationProjection {
+  return {
+    id: record.id,
+    shell: {
+      who: {
+        user: record.user ?? record.createdBy,
+        ...(record.source?.app ? { app: record.source.app } : {}),
+      },
+      title: record.title,
+      ...(record.body !== undefined ? { body: record.body } : {}),
+      category: record.category,
+      ...(record.choices ? { choices: record.choices } : {}),
+    },
+    ...(record.widget ? { widget: record.widget } : {}),
+    payloadFallback: {
+      body: record.body,
+      link: record.link,
+      ...(record.widget?.data !== undefined ? { data: record.widget.data } : {}),
+    },
+  };
+}
+
+/**
+ * Widget-originated (or choice) call from a notification — re-enters
+ * {@link evaluateAppToolDispatch} / the one dispatch predicate.
+ */
+export async function dispatchNotificationWidgetCall(input: {
+  principal: Principal;
+  manifest: AppManifest;
+  call: NotificationChoice["call"];
+  resource?: string;
+  effect?: Effect;
+  credential?: { level: "workspace-token" | "workspace-oauth" | "user-oauth"; id: string };
+}): Promise<DispatchDecision> {
+  // Workflow / native choices still need the app's own surface; provider
+  // tools go through evaluateDispatch with the app ceiling.
+  if (isWorkflowNamespace(input.call.namespace)) {
+    const workflow = resolveExportedWorkflow(
+      input.manifest.workflows ?? [],
+      input.call.procedure,
+    );
+    if (!workflow || !workflowCallable(input.manifest, workflow)) {
+      return { kind: "deny", reason: "capability" };
+    }
+    return { kind: "allow" };
   }
-  if (isNativeNamespace(call.namespace)) {
-    return toolAllowed(manifest, call.namespace, call.procedure);
+  if (isNativeNamespace(input.call.namespace)) {
+    if (!toolAllowed(input.manifest, input.call.namespace, input.call.procedure)) {
+      return { kind: "deny", reason: "capability" };
+    }
+    return { kind: "allow" };
   }
-  return providerGrantCallable(manifest, call.namespace, call.procedure);
+  return evaluateAppToolDispatch({
+    principal: input.principal,
+    manifest: input.manifest,
+    namespace: input.call.namespace,
+    procedure: input.call.procedure,
+    effect: input.effect ?? "action",
+    ...(input.resource !== undefined ? { resource: input.resource } : {}),
+    ...(input.credential ? { credential: input.credential } : {}),
+  });
+}
+
+function principalFromCtx(ctx: ServiceContext): Principal {
+  return {
+    sub: actorSub(ctx),
+    workspaceId: ctx.workspaceId,
+    role: ctx.appScope?.role === "admin" ? "admin" : "member",
+    groupIds: [],
+  };
 }
 
 function parseChoices(raw: unknown): NotificationChoice[] | undefined {
@@ -255,8 +329,14 @@ export const notificationsService: CoreService = {
             if (!manifest) {
               throw new ServiceError("App manifest unavailable — choices rejected", 403);
             }
+            const principal = principalFromCtx(ctx);
             for (const choice of choices) {
-              if (!choiceCallableByApp(manifest, choice.call)) {
+              const decision = await dispatchNotificationWidgetCall({
+                principal,
+                manifest,
+                call: choice.call,
+              });
+              if (decision.kind === "deny") {
                 throw new ServiceError(
                   `Choice "${choice.label}" calls ${choice.call.namespace}.${choice.call.procedure}, which this app has no access to`,
                   403,
