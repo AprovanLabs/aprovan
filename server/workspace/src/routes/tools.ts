@@ -268,6 +268,32 @@ function toContractToolEntries(
   });
 }
 
+/** Wire `scope: { app }` — maps to prefix=app root, ref=`app/<id>` (server). */
+const vcsAppScopeSchema: Record<string, unknown> = {
+  type: "object",
+  description: "App scope; absent = workspace/main. Maps to prefix + ref=app/<id>.",
+  properties: {
+    app: {
+      type: "string",
+      description: "App id or slug",
+    },
+  },
+};
+
+/** Commit record shape advertised on commit/log/show (includes parents). */
+const vcsCommitSchema: Record<string, unknown> = {
+  type: "object",
+  properties: {
+    id: { type: "string" },
+    message: { type: "string" },
+    createdAt: { type: "string" },
+    parents: { type: "array", items: { type: "string" } },
+    snapshot: { type: "string" },
+    author: { type: "string" },
+    prefix: { type: "string" },
+  },
+};
+
 /** Workspace commit-store ops advertised for the aprovan native vcs binding. */
 function nativeVcsDiscoveryEntries(namespace: string): ToolEntry[] {
   const ops: Array<{
@@ -278,19 +304,21 @@ function nativeVcsDiscoveryEntries(namespace: string): ToolEntry[] {
   }> = [
     {
       operation: "commit",
-      description: "Snapshot the current workspace tree as a commit on main.",
+      description:
+        "Snapshot the workspace tree (or an app scope) as a commit on main or app/<id>.",
       inputSchema: {
         type: "object",
         properties: {
           message: { type: "string" },
           prefix: { type: "string" },
           ref: { type: "string" },
+          scope: vcsAppScopeSchema,
         },
       },
       outputSchema: {
         type: "object",
         properties: {
-          commit: { type: "object" },
+          commit: vcsCommitSchema,
           created: { type: "boolean" },
         },
         required: ["commit", "created"],
@@ -298,14 +326,18 @@ function nativeVcsDiscoveryEntries(namespace: string): ToolEntry[] {
     },
     {
       operation: "log",
-      description: "Commit history, newest first.",
+      description: "Commit history, newest first (workspace main or scoped app ref).",
       inputSchema: {
         type: "object",
-        properties: { limit: { type: "number" }, ref: { type: "string" } },
+        properties: {
+          limit: { type: "number" },
+          ref: { type: "string" },
+          scope: vcsAppScopeSchema,
+        },
       },
       outputSchema: {
         type: "object",
-        properties: { commits: { type: "array", items: { type: "object" } } },
+        properties: { commits: { type: "array", items: vcsCommitSchema } },
         required: ["commits"],
       },
     },
@@ -314,13 +346,16 @@ function nativeVcsDiscoveryEntries(namespace: string): ToolEntry[] {
       description: "A commit's metadata, file list, and changes vs its parent.",
       inputSchema: {
         type: "object",
-        properties: { commit: { type: "string" } },
+        properties: {
+          commit: { type: "string" },
+          scope: vcsAppScopeSchema,
+        },
         required: ["commit"],
       },
       outputSchema: {
         type: "object",
         properties: {
-          commit: { type: "object" },
+          commit: vcsCommitSchema,
           files: { type: "array", items: { type: "string" } },
           changes: {
             type: "object",
@@ -358,13 +393,14 @@ function nativeVcsDiscoveryEntries(namespace: string): ToolEntry[] {
     },
     {
       operation: "diff",
-      description: "Added/modified/removed paths between two commits.",
+      description: "Added/modified/removed paths between two commits (hashes retained).",
       inputSchema: {
         type: "object",
         properties: {
           from: { type: "string" },
           to: { type: "string" },
           prefix: { type: "string" },
+          scope: vcsAppScopeSchema,
         },
         required: ["from", "to"],
       },
@@ -404,8 +440,12 @@ function nativeVcsDiscoveryEntries(namespace: string): ToolEntry[] {
     },
     {
       operation: "branches",
-      description: "Named refs with their head commits.",
-      inputSchema: { type: "object", properties: {} },
+      description:
+        "Named refs with head commits: main, app/<id>, tag/app/<id>/<release>, channel/app/<id>/<channel>.",
+      inputSchema: {
+        type: "object",
+        properties: { scope: vcsAppScopeSchema },
+      },
       outputSchema: {
         type: "object",
         properties: {
@@ -413,7 +453,14 @@ function nativeVcsDiscoveryEntries(namespace: string): ToolEntry[] {
             type: "array",
             items: {
               type: "object",
-              properties: { name: { type: "string" }, commit: { type: "string" } },
+              properties: {
+                name: {
+                  type: "string",
+                  description:
+                    "Ref name: main | app/<id> | tag/app/<id>/<releaseId> | channel/app/<id>/<channel>",
+                },
+                commit: { type: "string" },
+              },
             },
           },
         },
@@ -422,13 +469,14 @@ function nativeVcsDiscoveryEntries(namespace: string): ToolEntry[] {
     },
     {
       operation: "restore",
-      description: "Non-destructively restore a commit's content.",
+      description: "Non-destructively restore a commit's content (optionally app-scoped).",
       inputSchema: {
         type: "object",
         properties: {
           commit: { type: "string" },
           path: { type: "string" },
           prefix: { type: "string" },
+          scope: vcsAppScopeSchema,
         },
         required: ["commit"],
       },

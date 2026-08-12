@@ -36,6 +36,29 @@ function requireClient<T>(client: T | undefined, name: string): T {
 }
 
 /**
+ * Map wire `scope: { app }` onto `prefix`/`ref` for the native VCS client.
+ * Prefer already-resolved `prefix`/`ref` (server `applyVcsAppScope`); when
+ * those are absent and `scope.app` is present, set `ref` to `app/<app>`.
+ */
+function vcsPrefixRefFromArgs(args: Record<string, unknown>): {
+  prefix?: string;
+  ref?: string;
+} {
+  const out: { prefix?: string; ref?: string } = {};
+  if (typeof args["prefix"] === "string") out.prefix = args["prefix"];
+  if (typeof args["ref"] === "string") out.ref = args["ref"];
+
+  const scope = args["scope"];
+  if (scope && typeof scope === "object" && !Array.isArray(scope)) {
+    const app = (scope as Record<string, unknown>)["app"];
+    if (typeof app === "string" && app.trim() && out.ref === undefined) {
+      out.ref = `app/${app.trim()}`;
+    }
+  }
+  return out;
+}
+
+/**
  * Dispatch one operation for an Aprovan native interface.
  * Returns the contract-shaped result.
  */
@@ -65,18 +88,18 @@ export async function dispatchNativeOp(
     }
     case "vcs": {
       const vcs = requireClient(ctx.vcs, "vcs");
+      const scoped = vcsPrefixRefFromArgs(args);
       switch (operation) {
         case "commit":
           return vcs.commit({
             ...(typeof args["message"] === "string" ? { message: args["message"] } : {}),
             ...(typeof args["author"] === "string" ? { author: args["author"] } : {}),
-            ...(typeof args["prefix"] === "string" ? { prefix: args["prefix"] } : {}),
-            ...(typeof args["ref"] === "string" ? { ref: args["ref"] } : {}),
+            ...scoped,
           });
         case "log":
           return vcs.log({
             ...(typeof args["limit"] === "number" ? { limit: args["limit"] } : {}),
-            ...(typeof args["ref"] === "string" ? { ref: args["ref"] } : {}),
+            ...(scoped.ref !== undefined ? { ref: scoped.ref } : {}),
           });
         case "show":
           return vcs.show({ commit: String(args["commit"] ?? "") });
@@ -84,7 +107,7 @@ export async function dispatchNativeOp(
           return vcs.diff({
             from: String(args["from"] ?? ""),
             to: String(args["to"] ?? ""),
-            ...(typeof args["prefix"] === "string" ? { prefix: args["prefix"] } : {}),
+            ...(scoped.prefix !== undefined ? { prefix: scoped.prefix } : {}),
           });
         case "branches":
           return vcs.branches();
@@ -92,7 +115,7 @@ export async function dispatchNativeOp(
           return vcs.restore({
             commit: String(args["commit"] ?? ""),
             ...(typeof args["path"] === "string" ? { path: args["path"] } : {}),
-            ...(typeof args["prefix"] === "string" ? { prefix: args["prefix"] } : {}),
+            ...(scoped.prefix !== undefined ? { prefix: scoped.prefix } : {}),
           });
         default:
           throw Object.assign(new Error(`Unknown vcs operation: ${operation}`), { status: 404 });
