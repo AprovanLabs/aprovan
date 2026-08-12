@@ -49,17 +49,17 @@ class WidgetErrorBoundary extends Component<
   { onError: () => void; children: ReactNode },
   { failed: boolean }
 > {
-  state = { failed: false };
+  override state = { failed: false };
 
   static getDerivedStateFromError(): { failed: boolean } {
     return { failed: true };
   }
 
-  componentDidCatch(_error: Error, _info: ErrorInfo): void {
+  override componentDidCatch(_error: Error, _info: ErrorInfo): void {
     this.props.onError();
   }
 
-  render(): ReactNode {
+  override render(): ReactNode {
     if (this.state.failed) return null;
     return this.props.children;
   }
