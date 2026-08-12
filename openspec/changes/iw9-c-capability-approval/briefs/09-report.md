@@ -1,7 +1,7 @@
 # Report: stream 9 — action exception queue
 
 **Status:** done  
-**PR:** (filled after open)  
+**PR:** https://github.com/AprovanLabs/aprovan/pull/243  
 **Branch:** `feat/iw9-c-action-queue`  
 **Verify:** `pnpm --filter @aprovan/workspace test -- action-queue` — 9 passed  
 Also confirmed: `evaluate-dispatch` still green (11 passed).
