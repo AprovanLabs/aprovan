@@ -339,13 +339,13 @@ cross-repo rule 4).
 
 > Depends-on: 8 | Repo: aprovan | Touches: aprovan/server/workspace/src/derived-authority.ts, aprovan/server/workspace/src/routes/tools.ts (invalidateToolListCache call sites only, :112-113), aprovan/server/workspace/src/credentials.ts (revoke hook only), aprovan/server/workspace/tests/derived-authority.test.ts | Verify: cd /Users/jacob/Documents/Code/AprovanLabs/aprovan && pnpm --filter @aprovan/workspace test -- derived-authority
 
-- [ ] 11.1 New module `derived-authority.ts`: every standing
+- [x] 11.1 New module `derived-authority.ts`: every standing
       workflow/schedule/agent-profile execution resolves the owner's
       grants at dispatch time through `evaluateDispatch` (stream 8);
       nothing is copied into the automation record at save time (invariant
       3). Spec: "Runtime authority resolution", scenario "Narrowed owner
       narrows the automation".
-- [ ] 11.2 Membership-departure listener: on a member leaving (or
+- [x] 11.2 Membership-departure listener: on a member leaving (or
       membership revoked), deactivate their standing automations in that
       workspace before their next scheduled run, mark them "deactivated:
       owner departed", stop resolving their user-level credential grants
@@ -353,12 +353,12 @@ cross-repo rule 4).
       re-evaluates under the new owner's grants (never inherits). Spec:
       "Cascading revocation on departure", scenarios "Owner departs",
       "Reassignment re-derives".
-- [ ] 11.3 Grant/credential revocation invalidates the workspace tool-list
+- [x] 11.3 Grant/credential revocation invalidates the workspace tool-list
       cache (`invalidateToolListCache`, `routes/tools.ts:112-113`) on the
       same event so every dependent principal's next dispatch — not the
       next cache TTL — sees the narrowed grant. Spec: "Credential
       revocation cascades", scenario "Grant revoked mid-standing".
-- [ ] 11.4 New test file `tests/derived-authority.test.ts`: a standing
+- [x] 11.4 New test file `tests/derived-authority.test.ts`: a standing
       workflow's next run reflects a grant narrowed after it was saved; a
       departing member's nightly workflow does not run again and is
       listed deactivated with reason; an admin reassignment re-derives
