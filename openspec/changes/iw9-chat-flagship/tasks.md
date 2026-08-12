@@ -118,20 +118,20 @@ names below are `openspec/changes/iw9-chat-flagship/specs/<capability>/spec.md`.
 
 > Depends-on: 1 | Repo: aprovan | Touches: aprovan/Apps/chat/app.yaml, aprovan/Apps/chat/README.md, aprovan/server/workspace/tests/chat-app-manifest.test.ts | Verify: pnpm --filter @aprovan/workspace exec vitest run tests/chat-app-manifest.test.ts
 
-- [ ] 4.1 Author `Apps/chat/app.yaml` against iw9-b's landed `app.yaml`
+- [x] 4.1 Author `Apps/chat/app.yaml` against iw9-b's landed `app.yaml`
       grammar (F4): slug `chat`, icon, `hostModes: [workspace-managed,
       hosted-by-creator]`, capability ceiling limited to own-partition
       `records.*`, own-topic `realtime` subscribe/publish (`app:<installId>`
       from stream 2), instance-scoped `invites` issue (stream 3), and
       `agents.run` for the `chat/summarize` profile (stream 5) — spec
       `chat-app` "Single manifest, two host modes".
-- [ ] 4.2 Confirm (do not implement — iw9-b's job) that installing with two
+- [x] 4.2 Confirm (do not implement — iw9-b's job) that installing with two
       declared host modes triggers the mode-choice prompt and that the
       chosen mode lands on the install record as immutable; if iw9-b's
       landed install flow does NOT yet prompt for >1 mode, file that gap as
       a blocking note here rather than building a Chat-local install-flow
       workaround (tech-plan "Platform-first with explicit findings").
-- [ ] 4.3 New test file `tests/chat-app-manifest.test.ts`: `app.yaml` parses
+- [x] 4.3 New test file `tests/chat-app-manifest.test.ts`: `app.yaml` parses
       against iw9-b's loader/validator with no errors, capability ceiling
       matches the declared list exactly (no wildcard grants), both host
       modes present.
