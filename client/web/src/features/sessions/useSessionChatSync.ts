@@ -2,7 +2,6 @@ import { useEffect, useRef, type Dispatch, type SetStateAction } from "react";
 import type { UIMessage } from "ai";
 import { runChatCompletionJob } from "@/lib/llm";
 import {
-  appendSessionMessages,
   fetchSessionMessages,
   getChatSession,
   updateChatSession,
@@ -12,8 +11,13 @@ import { subscribeToWorkspaceChanges } from "@/lib/workspace-vfs";
 
 /**
  * Glue between `useChat`'s live transcript and the active session record:
- * transcript persistence, staged-change summary refresh, cross-window
- * transcript sync, and one-shot model naming of new chats.
+ * staged-change summary refresh, cross-window transcript sync, and one-shot
+ * model naming of new chats.
+ *
+ * Transcript persistence is server-owned (POST /agents/chat-turn writes the
+ * user message at run start and the assistant transcript at the terminal
+ * event). The former client-side `appendSessionMessages` writer was deleted
+ * in IW-9 D stream 8.10.
  */
 export function useSessionChatSync(args: {
   messages: UIMessage[];
@@ -46,32 +50,6 @@ export function useSessionChatSync(args: {
   const messageCountRef = useRef(0);
   messageCountRef.current = messages.length;
 
-  // Transcript persistence: once a turn settles (and when the user message
-  // first lands), push the tail to the gateway. Append upserts by message id,
-  // so re-sending a message that later gained parts just replaces it.
-  useEffect(() => {
-    if (!activeSession || activeSession.status !== "open") return;
-    if (status === "streaming") return;
-    if (messages.length === 0 || messages.length <= lastPersistedCountRef.current) return;
-    // Overlap by one: the previously-persisted last message may have gained
-    // parts since (append upserts by id, so this is just a refresh).
-    const from = Math.max(0, lastPersistedCountRef.current - 1);
-    const tail = messages.slice(from);
-    if (tail.length === 0) return;
-    lastPersistedCountRef.current = messages.length;
-    appendSessionMessages(activeSession.id, tail)
-      .then((updated) => {
-        setActiveSession((prev) =>
-          prev && prev.id === updated.id ? { ...prev, ...updated } : prev
-        );
-      })
-      .catch(() => {
-        // Retry on the next settle.
-        lastPersistedCountRef.current = from;
-      });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, messages, activeSession]);
-
   // Staged-change summary refresh: file writes fire the workspace watchers;
   // when a staged session is active, re-pull its record so the branch chip's
   // changed-file count tracks reality.
@@ -96,8 +74,9 @@ export function useSessionChatSync(args: {
   }, [activeSession?.id, activeSession?.mode]);
 
   // Cross-window transcript sync: while this window is idle, adopt messages
-  // another window appended to the same chat (?session= parallel windows,
-  // collaborators). Never touches an in-flight generation.
+  // another window / the server appended to the same chat (?session= parallel
+  // windows, collaborators, or the chat-turn route's server write). Never
+  // touches an in-flight generation.
   useEffect(() => {
     if (!activeSession || activeSession.status !== "open") return;
     const timer = setInterval(() => {

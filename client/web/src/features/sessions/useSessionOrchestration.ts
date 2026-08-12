@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Chat } from "@ai-sdk/react";
 import type { ChatTransport, UIMessage } from "ai";
+import { createRunUIMessageStream } from "@/features/chat/run-transport";
 import { GATEWAY_BASE } from "@/lib/gateway";
 import { runChatCompletionJob } from "@/lib/llm";
 import type { NotificationAction } from "@/lib/notifications";
@@ -41,9 +42,8 @@ export function useSessionOrchestration(args: {
   chatProviderRef: React.MutableRefObject<string>;
   chatModelRef: React.MutableRefObject<string>;
   /**
-   * Optional: kept in sync with the active session so RunTransport (dev toggle
-   * `USE_RUN_TRANSPORT`) can post `sessionId` on chat-turn. Legacy transport
-   * ignores it. Stream 8 removes the dual-path once RunTransport is default.
+   * Kept in sync with the active session so RunTransport can post
+   * `sessionId` on chat-turn (server lazy-creates when unset).
    */
   sessionIdRef?: React.MutableRefObject<string | undefined>;
 }) {
@@ -67,6 +67,8 @@ export function useSessionOrchestration(args: {
   if (sessionIdRef) {
     sessionIdRef.current = activeSession?.id;
   }
+  // Mid-run reload: session.activeRunId → resumeStream via this ref.
+  const resumeRunIdRef = useRef<string | undefined>(undefined);
   const [sessionChat, setSessionChat] = useState<Chat<UIMessage> | null>(null);
   const [sessionBusy, setSessionBusy] = useState(false);
   const [sessionNotice, setSessionNotice] = useState<string | null>(null);
@@ -82,10 +84,33 @@ export function useSessionOrchestration(args: {
     conflicts: string[];
     finalize: "apply" | "none";
   } | null>(null);
-  // How many transcript messages the gateway already has (append is an
-  // upsert by message id, so overshooting is harmless).
+  // How many transcript messages the local UI already holds (cross-window
+  // sync / openSession bookkeeping). Server owns persistence writes.
   const lastPersistedCountRef = useRef(0);
-  const bootChat = useMemo(() => new Chat<UIMessage>({ transport }), [transport]);
+
+  // Wrap transport so reconnectToStream can reattach via session.activeRunId
+  // when the in-memory RunTransport.lastRun is gone (page reload).
+  const transportWithResume = useMemo((): ChatTransport<UIMessage> => {
+    return {
+      sendMessages: (options) => transport.sendMessages(options),
+      reconnectToStream: async (options) => {
+        const existing = await transport.reconnectToStream(options);
+        if (existing) return existing;
+        const runId = resumeRunIdRef.current;
+        if (!runId) return null;
+        return createRunUIMessageStream({
+          runId,
+          from: 0,
+          messageId: `assistant-${runId}`,
+        });
+      },
+    };
+  }, [transport]);
+
+  const bootChat = useMemo(
+    () => new Chat<UIMessage>({ transport: transportWithResume }),
+    [transportWithResume],
+  );
 
   const applySession = useCallback((session: ChatSessionInfo | null) => {
     setActiveSession(session);
@@ -111,12 +136,24 @@ export function useSessionOrchestration(args: {
         typeof idOrInfo === "string" ? await getChatSession(idOrInfo) : idOrInfo;
       const stored = (await fetchSessionMessages(info.id)) as UIMessage[];
       lastPersistedCountRef.current = stored.length;
-      setSessionChat(new Chat<UIMessage>({ id: info.id, messages: stored, transport }));
+      resumeRunIdRef.current = info.activeRunId;
+      const chat = new Chat<UIMessage>({
+        id: info.id,
+        messages: stored,
+        transport: transportWithResume,
+      });
+      setSessionChat(chat);
       applySession(info);
       saveActiveSessionId(activeWorkspaceId, info.id);
       setSessionNotice(null);
+      // Reload mid-run: history is already rendered; reattach and stream the remainder.
+      if (info.activeRunId) {
+        void chat.resumeStream().catch(() => {
+          // History stays; reattach is best-effort (offline → existing error surface).
+        });
+      }
     },
-    [transport, applySession, activeWorkspaceId]
+    [transportWithResume, applySession, activeWorkspaceId]
   );
 
   /**
@@ -130,21 +167,23 @@ export function useSessionOrchestration(args: {
     setActiveVfsSession(null);
     saveActiveSessionId(activeWorkspaceId, null);
     lastPersistedCountRef.current = 0;
-    setSessionChat(new Chat<UIMessage>({ transport }));
-  }, [transport, activeWorkspaceId]);
+    resumeRunIdRef.current = undefined;
+    setSessionChat(new Chat<UIMessage>({ transport: transportWithResume }));
+  }, [transportWithResume, activeWorkspaceId]);
 
   const startSession = useCallback(
     async (mode: SessionMode) => {
       const created = await createChatSession({ mode });
       lastPersistedCountRef.current = 0;
-      setSessionChat(new Chat<UIMessage>({ id: created.id, transport }));
+      resumeRunIdRef.current = undefined;
+      setSessionChat(new Chat<UIMessage>({ id: created.id, transport: transportWithResume }));
       applySession(created);
       saveActiveSessionId(activeWorkspaceId, created.id);
       setSessionNotice(null);
       refreshSessions();
       return created;
     },
-    [transport, applySession, activeWorkspaceId, refreshSessions]
+    [transportWithResume, applySession, activeWorkspaceId, refreshSessions]
   );
 
   /** Wrap a session mutation with the busy flag + error surfacing. */
