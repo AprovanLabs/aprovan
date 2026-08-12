@@ -291,19 +291,19 @@ names below are `openspec/changes/iw9-chat-flagship/specs/<capability>/spec.md`.
 
 > Depends-on: 4, 7, 9 | Repo: aprovan | Touches: aprovan/client/web/e2e/chat-managed-install.spec.ts | Verify: pnpm --filter @aprovan/patchwork-web exec playwright test e2e/chat-managed-install.spec.ts --retries=0
 
-- [ ] 10.1 Flow: create a workspace, invite and add ≥2 users via the
+- [x] 10.1 Flow: create a workspace, invite and add ≥2 users via the
       existing `invites.*` machinery (not Chat's guest path), install Chat
       choosing **workspace-managed**, both users open the same channel and
       exchange messages, one user posts a thread reply — PRD goal "Managed
       install (company)".
-- [ ] 10.2 Assert: both users' timelines converge on the same message ids
+- [x] 10.2 Assert: both users' timelines converge on the same message ids
       (adapter reconciliation, T4); the install-mode prompt appeared because
       two modes are declared (spec `chat-app` "Install prompts for host
       mode"); the chosen mode is rejected on a follow-up mutation attempt
       (spec "Host mode cannot change after install" — call the platform
       mutation directly in-test, not through UI, to prove server-side
       enforcement independent of the UI).
-- [ ] 10.3 Assert data lands in the F2 shared partition of the company
+- [x] 10.3 Assert data lands in the F2 shared partition of the company
       workspace (server-side assertion via a test-only record read, not UI
       inference).
 
