@@ -2,7 +2,7 @@
  * `doc` realtime namespace — Yjs sync + awareness over base64-in-JSON frames (D1).
  *
  * Topic: `doc:<vfs path>`. Modeled on `presence.ts`'s NamespaceHandler shape.
- * Join auth / quiesce materialization belong to stream 4.
+ * Join re-checks tenant-scoped file access; applied updates arm quiesce timers.
  */
 
 import * as decoding from "lib0/decoding";
@@ -11,10 +11,13 @@ import * as awarenessProtocol from "y-protocols/awareness";
 import * as syncProtocol from "y-protocols/sync";
 import * as Y from "yjs";
 import { z } from "zod";
+import { assertPartitionAccess } from "../apps/store.js";
 import { normalizeFsPath } from "../fs-store.js";
+import { assertPathGranted } from "../grants.js";
 import type { Conn, NamespaceHandler, RealtimeBroker } from "../realtime/broker.js";
 import { parseTopic, type Topic } from "../realtime/protocol.js";
 import { appendUpdate } from "./persistence.js";
+import { armQuiesceTimers, noteDocActivity } from "./quiesce.js";
 import {
   getOrLoadDoc,
   hasLiveDoc,
@@ -60,6 +63,19 @@ function pathFromTopic(topic: Topic): string {
 
 function docTopic(path: string): Topic {
   return `doc:${path}` as Topic;
+}
+
+/**
+ * Refuse anonymous joins; re-check tenant-scoped read access (same choke
+ * points as `vfs.read` in services.ts). Throws → broker `bad-topic`.
+ */
+async function assertDocJoinAllowed(conn: Conn, path: string): Promise<void> {
+  if (!conn.userId || conn.userId === "anonymous") {
+    throw new Error("anonymous doc join refused");
+  }
+  // Human WS conns carry no agent grants (undefined → no-op), matching vfs.read.
+  assertPathGranted(undefined, path, false);
+  await assertPartitionAccess(conn.workspaceId, conn.userId, path);
 }
 
 function syncStep1Frame(doc: Y.Doc): DocSyncFrame {
@@ -159,10 +175,14 @@ export function createDocHandler(broker: RealtimeBroker): NamespaceHandler {
 
     async onSubscribe(conn, topic) {
       const path = pathFromTopic(topic);
+      // Auth before load — revoked / anonymous callers must not pin a LiveDoc.
+      await assertDocJoinAllowed(conn, path);
+
       const live = await getOrLoadDoc(conn.workspaceId, path);
       pendingRelease.delete(live.key);
       live.participants.add(conn.id);
       trackPath(conn.id, path);
+      armQuiesceTimers(live, conn.workspaceId, path);
 
       const body = syncStep1Frame(live.doc);
 
@@ -233,6 +253,7 @@ export function createDocHandler(broker: RealtimeBroker): NamespaceHandler {
       ) {
         if (collected.length > 0) {
           await appendUpdate(conn.workspaceId, path, collected);
+          noteDocActivity(live, conn.workspaceId, path);
         }
         broker.publishToTopic(conn.workspaceId, topic, parsed.data, { except: conn });
       }

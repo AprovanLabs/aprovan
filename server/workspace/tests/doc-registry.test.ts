@@ -81,11 +81,12 @@ describe("doc registry", () => {
   it("reload after release reconstructs identical content", async () => {
     const live = await getOrLoadDoc(WS, PATH);
     live.doc.getText("content").insert(0, "x");
-    // Durable not updated — release drops memory; next load re-reads durable
-    // (still the original file snapshot from first open).
+    const expected = live.doc.getText("content").toString();
+    // Stream 4: releaseDoc materializes + flushes before drop, so the edit
+    // survives cold reload (no longer memory-only teardown).
     await releaseDoc(docKey(WS, PATH));
     const reloaded = await getOrLoadDoc(WS, PATH);
-    expect(reloaded.doc.getText("content").toString()).toBe("# hello\n");
+    expect(reloaded.doc.getText("content").toString()).toBe(expected);
     expect(reloaded).not.toBe(live);
   });
 });

@@ -25,7 +25,7 @@ get UTF-8 Markdown, never CRDT bytes.
 
 ## Tasks
 
-- [ ] 4.1 `onSubscribe` re-checks tenant-scoped file access
+- [x] 4.1 `onSubscribe` re-checks tenant-scoped file access
       (`assertPathGranted`/`assertPartitionAccess`, same functions
       `services.ts:574-579` uses for `vfs.read`) before returning the sync
       frame — join is refused for a caller without current read access,
@@ -34,16 +34,16 @@ get UTF-8 Markdown, never CRDT bytes.
       at the same check (spec "Anonymous link recipient cannot join" —
       `Conn.userId` absent/anonymous never reaches `onSubscribe`, refused at
       the socket-auth layer per existing `attachRealtime` behavior).
-- [ ] 4.2 `doc/quiesce.ts`: per-`LiveDoc` idle timer (`DOC_QUIESCE_IDLE_MS`,
+- [x] 4.2 `doc/quiesce.ts`: per-`LiveDoc` idle timer (`DOC_QUIESCE_IDLE_MS`,
       5s default, reset on every applied update) and a hard max-interval
       timer (`DOC_QUIESCE_MAX_INTERVAL_MS`, 30s default, independent of the
       idle timer) — both call `materialize()` (tech-plan D5: plain
       `getFsStore().write`, no session, no commit).
-- [ ] 4.3 `releaseDoc` (registry.ts, wired from 3.2's zero-participant path)
+- [x] 4.3 `releaseDoc` (registry.ts, wired from 3.2's zero-participant path)
       calls `materialize()` then `persistence.appendUpdate`/snapshot flush
       before dropping the `LiveDoc` from the map, satisfying "Last leave
       releases the doc" together with 3.4.
-- [ ] 4.4 Tests: idle quiesce writes the file (spec "Idle quiesce writes the
+- [x] 4.4 Tests: idle quiesce writes the file (spec "Idle quiesce writes the
       file" — fake timers); continuous edits still bound staleness within
       the max interval (spec "Continuous typing still bounds staleness");
       `vfs.read` mid-session returns plain Markdown, never CRDT bytes (spec

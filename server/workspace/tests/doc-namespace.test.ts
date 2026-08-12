@@ -383,4 +383,66 @@ describe("doc namespace", () => {
     );
     expect(awarenessEvent).toBeDefined();
   });
+
+  it("anonymous join is refused", async () => {
+    const broker = createBroker();
+    broker.registerNamespace(createDocHandler(broker));
+
+    const anon = fakeConn({ id: "anon", userId: "" });
+    broker.addConnection(anon);
+    await broker.handleClientMessage(anon, { type: "subscribe", topic: TOPIC });
+
+    expect(anon.sent.some((m) => m.type === "error" && m.code === "bad-topic")).toBe(
+      true,
+    );
+    expect(anon.sent.some((m) => m.type === "subscribed")).toBe(false);
+    expect(hasLiveDoc(WS, PATH)).toBe(false);
+
+    const labeled = fakeConn({ id: "anon2", userId: "anonymous" });
+    broker.addConnection(labeled);
+    await broker.handleClientMessage(labeled, { type: "subscribe", topic: TOPIC });
+    expect(
+      labeled.sent.some((m) => m.type === "error" && m.code === "bad-topic"),
+    ).toBe(true);
+    expect(hasLiveDoc(WS, PATH)).toBe(false);
+  });
+
+  it("access revocation is honored at join for foreign partitions", async () => {
+    const foreignPath = ".users/alice/private.md";
+    const foreignTopic = `doc:${foreignPath}` as Topic;
+    await getFsStore().write(WS, foreignPath, "# private\n");
+
+    const broker = createBroker();
+    broker.registerNamespace(createDocHandler(broker));
+
+    // Owner can join.
+    const alice = fakeConn({ id: "alice-conn", userId: "alice" });
+    broker.addConnection(alice);
+    await broker.handleClientMessage(alice, {
+      type: "subscribe",
+      topic: foreignTopic,
+    });
+    expect(alice.sent.some((m) => m.type === "subscribed")).toBe(true);
+    expect(hasLiveDoc(WS, foreignPath)).toBe(true);
+
+    // Bob has no share — join refused regardless of knowing the topic.
+    const bob = fakeConn({ id: "bob-conn", userId: "bob" });
+    broker.addConnection(bob);
+    await broker.handleClientMessage(bob, {
+      type: "subscribe",
+      topic: foreignTopic,
+    });
+    expect(bob.sent.some((m) => m.type === "error" && m.code === "bad-topic")).toBe(
+      true,
+    );
+    expect(bob.sent.some((m) => m.type === "subscribed")).toBe(false);
+
+    broker.removeConnection(alice);
+    await flushMicrotasks();
+    await flushMicrotasks();
+    await new Promise((r) => setTimeout(r, 20));
+    if (hasLiveDoc(WS, foreignPath)) {
+      await releaseDoc(docKey(WS, foreignPath));
+    }
+  });
 });

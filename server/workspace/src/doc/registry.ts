@@ -6,6 +6,10 @@
 import * as awarenessProtocol from "y-protocols/awareness";
 import * as Y from "yjs";
 import { loadDurable } from "./persistence.js";
+import {
+  clearQuiesceTimers,
+  materializeAndFlush,
+} from "./quiesce.js";
 
 export interface LiveDoc {
   key: string;
@@ -61,15 +65,26 @@ export async function getOrLoadDoc(
   }
 }
 
+function parseDocKey(key: string): { workspaceId: string; path: string } {
+  const sep = key.indexOf("\0");
+  if (sep < 0) throw new Error(`invalid doc key: ${key}`);
+  return { workspaceId: key.slice(0, sep), path: key.slice(sep + 1) };
+}
+
 /**
- * Drop a live doc from the process map. Stream 4 wires quiesce-materialize
- * + durable flush before this; here we only tear down the in-memory replica.
+ * Quiesce-materialize + durable flush, then drop the live replica from the map
+ * (tech-plan `releaseDoc`; stream 4).
  */
 export async function releaseDoc(key: string): Promise<void> {
   const live = liveDocs.get(key);
   if (!live) return;
-  if (live.idleTimer) clearTimeout(live.idleTimer);
-  if (live.maxIntervalTimer) clearTimeout(live.maxIntervalTimer);
+  clearQuiesceTimers(live);
+  const { workspaceId, path } = parseDocKey(key);
+  try {
+    await materializeAndFlush(workspaceId, path, live.doc);
+  } catch {
+    // Still tear down the in-memory replica if materialize fails.
+  }
   live.awareness.destroy();
   live.doc.destroy();
   liveDocs.delete(key);
