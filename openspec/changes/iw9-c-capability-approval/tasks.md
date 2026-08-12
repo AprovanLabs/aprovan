@@ -56,14 +56,14 @@ cross-repo rule 4).
 
 > Depends-on: - | Repo: registry | Touches: registry/packages/utdk/agent/**, registry/packages/utdk/cloudflare/**, registry/packages/utdk/databricks/**, registry/packages/utdk/deepgram/**, registry/packages/utdk/fly/**, registry/packages/utdk/google/**, registry/packages/utdk/llm/**, registry/packages/utdk/postgres/**, registry/packages/utdk/s3/**, registry/packages/utdk/sandbox/**, registry/packages/utdk/snowflake/**, registry/packages/utdk/sql/**, registry/packages/utdk/sqs/**, registry/packages/utdk/vcs/** | Verify: cd /Users/jacob/Documents/Code/AprovanLabs/registry && pnpm --filter @utdk/clients check-types && pnpm --filter @utdk/clients build
 
-- [ ] 2.1 For each handwritten (non-OpenAPI-generated) provider under
+- [x] 2.1 For each handwritten (non-OpenAPI-generated) provider under
       `packages/utdk/*` — agent, cloudflare, databricks, deepgram, fly,
       google, llm, postgres, s3, sandbox, snowflake, sql, sqs, vcs — add
       an explicit `effect: "observation" | "action"` on every tool
       definition (read/list/get operations → `observation`; anything
       mutating → `action`). Spec: effect-classification "Handwritten
       providers and core services are annotated".
-- [ ] 2.2 Grep every handwritten provider's tool list for a missing
+- [x] 2.2 Grep every handwritten provider's tool list for a missing
       `effect` field before finishing this stream — a hole here silently
       falls back to `action` at dispatch (fail-closed, but noisy for
       reviewers); leave none.
