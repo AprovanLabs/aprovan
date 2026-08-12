@@ -88,19 +88,6 @@ export function matchesCapabilityPattern(
 }
 
 /**
- * @deprecated Prefer {@link matchesCapabilityPattern}. Retained name for
- * in-tree callers that still import the old helper; evaluateDispatch is the
- * enforcement chokepoint.
- */
-export function toolGranted(
-  patterns: string[],
-  namespace: string,
-  procedure: string,
-): boolean {
-  return matchesCapabilityPattern(patterns, namespace, procedure);
-}
-
-/**
  * Effective access for `path` under the grant list: the longest matching
  * prefix decides; nothing matching is "none". A prefix grant of "docs/"
  * covers "docs" itself and everything under it.
@@ -249,8 +236,8 @@ async function resolveAppCeiling(
   if (options?.appCeiling) return options.appCeiling;
   if (!req.via?.appId) return undefined;
   try {
-    const { getApp } = await import("./apps/store.js");
-    const app = await getApp(req.principal.workspaceId, req.via.appId);
+    const { readApp } = await import("./apps/store.js");
+    const app = await readApp(req.principal.workspaceId, req.via.appId);
     return app?.allowedTools;
   } catch {
     return undefined;

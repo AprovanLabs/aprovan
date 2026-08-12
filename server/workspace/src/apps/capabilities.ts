@@ -21,9 +21,9 @@
  *     procedure are indistinguishable (capability = namespace).
  *
  * `allowedTools` may therefore name (1), the app's own workflow namespace, and
- * exact provider procedures (2); {@link validateAllowedToolsEntries} (formerly
- * assertAllowedTools) rejects everything else — a provider *wildcard* in
- * particular — with a message pointing at (3). Runtime dispatch goes through
+ * exact provider procedures (2); {@link validateAllowedToolsEntries} rejects
+ * everything else — a provider *wildcard* in particular — with a message
+ * pointing at (3). Runtime dispatch goes through
  * {@link evaluateAppToolDispatch} → `evaluateDispatch`.
  */
 
@@ -342,12 +342,6 @@ export function validateAllowedToolsEntries(
   }
   return grants;
 }
-
-/**
- * @deprecated Use {@link validateAllowedToolsEntries}. Kept as a name alias
- * for publish-path callers outside this stream's Touches list.
- */
-export const assertAllowedTools = validateAllowedToolsEntries;
 
 /**
  * Parse and validate a publish-time `requires` array. Unknown contracts → 400.
