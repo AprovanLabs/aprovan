@@ -2,6 +2,9 @@
  * In-tab host for workspace `.md` paths: CollabMarkdownEditor + doc presence
  * cluster + reconnecting badge + conflict DraftBanner (ux.md open-doc /
  * conflict-resolve flows).
+ *
+ * Always mounts a local Y.Doc (store creates one even offline) so the rich /
+ * source editor is available immediately — never stuck on "Connecting…".
  */
 
 import { CollabMarkdownEditor } from "@aprovan/editor";
@@ -41,7 +44,7 @@ export function DocumentCollabTab({
           awareness={awareness}
           userInfo={userInfo}
           initialContent={initialContent}
-          className="flex-1 min-h-0 px-3 py-2"
+          className="flex-1 min-h-0"
           minHeight="100%"
         />
       ) : (

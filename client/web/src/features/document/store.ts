@@ -192,29 +192,40 @@ export class DocumentStore {
   }
 
   private ensureClient(): void {
-    if (this.client || !GATEWAY_BASE) return;
-    this.client = this.createClient();
-    this.socketState = this.client.state;
-    this.client.onStateChange((state) => {
-      this.socketState = state;
-      if (state === "closed") {
-        for (const session of this.sessions.values()) {
-          this.clearRemoteAwareness(session);
-          session.synced = false;
+    if (this.client) return;
+    if (!GATEWAY_BASE) return;
+    try {
+      const client = this.createClient();
+      if (!client) return;
+      this.client = client;
+      this.socketState = client.state;
+      client.onStateChange((state) => {
+        this.socketState = state;
+        if (state === "closed") {
+          for (const session of this.sessions.values()) {
+            this.clearRemoteAwareness(session);
+            session.synced = false;
+          }
+          this.emit();
+          return;
         }
+        // `open`: RealtimeClient resubscribes live topics; each session's
+        // onSnapshot runs a fresh SyncStep1 handshake (no missed-event replay).
         this.emit();
-        return;
-      }
-      // `open`: RealtimeClient resubscribes live topics; each session's
-      // onSnapshot runs a fresh SyncStep1 handshake (no missed-event replay).
-      this.emit();
-    });
+      });
+    } catch {
+      // Realtime unavailable — local Y.Doc sessions still mount for editing.
+      this.client = null;
+    }
   }
 
   private startSession(path: string): void {
     this.ensureClient();
-    if (!this.client || this.sessions.has(path)) return;
+    if (this.sessions.has(path)) return;
 
+    // Always mount a local Y.Doc so the tab can edit immediately. Realtime
+    // subscribe is best-effort — without a client the editor still works
+    // (quiesce/materialize is server-side when/if sync connects later).
     const doc = new Y.Doc();
     const awareness = new awarenessProtocol.Awareness(doc);
     const topic = docTopic(path);
@@ -254,11 +265,13 @@ export class DocumentStore {
     };
     awareness.on("update", onAwarenessChange);
 
-    const unsubRealtime = this.client.subscribe(
-      topic,
-      (body) => this.onEvent(path, body),
-      (body) => this.onSnapshot(path, body),
-    );
+    const unsubRealtime = this.client
+      ? this.client.subscribe(
+          topic,
+          (body) => this.onEvent(path, body),
+          (body) => this.onSnapshot(path, body),
+        )
+      : () => {};
 
     this.sessions.set(path, {
       path,
