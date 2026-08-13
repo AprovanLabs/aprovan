@@ -3,6 +3,7 @@
  * Local edits flow through y-codemirror.next's yCollab (no client SEARCH/REPLACE).
  */
 
+import { markdown } from "@codemirror/lang-markdown";
 import { EditorState, type Extension } from "@codemirror/state";
 import { basicSetup, EditorView } from "codemirror";
 import type { Awareness } from "y-protocols/awareness";
@@ -58,7 +59,7 @@ export type CreateCollabEditorViewOptions = {
 };
 
 /**
- * Mount a CM6 EditorView with basicSetup + yCollab.
+ * Mount a CM6 EditorView with basicSetup + markdown language + yCollab.
  * Used by CollabMarkdownEditor and unit tests (loopback convergence).
  */
 export function createCollabEditorView(
@@ -71,6 +72,7 @@ export function createCollabEditorView(
       doc: ytext.toString(),
       extensions: [
         basicSetup,
+        markdown(),
         createYCollabExtension(ytext, awareness),
         EditorView.theme({
           "&": { backgroundColor: "transparent", fontSize: "0.875rem" },

@@ -146,6 +146,18 @@ describe("DocumentStore", () => {
     store?.release(PATH);
   });
 
+  it("mounts a local Y.Doc when the realtime client fails to start", () => {
+    store = new DocumentStore({
+      createClient: () => {
+        throw new Error("realtime unavailable");
+      },
+    });
+    store.acquire(PATH);
+    expect(store.getDoc(PATH)).not.toBeNull();
+    expect(store.getAwareness(PATH)).not.toBeNull();
+    expect(store.isSynced(PATH)).toBe(false);
+  });
+
   it("applies an incoming sync frame and updates the local Y.Doc", () => {
     mock = createMockClient("open");
     store = new DocumentStore({ createClient: () => mock });
