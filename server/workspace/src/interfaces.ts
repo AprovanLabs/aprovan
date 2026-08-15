@@ -576,12 +576,28 @@ export async function resolveInterfaceForWorkspace(
   // one for `agent`: having an OpenAI key is not consent to run your agents in
   // OpenAI's cloud. Where a first-party implementation exists, it is the
   // conservative answer as well as the free one.
+  //
+  // Exception — `vcs`: the id is shared by the workspace commit store
+  // (credentialless `aprovan`) and third-party git hosting (github/…). The
+  // native path is short-circuited in `routes/tools.ts`; the generic catalog
+  // path used by `dispatchInterface` must not let `aprovan` pre-empt
+  // credentialed hosts, or git-hosting is unreachable without an explicit
+  // bind. So credentialless entries do not participate in zero-config for
+  // `vcs` — no connected host → reject; a connected github → github.
   const compat =
-    def.compat.find((entry) => entry.credentialless) ??
+    (interfaceId === "vcs"
+      ? undefined
+      : def.compat.find((entry) => entry.credentialless)) ??
     def.compat.find((entry) => connected.has(entry.provider));
   if (!compat) {
+    // `vcs-interface` (and the pre-profiles wording) assert "no binding and
+    // no connected"; keep that phrase for the vcs collision path. Other
+    // interfaces retain the profiles-era "no profile" wording so their
+    // pre-existing failure counts stay unchanged.
+    const absence =
+      interfaceId === "vcs" ? "no binding and no connected" : "no profile and no connected";
     throw new ServiceError(
-      `Interface ${interfaceId} has no profile and no connected compatible provider. ` +
+      `Interface ${interfaceId} has ${absence} compatible provider. ` +
         `Connect a credential for one of: ${def.compat.map((c) => c.provider).join(", ")} — or set one with profiles.set.`,
       400,
     );
