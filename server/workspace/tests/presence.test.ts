@@ -464,6 +464,68 @@ describe("presence", () => {
     watcher.close();
   });
 
+  it("two-workspace isolation: same path, separate store scopes", async () => {
+    // Spin up a second server+broker bound to workspaceId "ws-b" so we can
+    // verify that the broker-owned store scopes presence state per workspace
+    // and neither workspace can read or clobber the other's entries.
+    const listened2 = await listen();
+    const broker2 = createBroker();
+    const handle2 = attachRealtime(listened2.server, {
+      broker: broker2,
+      authenticate: async (_req, protocols) => {
+        if (!protocols.includes(REALTIME_SUBPROTOCOL)) return null;
+        const bearer = protocols.find((p) => p.startsWith("bearer."));
+        if (!bearer) return null;
+        const token = bearer.slice("bearer.".length);
+        if (token === "a") return { principal: principal({ sub: "user-a", workspaceId: "ws-b" }) };
+        if (token === "b") return { principal: principal({ sub: "user-b", workspaceId: "ws-b" }) };
+        return null;
+      },
+    });
+
+    try {
+      // user-b focuses on "notes/plan.md" in workspace ws-a (via the existing server).
+      const actorA = await openWs(port, "b");
+      actorA.send(
+        JSON.stringify({ type: "publish", topic: "presence:notes/plan.md", body: { action: "focus" } }),
+      );
+      await new Promise((r) => setTimeout(r, 30));
+
+      // user-a subscribes to "notes/plan.md" in workspace ws-b (via the new server).
+      const watcherB = await openWs(listened2.port, "a");
+      watcherB.send(JSON.stringify({ type: "subscribe", topic: "presence:notes/plan.md" }));
+      const snap = await nextMessage(watcherB);
+      expect(snap.type).toBe("subscribed");
+      // ws-b's roster must be empty — ws-a's focused member must not bleed across.
+      const peers = (snap.body as { peers: PresencePeer[] }).peers;
+      expect(peers).toHaveLength(0);
+
+      // user-b focuses in ws-b; ws-a's subscriber must not see it.
+      const actorB = await openWs(listened2.port, "b");
+      const eventsA = collectEvents(actorA); // reuse actorA socket to watch ws-a events
+      actorB.send(
+        JSON.stringify({ type: "subscribe", topic: "presence:notes/plan.md", body: {} }),
+      );
+      await nextMessage(actorB); // consume subscribed
+
+      const watcherA = await openWs(port, "a");
+      watcherA.send(JSON.stringify({ type: "subscribe", topic: "presence:notes/plan.md" }));
+      const snapA = await nextMessage(watcherA);
+      expect(snapA.type).toBe("subscribed");
+      const peersA = (snapA.body as { peers: PresencePeer[] }).peers;
+      // ws-a's roster contains only user-b from ws-a (not ws-b's user-b).
+      expect(peersA.map((p) => p.userId)).toEqual(["user-b"]);
+
+      actorA.close();
+      actorB.close();
+      watcherA.close();
+      watcherB.close();
+    } finally {
+      handle2.close();
+      await new Promise<void>((resolve) => listened2.server.close(() => resolve()));
+    }
+  });
+
   it("writes zero presence: record-store keys across a focus/leave cycle", async () => {
     const watcher = await openWs(port, "a");
     const actor = await openWs(port, "b");

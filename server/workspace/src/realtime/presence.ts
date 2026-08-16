@@ -1,8 +1,10 @@
 /**
- * Presence namespace handler — socket-memory rosters for `presence:<path>`.
+ * Presence namespace handler — broker-store-backed rosters for `presence:<path>`.
  *
  * Spec: openspec/changes/presence-realtime/specs/file-presence.
  * State is never persisted; disconnect clears focus.
+ * All handler state lives in broker.storeFor(workspaceId, "presence") — no
+ * closure maps (spec "Namespace handlers hold no state").
  */
 
 import { z } from "zod";
@@ -26,20 +28,16 @@ const presencePublishSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("blur") }),
 ]);
 
-/** Per-connection focus within a workspace. */
-interface ConnFocus {
+/** Per-connection focus entry in the store (`focus:<connId>`). */
+interface StoredFocus {
   path: string;
   lastActive: string;
 }
 
-/** User membership on a path: one roster entry, many connections. */
-interface UserMembership {
-  connIds: Set<string>;
+/** User membership on a path in the store (`member:<path>\0<userId>`). */
+interface StoredMembership {
+  connIds: string[];
   lastActive: string;
-}
-
-function topicKey(workspaceId: string, path: string): string {
-  return `${workspaceId}\0${path}`;
 }
 
 /**
@@ -67,16 +65,18 @@ function presenceTopic(path: string): Topic {
 }
 
 export function createPresenceHandler(broker: RealtimeBroker): NamespaceHandler {
-  /** conn.id → focus (scoped by that conn's workspaceId). */
-  const focusByConn = new Map<string, ConnFocus>();
-  /** `${workspaceId}\0${path}` → userId → membership. */
-  const members = new Map<string, Map<string, UserMembership>>();
+  function store(workspaceId: string) {
+    return broker.storeFor(workspaceId, "presence");
+  }
 
-  function roster(workspaceId: string, path: string): PresencePeer[] {
-    const byUser = members.get(topicKey(workspaceId, path));
-    if (!byUser) return [];
+  async function roster(workspaceId: string, path: string): Promise<PresencePeer[]> {
+    const st = store(workspaceId);
+    // Roster = all member entries for this path (prefix = "member:<path>\0").
+    const entries = await st.list<StoredMembership>(`member:${path}\0`);
     const peers: PresencePeer[] = [];
-    for (const [userId, membership] of byUser) {
+    for (const [key, membership] of entries) {
+      // key = "member:<path>\0<userId>"
+      const userId = key.slice(`member:${path}\0`.length);
       peers.push({ userId, path, lastActive: membership.lastActive });
     }
     return peers;
@@ -92,23 +92,25 @@ export function createPresenceHandler(broker: RealtimeBroker): NamespaceHandler 
     broker.publishToTopic(workspaceId, presenceTopic(path), body);
   }
 
-  function clearFocus(conn: Conn): void {
-    const current = focusByConn.get(conn.id);
+  async function clearFocus(conn: Conn): Promise<void> {
+    const st = store(conn.workspaceId);
+    const current = await st.get<StoredFocus>(`focus:${conn.id}`);
     if (!current) return;
-    focusByConn.delete(conn.id);
+    await st.delete(`focus:${conn.id}`);
 
-    const key = topicKey(conn.workspaceId, current.path);
-    const byUser = members.get(key);
-    if (!byUser) return;
-    const membership = byUser.get(conn.userId);
+    const memberKey = `member:${current.path}\0${conn.userId}`;
+    const membership = await st.get<StoredMembership>(memberKey);
     if (!membership) return;
 
-    membership.connIds.delete(conn.id);
-    if (membership.connIds.size > 0) return;
+    const connIds = membership.connIds.filter((id) => id !== conn.id);
+    if (connIds.length > 0) {
+      // Other connections still hold focus for this user on this path — update.
+      await st.set<StoredMembership>(memberKey, { ...membership, connIds });
+      return;
+    }
 
-    byUser.delete(conn.userId);
-    if (byUser.size === 0) members.delete(key);
-
+    // Last connection gone — user leaves the path.
+    await st.delete(memberKey);
     emit(conn.workspaceId, current.path, "leave", {
       userId: conn.userId,
       path: current.path,
@@ -116,15 +118,19 @@ export function createPresenceHandler(broker: RealtimeBroker): NamespaceHandler 
     });
   }
 
-  function setFocus(conn: Conn, path: string): void {
+  async function setFocus(conn: Conn, path: string): Promise<void> {
+    const st = store(conn.workspaceId);
     const now = new Date().toISOString();
-    const current = focusByConn.get(conn.id);
+    const current = await st.get<StoredFocus>(`focus:${conn.id}`);
 
     if (current?.path === path) {
       // Same path: refresh lastActive and emit update.
-      current.lastActive = now;
-      const membership = members.get(topicKey(conn.workspaceId, path))?.get(conn.userId);
-      if (membership) membership.lastActive = now;
+      await st.set<StoredFocus>(`focus:${conn.id}`, { path, lastActive: now });
+      const memberKey = `member:${path}\0${conn.userId}`;
+      const membership = await st.get<StoredMembership>(memberKey);
+      if (membership) {
+        await st.set<StoredMembership>(memberKey, { ...membership, lastActive: now });
+      }
       emit(conn.workspaceId, path, "update", {
         userId: conn.userId,
         path,
@@ -134,21 +140,15 @@ export function createPresenceHandler(broker: RealtimeBroker): NamespaceHandler 
     }
 
     // Leave old path first so the user is never present in both.
-    if (current) clearFocus(conn);
+    if (current) await clearFocus(conn);
 
-    focusByConn.set(conn.id, { path, lastActive: now });
+    await st.set<StoredFocus>(`focus:${conn.id}`, { path, lastActive: now });
 
-    const key = topicKey(conn.workspaceId, path);
-    let byUser = members.get(key);
-    if (!byUser) {
-      byUser = new Map();
-      members.set(key, byUser);
-    }
-    let membership = byUser.get(conn.userId);
+    const memberKey = `member:${path}\0${conn.userId}`;
+    const membership = await st.get<StoredMembership>(memberKey);
     if (!membership) {
-      membership = { connIds: new Set(), lastActive: now };
-      byUser.set(conn.userId, membership);
-      membership.connIds.add(conn.id);
+      // First connection for this user on this path — join.
+      await st.set<StoredMembership>(memberKey, { connIds: [conn.id], lastActive: now });
       emit(conn.workspaceId, path, "join", {
         userId: conn.userId,
         path,
@@ -157,8 +157,11 @@ export function createPresenceHandler(broker: RealtimeBroker): NamespaceHandler 
       return;
     }
 
-    membership.connIds.add(conn.id);
-    membership.lastActive = now;
+    // Additional connection for an already-present user — update.
+    await st.set<StoredMembership>(memberKey, {
+      connIds: [...membership.connIds, conn.id],
+      lastActive: now,
+    });
     emit(conn.workspaceId, path, "update", {
       userId: conn.userId,
       path,
@@ -169,32 +172,27 @@ export function createPresenceHandler(broker: RealtimeBroker): NamespaceHandler 
   return {
     namespace: "presence",
 
-    onSubscribe(conn, topic) {
+    async onSubscribe(conn, topic) {
       const path = pathFromTopic(topic);
-      // Readiness shim (Stream 1 task 1.7): wraps the still-synchronous
-      // presence logic to satisfy the broker's async onSubscribe contract.
-      // Zero behavior change, no store reads. Stream 2 (tasks 2.1-2.2)
-      // replaces this wholesale with the real store-backed implementation —
-      // do not build on top of it.
-      return Promise.resolve({ body: { peers: roster(conn.workspaceId, path) } });
+      return { body: { peers: await roster(conn.workspaceId, path) } };
     },
 
-    onPublish(conn, topic, body) {
+    async onPublish(conn, topic, body) {
       const path = pathFromTopic(topic);
       const parsed = presencePublishSchema.safeParse(body);
       if (!parsed.success) {
         throw new Error("presence body must be {action:\"focus\"|\"blur\"}");
       }
       if (parsed.data.action === "focus") {
-        setFocus(conn, path);
+        await setFocus(conn, path);
       } else {
         // Blur clears this connection's focus (exclusive focus model).
-        clearFocus(conn);
+        await clearFocus(conn);
       }
     },
 
-    onDisconnect(conn) {
-      clearFocus(conn);
+    async onDisconnect(conn) {
+      await clearFocus(conn);
     },
   };
 }

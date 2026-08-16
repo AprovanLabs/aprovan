@@ -69,18 +69,18 @@ stream is `Depends-on: 1` — it starts only after Stream 1 has merged, never
 in parallel with it, so there is no concurrent edit, only a sequential
 handoff on one file._
 
-- [ ] 2.1 Replace the closure maps `focusByConn`/`members`
+- [x] 2.1 Replace the closure maps `focusByConn`/`members`
       (presence.ts:71-73, types `ConnFocus` presence.ts:30-33 /
       `UserMembership` presence.ts:36-39) with reads/writes through
       `broker.storeFor(conn.workspaceId, "presence")` using the key layout
       from tech-plan "Interfaces & Data" (`focus:<connId>`,
       `member:<path>\0<userId>`).
-- [ ] 2.2 Make `onSubscribe`/`onPublish`/`onDisconnect` async against the
+- [x] 2.2 Make `onSubscribe`/`onPublish`/`onDisconnect` async against the
       store while keeping wire behavior byte-identical: roster `subscribed`
       body, join/leave/update deltas, exclusive focus (leave-before-join on
       path change), blur clears focus, disconnect clears focus (spec
       "Namespace handlers hold no state", both scenarios).
-- [ ] 2.3 Update `tests/presence.test.ts` for the async handler contract and
+- [x] 2.3 Update `tests/presence.test.ts` for the async handler contract and
       add a two-workspace isolation case (same path, separate store scopes);
       confirm zero handler-module state remains (the Verify grep gate).
 
