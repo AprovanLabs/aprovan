@@ -129,7 +129,7 @@ releases.ts` (owned by iw9-a) or `server/workspace/src/apps/identity.ts`
 
 > Depends-on: 3, 4 | Repo: aprovan | Touches: aprovan/server/workspace/src/apps/service.ts, aprovan/server/workspace/src/platform-output-schemas.ts, aprovan/server/workspace/tests/apps-shared-admin.test.ts | Verify: pnpm -C server/workspace exec vitest run tests/apps-shared-admin.test.ts && pnpm -C server/workspace typecheck
 
-- [ ] 5.1 Add `apps.dataInstances` (admin-gated instance listing with
+- [x] 5.1 Add `apps.dataInstances` (admin-gated instance listing with
       participants, storageBytes, cap) and accept an `instance` argument —
       mutually exclusive with `user`, 400 if both — on `apps.dataKeys`/
       `dataGet`/`dataRead`, reusing the existing admin gate
@@ -137,16 +137,16 @@ releases.ts` (owned by iw9-a) or `server/workspace/src/apps/identity.ts`
       tech-plan `operation` string shape; declare tool schemas beside the
       existing `apps.data*` entries (:612-668) and output schemas in
       platform-output-schemas.ts (TD6).
-- [ ] 5.2 Add `apps.instanceUsage` (with `recount: true` option),
+- [x] 5.2 Add `apps.instanceUsage` (with `recount: true` option),
       `apps.instanceCap`, `apps.instanceDelete`, gated on host
       (hosting-workspace admin, or creator when hosting in their personal
       space per IW-9 D1/D22); every call audited; non-host cap/delete → 403
       (spec `instance-storage` scenarios).
-- [ ] 5.3 Wire uninstall cleanup: the existing uninstall path that calls
+- [x] 5.3 Wire uninstall cleanup: the existing uninstall path that calls
       `purgeInstallData` also deletes each of the install's instances via
       `deleteInstance` so no instance records or spilled blobs are orphaned
       (tech-plan Risks).
-- [ ] 5.4 New test file `server/workspace/tests/apps-shared-admin.test.ts`:
+- [x] 5.4 New test file `server/workspace/tests/apps-shared-admin.test.ts`:
       admin reads shared record by instance+key with audit row asserted
       (caller, app, instance, key), non-admin 403 without a success audit
       row, `user`+`instance` together → 400, admin-as-non-participant direct

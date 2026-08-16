@@ -27,6 +27,7 @@
 import { getAuditStore } from "../audit.js";
 import { getCredentialStore } from "../credentials.js";
 import { getFsStore } from "../fs-store.js";
+import { getMembership } from "../memberships.js";
 import { getRecordStore } from "../records.js";
 import { ServiceError, type CoreService } from "../service-kernel.js";
 import { hookPath } from "../workflows/service.js";
@@ -76,6 +77,15 @@ import {
   type AppInstallation,
   type InstallPin,
 } from "./install.js";
+import {
+  deleteInstance,
+  getInstance,
+  listInstances,
+  recountInstanceUsage,
+  setInstanceCap,
+  sharedDataDir,
+  sharedRecordScope,
+} from "./instances.js";
 import {
   dropAlias,
   mintAppId,
@@ -734,35 +744,51 @@ export const appsService: CoreService = {
       },
     },
     {
+      name: "apps.dataInstances",
+      operation: "dataInstances",
+      effect: "observation",
+      description:
+        "List an app's shared instances (id, participants, storageBytes, cap). Admin-only; audited.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          app: { type: "string", description: "App alias or ULID" },
+          name: { type: "string" },
+        },
+      },
+    },
+    {
       name: "apps.dataKeys",
       operation: "dataKeys",
       effect: "observation",
       description:
-        "List record keys in one app user's partition. Admin-only; audited.",
+        "List record keys in one app user's partition — or a shared instance's via `instance`. Admin-only; audited.",
       inputSchema: {
         type: "object",
         properties: {
           app: { type: "string" },
           name: { type: "string" },
-          user: { type: "string", description: "App-user sub" },
+          user: { type: "string", description: "App-user sub (mutually exclusive with instance)" },
+          instance: { type: "string", description: "Shared instance id (mutually exclusive with user)" },
         },
-        required: ["user"],
       },
     },
     {
       name: "apps.dataGet",
       operation: "dataGet",
       effect: "observation",
-      description: "Read one record from an app user's partition. Admin-only; audited.",
+      description:
+        "Read one record from an app user's partition — or a shared instance's via `instance`. Admin-only; audited.",
       inputSchema: {
         type: "object",
         properties: {
           app: { type: "string" },
           name: { type: "string" },
-          user: { type: "string" },
+          user: { type: "string", description: "App-user sub (mutually exclusive with instance)" },
+          instance: { type: "string", description: "Shared instance id (mutually exclusive with user)" },
           key: { type: "string" },
         },
-        required: ["user", "key"],
+        required: ["key"],
       },
     },
     {
@@ -770,16 +796,61 @@ export const appsService: CoreService = {
       operation: "dataRead",
       effect: "observation",
       description:
-        "Read one file from an app user's file partition under .apps/<appId>/data/<user>. Admin-only; audited.",
+        "Read one file from an app user's file partition under .apps/<appId>/data/<user> — or a shared instance's under .apps/<appId>/shared/<instance>. Admin-only; audited.",
       inputSchema: {
         type: "object",
         properties: {
           app: { type: "string" },
           name: { type: "string" },
-          user: { type: "string" },
+          user: { type: "string", description: "App-user sub (mutually exclusive with instance)" },
+          instance: { type: "string", description: "Shared instance id (mutually exclusive with user)" },
           path: { type: "string" },
         },
-        required: ["user", "path"],
+        required: ["path"],
+      },
+    },
+    {
+      name: "apps.instanceUsage",
+      operation: "instanceUsage",
+      effect: "observation",
+      description:
+        "Report a shared instance's storage footprint and cap. Pass recount=true to recompute from store contents (authoritative drift correction). Host-only; audited.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          instance: { type: "string", description: "Instance id" },
+          recount: { type: "boolean", description: "Recompute the counter from actual contents" },
+        },
+        required: ["instance"],
+      },
+    },
+    {
+      name: "apps.instanceCap",
+      operation: "instanceCap",
+      effect: "action",
+      description:
+        "Set or clear a shared instance's storage cap (bytes). Omit `cap` to clear. Host-only; audited.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          instance: { type: "string", description: "Instance id" },
+          cap: { type: "number", description: "Cap in bytes; omit to clear" },
+        },
+        required: ["instance"],
+      },
+    },
+    {
+      name: "apps.instanceDelete",
+      operation: "instanceDelete",
+      effect: "action",
+      description:
+        "Delete a shared instance outright: every record (spilled blobs included), the shared file subtree, and the instance record. Host-only; audited.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          instance: { type: "string", description: "Instance id" },
+        },
+        required: ["instance"],
       },
     },
     {
@@ -1292,6 +1363,7 @@ export const appsService: CoreService = {
       }
       case "data":
       case "dataUsers":
+      case "dataInstances":
       case "dataKeys":
       case "dataGet":
       case "dataRead": {
@@ -1306,27 +1378,37 @@ export const appsService: CoreService = {
         }
 
         const user = typeof args["user"] === "string" ? args["user"] : undefined;
+        const instance = typeof args["instance"] === "string" ? args["instance"] : undefined;
         const key = typeof args["key"] === "string" ? args["key"] : undefined;
         const filePath = typeof args["path"] === "string" ? args["path"] : undefined;
         // Legacy `apps.data` overload still accepted; prefer the split ops.
         const mode =
           procedure === "dataUsers"
             ? "users"
-            : procedure === "dataKeys"
-              ? "keys"
-              : procedure === "dataGet"
-                ? "get"
-                : procedure === "dataRead"
-                  ? "read"
-                  : filePath !== undefined
+            : procedure === "dataInstances"
+              ? "instances"
+              : procedure === "dataKeys"
+                ? "keys"
+                : procedure === "dataGet"
+                  ? "get"
+                  : procedure === "dataRead"
                     ? "read"
-                    : key !== undefined
-                      ? "get"
-                      : user !== undefined
-                        ? "keys"
-                        : "users";
-        if ((mode === "keys" || mode === "get" || mode === "read") && user === undefined) {
-          throw new ServiceError("`user` is required", 400);
+                    : filePath !== undefined
+                      ? "read"
+                      : key !== undefined
+                        ? "get"
+                        : user !== undefined
+                          ? "keys"
+                          : "users";
+        if (user !== undefined && instance !== undefined) {
+          throw new ServiceError("`user` and `instance` are mutually exclusive", 400);
+        }
+        if (
+          (mode === "keys" || mode === "get" || mode === "read") &&
+          user === undefined &&
+          instance === undefined
+        ) {
+          throw new ServiceError("`user` or `instance` is required", 400);
         }
         if (mode === "get" && key === undefined) {
           throw new ServiceError("`key` is required", 400);
@@ -1340,43 +1422,71 @@ export const appsService: CoreService = {
 
         const records = getRecordStore();
         const tenant = ctx.workspaceId;
-        // Per-app partitions only (`app#<appId>#u#` / `.apps/<appId>/data/<user>`).
-        // The private `.users/**` space has no admin procedure.
+        // Per-app partitions only (`app#<appId>#u#<user>` / shared
+        // `app#<appId>#shared#<instance>`, `.apps/<appId>/data/<user>` /
+        // `.apps/<appId>/shared/<instance>`). The private `.users/**` space
+        // has no admin procedure. Instance addressing bypasses the
+        // participant ACL by design — this admin surface is gated above and
+        // audited below (TD6); the record/file planes stay deny-as-404.
         const scopePrefix = `app#${manifest.appId}#u#`;
+        const recordScope =
+          instance !== undefined
+            ? sharedRecordScope(manifest.appId, instance)
+            : `${scopePrefix}${user}`;
+        const subject = instance !== undefined ? { instance } : { user };
 
         let result: Record<string, unknown>;
-        if (mode === "read" && user !== undefined && filePath !== undefined) {
-          const partition = appDataDir(manifest.appId, user);
+        if (mode === "instances") {
+          result = {
+            appId: manifest.appId,
+            app: manifest.name,
+            instances: (await listInstances(tenant, manifest.appId)).map((record) => ({
+              instanceId: record.instanceId,
+              participants: record.participants,
+              storageBytes: record.storageBytes,
+              ...(record.storageCapBytes !== undefined
+                ? { storageCapBytes: record.storageCapBytes }
+                : {}),
+              createdBy: record.createdBy,
+              createdAt: record.createdAt,
+              updatedAt: record.updatedAt,
+            })),
+          };
+        } else if (mode === "read" && filePath !== undefined) {
+          const partition =
+            instance !== undefined
+              ? sharedDataDir(manifest.appId, instance)
+              : appDataDir(manifest.appId, user as string);
           const resolved = workspacePath(`${partition}/${filePath}`, "path");
           if (!resolved.startsWith(`${partition}/`)) {
-            throw new ServiceError(`path must stay within the user's partition`, 400);
+            throw new ServiceError(`path must stay within the partition`, 400);
           }
           const file = await getFsStore().read(tenant, resolved);
           result = {
             appId: manifest.appId,
             app: manifest.name,
-            user,
+            ...subject,
             path: filePath,
             content: file?.content ?? null,
             ...(file ? { hash: file.hash, mimeType: file.mimeType, size: file.size } : {}),
           };
-        } else if (mode === "get" && user !== undefined && key !== undefined) {
-          const entry = await records.get(tenant, `${scopePrefix}${user}`, key);
+        } else if (mode === "get" && key !== undefined) {
+          const entry = await records.get(tenant, recordScope, key);
           result = {
             appId: manifest.appId,
             app: manifest.name,
-            user,
+            ...subject,
             key,
             value: entry?.value ?? null,
             updatedAt: entry?.updatedAt,
             updatedBy: entry?.updatedBy,
           };
-        } else if (mode === "keys" && user !== undefined) {
+        } else if (mode === "keys") {
           result = {
             appId: manifest.appId,
             app: manifest.name,
-            user,
-            keys: await records.list(tenant, `${scopePrefix}${user}`),
+            ...subject,
+            keys: await records.list(tenant, recordScope),
           };
         } else {
           const scopes = await records.listScopes(tenant, scopePrefix);
@@ -1392,7 +1502,77 @@ export const appsService: CoreService = {
           workspaceId: tenant,
           callerId: ctx.userId,
           provider: "apps",
-          operation: `data:${manifest.appId}${user ? `:${user}` : ""}${key ? `:${key}` : ""}${filePath ? `:${filePath}` : ""}`,
+          operation:
+            mode === "instances"
+              ? `data:${manifest.appId}:instances`
+              : `data:${manifest.appId}${instance ? `:instance:${instance}` : ""}${user ? `:${user}` : ""}${key ? `:${key}` : ""}${filePath ? `:${filePath}` : ""}`,
+          status: 200,
+        });
+        return result;
+      }
+      case "instanceUsage":
+      case "instanceCap":
+      case "instanceDelete": {
+        const instanceId = typeof args["instance"] === "string" ? args["instance"] : "";
+        if (!instanceId) throw new ServiceError("instance is required", 400);
+        const record = await getInstance(ctx.workspaceId, instanceId);
+        if (!record) throw new ServiceError(`Not found: instance ${instanceId}`, 404);
+        // Host gate (IW-9 D1/D22): the host is the hosting-workspace admin —
+        // a personal-space creator is always that workspace's admin (see
+        // tech-plan TD6 "Host = hosting-workspace admin"), so one membership
+        // check covers both disjuncts. No success audit row before this.
+        const membership = await getMembership(record.hostWorkspaceId, ctx.userId);
+        if (membership?.role !== "admin") {
+          throw new ServiceError(
+            `Only the instance's host (an admin of workspace ${record.hostWorkspaceId}) can manage it`,
+            403,
+          );
+        }
+
+        let result: Record<string, unknown>;
+        let operation: string;
+        if (procedure === "instanceUsage") {
+          const storageBytes =
+            args["recount"] === true
+              ? await recountInstanceUsage(ctx.workspaceId, instanceId)
+              : record.storageBytes;
+          result = {
+            instanceId,
+            storageBytes,
+            ...(record.storageCapBytes !== undefined
+              ? { storageCapBytes: record.storageCapBytes }
+              : {}),
+          };
+          operation = `instance:usage:${instanceId}`;
+        } else if (procedure === "instanceCap") {
+          const rawCap = args["cap"];
+          if (rawCap !== undefined && rawCap !== null && typeof rawCap !== "number") {
+            throw new ServiceError("cap must be a number of bytes (omit to clear)", 400);
+          }
+          const updated = await setInstanceCap(
+            ctx.workspaceId,
+            instanceId,
+            typeof rawCap === "number" ? rawCap : undefined,
+            ctx.userId,
+          );
+          result = {
+            instanceId,
+            storageBytes: updated.storageBytes,
+            storageCapBytes: updated.storageCapBytes ?? null,
+          };
+          operation = `instance:cap:${instanceId}`;
+        } else {
+          await deleteInstance(ctx.workspaceId, instanceId, ctx.userId);
+          result = { instanceId, deleted: true };
+          operation = `instance:delete:${instanceId}`;
+        }
+
+        getAuditStore().append({
+          requestId: crypto.randomUUID(),
+          workspaceId: ctx.workspaceId,
+          callerId: ctx.userId,
+          provider: "apps",
+          operation,
           status: 200,
         });
         return result;
@@ -1801,7 +1981,16 @@ export const appsService: CoreService = {
         }
         const removed = await removeInstall(ctx.workspaceId, installId);
         const purge = args["purgeData"] === true || args["purge_data"] === true;
-        if (purge) await purgeInstallData(ctx.workspaceId, installId);
+        if (purge) {
+          // Instances first: `deleteInstance` cleans the record scope
+          // (spilled blobs included) and the shared subtree before the
+          // blanket `.apps/<installId>` purge, so no instance record or
+          // spilled record blob is ever orphaned (tech-plan Risks).
+          for (const instance of await listInstances(ctx.workspaceId, installId)) {
+            await deleteInstance(ctx.workspaceId, instance.instanceId, ctx.userId);
+          }
+          await purgeInstallData(ctx.workspaceId, installId);
+        }
         return { install: installId, removed, purged: purge };
       }
       case "installed": {
