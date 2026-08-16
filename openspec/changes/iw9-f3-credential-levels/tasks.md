@@ -58,14 +58,14 @@ External dependencies:
 
 > Depends-on: 1 | Repo: registry | Touches: registry/packages/registry-server/src/profiles/resolve.ts, registry/packages/registry-server/src/credentials/service.ts, registry/packages/registry-server/src/index.ts, registry/packages/registry-server/src/profiles/__tests__/level-resolution.test.ts | Verify: cd /Users/jacob/Documents/Code/AprovanLabs/registry && pnpm --filter @aprovan/registry-server test && grep -n "CredentialNotConnectedError" packages/registry-server/src/index.ts && grep -n "resolveForInvoker" packages/registry-server/src/credentials/service.ts && ! grep -n "deps\.credentials\.firstForProvider" packages/registry-server/src/profiles/resolve.ts
 
-- [ ] 2.1 Define and export the resolution contract from the package
+- [x] 2.1 Define and export the resolution contract from the package
       root: `CredentialInvoker`, `CredentialResolutionRequest`,
       `ResolvedCredential` (id, level, owner?, payload),
       `CredentialNotConnectedError` (`code: "credential_not_connected"`,
       `status: 403`, `provider`, `requiredLevel`) — tech-plan
       "Interfaces & Data", D5. Spec: credential-level-resolution
       "Resolution-order contract is published".
-- [ ] 2.2 Add `CredentialService.resolveForInvoker(tenantId, provider, invoker)`
+- [x] 2.2 Add `CredentialService.resolveForInvoker(tenantId, provider, invoker)`
       (tech-plan D4a; additive, sits beside `firstForProvider` — does not
       change its signature or behavior) implementing D4's order: the
       invoker's own `user-oauth` row for the provider first, else the
@@ -80,14 +80,14 @@ External dependencies:
       `ctx.principal` throws `CredentialNotConnectedError` (never another
       user's payload, never a downgrade); other users' `user-oauth` rows
       are invisible to the unpinned paths (tech-plan D4/D4a).
-- [ ] 2.3 `CredentialService.resolveById` and the new `resolveForInvoker`
+- [x] 2.3 `CredentialService.resolveById` and the new `resolveForInvoker`
       return `ResolvedCredential` (level via `effectiveLevel`, owner for
       user-level) so dispatch/audit callers read level without a second
       fetch. `firstForProvider` itself is unchanged (additive-only bump —
       tech-plan D4a) but has zero remaining callers inside
       `profiles/resolve.ts` once 2.2 lands (gate: task 6.5-equivalent for
       registry, `! grep -n "deps\.credentials\.firstForProvider" profiles/resolve.ts`).
-- [ ] 2.4 New test file
+- [x] 2.4 New test file
       `profiles/__tests__/level-resolution.test.ts`: owner resolves own
       connection; other user fails closed with
       `credential_not_connected`; own user-oauth outranks workspace row;
