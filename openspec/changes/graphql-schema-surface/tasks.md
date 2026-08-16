@@ -79,7 +79,7 @@ without the SDL entering context.
       400 — that is the drift this change exists to prevent.
 - [x] 5.3 Keep both fields optional: most of the ~2,000 providers have no version
       concept.
-- [ ] 5.4 Lint: a provider with `schemas/` must declare `defaultVersion`, and every
+- [x] 5.4 Lint: a provider with `schemas/` must declare `defaultVersion`, and every
       declared version must have a schema file.
 - [x] 5.5 Tests: pinned version selects its schema and its endpoint; a version with no
       schema fails loudly; unversioned providers are unaffected.
