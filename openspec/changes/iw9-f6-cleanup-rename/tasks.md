@@ -56,7 +56,7 @@ is independent).
 
 > Depends-on: - | Repo: aprovan | Touches: aprovan/server/workspace/src/interfaces.ts | Verify: pnpm --filter @aprovan/workspace test -- tests/vcs-interface.test.ts
 
-- [ ] 3.1 In `interfaces.ts`, locate the compat-resolution logic
+- [x] 3.1 In `interfaces.ts`, locate the compat-resolution logic
       `resolveInterfaceForWorkspace` uses to pick a zero-config default among
       an interface's `compat` entries. Confirm (via the failing assertions in
       `tests/vcs-interface.test.ts:109,142,151`) that the `vcs` interface's
@@ -64,7 +64,7 @@ is independent).
       currently wins zero-config resolution unconditionally, pre-empting
       both "no credential → reject" and "credentialed github → route to
       github" (tech-plan D3).
-- [ ] 3.2 Change resolution so the native `aprovan` compat entry does not
+- [x] 3.2 Change resolution so the native `aprovan` compat entry does not
       win the *generic* catalog path (`resolveInterfaceForWorkspace`/
       `dispatchInterface`) used by third-party git-hosting dispatch — the
       native path already has its own explicit short-circuit at
@@ -73,13 +73,13 @@ is independent).
       generic resolver to also answer for it. Do not edit `routes/tools.ts`
       (F1-owned region) — the fix is confined to `interfaces.ts`'s
       resolution-order logic.
-- [ ] 3.3 Verify all three `vcs-interface.test.ts` assertions pass:
+- [x] 3.3 Verify all three `vcs-interface.test.ts` assertions pass:
       "zero-configs to github once a github credential exists" (rejects with
       no credential), "reaches the github/vcs adapter with the workspace's
       github credential" (routes to github once bound), "refuses a bitbucket
       binding with the reason, not a module-loader error" (200 + reason, not
       404).
-- [ ] 3.4 Regression check: run the full suite and confirm no other
+- [x] 3.4 Regression check: run the full suite and confirm no other
       interface's resolution (`llm`, `telemetry`, `agent`, `events`,
       `keyvalue`) changes behavior — `pnpm --filter @aprovan/workspace test`
       shows the same pass/fail set for every non-F6-owned suite as the

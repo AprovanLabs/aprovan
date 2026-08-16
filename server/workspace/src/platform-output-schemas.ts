@@ -138,6 +138,8 @@ const SCHEMAS: Record<string, Record<string, unknown>> = {
   "webhooks.remove": obj({ removed: { type: "boolean" } }, ["removed"]),
   "webhooks.providers": obj({ providers: arr() }, ["providers"]),
   "interfaces.list": obj({ interfaces: arr() }, ["interfaces"]),
+  "interfaces.bind": obj({ namespace: { type: "string" }, interface: { type: "string" }, provider: { type: "string" } }, ["namespace", "interface", "provider"]),
+  "interfaces.unbind": obj({ namespace: { type: "string" }, interface: { type: "string" }, unbound: { type: "boolean" } }, ["namespace", "interface", "unbound"]),
   "profiles.set": obj({ profile: { type: "object" } }, ["profile"]),
   "profiles.list": obj({ profiles: arr() }, ["profiles"]),
   "profiles.remove": obj({ removed: { type: "boolean" } }, ["removed"]),

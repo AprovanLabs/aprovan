@@ -79,10 +79,16 @@ describe("vfs-vcs-split", () => {
     expect(log.commits.some((c) => c.id === committed.commit.id)).toBe(true);
   });
 
-  it("default binding for vcs is the workspace store (aprovan native)", async () => {
-    const resolved = await resolveInterfaceForWorkspace("ws-split-ns", "vcs");
-    expect(resolved.compat.provider).toBe(NATIVE_PROVIDER_ID);
-    expect(resolved.compat.credentialless).toBe(true);
+  it("vcs resolution rejects when no credential or binding exists (generic resolver excludes aprovan)", async () => {
+    // The aprovan compat entry for `vcs` is excluded from the generic catalog's
+    // zero-config path (see resolveInterfaceForWorkspace in interfaces.ts).
+    // routes/tools.ts and workflows/invoke.ts carry dedicated pre-resolution
+    // short-circuits that always reach the native aprovan commit-store for vcs;
+    // the generic resolver must not also answer for it so third-party
+    // git-hosting providers (github, bitbucket) remain reachable.
+    await expect(resolveInterfaceForWorkspace("ws-split-ns", "vcs")).rejects.toThrow(
+      /no binding and no connected/iu,
+    );
   });
 
   it("no mount operations on the file namespace; resolution stays on read", async () => {
