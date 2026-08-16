@@ -124,12 +124,12 @@ handoff on one file._
 
 > Repo: aprovan | Depends-on: 1, 2, 3 | Touches: aprovan/server/workspace/tests/realtime-e2e.test.ts | Verify: pnpm --filter @aprovan/workspace test && grep -n "Promise<{ body?: unknown }>" server/workspace/src/realtime/broker.ts && ! grep -rn "focusByConn\|UserMembership" server/workspace/src/realtime/presence.ts && ! grep -rn --include="*.ts" "focusByConn\|UserMembership" ../registry/packages
 
-- [ ] 4.1 Update `tests/realtime-e2e.test.ts` for the async contract and add
+- [x] 4.1 Update `tests/realtime-e2e.test.ts` for the async contract and add
       an end-to-end recovery case: client is disconnected for slowness (or
       drops events), reconnects, resubscribes, and rebuilds correct presence
       state from the `subscribed` body alone (spec "Client recovers by
       resubscribing").
-- [ ] 4.2 Run the full workspace suite plus the grep gates in Verify
+- [x] 4.2 Run the full workspace suite plus the grep gates in Verify
       (MIGRATION-DEBT definition of done: replaced state names return
       nothing **in both repos** — aprovan realtime sources and the sibling
       `../registry` checkout, per IW-9 cross-repo rule 4; async signature

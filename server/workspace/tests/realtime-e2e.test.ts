@@ -1,6 +1,13 @@
 /**
  * Protocol-level e2e for ux.md "See who's in your file":
- * two users, tab-switch focus, blur, disconnect leave, reserved namespaces.
+ * two users, tab-switch focus, blur, disconnect leave, reserved namespaces,
+ * and async-contract recovery (spec "Client recovers by resubscribing").
+ *
+ * The subscribe handler is async (returns Promise<{body?:unknown}>) — the
+ * broker awaits it before sending the `subscribed` frame. Events between
+ * subscription registration and `subscribed` delivery MAY arrive in either
+ * order (spec "No ordering or exactly-once assumptions"); clients MUST NOT
+ * assume `subscribed` precedes the first event.
  */
 
 import { mkdtempSync, rmSync } from "node:fs";
@@ -277,22 +284,11 @@ describe("realtime-e2e — See who's in your file", () => {
     wsA.close();
   });
 
-  it("reserved namespaces doc: and fs: return reserved-namespace", async () => {
+  it("reserved namespace fs: returns reserved-namespace; doc: is now registered", async () => {
     const ws = await openWs(port, "a");
 
-    ws.send(JSON.stringify({ type: "subscribe", topic: "doc:notes/plan.md" }));
-    expect(await nextMessage(ws)).toMatchObject({
-      type: "error",
-      code: "reserved-namespace",
-    });
-
+    // fs: is still reserved — no handler registered for it.
     ws.send(JSON.stringify({ type: "subscribe", topic: "fs:changes" }));
-    expect(await nextMessage(ws)).toMatchObject({
-      type: "error",
-      code: "reserved-namespace",
-    });
-
-    ws.send(JSON.stringify({ type: "publish", topic: "doc:notes/plan.md", body: {} }));
     expect(await nextMessage(ws)).toMatchObject({
       type: "error",
       code: "reserved-namespace",
@@ -304,9 +300,71 @@ describe("realtime-e2e — See who's in your file", () => {
       code: "reserved-namespace",
     });
 
+    // doc: was previously reserved but is now registered by createDocHandler
+    // (iw9-doc-markdown, commit 19da322). Subscribing it returns a subscribed
+    // frame, not reserved-namespace.
+    ws.send(JSON.stringify({ type: "subscribe", topic: "doc:notes/plan.md" }));
+    expect(await nextMessage(ws)).toMatchObject({
+      type: "subscribed",
+      topic: "doc:notes/plan.md",
+    });
+
     // Presence still works on the same connection after reserved errors.
     const snap = await subscribe(ws, PLAN_TOPIC);
     expect(snap.peers).toEqual([]);
     ws.close();
+  });
+
+  it("recovery: disconnected client resubscribes and rebuilds state from subscribed body alone", async () => {
+    // Scenario from spec "Client recovers by resubscribing":
+    // WHEN a client suspects it missed events (reconnect, buffer-drop disconnect)
+    // THEN re-subscribing yields a `subscribed` body sufficient to rebuild
+    //      current state without any replayed events.
+    //
+    // Async-contract note: the broker awaits onSubscribe before sending
+    // `subscribed`, so the body reflects store state at await-resolution time.
+    // Events published between subscription registration and `subscribed`
+    // delivery MAY arrive in either order — the recovery case is that the
+    // client ignores the event stream entirely and reads state only from the
+    // `subscribed` body.
+
+    // 1. User A is already focused on plan.md.
+    const wsA = await openWs(port, "a");
+    const subA = await subscribe(wsA, PLAN_TOPIC);
+    expect(subA.peers).toEqual([]);
+    focus(wsA, PLAN_TOPIC);
+
+    // 2. User B connects and subscribes — snapshot reflects A's presence.
+    const wsB = await openWs(port, "b");
+    const snapBefore = await subscribe(wsB, PLAN_TOPIC);
+    expect(snapBefore.peers.map((p) => p.userId)).toContain("user-a");
+
+    // 3. Simulate B being disconnected (e.g. slow-client 1013 close).
+    wsB.close();
+    await new Promise<void>((resolve) => wsB.once("close", resolve));
+
+    // 4. A performs additional actions while B is offline:
+    //    A switches to other.md then back to plan.md — B will have missed
+    //    the leave + join events entirely.
+    const eventsA = collectEvents(wsA);
+    await subscribe(wsA, OTHER_TOPIC);
+    focus(wsA, OTHER_TOPIC);
+    // Wait for the leave event on plan.md so the store is settled before B reconnects.
+    await waitForEvent(eventsA, (m) => isEvent(m, PLAN_TOPIC, "leave", "user-a"));
+    focus(wsA, PLAN_TOPIC);
+    await waitForEvent(eventsA, (m) => isEvent(m, PLAN_TOPIC, "join", "user-a"));
+
+    // 5. B reconnects and resubscribes — the subscribed body is sufficient to
+    //    rebuild current state from scratch, without replaying any missed events.
+    const wsB2 = await openWs(port, "b");
+    const recoverySnap = await subscribe(wsB2, PLAN_TOPIC);
+
+    // A is currently focused on plan.md — the recovered snapshot must show A.
+    // B must NOT need any missed events to discover this; the body alone suffices.
+    expect(recoverySnap.peers.map((p) => p.userId)).toContain("user-a");
+    expect(recoverySnap.peers.find((p) => p.userId === "user-a")?.path).toBe(PLAN);
+
+    wsA.close();
+    wsB2.close();
   });
 });
