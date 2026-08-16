@@ -68,26 +68,26 @@
 
 > Repo: aprovan | Depends-on: 1 | Touches: aprovan/server/workspace/src/apps/releases.ts, aprovan/server/workspace/src/apps/release-tags.ts, aprovan/server/workspace/src/apps/store.ts, aprovan/server/workspace/src/apps/service.ts, aprovan/server/workspace/src/apps/install.ts, aprovan/server/workspace/src/apps/directory.ts, aprovan/server/workspace/src/routes/live-apps.ts, aprovan/server/workspace/src/notifications/service.ts, aprovan/server/workspace/tests/apps.test.ts, aprovan/server/workspace/tests/app-install.test.ts | Verify: cd aprovan/server/workspace && pnpm typecheck && pnpm vitest run tests/apps.test.ts tests/app-install.test.ts tests/app-directory.test.ts && grep -rn "listEntryVersions\|readEntryVersion\|restoreEntryVersion\|apps/releases" /Users/jacob/Documents/Code/AprovanLabs/aprovan/server /Users/jacob/Documents/Code/AprovanLabs/aprovan/packages /Users/jacob/Documents/Code/AprovanLabs/aprovan/client /Users/jacob/Documents/Code/AprovanLabs/registry --include='*.ts' --include='*.tsx' | grep -v node_modules; test $? -ne 0
 
-- [ ] 3.1 New `apps/release-tags.ts` implementing the tech-plan interface:
+- [x] 3.1 New `apps/release-tags.ts` implementing the tech-plan interface:
       `cutRelease` (commit app scope if dirty → write immutable tag → point
       channel), `resolveRelease`, `listReleases`; channel-name validation
       kept (`^[a-z][a-z0-9-]{0,31}$`). This is the interface iw9-b consumes
       for install-as-copy (spec app-release-tags).
-- [ ] 3.2 Re-point consumers off `releases.ts`: `apps/install.ts`,
+- [x] 3.2 Re-point consumers off `releases.ts`: `apps/install.ts`,
       `routes/live-apps.ts` (serve pinned content from the release commit's
       snapshot, replacing `readEntryVersion(entry, release.entryHash)` at
       :209), `apps/directory.ts`, `notifications/service.ts`,
       `platform-output-schemas.ts` release shapes.
-- [ ] 3.3 One-time cut-over: re-tag every `svc#apps#releases#<appId>` record
+- [x] 3.3 One-time cut-over: re-tag every `svc#apps#releases#<appId>` record
       as an app-scoped commit + tag BEFORE dropping records; assert no
       install resolves to a dangling release (scenario "Old release ids do
       not silently dangle"). Tags written before records dropped (tech-plan
       Rollout 4).
-- [ ] 3.4 Replace the `apps.release`/`apps.releases`/`apps.channel` tool
+- [x] 3.4 Replace the `apps.release`/`apps.releases`/`apps.channel` tool
       operations in `apps/service.ts` with the tag-backed implementations;
       DELETE the `apps.versions`/`apps.version`/`apps.restore` operations
       and the per-file helpers at `apps/store.ts:422-452`.
-- [ ] 3.5 DELETE `apps/releases.ts`. Grep gate (in Verify) must return
+- [x] 3.5 DELETE `apps/releases.ts`. Grep gate (in Verify) must return
       nothing across BOTH repos (aprovan + registry), per MIGRATION-DEBT
       rule. Do this task last in the stream.
 

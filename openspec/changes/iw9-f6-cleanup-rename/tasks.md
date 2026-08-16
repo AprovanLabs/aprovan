@@ -233,14 +233,17 @@ is independent).
       (lines ~166-168), and `"https://aprovan.com/workspace"` /
       `"http://localhost:5173/workspace"` to `logoutUrls` (lines ~191-193).
       Do **not** remove any existing `/chat` entry (tech-plan D9).
-- [ ] 9.5 Verify the CDK app synthesizes with the new function and URLs
+- [x] 9.5 Verify the CDK app synthesizes with the new function and URLs
       (Verify command above); manually confirm (documented in the PR, not a
       script) that a deployed distribution 301s `/chat`, `/chat/`, and
       `/chat/deep/path?x=1` to the correct `/workspace` equivalents,
       preserving query strings, before calling this stream done (tech-plan
       Risks — no automated CDK test exists in this repo to assert it).
       _(Phase 1 synth/typecheck/bash -n/grep passed in this PR; Phase 2 live
-      curl gate left open until CDK is deployed to the live distribution.)_
+      curl gate verified 2026-08-16 against the deployed distribution:
+      `/chat` → 301 `https://aprovan.com/workspace`, `/chat/` → 301
+      `https://aprovan.com/workspace/`, `/chat/deep/path?x=1` → 301
+      `https://aprovan.com/workspace/deep/path?x=1` — query preserved.)_
 - [x] 9.6 Grep gate: `grep -rn '"chat/\|/chat/\*\|aprovan.com/chat' scripts/deploy-web.sh .github/workflows/web.yml`
       returns nothing (the `/chat/auth/callback` and `/chat` literals in
       `main.ts`'s Cognito lists are expected to remain per D9 — this gate
