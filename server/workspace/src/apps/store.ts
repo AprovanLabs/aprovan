@@ -15,8 +15,10 @@
  * multi-prefix input.
  *
  * Per-user app data lives under `.apps/<appId>/data/<user>` ({@link appDataDir});
- * each member's private space is `.users/<user>` ({@link userSpaceDir}). Both
- * are enforced structurally by the partition guard — no manifest listing.
+ * shared instance partitions under `.apps/<appId>/shared/<instanceId>`
+ * ({@link sharedDataDir}, ACL'd by instances.ts); each member's private space
+ * is `.users/<user>` ({@link userSpaceDir}). All are enforced structurally by
+ * the partition guard — no manifest listing.
  * Manifests are stored under `svc#apps / <appId>`; `(workspaceId, name)` is a
  * mutable alias only (see apps/identity.ts).
  *
@@ -43,6 +45,9 @@ import {
   setAlias,
   type AppId,
 } from "./identity.js";
+// Safe statically: instances.ts reaches install.ts (which imports this module)
+// only via dynamic import(), so no cycle closes (see instances.ts docstring).
+import { assertInstanceAccess, sharedDataDir } from "./instances.js";
 import type { AppYaml, AppYamlIssue } from "./manifest.js";
 import { releaseGlobalSlug } from "./slugs.js";
 
@@ -279,6 +284,13 @@ export function appDataDir(id: string, userSub: string): string {
   return `${appDataRoot(id)}/${userSub}`;
 }
 
+/**
+ * Shared instance partition beside {@link appDataDir}:
+ * `.apps/<id>/shared/<instanceId>`. Defined next to its ACL in instances.ts
+ * (TD1); re-exported here to keep the partition-shape helpers in one place.
+ */
+export { sharedDataDir };
+
 /** A member's private file-plane space: `.users/<userSub>`. */
 export function userSpaceDir(userSub: string): string {
   return `${USER_SPACE_ROOT}/${userSub}`;
@@ -315,15 +327,19 @@ export function resetHiddenDataPrefixCache(): void {
 // (specs per-user-space; tech-plan D3).
 // ---------------------------------------------------------------------------
 
-export type PartitionAccess = "open" | "own" | "foreign";
+export type PartitionAccess = "open" | "own" | "foreign" | "shared";
 
 /**
  * Pure partition rule over the two structural roots:
- *   `.apps/<id>/data/<sub>/…`  — owner is `<sub>`
- *   `.users/<sub>/…`           — owner is `<sub>`
- * Partition containers (`.apps`, `.apps/<id>`, `.apps/<id>/data`, `.users`)
- * belong to nobody ("open"). `hiddenPrefixes` is retained for call-site
- * compatibility; matching is structural and ignores the list contents.
+ *   `.apps/<id>/data/<sub>/…`           — owner is `<sub>`
+ *   `.apps/<id>/shared/<instanceId>/…`  — "shared": ACL required, resolve via
+ *                                         {@link assertPartitionAccess} /
+ *                                         instances.ts before granting anything
+ *   `.users/<sub>/…`                    — owner is `<sub>`
+ * Partition containers (`.apps`, `.apps/<id>`, `.apps/<id>/data`,
+ * `.apps/<id>/shared`, `.users`) belong to nobody ("open"). `hiddenPrefixes`
+ * is retained for call-site compatibility; matching is structural and ignores
+ * the list contents.
  */
 export function partitionAccess(
   path: string,
@@ -332,6 +348,7 @@ export function partitionAccess(
 ): PartitionAccess {
   if (underPrefix(path, APP_DATA_ROOT)) {
     if (path === APP_DATA_ROOT) return "open";
+    if (parseSharedPartition(path)) return "shared";
     const parts = path.slice(APP_DATA_ROOT.length + 1).split("/");
     // Expect <id>/data/<sub>/… — shorter paths are containers, not partitions.
     if (parts.length < 3 || parts[1] !== "data") return "open";
@@ -347,8 +364,26 @@ export function partitionAccess(
 }
 
 /**
+ * `.apps/<id>/shared/<instanceId>[/...]` → ids; undefined otherwise
+ * (containers, per-user partitions, other discriminators, empty segments).
+ */
+export function parseSharedPartition(
+  path: string,
+): { id: string; instanceId: string } | undefined {
+  if (!underPrefix(path, APP_DATA_ROOT)) return undefined;
+  const [id, discriminator, instanceId] = path.slice(APP_DATA_ROOT.length + 1).split("/");
+  if (!id || discriminator !== "shared" || !instanceId) return undefined;
+  return { id, instanceId };
+}
+
+/**
  * Throws `ServiceError("Not found: <path>", 404)` when `path` sits inside
  * another user's data partition — deny-as-404.
+ *
+ * Shared partitions resolve their participant ACL here (the one async choke
+ * point, TD2): "shared" classification delegates to instances.ts
+ * `assertInstanceAccess`, whose per-request participant + invariant-5
+ * membership checks and fail-closed 404 pass through unchanged.
  *
  * Person-shares are checked at this same choke point: an active person-share
  * covering `path` for `callerSub` lifts the foreign-partition denial so the
@@ -361,7 +396,13 @@ export async function assertPartitionAccess(
   path: string,
 ): Promise<void> {
   const hidden = await hiddenDataPrefixes(workspaceId);
-  if (partitionAccess(path, callerSub, hidden) !== "foreign") return;
+  const access = partitionAccess(path, callerSub, hidden);
+  if (access === "shared") {
+    const { id, instanceId } = parseSharedPartition(path)!;
+    await assertInstanceAccess(workspaceId, id, instanceId, callerSub);
+    return;
+  }
+  if (access !== "foreign") return;
   // Lazy import keeps store.ts free of a hard cycle with vfs/shares → svc-records
   // while still routing every person-share grant through this one choke point.
   const { personShareAllowsRead } = await import("../vfs/shares.js");
@@ -389,11 +430,12 @@ export function appPathAllowed(app: AppPaths, path: string): boolean {
 }
 
 /**
- * Is `path` publishable over HTTP? The app root minus the ID-keyed data
- * partition — per-user app data is never served through the live site.
+ * Is `path` publishable over HTTP? The app root minus the whole ID-keyed
+ * partition container (`.apps/<id>`) — per-user app data and shared instance
+ * partitions are never served through the live site.
  */
 export function appPathServable(app: AppPaths, path: string): boolean {
-  return appPathAllowed(app, path) && !underPrefix(path, appDataRoot(app.id));
+  return appPathAllowed(app, path) && !underPrefix(path, `${APP_DATA_ROOT}/${app.id}`);
 }
 
 /**
