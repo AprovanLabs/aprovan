@@ -77,34 +77,74 @@ const SCHEMAS: Record<string, Record<string, unknown>> = {
     },
     ["appId", "app", "users"],
   ),
+  "apps.dataInstances": obj(
+    {
+      appId: { type: "string" },
+      app: { type: "string" },
+      instances: arr(
+        obj({
+          instanceId: { type: "string" },
+          participants: arr({ type: "string" }),
+          storageBytes: { type: "number" },
+          storageCapBytes: { type: "number" },
+        }),
+      ),
+    },
+    ["appId", "app", "instances"],
+  ),
+  // dataKeys/dataGet/dataRead address one subject: `user` OR `instance`
+  // (mutually exclusive) — exactly one of the two appears in the result.
   "apps.dataKeys": obj(
     {
       appId: { type: "string" },
       app: { type: "string" },
       user: { type: "string" },
+      instance: { type: "string" },
       keys: arr({ type: "string" }),
     },
-    ["appId", "app", "user", "keys"],
+    ["appId", "app", "keys"],
   ),
   "apps.dataGet": obj(
     {
       appId: { type: "string" },
       app: { type: "string" },
       user: { type: "string" },
+      instance: { type: "string" },
       key: { type: "string" },
       value: {},
     },
-    ["appId", "app", "user", "key"],
+    ["appId", "app", "key"],
   ),
   "apps.dataRead": obj(
     {
       appId: { type: "string" },
       app: { type: "string" },
       user: { type: "string" },
+      instance: { type: "string" },
       path: { type: "string" },
       content: { type: ["string", "null"] },
     },
-    ["appId", "app", "user", "path"],
+    ["appId", "app", "path"],
+  ),
+  "apps.instanceUsage": obj(
+    {
+      instanceId: { type: "string" },
+      storageBytes: { type: "number" },
+      storageCapBytes: { type: "number" },
+    },
+    ["instanceId", "storageBytes"],
+  ),
+  "apps.instanceCap": obj(
+    {
+      instanceId: { type: "string" },
+      storageBytes: { type: "number" },
+      storageCapBytes: { type: ["number", "null"] },
+    },
+    ["instanceId", "storageCapBytes"],
+  ),
+  "apps.instanceDelete": obj(
+    { instanceId: { type: "string" }, deleted: { type: "boolean" } },
+    ["instanceId", "deleted"],
   ),
   "apps.sdk": obj({ js: { type: "string" }, dts: { type: "string" } }, ["js", "dts"]),
   "apps.release": obj(
