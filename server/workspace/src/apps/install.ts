@@ -80,7 +80,11 @@ export interface AppInstallation {
    * stream 6/7 migrate existing records.
    */
   pin: InstallPin;
-  /** F2 hosting mode — immutable after creation. */
+  /**
+   * F2 hosting mode — IMMUTABLE at creation (IW-9 invariant 10; enforced in
+   * {@link saveInstall}). Absent on pre-F2 stored records ⇒ read as
+   * "managed" (TD4). No mode-flip migration exists or will.
+   */
   hosting: HostingMode;
   /** Set when `hosting === "hosted"` — which workspace hosts the data. */
   hostingWorkspaceId?: string;
@@ -155,8 +159,10 @@ export async function requireInstall(
 }
 
 /**
- * Persist an install. Rejects flips of `hosting` / `hostingWorkspaceId`
- * (F2 TD4 / app-data-hosting immutability — 400).
+ * Persist an install. Rejects flips of `hostingWorkspaceId` (400) and of
+ * `hosting` (409 per the F2 TD4 frozen contract — the mode is immutable at
+ * creation; absent field on pre-F2 records reads as "managed"). No mode-flip
+ * migration exists or will (IW-9 invariant 10).
  */
 export async function saveInstall(
   workspaceId: string,
@@ -164,18 +170,18 @@ export async function saveInstall(
 ): Promise<void> {
   const existing = await readInstall(workspaceId, install.installId);
   if (existing) {
+    if ((existing.hostingWorkspaceId ?? undefined) !== (install.hostingWorkspaceId ?? undefined)) {
+      throw new ServiceError(
+        "hostingWorkspaceId is immutable at creation",
+        400,
+      );
+    }
     const prevHosting = existing.hosting ?? "managed";
     const nextHosting = install.hosting ?? "managed";
     if (prevHosting !== nextHosting) {
       throw new ServiceError(
         `Hosting mode is immutable at creation (was "${prevHosting}")`,
-        400,
-      );
-    }
-    if ((existing.hostingWorkspaceId ?? undefined) !== (install.hostingWorkspaceId ?? undefined)) {
-      throw new ServiceError(
-        "hostingWorkspaceId is immutable at creation",
-        400,
+        409,
       );
     }
   }

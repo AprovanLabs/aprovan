@@ -100,6 +100,13 @@ export { NATIVE_PROVIDER_ID, isNativeInterface };
 
 const EVENTS_MAX_RETAINED = 500;
 
+/**
+ * Instance-less scope builder for the native keyvalue backend fallback.
+ * Live keyvalue dispatch short-circuits to `keyvalueProductService`
+ * (services.ts), whose `resolveRecordScope(ctx, { instance? })` also
+ * resolves the F2 shared-instance scope `app#<id>#shared#<instanceId>`
+ * (ACL-asserted) — the wire `instance` argument threads through untouched.
+ */
 function kvScopeFor(ctx: ServiceContext): string {
   if (ctx.appScope) return `app#${ctx.appScope.id}#u#${ctx.appScope.userId}`;
   return "ws";
@@ -545,7 +552,9 @@ export async function dispatchAprovanNativeOp(
       return result;
     }
     // Key-value product surface: app partitions + legacy FS migration, adapted
-    // to contract shapes (`found`, list rows, write timestamps).
+    // to contract shapes (`found`, list rows, write timestamps). The optional
+    // `instance` arg passes through and is resolved (ACL-asserted) by
+    // `resolveRecordScope` — shared-instance addressing (iw9-f2).
     if (interfaceId === "keyvalue") {
       const { keyvalueProductService } = await import("./services.js");
       const result = await keyvalueProductService.call(ctx, operation, args);

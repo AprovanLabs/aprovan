@@ -67,29 +67,29 @@ releases.ts` (owned by iw9-a) or `server/workspace/src/apps/identity.ts`
 
 > Depends-on: 2 | Repo: aprovan | Touches: aprovan/server/workspace/src/services.ts, aprovan/server/workspace/src/native-dispatch.ts, aprovan/server/workspace/src/apps/install.ts, aprovan/server/workspace/tests/shared-scope-addressing.test.ts, aprovan/server/workspace/tests/install-hosting-mode.test.ts | Verify: pnpm -C server/workspace exec vitest run tests/shared-scope-addressing.test.ts tests/install-hosting-mode.test.ts && pnpm -C server/workspace typecheck
 
-- [ ] 3.1 Implement `resolveRecordScope(ctx, { instance? })` in `services.ts`
+- [x] 3.1 Implement `resolveRecordScope(ctx, { instance? })` in `services.ts`
       per the tech-plan seam: absent `instance` preserves today's behavior
       (services.ts:104); present `instance` returns
       `app#<id>#shared#<instanceId>` only after `assertInstanceAccess`.
       Thread the optional `instance` argument through the record/keyvalue
       tool procedures (native-dispatch.ts scope builder at :49) —
       `assertCallerScope` (svc-records.ts:51-65) semantics unchanged.
-- [ ] 3.2 Add `hosting: HostingMode` to `AppInstallation`
+- [x] 3.2 Add `hosting: HostingMode` to `AppInstallation`
       (apps/install.ts:33-50) and `mintNewInstall` (install.ts:231-256),
       default `"managed"`; readers treat an absent field on pre-F2 records as
       `"managed"` (TD4). No migration script — grep gate in stream 6 enforces
       the foreclosure (invariant 10; `scripts/migrate-app-records.ts` CAVEAT
       is the cited precedent).
-- [ ] 3.3 Guard `saveInstall` (install.ts:86-91): when a stored record exists
+- [x] 3.3 Guard `saveInstall` (install.ts:86-91): when a stored record exists
       and `stored.hosting !== install.hosting`, throw `ServiceError` 409
       stating the mode is immutable (spec "Hosting mode is immutable on the
       install record").
-- [ ] 3.4 New test file `server/workspace/tests/shared-scope-addressing.test.ts`:
+- [x] 3.4 New test file `server/workspace/tests/shared-scope-addressing.test.ts`:
       instance-addressed record get/set/list succeed for participants with
       `updatedBy` attribution, 404 for non-participants, distinct listing of
       `app#A#shared#I1` vs `app#A#u#S1` under `listScopes` (spec "Shared
       scope-key grammar" scenarios).
-- [ ] 3.5 New test file `server/workspace/tests/install-hosting-mode.test.ts`:
+- [x] 3.5 New test file `server/workspace/tests/install-hosting-mode.test.ts`:
       mode fixed at creation, flip rejected with 409 and stored record
       unchanged, absent-field record reads as `managed`.
 
