@@ -84,6 +84,33 @@ spec-compliant), and states explicitly that Stream 3 owns it because Stream
 1's `Touches` never opens `socket.ts`. Tech-plan D1 gained a matching
 parenthetical pointing to Stream 3.
 
+## 5. Registry grep gate — pre-existing false positive on Datadog types
+
+**Finding (Stream 4).** The Verify command `! grep -rn --include="*.ts"
+"focusByConn\|UserMembership" ../registry/packages` returns 3 non-zero results:
+
+```
+registry/packages/utdk/datadog/metadata.ts:16862:  "GetUserMemberships": {
+registry/packages/utdk/datadog/metadata.ts:16864:      "getUserMemberships"
+registry/packages/utdk/datadog/types/index.ts:8595:  getUserMemberships: (input: {
+```
+
+These are Datadog API client type definitions (`GetUserMemberships`,
+`getUserMemberships`) that contain the substring `UserMembership` — a Datadog
+API operation for listing Datadog user memberships, entirely unrelated to the
+presence handler's former `UserMembership` interface. These files were last
+changed in commit `2167184` (stream 4, Aug 2025) and have not been touched by
+any F5 stream. The grep pattern `UserMembership` matches these Datadog names as
+substrings, not as the symbol F5 deleted.
+
+**Fix.** None; this is outside Stream 4's `Touches` (`realtime-e2e.test.ts`
+only). The gate as written will exit 1 for this reason. Stream 4's report
+documents this as a pre-existing false positive. The deleted symbol
+(`UserMembership` the presence interface) is confirmed absent from
+`server/workspace/src/realtime/presence.ts` (gate 2 passes cleanly). The
+registry hits are not the deleted symbol; they cannot be a migration-debt
+indicator for F5's work.
+
 ## 4. Full-suite baseline recorded (for Stream 4)
 
 Ran `pnpm --filter @aprovan/workspace test` against a clean `main` checkout
