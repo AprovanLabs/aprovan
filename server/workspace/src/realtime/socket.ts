@@ -31,6 +31,12 @@ export const REALTIME_SUBPROTOCOL = "aprovan.v1";
 const DEFAULT_PING_INTERVAL_MS = 30_000;
 const DEFAULT_MAX_MISSED_PONGS = 2;
 
+// Backpressure defaults (tech-plan D5).
+const DEFAULT_OUTBOUND_QUEUE_LIMIT = 256;   // event frames per connection
+const DEFAULT_FLUSH_INTERVAL_MS = 25;        // batch flush cadence
+const DEFAULT_SEND_HIGH_WATER_MARK = 1 << 20; // 1 MiB ws.bufferedAmount gate
+const DEFAULT_MAX_FULL_BUFFER_FLUSHES = 3;   // consecutive → close 1013
+
 export interface AttachRealtimeOptions {
   /** Override the broker (tests register handlers on a shared instance). */
   broker?: RealtimeBroker;
@@ -48,6 +54,116 @@ export interface AttachRealtimeOptions {
     req: IncomingMessage,
     protocols: string[],
   ) => Promise<{ principal: Principal; exp?: number } | null>;
+  // Backpressure — same injectable-constant pattern as pingIntervalMs above:
+  /** Max queued event frames per connection before drop-oldest kicks in; default 256. */
+  outboundQueueLimit?: number;
+  /** Batch flush interval in ms; default 25. */
+  flushIntervalMs?: number;
+  /** Hold flush while ws.bufferedAmount exceeds this; default 1 MiB. */
+  sendHighWaterMark?: number;
+  /** Close with 1013 after this many consecutive full-buffer flush attempts; default 3. */
+  maxFullBufferFlushes?: number;
+}
+
+/**
+ * Minimal WebSocket surface used by OutboundChannel.
+ * Typed separately so tests can pass a plain object instead of a real WebSocket.
+ * @internal
+ */
+export interface WsLike {
+  readonly readyState: number;
+  readonly OPEN: number;
+  bufferedAmount: number;
+  send(data: string): void;
+  close(code: number, reason: string): void;
+}
+
+/**
+ * Per-connection outbound channel (tech-plan D5).
+ *
+ * - `event` frames enter a bounded drop-oldest queue; excess oldest frames are
+ *   silently dropped when the queue is full.
+ * - `subscribed`/`error` and any future non-event frame write immediately on
+ *   the priority path — never queued, never dropped.
+ * - A timer batches queue flushes onto the socket.  While `ws.bufferedAmount`
+ *   exceeds `sendHighWaterMark` the flusher holds the queue.  After
+ *   `maxFullBufferFlushes` consecutive held flushes the socket is closed with
+ *   1013 and the normal cleanup path runs.
+ *
+ * Exported for unit testing; not part of the public API — the public surface
+ * is `Conn.send(msg)` unchanged.
+ */
+export class OutboundChannel {
+  private readonly queue: Array<{ type: "event"; topic: string; body: unknown }> = [];
+  private consecutiveFullFlushes = 0;
+  private readonly flushTimer: ReturnType<typeof setInterval>;
+
+  constructor(
+    private readonly ws: WsLike,
+    private readonly queueLimit: number,
+    private readonly highWaterMark: number,
+    private readonly maxFullFlushes: number,
+    flushIntervalMs: number,
+  ) {
+    this.flushTimer = setInterval(() => this.flush(), flushIntervalMs);
+    this.flushTimer.unref?.();
+  }
+
+  /** Route a ServerMessage: event frames queue; all other frames write immediately. */
+  send(msg: ServerMessage): void {
+    if (this.ws.readyState !== this.ws.OPEN) return;
+
+    if (msg.type === "event") {
+      // Bounded drop-oldest queue.
+      if (this.queue.length >= this.queueLimit) {
+        this.queue.shift(); // drop oldest
+      }
+      this.queue.push(msg);
+    } else {
+      // Priority path: subscribed, error, and any future non-event frame.
+      this.ws.send(JSON.stringify(msg));
+    }
+  }
+
+  /** Stop the flush timer (call on close/cleanup). */
+  destroy(): void {
+    clearInterval(this.flushTimer);
+  }
+
+  /**
+   * Exposed for unit tests to trigger a flush synchronously without waiting for
+   * the timer.  Production code uses the timer exclusively.
+   * @internal
+   */
+  flushNow(): void {
+    this.flush();
+  }
+
+  private flush(): void {
+    if (this.ws.readyState !== this.ws.OPEN) return;
+    if (this.queue.length === 0) {
+      // Nothing to flush; a drain while there was nothing queued resets the counter.
+      this.consecutiveFullFlushes = 0;
+      return;
+    }
+
+    if (this.ws.bufferedAmount > this.highWaterMark) {
+      this.consecutiveFullFlushes += 1;
+      if (this.consecutiveFullFlushes >= this.maxFullFlushes) {
+        // Persistently slow client — close with 1013 and let cleanup run.
+        this.ws.close(1013, "send buffer full");
+      }
+      return;
+    }
+
+    // Buffer is healthy — drain the queue in enqueue order and reset the counter.
+    this.consecutiveFullFlushes = 0;
+    const batch = this.queue.splice(0, this.queue.length);
+    for (const frame of batch) {
+      if (this.ws.readyState !== this.ws.OPEN) break;
+      this.ws.send(JSON.stringify(frame));
+    }
+  }
 }
 
 export interface RealtimeHandle {
@@ -162,6 +278,10 @@ export function attachRealtime(
   const maxMissedPongs = options.maxMissedPongs ?? DEFAULT_MAX_MISSED_PONGS;
   const now = options.now ?? Date.now;
   const authenticate = options.authenticate ?? defaultAuthenticate;
+  const outboundQueueLimit = options.outboundQueueLimit ?? DEFAULT_OUTBOUND_QUEUE_LIMIT;
+  const flushIntervalMs = options.flushIntervalMs ?? DEFAULT_FLUSH_INTERVAL_MS;
+  const sendHighWaterMark = options.sendHighWaterMark ?? DEFAULT_SEND_HIGH_WATER_MARK;
+  const maxFullBufferFlushes = options.maxFullBufferFlushes ?? DEFAULT_MAX_FULL_BUFFER_FLUSHES;
 
   const wss = new WebSocketServer({ noServer: true, handleProtocols: () => REALTIME_SUBPROTOCOL });
   const sockets = new Set<WebSocket>();
@@ -206,14 +326,22 @@ export function attachRealtime(
     ) => {
       sockets.add(ws);
 
+      // OutboundChannel routes event frames through the bounded queue and
+      // flushes in batches; control frames (subscribed/error) write immediately.
+      const channel = new OutboundChannel(
+        ws,
+        outboundQueueLimit,
+        sendHighWaterMark,
+        maxFullBufferFlushes,
+        flushIntervalMs,
+      );
+
       const conn: Conn = {
         id: randomUUID(),
         userId: auth.principal.sub,
         workspaceId: auth.principal.workspaceId,
         send(msg: ServerMessage) {
-          if (ws.readyState === ws.OPEN) {
-            ws.send(JSON.stringify(msg));
-          }
+          channel.send(msg);
         },
       };
       broker.addConnection(conn);
@@ -266,13 +394,14 @@ export function attachRealtime(
           conn.send({ type: "error", code: "bad-message", message: "invalid message" });
           return;
         }
-        broker.handleClientMessage(conn, parsed);
+        void broker.handleClientMessage(conn, parsed);
       });
 
       let cleaned = false;
       const cleanup = (): void => {
         if (cleaned) return;
         cleaned = true;
+        channel.destroy();
         clearInterval(pingTimer);
         if (expTimer) clearTimeout(expTimer);
         sockets.delete(ws);

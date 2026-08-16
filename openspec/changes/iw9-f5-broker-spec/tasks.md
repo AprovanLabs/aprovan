@@ -88,18 +88,18 @@ handoff on one file._
 
 > Repo: aprovan | Depends-on: 1 | Touches: aprovan/server/workspace/src/realtime/socket.ts, aprovan/server/workspace/tests/realtime-socket.test.ts, aprovan/server/workspace/tests/realtime-backpressure.test.ts | Verify: pnpm --filter @aprovan/workspace exec vitest run tests/realtime-socket.test.ts tests/realtime-backpressure.test.ts
 
-- [ ] 3.1 Build the OutboundChannel inside socket.ts behind the unchanged
+- [x] 3.1 Build the OutboundChannel inside socket.ts behind the unchanged
       `Conn.send(msg)` signature: `event` frames enter a bounded drop-oldest
       queue; `subscribed`/`error` and any future non-event frame write
       immediately on the priority path (tech-plan D5; spec realtime-socket
       "Bounded outbound queue" + "Priority control channel").
-- [ ] 3.2 Batch flusher: flush queued events in enqueue order on the flush
+- [x] 3.2 Batch flusher: flush queued events in enqueue order on the flush
       interval, holding while `ws.bufferedAmount` exceeds the high-water
       mark; count consecutive flush attempts that find the buffer still full,
       reset on drain, and `ws.close(1013, ...)` at N — normal close path runs
       cleanup → `broker.removeConnection` (spec "Batch flush" +
       "Slow-client disconnect").
-- [ ] 3.3 Extend `AttachRealtimeOptions` with `outboundQueueLimit` (256),
+- [x] 3.3 Extend `AttachRealtimeOptions` with `outboundQueueLimit` (256),
       `flushIntervalMs` (25), `sendHighWaterMark` (1 MiB),
       `maxFullBufferFlushes` (3) — defaults as constants, all
       test-injectable, matching the existing `pingIntervalMs` pattern. After
@@ -113,7 +113,7 @@ handoff on one file._
       one-line edit: Stream 1's Touches is limited to broker.ts/store.ts and
       never opens socket.ts. Update `tests/realtime-socket.test.ts` for the
       async call site accordingly.
-- [ ] 3.4 New `tests/realtime-backpressure.test.ts`: full queue drops oldest
+- [x] 3.4 New `tests/realtime-backpressure.test.ts`: full queue drops oldest
       and keeps newest; control frame delivered while event queue saturated;
       burst coalesced into batched in-order writes; N consecutive full-buffer
       flushes → close 1013 with handlers observing a normal disconnect;

@@ -204,12 +204,23 @@ describe("realtime-socket", () => {
 
     function attachWithAuth(
       resolve: (protocols: string[]) => { principal: Principal; exp?: number } | null,
-      opts: { pingIntervalMs?: number; maxMissedPongs?: number } = {},
+      opts: {
+        pingIntervalMs?: number;
+        maxMissedPongs?: number;
+        flushIntervalMs?: number;
+        outboundQueueLimit?: number;
+        sendHighWaterMark?: number;
+        maxFullBufferFlushes?: number;
+      } = {},
     ): void {
       handle = attachRealtime(server, {
         broker,
         pingIntervalMs: opts.pingIntervalMs,
         maxMissedPongs: opts.maxMissedPongs,
+        flushIntervalMs: opts.flushIntervalMs,
+        outboundQueueLimit: opts.outboundQueueLimit,
+        sendHighWaterMark: opts.sendHighWaterMark,
+        maxFullBufferFlushes: opts.maxFullBufferFlushes,
         authenticate: async (_req, protocols) => {
           if (!protocols.includes(REALTIME_SUBPROTOCOL)) return null;
           return resolve(protocols);
@@ -306,12 +317,7 @@ describe("realtime-socket", () => {
       attachWithAuth(() => ({ principal: principal() }));
       const ws = await openWs(port);
 
-      ws.send(JSON.stringify({ type: "subscribe", topic: "doc:notes/plan.md" }));
-      expect(await nextMessage(ws)).toMatchObject({
-        type: "error",
-        code: "reserved-namespace",
-      });
-
+      // fs is still reserved (no handler registered for it).
       ws.send(JSON.stringify({ type: "subscribe", topic: "fs:changes" }));
       expect(await nextMessage(ws)).toMatchObject({
         type: "error",
