@@ -16,6 +16,8 @@
  *   PK = t#<tenantWorkspaceId>#s#<scope>        SK = <key>
  *     scope for a workspace caller:  "ws"                     (shared workspace KV)
  *     scope for an app session:      "app#<name>#u#<userSub>" (per-app-user, always)
+ *     scope for a shared instance:   "app#<id>#shared#<instanceId>" (participant ACL
+ *                                    + byte metering via apps/instances.ts — iw9-f2)
  *
  * `tenantWorkspaceId` is the only thing that varies with tenancy resolution
  * (owner's workspace vs. the caller's own) — the scope suffix is identical
@@ -109,6 +111,48 @@ function partitionKey(tenant: string, scope: string): string {
   return `t#${tenant}#s#${scope}`;
 }
 
+// ---------------------------------------------------------------------------
+// Shared-scope metering (iw9-f2 tech-plan TD5)
+//
+// Rows written under an `app#<id>#shared#<instanceId>` scope carry the
+// serialized-value byte size (Dynamo item attribute / nullable SQL column
+// `bytes`; spilled values included, sized before the spill). Each backend
+// reads the prior row's stamp, and the write/delete path feeds the delta to
+// `reserveInstanceBytes` in apps/instances.ts — the pre-write cap gate (413,
+// strict) plus a best-effort bump of the instance record's `storageBytes`
+// counter. Legacy, per-user, and svc# rows keep `bytes` null and are never
+// metered. `RecordEntry` is unchanged; the stamp is internal to metering.
+// ---------------------------------------------------------------------------
+
+/** `app#<id>#shared#<instanceId>` → instanceId; undefined for any other scope. */
+function sharedScopeInstanceId(scope: string): string | undefined {
+  return /^app#[^#]+#shared#([^#]+)$/.exec(scope)?.[1];
+}
+
+/**
+ * Cap gate + best-effort counter delta for one shared-scope write/delete. The
+ * 413 over-cap rejection propagates (the caller must store nothing); every
+ * other failure — instance record missing (orphan crash window; the ACL
+ * layer, not metering, polices those scopes), counter-write hiccup — is
+ * swallowed: the counter is eventually consistent and `recountInstanceUsage`
+ * is the correction path (TD5). Dynamic import because a static one would
+ * close the cycle records.ts → apps/instances.ts → svc-records.ts → records.ts.
+ */
+async function meterSharedScopeDelta(
+  tenant: string,
+  scope: string,
+  deltaBytes: number,
+): Promise<void> {
+  const instanceId = sharedScopeInstanceId(scope);
+  if (instanceId === undefined || deltaBytes === 0) return;
+  try {
+    const { reserveInstanceBytes } = await import("./apps/instances.js");
+    await reserveInstanceBytes(tenant, instanceId, deltaBytes);
+  } catch (error) {
+    if ((error as { status?: number } | null)?.status === 413) throw error;
+  }
+}
+
 export class RecordStoreDynamodb implements IRecordStore {
   private readonly tableName: string;
   private readonly bucket: string | undefined;
@@ -153,7 +197,16 @@ export class RecordStoreDynamodb implements IRecordStore {
   ): Promise<RecordEntry> {
     const updatedAt = new Date().toISOString();
     const json = JSON.stringify(value ?? null);
-    const spill = Buffer.byteLength(json, "utf8") > SPILL_THRESHOLD_BYTES;
+    const bytes = Buffer.byteLength(json, "utf8");
+    const shared = sharedScopeInstanceId(scope) !== undefined;
+    if (shared) {
+      // Cap gate before anything is stored (spill blob included) — a 413
+      // here must leave no trace. The prior stamp comes from a projected
+      // read rather than `ReturnValues: ALL_OLD` on the Put, because ALL_OLD
+      // only reports after the item is already written.
+      await meterSharedScopeDelta(tenant, scope, bytes - (await this.readBytes(tenant, scope, key)));
+    }
+    const spill = bytes > SPILL_THRESHOLD_BYTES;
     const item: Record<string, unknown> = {
       PK: partitionKey(tenant, scope),
       SK: key,
@@ -162,6 +215,7 @@ export class RecordStoreDynamodb implements IRecordStore {
       key,
       updatedAt,
       updatedBy,
+      ...(shared ? { bytes } : {}),
       ...(options?.expiresAtEpochSeconds
         ? { expiresAt: Math.floor(options.expiresAtEpochSeconds) }
         : {}),
@@ -212,7 +266,25 @@ export class RecordStoreDynamodb implements IRecordStore {
         .send(new DeleteObjectCommand({ Bucket: this.bucket, Key: this.blobKey(tenant, scope, key) }))
         .catch(() => undefined);
     }
+    // Shared-scope rows give back their `bytes` stamp via ALL_OLD (TD5);
+    // deletes are never blocked, so the negative delta cannot 413.
+    const oldBytes = Number(result.Attributes["bytes"] ?? 0);
+    if (oldBytes) await meterSharedScopeDelta(tenant, scope, -oldBytes);
     return true;
+  }
+
+  /** Stored `bytes` stamp for a shared-scope row; 0 when absent. */
+  private async readBytes(tenant: string, scope: string, key: string): Promise<number> {
+    const { client, GetCommand } = await dynamo();
+    const result = await client.send(
+      new GetCommand({
+        TableName: this.tableName,
+        Key: { PK: partitionKey(tenant, scope), SK: key },
+        ProjectionExpression: "#bytes",
+        ExpressionAttributeNames: { "#bytes": "bytes" },
+      }),
+    );
+    return Number(result.Item?.["bytes"] ?? 0);
   }
 
   async list(tenant: string, scope: string, prefix = ""): Promise<string[]> {
@@ -314,12 +386,19 @@ export class RecordStoreSqlite implements IRecordStore {
         updated_at TEXT NOT NULL,
         updated_by TEXT NOT NULL,
         expires_at INTEGER,
+        bytes INTEGER,
         PRIMARY KEY (tenant, scope, key)
       );
     `);
     // Pre-expiry dev databases lack the column; add it in place.
     try {
       this.database.exec(`ALTER TABLE records ADD COLUMN expires_at INTEGER`);
+    } catch {
+      // Column already exists.
+    }
+    // Pre-metering databases lack the shared-scope `bytes` stamp (TD5).
+    try {
+      this.database.exec(`ALTER TABLE records ADD COLUMN bytes INTEGER`);
     } catch {
       // Column already exists.
     }
@@ -359,28 +438,51 @@ export class RecordStoreSqlite implements IRecordStore {
     options?: RecordSetOptions,
   ): Promise<RecordEntry> {
     const updatedAt = new Date().toISOString();
+    const json = JSON.stringify(value ?? null);
+    const shared = sharedScopeInstanceId(scope) !== undefined;
+    const bytes = Buffer.byteLength(json, "utf8");
+    if (shared) {
+      // Cap gate before the row is stored — a 413 must leave nothing behind.
+      await meterSharedScopeDelta(tenant, scope, bytes - this.readBytes(tenant, scope, key));
+    }
     this.database
       .prepare(
-        `INSERT OR REPLACE INTO records (tenant, scope, key, value, updated_at, updated_by, expires_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT OR REPLACE INTO records (tenant, scope, key, value, updated_at, updated_by, expires_at, bytes)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         tenant,
         scope,
         key,
-        JSON.stringify(value ?? null),
+        json,
         updatedAt,
         updatedBy,
         options?.expiresAtEpochSeconds ?? null,
+        shared ? bytes : null,
       );
     return { tenant, scope, key, value: value ?? null, updatedAt, updatedBy };
   }
 
   async delete(tenant: string, scope: string, key: string): Promise<boolean> {
+    // Prior row's stamp, read before the delete (TD5's "SQL backends read
+    // prior row"); deletes are never blocked, so the delta cannot 413.
+    const oldBytes =
+      sharedScopeInstanceId(scope) === undefined ? 0 : this.readBytes(tenant, scope, key);
     const result = this.database
       .prepare(`DELETE FROM records WHERE tenant = ? AND scope = ? AND key = ?`)
       .run(tenant, scope, key);
+    if (result.changes > 0 && oldBytes) {
+      await meterSharedScopeDelta(tenant, scope, -oldBytes);
+    }
     return result.changes > 0;
+  }
+
+  /** Stored `bytes` stamp for a shared-scope row; 0 when absent. */
+  private readBytes(tenant: string, scope: string, key: string): number {
+    const row = this.database
+      .prepare(`SELECT bytes FROM records WHERE tenant = ? AND scope = ? AND key = ?`)
+      .get(tenant, scope, key) as { bytes: number | null } | undefined;
+    return row?.bytes ?? 0;
   }
 
   async list(tenant: string, scope: string, prefix = ""): Promise<string[]> {
@@ -480,7 +582,19 @@ export class RecordStoreDsql implements IRecordStore {
     const { dsqlQuery, withOccRetry } = await this.db();
     const updatedAt = new Date().toISOString();
     const json = JSON.stringify(value ?? null);
-    const spill = Buffer.byteLength(json, "utf8") > SPILL_THRESHOLD_BYTES;
+    const bytes = Buffer.byteLength(json, "utf8");
+    const shared = sharedScopeInstanceId(scope) !== undefined;
+    if (shared) {
+      // Cap gate before anything is stored (spill blob included) — a 413
+      // must leave no trace. Prior stamp read per TD5 ("SQL backends read
+      // prior row").
+      const prior = await dsqlQuery(
+        `SELECT bytes FROM records WHERE tenant = $1 AND scope = $2 AND key = $3`,
+        [tenant, scope, key],
+      );
+      await meterSharedScopeDelta(tenant, scope, bytes - Number(prior.rows[0]?.["bytes"] ?? 0));
+    }
+    const spill = bytes > SPILL_THRESHOLD_BYTES;
     if (spill) {
       const bucket = this.requireBucket();
       const { client, PutObjectCommand } = await s3();
@@ -495,10 +609,10 @@ export class RecordStoreDsql implements IRecordStore {
     }
     await withOccRetry(() =>
       dsqlQuery(
-        `INSERT INTO records (tenant, scope, key, value, spilled, updated_at, updated_by, expires_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        `INSERT INTO records (tenant, scope, key, value, spilled, updated_at, updated_by, expires_at, bytes)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          ON CONFLICT (tenant, scope, key)
-         DO UPDATE SET value = $4, spilled = $5, updated_at = $6, updated_by = $7, expires_at = $8`,
+         DO UPDATE SET value = $4, spilled = $5, updated_at = $6, updated_by = $7, expires_at = $8, bytes = $9`,
         [
           tenant,
           scope,
@@ -508,6 +622,7 @@ export class RecordStoreDsql implements IRecordStore {
           updatedAt,
           updatedBy,
           options?.expiresAtEpochSeconds ? Math.floor(options.expiresAtEpochSeconds) : null,
+          shared ? bytes : null,
         ],
       ),
     );
@@ -523,8 +638,8 @@ export class RecordStoreDsql implements IRecordStore {
 
   async delete(tenant: string, scope: string, key: string): Promise<boolean> {
     const { dsqlQuery, withOccRetry } = await this.db();
-    const spilled = await dsqlQuery(
-      `SELECT spilled FROM records WHERE tenant = $1 AND scope = $2 AND key = $3`,
+    const prior = await dsqlQuery(
+      `SELECT spilled, bytes FROM records WHERE tenant = $1 AND scope = $2 AND key = $3`,
       [tenant, scope, key],
     );
     const result = await withOccRetry(() =>
@@ -535,12 +650,16 @@ export class RecordStoreDsql implements IRecordStore {
       ]),
     );
     if ((result.rowCount ?? 0) === 0) return false;
-    if (spilled.rows[0]?.["spilled"] && this.bucket) {
+    if (prior.rows[0]?.["spilled"] && this.bucket) {
       const { client, DeleteObjectCommand } = await s3();
       await client
         .send(new DeleteObjectCommand({ Bucket: this.bucket, Key: this.blobKey(tenant, scope, key) }))
         .catch(() => undefined);
     }
+    // Shared-scope rows give back their stamp via the prior-row read (TD5);
+    // deletes are never blocked, so the negative delta cannot 413.
+    const oldBytes = Number(prior.rows[0]?.["bytes"] ?? 0);
+    if (oldBytes) await meterSharedScopeDelta(tenant, scope, -oldBytes);
     return true;
   }
 

@@ -24,9 +24,12 @@
  */
 
 import { ulid } from "ulid";
+import { getFsStore, listAll } from "../fs-store.js";
 import { getMembership } from "../memberships.js";
+import { getRecordStore } from "../records.js";
 import { ServiceError } from "../service-kernel.js";
 import {
+  deleteSvcRecord,
   listSvcRecords,
   readSvcRecord,
   svcScope,
@@ -205,4 +208,109 @@ export async function removeParticipant(
     await writeSvcRecord(workspaceId, INSTANCES_SCOPE, instanceId, record, actor);
   }
   return record;
+}
+
+// ---------------------------------------------------------------------------
+// Storage metering (tech-plan TD5, IW-9 D22): the host pays for storage, so
+// the host sees per-instance size, caps it, and may delete the instance. The
+// counter is best-effort/eventually consistent — shared-scope writes and
+// deletes in records.ts feed byte deltas through `reserveInstanceBytes`, and
+// `recountInstanceUsage` is the authoritative correction path. Host-gating
+// and audit rows live in the `apps.instance*` procedures (stream 5), not here.
+// ---------------------------------------------------------------------------
+
+export async function setInstanceCap(
+  workspaceId: string,
+  instanceId: string,
+  capBytes: number | undefined,
+  actor: string,
+): Promise<AppInstanceRecord> {
+  if (capBytes !== undefined && (!Number.isSafeInteger(capBytes) || capBytes < 0)) {
+    throw new ServiceError("storageCapBytes must be a non-negative integer", 400);
+  }
+  const record = await requireInstance(workspaceId, instanceId);
+  if (capBytes === undefined) delete record.storageCapBytes;
+  else record.storageCapBytes = capBytes;
+  record.updatedAt = new Date().toISOString();
+  await writeSvcRecord(workspaceId, INSTANCES_SCOPE, instanceId, record, actor);
+  return record;
+}
+
+/**
+ * Pre-write cap gate plus counter delta in one call (TD5): throws 413 when a
+ * positive delta would push `storageBytes` past `storageCapBytes`, otherwise
+ * applies the delta and persists. Negative deltas (deletes) are never blocked
+ * — an over-cap instance must stay shrinkable — and the counter floors at 0
+ * rather than going negative under drift.
+ */
+export async function reserveInstanceBytes(
+  workspaceId: string,
+  instanceId: string,
+  deltaBytes: number,
+): Promise<void> {
+  if (deltaBytes === 0) return;
+  const record = await requireInstance(workspaceId, instanceId);
+  if (
+    deltaBytes > 0 &&
+    record.storageCapBytes !== undefined &&
+    record.storageBytes + deltaBytes > record.storageCapBytes
+  ) {
+    throw new ServiceError(
+      `Instance ${instanceId} storage cap exceeded: ${record.storageBytes} + ${deltaBytes} > ${record.storageCapBytes} bytes`,
+      413,
+    );
+  }
+  record.storageBytes = Math.max(0, record.storageBytes + deltaBytes);
+  record.updatedAt = new Date().toISOString();
+  await writeSvcRecord(workspaceId, INSTANCES_SCOPE, instanceId, record);
+}
+
+/**
+ * Recompute the instance's true footprint — every record in its shared scope
+ * (spilled values included: `get` resolves them from S3 before sizing) plus
+ * every file under its shared dir — rewrite `storageBytes`, and return the
+ * figure. This is the authoritative correction for counter drift (TD5).
+ */
+export async function recountInstanceUsage(
+  workspaceId: string,
+  instanceId: string,
+): Promise<number> {
+  const record = await requireInstance(workspaceId, instanceId);
+  const store = getRecordStore();
+  const scope = sharedRecordScope(record.appId, instanceId);
+  let total = 0;
+  for (const key of await store.list(workspaceId, scope)) {
+    const hit = await store.get(workspaceId, scope, key);
+    if (hit) total += Buffer.byteLength(JSON.stringify(hit.value ?? null), "utf8");
+  }
+  const files = await listAll(getFsStore(), workspaceId, sharedDataDir(record.appId, instanceId));
+  for (const entry of files) total += entry.size;
+
+  record.storageBytes = total;
+  record.updatedAt = new Date().toISOString();
+  await writeSvcRecord(workspaceId, INSTANCES_SCOPE, instanceId, record);
+  return total;
+}
+
+/**
+ * Remove the instance outright: every record in its shared scope (the store's
+ * own delete cleans up spilled blobs), the shared file subtree (same FsStore
+ * prefix removal `purgeInstallData` uses), then the instance record itself —
+ * after which all access fails closed (404, orphan-scope rule). Mechanism
+ * only: the audit row naming `actor` is appended by the stream-5
+ * `apps.instanceDelete` procedure, which is also where host-gating lives.
+ */
+export async function deleteInstance(
+  workspaceId: string,
+  instanceId: string,
+  _actor: string,
+): Promise<void> {
+  const record = await requireInstance(workspaceId, instanceId);
+  const store = getRecordStore();
+  const scope = sharedRecordScope(record.appId, instanceId);
+  for (const key of await store.list(workspaceId, scope)) {
+    await store.delete(workspaceId, scope, key);
+  }
+  await getFsStore().removePrefix(workspaceId, sharedDataDir(record.appId, instanceId));
+  await deleteSvcRecord(workspaceId, INSTANCES_SCOPE, instanceId);
 }

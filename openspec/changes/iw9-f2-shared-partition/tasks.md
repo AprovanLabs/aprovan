@@ -97,28 +97,28 @@ releases.ts` (owned by iw9-a) or `server/workspace/src/apps/identity.ts`
 
 > Depends-on: 1 | Repo: aprovan | Touches: aprovan/server/workspace/src/records.ts, aprovan/server/workspace/src/db/dsql-schema.sql, aprovan/server/workspace/src/apps/instances.ts, aprovan/server/workspace/tests/instance-storage.test.ts | Verify: pnpm -C server/workspace exec vitest run tests/instance-storage.test.ts && pnpm -C server/workspace typecheck
 
-- [ ] 4.1 Stamp serialized-value byte size on rows written under `#shared#`
+- [x] 4.1 Stamp serialized-value byte size on rows written under `#shared#`
       scopes in all three `IRecordStore` backends (Dynamo item attribute
       `bytes`; nullable `bytes INTEGER` column for SQLite in-place ALTER and
       dsql-schema.sql), per TD5. `RecordEntry` shape unchanged; legacy and
       per-user rows keep `bytes` null.
-- [ ] 4.2 Implement `setInstanceCap`, `reserveInstanceBytes` (413 when
+- [x] 4.2 Implement `setInstanceCap`, `reserveInstanceBytes` (413 when
       `storageBytes + delta > storageCapBytes`; deletes and reads never
       blocked), and best-effort counter deltas on shared record writes/
       deletes (Dynamo `ReturnValues: ALL_OLD`; SQL backends read prior row)
       in `instances.ts` (TD5; spec `instance-storage` "Host-set storage
       cap").
-- [ ] 4.3 Implement `recountInstanceUsage`: walk the instance's record scope
+- [x] 4.3 Implement `recountInstanceUsage`: walk the instance's record scope
       (including spilled S3 blob sizes) and shared file partition (FsStore
       entry sizes), rewrite `storageBytes`, return the recomputed figure
       (spec "Per-instance storage metering" / recount-corrects-drift).
-- [ ] 4.4 Implement `deleteInstance`: remove every record in the scope
+- [x] 4.4 Implement `deleteInstance`: remove every record in the scope
       (spilled blobs included, reusing the store's existing blob cleanup),
       remove the shared file subtree via the FsStore prefix removal (cf.
       `purgeInstallData`, install.ts:298-303), delete the instance record;
       subsequent access 404s (spec `instance-storage` "Host-initiated
       instance deletion" — audit row is appended by the stream-5 procedure).
-- [ ] 4.5 New test file `server/workspace/tests/instance-storage.test.ts`:
+- [x] 4.5 New test file `server/workspace/tests/instance-storage.test.ts`:
       usage reporting, over-cap write 413 with nothing stored, delete
       permitted while over cap, drift + recount convergence, deleteInstance
       clearing both planes and failing closed afterwards. Cover SQLite
