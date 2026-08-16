@@ -19,6 +19,7 @@
  */
 
 import { appsService } from "./apps/service.js";
+import { assertInstanceAccess, sharedRecordScope } from "./apps/instances.js";
 import {
   appDataDir,
   appFsAllowed,
@@ -107,6 +108,42 @@ function kvScope(ctx: ServiceContext): string {
   return resolved;
 }
 
+/**
+ * Instance-aware record-store scope for this call — the frozen iw9-b seam
+ * (iw9-f2 tech-plan "Interfaces & Data"). Absent `instance` preserves
+ * {@link kvScope} behavior exactly; with `instance` an app session addresses
+ * its instance's shared partition `app#<id>#shared#<instanceId>`, returned
+ * only after `assertInstanceAccess` (deny-as-404; participant ACL and
+ * managed-membership re-checked per request — invariants 3, 4, 5). Malformed
+ * instance ids (empty, `#`-bearing, non-ident) are 400 before any lookup, so
+ * a scope like `app#A#team#X` or `app#A#shared#` can never be formed here.
+ */
+export async function resolveRecordScope(
+  ctx: ServiceContext,
+  opts?: { instance?: string },
+): Promise<string> {
+  if (opts?.instance === undefined) return kvScope(ctx);
+  const instance = ident(opts.instance, "instance");
+  const app = ctx.appScope;
+  if (!app) {
+    throw new ServiceError("instance addressing requires an app session", 400);
+  }
+  await assertInstanceAccess(ctx.workspaceId, app.id, instance, ctx.userId);
+  const resolved = sharedRecordScope(app.id, instance);
+  assertCallerScope(resolved, "scope", ctx.userId);
+  return resolved;
+}
+
+/** Optional `instance` argument on the record/keyvalue procedures. */
+function instanceOpt(args: Record<string, unknown>): { instance?: string } {
+  const raw = args["instance"];
+  if (raw === undefined || raw === null) return {};
+  if (typeof raw !== "string") {
+    throw new ServiceError("instance must be a string", 400);
+  }
+  return { instance: raw };
+}
+
 /** Where this key would have lived under the old FS-backed keyvalue, for the
  * lazy-migration fallback read and for `list`'s legacy-key merge. */
 function legacyKvPath(ctx: ServiceContext, key: string): string {
@@ -126,7 +163,11 @@ const keyvalue: CoreService = {
       name: "keyvalue.get",
       operation: "get",
       description: "Read a value by key (null when absent).",
-      inputSchema: { type: "object", properties: { key: { type: "string" } }, required: ["key"] },
+      inputSchema: {
+        type: "object",
+        properties: { key: { type: "string" }, instance: { type: "string" } },
+        required: ["key"],
+      },
     },
     {
       name: "keyvalue.set",
@@ -134,7 +175,7 @@ const keyvalue: CoreService = {
       description: "Write a JSON-serializable value under a key.",
       inputSchema: {
         type: "object",
-        properties: { key: { type: "string" }, value: {} },
+        properties: { key: { type: "string" }, value: {}, instance: { type: "string" } },
         required: ["key", "value"],
       },
     },
@@ -142,25 +183,37 @@ const keyvalue: CoreService = {
       name: "keyvalue.delete",
       operation: "delete",
       description: "Delete a key.",
-      inputSchema: { type: "object", properties: { key: { type: "string" } }, required: ["key"] },
+      inputSchema: {
+        type: "object",
+        properties: { key: { type: "string" }, instance: { type: "string" } },
+        required: ["key"],
+      },
     },
     {
       name: "keyvalue.list",
       operation: "list",
       description: "List keys under an optional prefix.",
-      inputSchema: { type: "object", properties: { prefix: { type: "string" } } },
+      inputSchema: {
+        type: "object",
+        properties: { prefix: { type: "string" }, instance: { type: "string" } },
+      },
     },
   ],
 
   async call(ctx, procedure, args) {
     const records = getRecordStore();
     const tenant = ctx.workspaceId;
-    const scope = kvScope(ctx);
+    const opts = instanceOpt(args);
+    const scope = await resolveRecordScope(ctx, opts);
+    // Shared instance scopes post-date the FS-backed keyvalue, so
+    // instance-addressed calls skip the legacy fallback/migration entirely.
+    const shared = opts.instance !== undefined;
     switch (procedure) {
       case "get": {
         const key = ident(args["key"], "key");
         const hit = await records.get(tenant, scope, key);
         if (hit) return { key, value: hit.value };
+        if (shared) return { key, value: null };
 
         // Miss: fall back to the legacy FS path. Found → migrate in place
         // (write-through then delete) so the next read is a plain hit.
@@ -178,22 +231,27 @@ const keyvalue: CoreService = {
         // shadow if one exists so a reader can't resurrect an old value
         // (e.g. after a delete + re-set) by falling through to it. Best
         // effort — the file may well not exist.
-        await getFsStore()
-          .remove(tenant, legacyKvPath(ctx, key))
-          .catch(() => undefined);
+        if (!shared) {
+          await getFsStore()
+            .remove(tenant, legacyKvPath(ctx, key))
+            .catch(() => undefined);
+        }
         return { key, ok: true };
       }
       case "delete": {
         const key = ident(args["key"], "key");
         const deletedRecord = await records.delete(tenant, scope, key);
-        const deletedLegacy = await getFsStore()
-          .remove(tenant, legacyKvPath(ctx, key))
-          .catch(() => false);
+        const deletedLegacy = shared
+          ? false
+          : await getFsStore()
+              .remove(tenant, legacyKvPath(ctx, key))
+              .catch(() => false);
         return { key, deleted: deletedRecord || deletedLegacy };
       }
       case "list": {
         const prefix = typeof args["prefix"] === "string" ? args["prefix"] : "";
         const recordKeys = await records.list(tenant, scope, prefix);
+        if (shared) return { keys: [...recordKeys].sort() };
 
         // Merge in not-yet-migrated legacy keys (defense during the
         // migration window; harmless once the sweep script has run).
