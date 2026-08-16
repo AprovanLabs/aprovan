@@ -802,6 +802,12 @@ async function interfaceIsExecutable(
   workspaceId: string,
   namespace: string,
 ): Promise<boolean> {
+  // `vcs` always has the native aprovan workspace commit-store available as a
+  // fallback (see the short-circuit at line 765).  The generic resolver no
+  // longer returns that entry (to keep github/bitbucket reachable), so a
+  // plain resolution failure here must not suppress vcs discovery.
+  const parsed = parseInterfaceNamespace(namespace);
+  if (parsed?.interfaceId === "vcs") return true;
   try {
     const resolved = await resolveInterfaceForWorkspace(workspaceId, namespace);
     return !resolved.compat.unavailable;
@@ -1403,10 +1409,22 @@ toolsRouter.post("/:provider/:operation{.*}", rateLimitByUserId, async (c) => {
       interfaceModuleSpecifier = resolved.compat.moduleSpecifier;
       interfaceCredentialId = resolved.credentialId;
     } catch (err) {
-      const status = err instanceof ServiceError ? err.status : 500;
-      const message = err instanceof Error ? err.message : String(err);
-      recordDispatch(status, 0, message);
-      return c.json({ error: message }, status as 400);
+      // The vcs interface excludes its native `aprovan` entry from generic
+      // zero-config resolution so third-party providers (github/bitbucket) remain
+      // reachable. When zero-config resolution rejects with 400 (no binding and
+      // no connected provider), fall back to the workspace commit-store (aprovan
+      // native) — the same path the discovery handler takes at lines 765-775.
+      // When resolution *succeeds* but the resolved entry is unavailable (501),
+      // or any other non-400 error, propagate it directly.
+      if (provider === "vcs" && err instanceof ServiceError && err.status === 400) {
+        aprovanNativeInterface = "vcs";
+        provider = "aprovan";
+      } else {
+        const status = err instanceof ServiceError ? err.status : 500;
+        const message = err instanceof Error ? err.message : String(err);
+        recordDispatch(status, 0, message);
+        return c.json({ error: message }, status as 400);
+      }
     }
   } else if (provider && requestProfile) {
     // Provider namespace profile → resolve credential id from the profile store.

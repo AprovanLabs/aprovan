@@ -43,11 +43,25 @@ describe("aprovan native default bindings", () => {
 
   it("default resolution reaches aprovan without a profile", async () => {
     const workspaceId = "ws-native-default";
-    for (const id of ["vfs", "vcs", "keyvalue", "events", "telemetry"] as const) {
+    // vfs / keyvalue / events / telemetry: the aprovan credentialless entry wins
+    // zero-config resolution in the generic catalog — no credential or binding needed.
+    for (const id of ["vfs", "keyvalue", "events", "telemetry"] as const) {
       const resolved = await resolveInterfaceForWorkspace(workspaceId, id);
       expect(resolved.compat.provider).toBe(NATIVE_PROVIDER_ID);
       expect(resolved.compat.credentialless).toBe(true);
     }
+    // vcs is different: routes/tools.ts and workflows/invoke.ts each carry a
+    // dedicated native short-circuit for the workspace commit store (aprovan)
+    // that fires *before* calling resolveInterfaceForWorkspace, so the generic
+    // catalog must not also answer for the aprovan entry — otherwise third-party
+    // git-hosting providers (github/vcs, bitbucket/vcs) sharing the same
+    // interface id become permanently unreachable through dispatchInterface.
+    // Resolution for vcs therefore rejects when no binding or third-party
+    // credential is present; the native path is always reachable via the
+    // pre-resolution short-circuits in routes/tools.ts and invoke.ts.
+    await expect(resolveInterfaceForWorkspace(workspaceId, "vcs")).rejects.toThrow(
+      /no binding and no connected/iu,
+    );
   });
 
   it("a binding to a third party reaches that instead", async () => {

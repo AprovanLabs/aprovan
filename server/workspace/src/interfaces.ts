@@ -576,12 +576,27 @@ export async function resolveInterfaceForWorkspace(
   // one for `agent`: having an OpenAI key is not consent to run your agents in
   // OpenAI's cloud. Where a first-party implementation exists, it is the
   // conservative answer as well as the free one.
+  //
+  // Exception — vcs only: the `aprovan` compat entry (workspace commit store)
+  // is excluded from the generic catalog's credentialless-first zero-config
+  // resolution. Both the HTTP tools route (routes/tools.ts) and the in-process
+  // dispatch (workflows/invoke.ts) carry their own dedicated short-circuits for
+  // the native `aprovan` vcs path that fire *before* invoking the generic
+  // resolver; the generic catalog must not also answer for it, or third-party
+  // git-hosting providers (github/vcs, bitbucket/vcs) sharing the same
+  // interface id become permanently unreachable through this path.
+  //
+  // Other native-aprovan interfaces (vfs, keyvalue, events, telemetry) have no
+  // such pre-resolution bypass and their aprovan credentialless entry must
+  // continue to win zero-config normally.
+  const isVcsAprovanEntry = (entry: InterfaceCompat): boolean =>
+    interfaceId === "vcs" && entry.provider === "aprovan";
   const compat =
-    def.compat.find((entry) => entry.credentialless) ??
+    def.compat.find((entry) => entry.credentialless && !isVcsAprovanEntry(entry)) ??
     def.compat.find((entry) => connected.has(entry.provider));
   if (!compat) {
     throw new ServiceError(
-      `Interface ${interfaceId} has no profile and no connected compatible provider. ` +
+      `Interface ${interfaceId} has no binding and no connected compatible provider. ` +
         `Connect a credential for one of: ${def.compat.map((c) => c.provider).join(", ")} — or set one with profiles.set.`,
       400,
     );
