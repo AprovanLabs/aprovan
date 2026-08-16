@@ -121,10 +121,10 @@ cross-repo rule 4).
 
 > Depends-on: 2, 3, 4 | Repo: registry | Touches: registry/packages/utdk/**/package.json, registry/packages/registry-server/package.json, registry/packages/registry-server/CHANGELOG.md | Verify: npm view @aprovan/registry-server version && npm view @utdk/github version
 
-- [ ] 5.1 Publish every regenerated/annotated `@utdk/*` provider package
+- [x] 5.1 Publish every regenerated/annotated `@utdk/*` provider package
       (streams 2 and 4) to npm — additive metadata field only, no
       breaking change.
-- [ ] 5.2 Minor-bump and publish `@aprovan/registry-server` (stream 3's
+- [x] 5.2 Minor-bump and publish `@aprovan/registry-server` (stream 3's
       resource-grants storage/matcher/dispatch export — additive), on the
       `^0.2.x` line, strictly above current `0.2.10` (never re-publish
       into the deprecated-broken `0.2.4-0.2.6` range). Publish before pin
