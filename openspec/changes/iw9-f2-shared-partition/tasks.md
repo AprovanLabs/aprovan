@@ -157,7 +157,7 @@ releases.ts` (owned by iw9-a) or `server/workspace/src/apps/identity.ts`
 
 > Depends-on: 5 | Repo: aprovan | Touches: aprovan/server/workspace/tests/shared-partition-contract.test.ts | Verify: pnpm -C server/workspace exec vitest run tests/shared-partition-contract.test.ts && pnpm -C server/workspace typecheck && pnpm -C server/workspace build && test -z "$(git diff HEAD --name-only -- server/workspace/src/apps/releases.ts server/workspace/src/apps/identity.ts)" && ! grep -rn "hosting" server/workspace/scripts/ && ! grep -rln "dataScope" server/workspace/src/apps/instances.ts
 
-- [ ] 6.1 New test file `server/workspace/tests/shared-partition-contract.test.ts`
+- [x] 6.1 New test file `server/workspace/tests/shared-partition-contract.test.ts`
       pinning the frozen iw9-b seam exactly as written in tech-plan
       "Interfaces & Data": scope-string construction
       (`sharedRecordScope`/`sharedDataDir` literals), `PartitionAccess`
@@ -165,7 +165,7 @@ releases.ts` (owned by iw9-a) or `server/workspace/src/apps/identity.ts`
       instanceId, rejects other discriminators), `AppInstallation.hosting`
       accepted values, and 409/413/404/403 error codes at the module seams —
       a breaking edit by a later wave fails this suite by construction.
-- [ ] 6.2 Run the full Verify chain and confirm the gates: `releases.ts`
+- [x] 6.2 Run the full Verify chain and confirm the gates: `releases.ts`
       (iw9-a) and `identity.ts` (iw9-f4) untouched per `git diff`; no
       script under `server/workspace/scripts/` mentions `hosting` (no
       mode-flip migration exists, invariant 10); the new module carries no
