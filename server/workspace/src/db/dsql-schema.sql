@@ -33,6 +33,8 @@ CREATE TABLE IF NOT EXISTS fs_files (
 );
 
 -- Records (record store) — value NULL when spilled to S3 (records/ prefix).
+-- bytes is the serialized-value size stamp on `#shared#` scope rows (iw9-f2
+-- storage metering, TD5); NULL on legacy and per-user rows.
 CREATE TABLE IF NOT EXISTS records (
   tenant text NOT NULL,
   scope text NOT NULL,
@@ -42,8 +44,13 @@ CREATE TABLE IF NOT EXISTS records (
   updated_at text NOT NULL,
   updated_by text NOT NULL,
   expires_at bigint,
+  bytes bigint,
   PRIMARY KEY (tenant, scope, key)
 );
+
+-- Deployments that created records before metering existed should also run:
+--   ALTER TABLE records ADD COLUMN bytes bigint;
+-- (SQLite applies this additively in records.ts on open.)
 
 CREATE INDEX ASYNC IF NOT EXISTS records_scopes ON records (tenant, scope);
 
