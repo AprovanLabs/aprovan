@@ -42,21 +42,21 @@ releases.ts` (owned by iw9-a) or `server/workspace/src/apps/identity.ts`
 
 > Depends-on: 1 | Repo: aprovan | Touches: aprovan/server/workspace/src/apps/store.ts, aprovan/server/workspace/tests/shared-partition-guard.test.ts | Verify: pnpm -C server/workspace exec vitest run tests/shared-partition-guard.test.ts && pnpm -C server/workspace typecheck
 
-- [ ] 2.1 Extend `partitionAccess` (apps/store.ts:279-298) to classify
+- [x] 2.1 Extend `partitionAccess` (apps/store.ts:279-298) to classify
       `.apps/<id>/shared/<instanceId>/…` as the new `"shared"` value —
       containers (`.apps/<id>/shared` and shorter) stay `"open"`; add
       `parseSharedPartition(path)` per the tech-plan contract (TD1, TD2).
       Keep the function pure and synchronous.
-- [ ] 2.2 Extend `assertPartitionAccess` (apps/store.ts:304-313): on
+- [x] 2.2 Extend `assertPartitionAccess` (apps/store.ts:304-313): on
       `"shared"`, delegate to `instances.ts` `assertInstanceAccess`
       (deny-as-404 falls out); `hiddenDataPrefixes` (store.ts:250-252) is
       intentionally unchanged — structural `.apps` root already hides shared
       paths (tech-plan Context, deviation 2).
-- [ ] 2.3 Widen `appPathServable` (apps/store.ts:336-338) to exclude the
+- [x] 2.3 Widen `appPathServable` (apps/store.ts:336-338) to exclude the
       whole `.apps/<id>` container instead of only `appDataRoot(id)`, so
       shared partitions are never servable over HTTP (spec "Shared
       partitions are hidden from the file plane").
-- [ ] 2.4 New test file `server/workspace/tests/shared-partition-guard.test.ts`:
+- [x] 2.4 New test file `server/workspace/tests/shared-partition-guard.test.ts`:
       classification table for shared paths/containers, `parseSharedPartition`
       round-trips, malformed discriminators (`app#A#team#X`, empty instance
       id) rejected by the guard layer, snapshot/list hiding of
