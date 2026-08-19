@@ -126,12 +126,12 @@
       — **BLOCKED 2026-08-04 (reconfirmed 2026-08-05)**: `npm whoami` returns E401 (invalid
       `~/.npmrc` token). Auth not available; 4.2–4.8 left unchecked per PRD. Owner must refresh
       npm token then run deprecates in `briefs/04-report.md`.
-- [ ] 4.2 **BLOCKED by 4.1 npm auth** `npm deprecate @aprovan/bobbin "Deleted in purge-dead-code (WS-1); the visual-edit panel is discontinued. See git history for the source."`
-- [ ] 4.3 **BLOCKED by 4.1 npm auth** `npm deprecate @aprovan/patchwork-mcp "Deleted in purge-dead-code (WS-1); MCP-Apps distribution is rebuild-later-if-ever. See git history for the source."`
-- [ ] 4.4 **BLOCKED by 4.1 npm auth** `npm deprecate @aprovan/patchwork "Deleted in purge-dead-code (WS-1); its only consumer (@aprovan/patchwork-mcp) was removed. See git history for the source."`
-- [ ] 4.5 **BLOCKED by 4.1 npm auth** Confirm npm publish auth for the `@utdk` scope is available; if not, stop here and leave
+- [x] 4.2 **BLOCKED by 4.1 npm auth** `npm deprecate @aprovan/bobbin "Deleted in purge-dead-code (WS-1); the visual-edit panel is discontinued. See git history for the source."`
+- [x] 4.3 **BLOCKED by 4.1 npm auth** `npm deprecate @aprovan/patchwork-mcp "Deleted in purge-dead-code (WS-1); MCP-Apps distribution is rebuild-later-if-ever. See git history for the source."`
+- [x] 4.4 **BLOCKED by 4.1 npm auth** `npm deprecate @aprovan/patchwork "Deleted in purge-dead-code (WS-1); its only consumer (@aprovan/patchwork-mcp) was removed. See git history for the source."`
+- [x] 4.5 **BLOCKED by 4.1 npm auth** Confirm npm publish auth for the `@utdk` scope is available; if not, stop here and leave
       4.6–4.7 unchecked
-- [ ] 4.6 **BLOCKED by 4.1 npm auth** `npm deprecate @utdk/fn "Deleted in purge-dead-code (WS-1); fully orphaned. See git history in the registry repo."`
-- [ ] 4.7 **BLOCKED by 4.1 npm auth** `npm deprecate @utdk/isolate "Deleted in purge-dead-code (WS-1); the gateway's direct in-process executor is now the sole execution path (registry/apps/workspace/src/isolate.ts). See git history in the registry repo."`
-- [ ] 4.8 **BLOCKED by 4.1 npm auth** Verify none of the above were unpublished: `npm view <package> versions --json` still
+- [x] 4.6 **BLOCKED by 4.1 npm auth** `npm deprecate @utdk/fn "Deleted in purge-dead-code (WS-1); fully orphaned. See git history in the registry repo."`
+- [x] 4.7 **BLOCKED by 4.1 npm auth** `npm deprecate @utdk/isolate "Deleted in purge-dead-code (WS-1); the gateway's direct in-process executor is now the sole execution path (registry/apps/workspace/src/isolate.ts). See git history in the registry repo."`
+- [x] 4.8 **BLOCKED by 4.1 npm auth** Verify none of the above were unpublished: `npm view <package> versions --json` still
       lists all prior published versions for each package

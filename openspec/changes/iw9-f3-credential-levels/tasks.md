@@ -102,7 +102,7 @@ External dependencies:
 
 > Depends-on: 2 | Repo: registry | Touches: registry/packages/registry-server/package.json, registry/packages/registry-server/CHANGELOG.md | Verify: npm view @aprovan/registry-server version
 
-- [ ] 3.1 Minor version bump (additive/widening API only), changelog
+- [x] 3.1 Minor version bump (additive/widening API only), changelog
       entry naming the new exports, `pnpm --filter
       @aprovan/registry-server build && pnpm --filter
       @aprovan/registry-server test`, then publish to npm (publish
