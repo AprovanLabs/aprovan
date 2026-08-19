@@ -213,21 +213,21 @@ External dependencies:
 
 > Depends-on: 6 | Repo: aprovan | Touches: aprovan/server/workspace/src/audit.ts, aprovan/server/workspace/src/db/dsql-schema.sql, aprovan/server/workspace/src/routes/tools.ts, aprovan/server/workspace/src/routes/llm.ts, aprovan/server/workspace/src/workflows/invoke.ts, aprovan/server/workspace/tests/audit-attribution.test.ts | Verify: cd /Users/jacob/Documents/Code/AprovanLabs/aprovan && pnpm --filter @aprovan/workspace test -- audit-attribution && grep -n "credential_level" server/workspace/src/db/dsql-schema.sql
 
-- [ ] 7.1 Extend `AuditEntry` with `credentialId?`, `credentialLevel?`,
+- [x] 7.1 Extend `AuditEntry` with `credentialId?`, `credentialLevel?`,
       `credentialSource?: "stored" | "ephemeral"`, `actorKind?`,
       `actorId?`, `profileName?` (tech-plan D7); additive columns on
       sqlite (try/catch ALTER) and `db/dsql-schema.sql`; Dynamo
       test-only store passes them through; `recent()` returns them and
       tolerates pre-change rows (spec: "Attribution fields are
       queryable").
-- [ ] 7.2 Thread attribution into every dispatch audit append: stored
+- [x] 7.2 Thread attribution into every dispatch audit append: stored
       credentials record id + level from `ResolvedCredential`; ephemeral
       request-supplied credentials record `credentialSource:
       "ephemeral"` and no id (`routes/tools.ts:1227-1240`);
       credential-less dispatches append unchanged; workflow/agent paths
       record actor kind+id and the profile name when one selected the
       credential.
-- [ ] 7.3 New test file
+- [x] 7.3 New test file
       `server/workspace/tests/audit-attribution.test.ts` (sqlite):
       round-trip of all six fields, pre-change row reads back with
       fields undefined, shared-bot row carries callerId + level

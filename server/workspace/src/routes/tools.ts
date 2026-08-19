@@ -22,7 +22,7 @@ import { llmToolEntries as llmDiscoveryEntries } from "@utdk/llm";
 import { telemetryToolEntries as telemetryDiscoveryEntries } from "@utdk/telemetry";
 import { vfsToolEntries as vfsDiscoveryEntries } from "@utdk/vfs";
 import { Hono } from "hono";
-import { getAuditStore } from "../audit.js";
+import { getAuditStore, type AuditEntry } from "../audit.js";
 import {
   CredentialNotConnectedError,
   getCredentialStore,
@@ -1697,11 +1697,19 @@ toolsRouter.post("/:provider/:operation{.*}", rateLimitByUserId, async (c) => {
     }
   }
   let credentials: CredentialPayload | undefined;
+  // Audit attribution (IW-9 F3 D7): stored credentials record id + level from
+  // the resolution result; request-supplied ephemeral credentials are marked
+  // as such and record no id; credential-less dispatches record nothing.
+  let auditCredential: Pick<
+    AuditEntry,
+    "credentialId" | "credentialLevel" | "credentialSource" | "profileName"
+  > = {};
   if (body.credential) {
     if (process.env["GATEWAY_EPHEMERAL_CREDENTIALS"] === "0") {
       recordDispatch(403, Date.now() - startTime, "Ephemeral credentials are disabled");
       return c.json({ error: "Ephemeral credentials are disabled" }, 403);
     }
+    auditCredential = { credentialSource: "ephemeral" };
     credentials =
       body.credential.type === "bearer_token"
         ? { type: "bearer_token", token: body.credential.token ?? "" }
@@ -1738,6 +1746,16 @@ toolsRouter.post("/:provider/:operation{.*}", rateLimitByUserId, async (c) => {
       return c.json({ error: message }, status as 400);
     }
     if (record) {
+      auditCredential = {
+        credentialId: record.id,
+        credentialLevel: record.level,
+        credentialSource: "stored",
+        // The request profile is the via-path only when it actually selected
+        // the credential (it pinned a credential id above).
+        ...(requestProfile !== undefined && interfaceCredentialId !== undefined
+          ? { profileName: requestProfile }
+          : {}),
+      };
       // OAuth payloads resolve to live bearer tokens here (client-credentials
       // grant or refresh); the executor only ever sees injectable credentials.
       try {
@@ -1752,7 +1770,7 @@ toolsRouter.post("/:provider/:operation{.*}", rateLimitByUserId, async (c) => {
             ? `OAuth token resolution failed for ${provider}: ${err.message}`
             : `OAuth token resolution failed for ${provider}`;
         logMetadata({ requestId, workspaceId, callerId, provider, operation, status: 502 });
-        getAuditStore().append({ requestId, workspaceId, callerId, provider, operation, status: 502 });
+        getAuditStore().append({ requestId, workspaceId, callerId, provider, operation, status: 502, ...auditCredential });
         recordDispatch(502, Date.now() - startTime, message);
         return c.json({ error: message }, 502);
       }
@@ -1812,7 +1830,7 @@ toolsRouter.post("/:provider/:operation{.*}", rateLimitByUserId, async (c) => {
     const durationMs = Date.now() - startTime;
     const status = result.success ? 200 : 500;
     logMetadata({ requestId, workspaceId, callerId, provider, operation, status, durationMs });
-    getAuditStore().append({ requestId, workspaceId, callerId, provider, operation, status, durationMs });
+    getAuditStore().append({ requestId, workspaceId, callerId, provider, operation, status, durationMs, ...auditCredential });
     recordDispatch(status, durationMs, result.success ? undefined : (result.error ?? "Execution failed"));
   };
 

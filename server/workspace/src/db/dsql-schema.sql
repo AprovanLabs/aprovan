@@ -54,7 +54,8 @@ CREATE TABLE IF NOT EXISTS records (
 
 CREATE INDEX ASYNC IF NOT EXISTS records_scopes ON records (tenant, scope);
 
--- Audit log (30-day retention by sweep).
+-- Audit log (30-day retention by sweep). credential_*/actor_*/profile_name
+-- are the IW-9 F3 attribution columns — nullable, NULL on pre-F3 rows.
 CREATE TABLE IF NOT EXISTS audit_log (
   workspace_id text NOT NULL,
   ts text NOT NULL,
@@ -67,8 +68,24 @@ CREATE TABLE IF NOT EXISTS audit_log (
   duration_ms integer,
   result text NOT NULL,
   mcp_tool_name text,
+  credential_id text,
+  credential_level text,
+  credential_source text,
+  actor_kind text,
+  actor_id text,
+  profile_name text,
   PRIMARY KEY (workspace_id, ts, id)
 );
+
+-- Deployments that created audit_log before credential attribution existed
+-- should also run:
+--   ALTER TABLE audit_log ADD COLUMN credential_id text;
+--   ALTER TABLE audit_log ADD COLUMN credential_level text;
+--   ALTER TABLE audit_log ADD COLUMN credential_source text;
+--   ALTER TABLE audit_log ADD COLUMN actor_kind text;
+--   ALTER TABLE audit_log ADD COLUMN actor_id text;
+--   ALTER TABLE audit_log ADD COLUMN profile_name text;
+-- (SQLite applies these additively in audit.ts on open.)
 
 -- Identity / authz (stream 8): real columns for today's composite keys.
 CREATE TABLE IF NOT EXISTS users (

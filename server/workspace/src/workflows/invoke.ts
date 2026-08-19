@@ -11,6 +11,7 @@ import {
   raiseAskCard,
   type CapabilityCard,
 } from "../capability-cards.js";
+import { getAuditStore } from "../audit.js";
 import { assertToolGranted, denyMessage, evaluateDispatch } from "../grants.js";
 import {
   CredentialNotConnectedError,
@@ -239,7 +240,10 @@ export async function invokeTool(
 
   return dispatchProviderLegacy(ctx, {
     credentialProvider: namespace,
+    // `credentialId` is only ever set by the profile branch above, so its
+    // presence means the profile selected the credential (audit via-path).
     ...(credentialId ? { credentialId } : {}),
+    ...(credentialId && profile !== undefined ? { profileName: profile } : {}),
     module: llmAlias?.module ?? namespace,
     baseUrl: llmAlias?.baseUrl,
     procedure,
@@ -342,6 +346,11 @@ export async function dispatchInterface(
   return dispatchProviderLegacy(ctx, {
     credentialProvider: resolved.compat.provider,
     ...(resolved.credentialId ? { credentialId: resolved.credentialId } : {}),
+    // A profile-pinned interface resolution is the closest signal available
+    // for "a profile selected the credential" (audit via-path).
+    ...(resolved.credentialId && effectiveProfile !== undefined
+      ? { profileName: effectiveProfile }
+      : {}),
     module: resolved.compat.module,
     ...(resolved.compat.moduleSpecifier
       ? { moduleSpecifier: resolved.compat.moduleSpecifier }
@@ -358,6 +367,8 @@ interface ProviderDispatch {
   credentialProvider: string;
   credentialId?: string;
   credentialProfile?: string;
+  /** Audit attribution (IW-9 F3 D7): set when a profile selected the credential. */
+  profileName?: string;
   module: string;
   moduleSpecifier?: string;
   baseUrl?: string;
@@ -383,14 +394,21 @@ function invokerFromContext(ctx: ServiceContext): CredentialInvoker {
   };
 }
 
-/** Resolve a provider's workspace credential to an injectable payload. */
+/**
+ * Resolve a provider's workspace credential to an injectable payload. The
+ * resolved record travels back alongside so the dispatch audit row can name
+ * the credential (id + level) it ran under (IW-9 F3 D7).
+ */
 async function resolveProviderCredentials(
   ctx: ServiceContext,
   provider: string,
   label: string,
   credentialId?: string,
   credentialProfile?: string,
-): Promise<CredentialPayload | undefined> {
+): Promise<{
+  credentials: CredentialPayload | undefined;
+  record: ResolvedCredential | undefined;
+}> {
   const store = getCredentialStore();
   let record: ResolvedCredential | undefined;
   try {
@@ -407,13 +425,16 @@ async function resolveProviderCredentials(
     if (err instanceof CredentialNotConnectedError) throw err;
     throw new ServiceError(err instanceof Error ? err.message : String(err), 400);
   }
-  if (!record) return undefined;
+  if (!record) return { credentials: undefined, record: undefined };
   try {
-    return await resolveToInjectable(record.payload, {
-      provider,
-      cacheKey: `${ctx.workspaceId}:${provider}:${record.id}`,
-      persist: (payload) => store.updatePayload(ctx.workspaceId, record.id, payload),
-    });
+    return {
+      credentials: await resolveToInjectable(record.payload, {
+        provider,
+        cacheKey: `${ctx.workspaceId}:${provider}:${record.id}`,
+        persist: (payload) => store.updatePayload(ctx.workspaceId, record.id, payload),
+      }),
+      record,
+    };
   } catch (err) {
     throw new ServiceError(
       err instanceof OAuthExchangeError
@@ -429,7 +450,7 @@ async function dispatchProviderLegacy(
   ctx: ServiceContext,
   dispatch: ProviderDispatch,
 ): Promise<unknown> {
-  const credentials = await resolveProviderCredentials(
+  const { credentials, record } = await resolveProviderCredentials(
     ctx,
     dispatch.credentialProvider,
     dispatch.label,
@@ -437,6 +458,7 @@ async function dispatchProviderLegacy(
     dispatch.credentialProfile,
   );
 
+  const startTime = Date.now();
   const executor = await getExecutor();
   const result = await executor.execute({
     provider: dispatch.module,
@@ -447,6 +469,28 @@ async function dispatchProviderLegacy(
     ...(dispatch.baseUrl ? { baseUrl: dispatch.baseUrl } : {}),
     timeout: dispatch.timeout,
   });
+  if (record) {
+    // Audit attribution (IW-9 F3 D7): an in-process dispatch that ran under a
+    // resolved credential names it (id + level) and the via-path — actor
+    // kind/id for app/workflow-originated calls, profile name when one
+    // selected the credential. Credential-less dispatches stay as before
+    // (no audit row from this path).
+    const { actor } = invokerFromContext(ctx);
+    getAuditStore().append({
+      requestId: crypto.randomUUID(),
+      workspaceId: ctx.workspaceId,
+      callerId: ctx.userId,
+      provider: dispatch.credentialProvider,
+      operation: dispatch.procedure,
+      status: result.success ? 200 : 502,
+      durationMs: Date.now() - startTime,
+      credentialId: record.id,
+      credentialLevel: record.level,
+      credentialSource: "stored",
+      ...(actor ? { actorKind: actor.kind, actorId: actor.id } : {}),
+      ...(dispatch.profileName !== undefined ? { profileName: dispatch.profileName } : {}),
+    });
+  }
   if (!result.success) {
     throw new ServiceError(
       result.error ?? `${dispatch.label}.${dispatch.procedure} failed`,
