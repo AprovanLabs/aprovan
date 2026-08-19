@@ -162,12 +162,12 @@ External dependencies:
 
 > Depends-on: 5 | Repo: aprovan | Touches: aprovan/server/workspace/src/credentials.ts, aprovan/server/workspace/src/credential-store-adapter.ts, aprovan/server/workspace/src/routes/tools.ts, aprovan/server/workspace/src/routes/llm.ts, aprovan/server/workspace/src/workflows/invoke.ts, aprovan/server/workspace/src/vcs/mounts.ts, aprovan/server/workspace/tests/credential-level-resolution.test.ts | Verify: cd /Users/jacob/Documents/Code/AprovanLabs/aprovan && pnpm --filter @aprovan/workspace test -- credential-level-resolution && grep -n "resolveWorkspaceCredential" server/workspace/src/vcs/mounts.ts server/workspace/src/credential-store-adapter.ts && ! grep -rln "resolveRecordForProvider" server/workspace/src --include="*.ts" | grep -v "^server/workspace/src/credentials\.ts$"
 
-- [ ] 6.1 `resolveCredentialRecord` gains a **required**
+- [x] 6.1 `resolveCredentialRecord` gains a **required**
       `invoker: CredentialInvoker` parameter, returns
       `ResolvedCredential`, and implements the D4 order (pin loud →
       invoker's own user-oauth → workspace-level rows; fail closed with
       the re-exported `CredentialNotConnectedError`).
-- [ ] 6.2 Add `resolveWorkspaceCredential(workspaceId: string, provider: string): Promise<ResolvedCredential | undefined>`
+- [x] 6.2 Add `resolveWorkspaceCredential(workspaceId: string, provider: string): Promise<ResolvedCredential | undefined>`
       for invoker-less system paths (tech-plan D6) — same
       `ResolvedCredential` return shape as `resolveCredentialRecord`, but
       row *selection* is structurally restricted to
@@ -179,7 +179,7 @@ External dependencies:
       `credential-store-adapter.ts`'s `firstForProvider` (:42-51 —
       currently dead code with zero call sites, verified; migrated now so
       no future caller can wire it up unsafely — tech-plan D6/D6a).
-- [ ] 6.3 Thread the invoker at all three dispatch call sites:
+- [x] 6.3 Thread the invoker at all three dispatch call sites:
       `routes/tools.ts:1248` (principal.sub from :858 + actor when the
       call is app/workflow/agent-originated), `workflows/invoke.ts:366`
       (ServiceContext), `routes/llm.ts:116`. A
@@ -188,7 +188,7 @@ External dependencies:
       numbers per tech-plan; if drifted, the cited intent wins — see
       `briefs/deviations.md` for the drift already observed at
       elaboration time.)
-- [ ] 6.4 New test file
+- [x] 6.4 New test file
       `server/workspace/tests/credential-level-resolution.test.ts`:
       per-invoker resolution through the workspace entry point, fail
       closed (owner ≠ invoker; no connection and no workspace row),
@@ -196,7 +196,7 @@ External dependencies:
       selection, `resolveWorkspaceCredential` never returns user-oauth
       (assert `owner === undefined` on every result, not just that no
       `user-oauth` row was picked).
-- [ ] 6.5 Grep gate (both repos, IW-9 rule 4), exclusion-based so it
+- [x] 6.5 Grep gate (both repos, IW-9 rule 4), exclusion-based so it
       covers every current AND future invoker-less call site rather than
       allowlisting known directories (tech-plan D6a):
       aprovan —

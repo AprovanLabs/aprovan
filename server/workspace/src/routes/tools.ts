@@ -23,7 +23,12 @@ import { telemetryToolEntries as telemetryDiscoveryEntries } from "@utdk/telemet
 import { vfsToolEntries as vfsDiscoveryEntries } from "@utdk/vfs";
 import { Hono } from "hono";
 import { getAuditStore } from "../audit.js";
-import { getCredentialStore, resolveCredentialRecord } from "../credentials.js";
+import {
+  CredentialNotConnectedError,
+  getCredentialStore,
+  resolveCredentialRecord,
+  type ResolvedCredential,
+} from "../credentials.js";
 import { setToolListCacheInvalidator } from "../derived-authority.js";
 import { evaluateDispatch, denyMessage } from "../grants.js";
 import {
@@ -1611,7 +1616,13 @@ toolsRouter.post("/:provider/:operation{.*}", rateLimitByUserId, async (c) => {
         recordDispatch(200, durationMs);
         return c.json({ data, meta: { requestId, durationMs } });
       } catch (err) {
-        const status = err instanceof ServiceError ? err.status : 500;
+        // In-process dispatch rethrows CredentialNotConnectedError unwrapped
+        // (workflows/invoke.ts) — surface it as 403 with its code so callers
+        // can distinguish "not connected" from a config error.
+        const status =
+          err instanceof ServiceError || err instanceof CredentialNotConnectedError
+            ? err.status
+            : 500;
         const message = err instanceof Error ? err.message : String(err);
         getAuditStore().append({
           requestId,
@@ -1622,6 +1633,9 @@ toolsRouter.post("/:provider/:operation{.*}", rateLimitByUserId, async (c) => {
           status,
         });
         recordDispatch(status, Date.now() - startTime, message);
+        if (err instanceof CredentialNotConnectedError) {
+          return c.json({ error: message, code: err.code }, err.status);
+        }
         return c.json({ error: message }, status as 400);
       }
     }
@@ -1698,18 +1712,30 @@ toolsRouter.post("/:provider/:operation{.*}", rateLimitByUserId, async (c) => {
           };
   } else {
     const store = getCredentialStore();
-    let record: { id: string; payload: CredentialPayload } | undefined;
+    let record: ResolvedCredential | undefined;
     try {
       // `interfaceCredentialId` is set when the namespace was an interface
-      // instance pinned to one credential; otherwise this is the provider's
-      // first credential, as it has always been.
-      record = await resolveCredentialRecord(workspaceId, provider, interfaceCredentialId);
+      // instance pinned to one credential; otherwise D4 order per invoker
+      // (the authenticated principal — the invoker-aware seam, IW-9 F3).
+      record = await resolveCredentialRecord(
+        workspaceId,
+        provider,
+        { sub: callerId },
+        interfaceCredentialId,
+      );
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      logMetadata({ requestId, workspaceId, callerId, provider, operation, status: 400 });
-      getAuditStore().append({ requestId, workspaceId, callerId, provider, operation, status: 400 });
-      recordDispatch(400, Date.now() - startTime, message);
-      return c.json({ error: message }, 400);
+      // "Not connected" is machine-distinguishable (403 + code) so a future
+      // connect flow / iw9-c approval routing can react to it; anything else
+      // stays a 400 configuration error, as it has always been.
+      const status = err instanceof CredentialNotConnectedError ? err.status : 400;
+      logMetadata({ requestId, workspaceId, callerId, provider, operation, status });
+      getAuditStore().append({ requestId, workspaceId, callerId, provider, operation, status });
+      recordDispatch(status, Date.now() - startTime, message);
+      if (err instanceof CredentialNotConnectedError) {
+        return c.json({ error: message, code: err.code }, err.status);
+      }
+      return c.json({ error: message }, status as 400);
     }
     if (record) {
       // OAuth payloads resolve to live bearer tokens here (client-credentials

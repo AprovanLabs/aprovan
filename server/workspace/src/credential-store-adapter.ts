@@ -11,6 +11,7 @@ import type {
   CredentialType,
 } from "@aprovan/registry-server";
 import { getCredentialCipher } from "./credentialCipher.js";
+import { resolveWorkspaceCredential } from "./credentials.js";
 import type { CredentialPayload, ICredentialStore } from "./credentials.js";
 
 export function adaptCredentialStore(store: ICredentialStore): CredentialStore {
@@ -46,7 +47,10 @@ export function adaptCredentialStore(store: ICredentialStore): CredentialStore {
       };
     },
     async firstForProvider(tenantId, provider) {
-      const resolved = await store.resolveRecordForProvider(tenantId, provider);
+      // No invoker in scope here, so this path resolves through the
+      // workspace-only resolver (tech-plan D6/D6a): a `user-oauth` row is
+      // structurally unreachable, not merely unpicked.
+      const resolved = await resolveWorkspaceCredential(tenantId, provider);
       if (!resolved) return undefined;
       const row = await store.get(tenantId, resolved.id);
       if (!row) return undefined;

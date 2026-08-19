@@ -27,7 +27,13 @@
 import { Hono, type Context } from "hono";
 import { getAuditStore } from "../audit.js";
 import { expandPromptVars, resolveStoredPrompt } from "../promptStore.js";
-import { getCredentialStore, resolveCredentialRecord } from "../credentials.js";
+import {
+  CredentialNotConnectedError,
+  getCredentialStore,
+  resolveCredentialRecord,
+  type CredentialInvoker,
+  type ResolvedCredential,
+} from "../credentials.js";
 import {
   listInstances,
   parseInterfaceNamespace,
@@ -104,16 +110,29 @@ llmRouter.get("/providers", async (c) => {
 // Credential resolution (same contract as the tools route)
 // ---------------------------------------------------------------------------
 
+interface ResolvedChatCredentials {
+  credentials?: CredentialPayload;
+  error?: string;
+  /** HTTP status for `error` — 403 for "not connected", else the caller's 502. */
+  status?: 403;
+  /** `credential_not_connected` — machine-distinguishable (IW-9 F3, D5). */
+  code?: string;
+}
+
 async function resolveCredentials(
   workspaceId: string,
   providerId: string,
+  invoker: CredentialInvoker,
   credentialId?: string,
-): Promise<{ credentials?: CredentialPayload; error?: string }> {
+): Promise<ResolvedChatCredentials> {
   const store = getCredentialStore();
-  let record: { id: string; payload: CredentialPayload } | undefined;
+  let record: ResolvedCredential | undefined;
   try {
-    record = await resolveCredentialRecord(workspaceId, providerId, credentialId);
+    record = await resolveCredentialRecord(workspaceId, providerId, invoker, credentialId);
   } catch (err) {
+    if (err instanceof CredentialNotConnectedError) {
+      return { error: err.message, status: err.status, code: err.code };
+    }
     return { error: err instanceof Error ? err.message : String(err) };
   }
   if (!record) return {};
@@ -143,9 +162,10 @@ async function resolveCredentials(
 async function resolveChatCredentials(
   workspaceId: string,
   providerId: string,
+  invoker: CredentialInvoker,
   body: { credential?: { type: string; token?: string; value?: string; name?: string } },
   credentialId?: string,
-): Promise<{ credentials?: CredentialPayload; error?: string }> {
+): Promise<ResolvedChatCredentials> {
   if (body.credential && process.env["GATEWAY_EPHEMERAL_CREDENTIALS"] !== "0") {
     return {
       credentials:
@@ -154,7 +174,7 @@ async function resolveChatCredentials(
           : { type: "api_key", value: body.credential.value ?? "", headerName: body.credential.name },
     };
   }
-  return resolveCredentials(workspaceId, providerId, credentialId);
+  return resolveCredentials(workspaceId, providerId, invoker, credentialId);
 }
 
 /**
@@ -218,18 +238,20 @@ function isTargetError(
 // ---------------------------------------------------------------------------
 
 llmRouter.get("/:provider/models", rateLimitByUserId, async (c) => {
-  const workspaceId = c.get("principal").workspaceId;
+  const principal = c.get("principal");
+  const workspaceId = principal.workspaceId;
   const target = await resolveChatTarget(workspaceId, c.req.param("provider") ?? "");
   if (isTargetError(target)) return c.json({ error: target.error }, target.status as 404);
   const { provider } = target;
   const providerId = provider.id;
 
-  const { credentials, error } = await resolveCredentials(
+  const { credentials, error, status, code } = await resolveCredentials(
     workspaceId,
     providerId,
+    { sub: principal.sub },
     target.credentialId,
   );
-  if (error) return c.json({ error }, 502);
+  if (error) return c.json({ error, ...(code ? { code } : {}) }, status ?? 502);
   if (!credentials) {
     return c.json({ error: `No credential for ${providerId} in this workspace` }, 403);
   }
@@ -321,13 +343,24 @@ async function handleChat(
     messages.unshift({ role: "system", content: system });
   }
 
-  const { credentials, error: credentialError } = await resolveChatCredentials(
+  const {
+    credentials,
+    error: credentialError,
+    status: credentialStatus,
+    code: credentialCode,
+  } = await resolveChatCredentials(
     workspaceId,
     providerId,
+    { sub: principal.sub },
     body,
     credentialId,
   );
-  if (credentialError) return c.json({ error: credentialError }, 502);
+  if (credentialError) {
+    return c.json(
+      { error: credentialError, ...(credentialCode ? { code: credentialCode } : {}) },
+      credentialStatus ?? 502,
+    );
+  }
   if (!credentials) {
     return c.json({ error: `No credential for ${providerId} in this workspace` }, 403);
   }
@@ -577,13 +610,24 @@ async function handleCompletionJob(
     messages.unshift({ role: "system", content: system });
   }
 
-  const { credentials, error: credentialError } = await resolveChatCredentials(
+  const {
+    credentials,
+    error: credentialError,
+    status: credentialStatus,
+    code: credentialCode,
+  } = await resolveChatCredentials(
     workspaceId,
     providerId,
+    { sub: principal.sub },
     body,
     credentialId,
   );
-  if (credentialError) return c.json({ error: credentialError }, 502);
+  if (credentialError) {
+    return c.json(
+      { error: credentialError, ...(credentialCode ? { code: credentialCode } : {}) },
+      credentialStatus ?? 502,
+    );
+  }
   if (!credentials) {
     return c.json({ error: `No credential for ${providerId} in this workspace` }, 403);
   }
