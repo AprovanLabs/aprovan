@@ -32,6 +32,7 @@ import {
   getCredentialStore,
   resolveCredentialRecord,
   type CredentialInvoker,
+  type CredentialLevel,
   type ResolvedCredential,
 } from "../credentials.js";
 import {
@@ -117,6 +118,11 @@ interface ResolvedChatCredentials {
   status?: 403;
   /** `credential_not_connected` — machine-distinguishable (IW-9 F3, D5). */
   code?: string;
+  /** Audit attribution (IW-9 F3 D7): the stored credential the call runs under. */
+  credentialId?: string;
+  credentialLevel?: CredentialLevel;
+  /** "stored" for workspace rows; "ephemeral" for request-supplied. */
+  credentialSource?: "stored" | "ephemeral";
 }
 
 async function resolveCredentials(
@@ -143,6 +149,9 @@ async function resolveCredentials(
         cacheKey: `${workspaceId}:${providerId}:${record.id}`,
         persist: (payload) => store.updatePayload(workspaceId, record.id, payload),
       }),
+      credentialId: record.id,
+      credentialLevel: record.level,
+      credentialSource: "stored",
     };
   } catch (err) {
     return {
@@ -172,6 +181,8 @@ async function resolveChatCredentials(
         body.credential.type === "bearer_token"
           ? { type: "bearer_token", token: body.credential.token ?? "" }
           : { type: "api_key", value: body.credential.value ?? "", headerName: body.credential.name },
+      // Distinguishable from stored rows in the audit trail; no stored id.
+      credentialSource: "ephemeral",
     };
   }
   return resolveCredentials(workspaceId, providerId, invoker, credentialId);
@@ -348,6 +359,9 @@ async function handleChat(
     error: credentialError,
     status: credentialStatus,
     code: credentialCode,
+    credentialId: auditCredentialId,
+    credentialLevel,
+    credentialSource,
   } = await resolveChatCredentials(
     workspaceId,
     providerId,
@@ -397,6 +411,9 @@ async function handleChat(
       operation: "createChatCompletion",
       status: result.success ? 200 : 502,
       durationMs: Date.now() - startTime,
+      ...(auditCredentialId ? { credentialId: auditCredentialId } : {}),
+      ...(credentialLevel ? { credentialLevel } : {}),
+      ...(credentialSource ? { credentialSource } : {}),
     });
     if (!result.success) return { error: result.error ?? "Chat completion failed" };
     if (result.data instanceof ReadableStream) return { upstream: result.data };
@@ -615,6 +632,9 @@ async function handleCompletionJob(
     error: credentialError,
     status: credentialStatus,
     code: credentialCode,
+    credentialId: auditCredentialId,
+    credentialLevel,
+    credentialSource,
   } = await resolveChatCredentials(
     workspaceId,
     providerId,
@@ -654,6 +674,9 @@ async function handleCompletionJob(
     operation: "createChatCompletion",
     status: result.success ? 200 : 502,
     durationMs,
+    ...(auditCredentialId ? { credentialId: auditCredentialId } : {}),
+    ...(credentialLevel ? { credentialLevel } : {}),
+    ...(credentialSource ? { credentialSource } : {}),
   });
 
   if (!result.success) {

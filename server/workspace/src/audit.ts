@@ -10,6 +10,7 @@ import { createRequire } from "node:module";
 import { join } from "node:path";
 import { dynamo } from "./db/client.js";
 import { storeBackend, workspaceDataDir } from "./runtime/config.js";
+import type { CredentialLevel } from "./credentials.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -30,6 +31,18 @@ export interface AuditEntry {
   result: "success" | "forbidden" | "error";
   /** MCP meta-tool name when the call came via the MCP transport */
   mcp_tool_name?: string;
+  /** Stored credential the dispatch resolved (IW-9 F3 audit attribution). */
+  credentialId?: string;
+  /** The resolved credential's level (already effective — never re-derived). */
+  credentialLevel?: CredentialLevel;
+  /** "stored" for workspace-store rows; "ephemeral" for request-supplied. */
+  credentialSource?: "stored" | "ephemeral";
+  /** Via-path actor kind when the dispatch was app/workflow/agent-originated. */
+  actorKind?: "app" | "workflow" | "agent";
+  /** Via-path actor id (app id, dispatching run id, …). */
+  actorId?: string;
+  /** Profile name, when a profile selected the credential. */
+  profileName?: string;
 }
 
 export interface IAuditStore {
@@ -80,6 +93,12 @@ export class AuditStoreDynamodb implements IAuditStore {
     };
     if (entry.durationMs !== undefined) item["durationMs"] = entry.durationMs;
     if (entry.mcp_tool_name !== undefined) item["mcp_tool_name"] = entry.mcp_tool_name;
+    if (entry.credentialId !== undefined) item["credentialId"] = entry.credentialId;
+    if (entry.credentialLevel !== undefined) item["credentialLevel"] = entry.credentialLevel;
+    if (entry.credentialSource !== undefined) item["credentialSource"] = entry.credentialSource;
+    if (entry.actorKind !== undefined) item["actorKind"] = entry.actorKind;
+    if (entry.actorId !== undefined) item["actorId"] = entry.actorId;
+    if (entry.profileName !== undefined) item["profileName"] = entry.profileName;
 
     // Still fire-and-forget: resolving the SDK is part of the same detached
     // promise, so an audit write never blocks (or fails) the request path.
@@ -159,6 +178,12 @@ export class AuditStoreDynamodb implements IAuditStore {
       durationMs: item["durationMs"] as number | undefined,
       result: item["result"] as "success" | "forbidden" | "error",
       mcp_tool_name: item["mcp_tool_name"] as string | undefined,
+      credentialId: item["credentialId"] as string | undefined,
+      credentialLevel: item["credentialLevel"] as CredentialLevel | undefined,
+      credentialSource: item["credentialSource"] as "stored" | "ephemeral" | undefined,
+      actorKind: item["actorKind"] as AuditEntry["actorKind"],
+      actorId: item["actorId"] as string | undefined,
+      profileName: item["profileName"] as string | undefined,
     };
   }
 }
@@ -195,10 +220,32 @@ export class AuditStoreSqlite implements IAuditStore {
         status INTEGER NOT NULL,
         duration_ms INTEGER,
         result TEXT NOT NULL,
-        mcp_tool_name TEXT
+        mcp_tool_name TEXT,
+        credential_id TEXT,
+        credential_level TEXT,
+        credential_source TEXT,
+        actor_kind TEXT,
+        actor_id TEXT,
+        profile_name TEXT
       );
       CREATE INDEX IF NOT EXISTS audit_log_ws_ts ON audit_log(workspace_id, ts DESC);
     `);
+    // Pre-attribution (IW-9 F3) databases lack the credential/actor columns;
+    // add them in place (the created_by pattern in credentials.ts).
+    for (const column of [
+      "credential_id TEXT",
+      "credential_level TEXT",
+      "credential_source TEXT",
+      "actor_kind TEXT",
+      "actor_id TEXT",
+      "profile_name TEXT",
+    ]) {
+      try {
+        this.database.exec(`ALTER TABLE audit_log ADD COLUMN ${column}`);
+      } catch {
+        // Column already exists.
+      }
+    }
     this.database
       .prepare(`DELETE FROM audit_log WHERE ts < ?`)
       .run(new Date(Date.now() - TTL_30_DAYS_MS).toISOString());
@@ -209,8 +256,9 @@ export class AuditStoreSqlite implements IAuditStore {
       this.database
         .prepare(
           `INSERT INTO audit_log
-           (id, ts, request_id, workspace_id, caller_id, provider, operation, status, duration_ms, result, mcp_tool_name)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           (id, ts, request_id, workspace_id, caller_id, provider, operation, status, duration_ms, result, mcp_tool_name,
+            credential_id, credential_level, credential_source, actor_kind, actor_id, profile_name)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .run(
           crypto.randomUUID(),
@@ -224,6 +272,12 @@ export class AuditStoreSqlite implements IAuditStore {
           entry.durationMs ?? null,
           entry.status === 403 ? "forbidden" : entry.status < 400 ? "success" : "error",
           entry.mcp_tool_name ?? null,
+          entry.credentialId ?? null,
+          entry.credentialLevel ?? null,
+          entry.credentialSource ?? null,
+          entry.actorKind ?? null,
+          entry.actorId ?? null,
+          entry.profileName ?? null,
         );
     } catch (err) {
       console.error("[AuditStoreSqlite] append failed:", err);
@@ -265,6 +319,23 @@ export class AuditStoreSqlite implements IAuditStore {
       durationMs: row["duration_ms"] === null ? undefined : Number(row["duration_ms"]),
       result: String(row["result"]) as AuditEntry["result"],
       mcp_tool_name: row["mcp_tool_name"] === null ? undefined : String(row["mcp_tool_name"]),
+      // Attribution columns (IW-9 F3) are NULL on pre-change rows and absent
+      // entirely on a not-yet-migrated table — both read back as undefined.
+      credentialId: typeof row["credential_id"] === "string" ? row["credential_id"] : undefined,
+      credentialLevel:
+        typeof row["credential_level"] === "string"
+          ? (row["credential_level"] as CredentialLevel)
+          : undefined,
+      credentialSource:
+        typeof row["credential_source"] === "string"
+          ? (row["credential_source"] as "stored" | "ephemeral")
+          : undefined,
+      actorKind:
+        typeof row["actor_kind"] === "string"
+          ? (row["actor_kind"] as AuditEntry["actorKind"])
+          : undefined,
+      actorId: typeof row["actor_id"] === "string" ? row["actor_id"] : undefined,
+      profileName: typeof row["profile_name"] === "string" ? row["profile_name"] : undefined,
     }));
   }
 }
@@ -293,8 +364,9 @@ export class AuditStoreDsql implements IAuditStore {
       await withOccRetry(() =>
         dsqlQuery(
           `INSERT INTO audit_log
-           (workspace_id, ts, id, request_id, caller_id, provider, operation, status, duration_ms, result, mcp_tool_name)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+           (workspace_id, ts, id, request_id, caller_id, provider, operation, status, duration_ms, result, mcp_tool_name,
+            credential_id, credential_level, credential_source, actor_kind, actor_id, profile_name)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
           [
             entry.workspaceId,
             ts,
@@ -307,6 +379,12 @@ export class AuditStoreDsql implements IAuditStore {
             entry.durationMs ?? null,
             result,
             entry.mcp_tool_name ?? null,
+            entry.credentialId ?? null,
+            entry.credentialLevel ?? null,
+            entry.credentialSource ?? null,
+            entry.actorKind ?? null,
+            entry.actorId ?? null,
+            entry.profileName ?? null,
           ],
         ),
       );
@@ -354,6 +432,23 @@ export class AuditStoreDsql implements IAuditStore {
       durationMs: row["duration_ms"] === null ? undefined : Number(row["duration_ms"]),
       result: String(row["result"]) as AuditEntry["result"],
       mcp_tool_name: row["mcp_tool_name"] === null ? undefined : String(row["mcp_tool_name"]),
+      // Attribution columns (IW-9 F3) are NULL on pre-change rows and absent
+      // entirely on a not-yet-migrated table — both read back as undefined.
+      credentialId: typeof row["credential_id"] === "string" ? row["credential_id"] : undefined,
+      credentialLevel:
+        typeof row["credential_level"] === "string"
+          ? (row["credential_level"] as CredentialLevel)
+          : undefined,
+      credentialSource:
+        typeof row["credential_source"] === "string"
+          ? (row["credential_source"] as "stored" | "ephemeral")
+          : undefined,
+      actorKind:
+        typeof row["actor_kind"] === "string"
+          ? (row["actor_kind"] as AuditEntry["actorKind"])
+          : undefined,
+      actorId: typeof row["actor_id"] === "string" ? row["actor_id"] : undefined,
+      profileName: typeof row["profile_name"] === "string" ? row["profile_name"] : undefined,
     }));
   }
 
