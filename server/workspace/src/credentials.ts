@@ -33,7 +33,14 @@ import {
 import { createRequire } from "node:module";
 import { join } from "node:path";
 import type { CredentialType } from "@utdk/common/auth";
-import type { CredentialPayload } from "@aprovan/registry-server";
+import {
+  CredentialService,
+  credentialLevelValues,
+  defaultLevelForType,
+  effectiveLevel,
+  isCredentialLevel,
+} from "@aprovan/registry-server";
+import type { CredentialLevel, CredentialPayload } from "@aprovan/registry-server";
 import { getCredentialCipher } from "./credentialCipher.js";
 import { dynamo } from "./db/client.js";
 import { getRegistryStorage } from "./registry-storage.js";
@@ -65,11 +72,13 @@ export type { CredentialType } from "@utdk/common/auth";
 export type {
   ApiKeyPayload,
   BearerTokenPayload,
+  CredentialLevel,
   CredentialPayload,
   OAuth2AuthCodePayload,
   OAuth2ClientPayload,
   OAuthClientOrigin,
 } from "@aprovan/registry-server";
+export { effectiveLevel } from "@aprovan/registry-server";
 
 export interface CredentialInput {
   provider: string;
@@ -77,6 +86,11 @@ export interface CredentialInput {
   payload: CredentialPayload;
   /** Creating user's sub (tech-plan D5) — the Profiles ownership seam. */
   createdBy?: string;
+  /**
+   * IW-9 F3 level; validated against the closed `CredentialLevel` vocabulary
+   * at create, defaulting from the payload type (`defaultLevelForType`).
+   */
+  level?: string;
 }
 
 export interface CredentialRecord {
@@ -85,10 +99,51 @@ export interface CredentialRecord {
   provider: string;
   label?: string;
   type: CredentialType;
+  /**
+   * Always present on read: `effectiveLevel(type, stored)` backfills legacy
+   * rows, so every backend returns a trustworthy level (IW-9 F3).
+   */
+  level: CredentialLevel;
   /** Creating user's sub; undefined = legacy/tenant-shared row. */
   createdBy?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * Create-time level rules shared by the sqlite/Dynamo backends — the exact
+ * semantics of registry-server's `CredentialService.create` (which the dsql
+ * backend routes through directly, tech-plan D3b): vocabulary validation,
+ * default derivation, the level/type compatibility matrix, and the
+ * user-oauth owner requirement.
+ */
+function resolveCreateLevel(input: CredentialInput): CredentialLevel {
+  const type = input.payload.type;
+  let level: CredentialLevel;
+  if (input.level === undefined) {
+    level = defaultLevelForType(type);
+  } else if (isCredentialLevel(input.level)) {
+    level = input.level;
+  } else {
+    throw new CredentialResolutionError(
+      `Invalid credential level ${JSON.stringify(input.level)}; allowed values: ${credentialLevelValues().join(", ")}`,
+    );
+  }
+  const compatible =
+    (level === "workspace-token" && (type === "bearer_token" || type === "api_key")) ||
+    (level === "workspace-oauth" && (type === "oauth2_client" || type === "oauth2_authcode")) ||
+    (level === "user-oauth" && type === "oauth2_authcode");
+  if (!compatible) {
+    throw new CredentialResolutionError(
+      `Credential level ${level} is incompatible with payload type ${type}`,
+    );
+  }
+  if (level === "user-oauth" && !input.createdBy) {
+    throw new CredentialResolutionError(
+      "user-oauth credentials require an owner (createdBy)",
+    );
+  }
+  return level;
 }
 
 // ---------------------------------------------------------------------------
@@ -138,6 +193,24 @@ export interface ICredentialStore {
 // ---------------------------------------------------------------------------
 
 /**
+ * Did the create transact fail on the `USEROAUTH#` pointer condition (a
+ * duplicate user connection, D3a)? Mirrors registry dynamo-storage's
+ * `isConditionalFailure`, transact-aware: a lone conditional put surfaces
+ * `ConditionalCheckFailedException`, while a `TransactWriteCommand` reports a
+ * `TransactionCanceledException` whose per-item `CancellationReasons` name the
+ * failed condition — the `USEROAUTH#` pointer is the third item (index 2), so
+ * an id-collision failure on the record put still rethrows raw.
+ */
+const USEROAUTH_TRANSACT_INDEX = 2;
+function isUserOauthConflict(err: unknown): boolean {
+  if (typeof err !== "object" || err === null || !("name" in err)) return false;
+  if (err.name === "ConditionalCheckFailedException") return true;
+  if (err.name !== "TransactionCanceledException") return false;
+  const reasons = (err as { CancellationReasons?: { Code?: string }[] }).CancellationReasons;
+  return reasons?.[USEROAUTH_TRANSACT_INDEX]?.Code === "ConditionalCheckFailed";
+}
+
+/**
  * DynamoDB-backed credential store using the single-table schema in
  * `db/schema.ts` (`Credentials`):
  *   - `PK = WS#<workspaceId>`
@@ -161,6 +234,7 @@ export class CredentialStoreDynamodb implements ICredentialStore {
   }
 
   async create(workspaceId: string, input: CredentialInput): Promise<CredentialRecord> {
+    const level = resolveCreateLevel(input);
     const id = randomBytes(12).toString("hex");
     const now = new Date().toISOString();
     const item: Record<string, unknown> = {
@@ -170,6 +244,7 @@ export class CredentialStoreDynamodb implements ICredentialStore {
       workspaceId,
       provider: input.provider,
       type: input.payload.type,
+      level,
       payload: await getCredentialCipher().encrypt(JSON.stringify(input.payload)),
       createdAt: now,
       updatedAt: now,
@@ -181,23 +256,50 @@ export class CredentialStoreDynamodb implements ICredentialStore {
       SK: `CREDID#${id}`,
       provider: input.provider,
     };
-    const { client, PutCommand } = await dynamo();
-    // Write the record first with a condition so a rare id collision throws
-    // instead of silently overwriting, then write the credId → provider pointer.
-    await client.send(
-      new PutCommand({
-        TableName: this.tableName,
-        Item: item,
-        ConditionExpression: "attribute_not_exists(PK)",
-      }),
-    );
-    await client.send(
-      new PutCommand({
-        TableName: this.tableName,
-        Item: pointer,
-        ConditionExpression: "attribute_not_exists(PK)",
-      }),
-    );
+    const { client, TransactWriteCommand } = await dynamo();
+    // One transact (D3a): the conditioned record put still turns a rare id
+    // collision into a throw instead of a silent overwrite, and a user-oauth
+    // create additionally claims the `USEROAUTH#<provider>#<owner>` pointer so
+    // a duplicate connection fails atomically, never check-then-insert.
+    const transactItems: NonNullable<
+      ConstructorParameters<typeof TransactWriteCommand>[0]["TransactItems"]
+    > = [
+      {
+        Put: {
+          TableName: this.tableName,
+          Item: item,
+          ConditionExpression: "attribute_not_exists(PK)",
+        },
+      },
+      {
+        Put: {
+          TableName: this.tableName,
+          Item: pointer,
+          ConditionExpression: "attribute_not_exists(PK)",
+        },
+      },
+    ];
+    if (level === "user-oauth") {
+      transactItems.push({
+        Put: {
+          TableName: this.tableName,
+          Item: {
+            PK: `WS#${workspaceId}`,
+            SK: `USEROAUTH#${input.provider}#${input.createdBy}`,
+            credentialId: id,
+          },
+          ConditionExpression: "attribute_not_exists(PK)",
+        },
+      });
+    }
+    try {
+      await client.send(new TransactWriteCommand({ TransactItems: transactItems }));
+    } catch (err) {
+      if (level === "user-oauth" && isUserOauthConflict(err)) {
+        throw new CredentialResolutionError(`${input.provider} is already connected`);
+      }
+      throw err;
+    }
     return this.toRecord(item);
   }
 
@@ -212,8 +314,9 @@ export class CredentialStoreDynamodb implements ICredentialStore {
           ":sk": "CRED#",
         },
         // Exclude the payload from the listing response.
-        ProjectionExpression: "id, workspaceId, provider, #lbl, #tp, createdBy, createdAt, updatedAt",
-        ExpressionAttributeNames: { "#lbl": "label", "#tp": "type" },
+        ProjectionExpression:
+          "id, workspaceId, provider, #lbl, #tp, #lvl, createdBy, createdAt, updatedAt",
+        ExpressionAttributeNames: { "#lbl": "label", "#tp": "type", "#lvl": "level" },
       }),
     );
     return (result.Items ?? []).map((it) => this.toRecord(it as Record<string, unknown>));
@@ -236,25 +339,38 @@ export class CredentialStoreDynamodb implements ICredentialStore {
   async delete(workspaceId: string, id: string): Promise<boolean> {
     const provider = await this.resolveProviderViaPointer(workspaceId, id);
     if (provider === undefined) return false;
+    // A user-oauth record also owns a `USEROAUTH#` pointer (D3a); delete it in
+    // the same transact so a disconnected user can reconnect.
+    const record = await this.get(workspaceId, id);
     const { client, TransactWriteCommand } = await dynamo();
-    await client.send(
-      new TransactWriteCommand({
-        TransactItems: [
-          {
-            Delete: {
-              TableName: this.tableName,
-              Key: { PK: `WS#${workspaceId}`, SK: `CRED#${provider}#${id}` },
-            },
+    const transactItems: NonNullable<
+      ConstructorParameters<typeof TransactWriteCommand>[0]["TransactItems"]
+    > = [
+      {
+        Delete: {
+          TableName: this.tableName,
+          Key: { PK: `WS#${workspaceId}`, SK: `CRED#${provider}#${id}` },
+        },
+      },
+      {
+        Delete: {
+          TableName: this.tableName,
+          Key: { PK: `WS#${workspaceId}`, SK: `CREDID#${id}` },
+        },
+      },
+    ];
+    if (record?.level === "user-oauth" && record.createdBy !== undefined) {
+      transactItems.push({
+        Delete: {
+          TableName: this.tableName,
+          Key: {
+            PK: `WS#${workspaceId}`,
+            SK: `USEROAUTH#${provider}#${record.createdBy}`,
           },
-          {
-            Delete: {
-              TableName: this.tableName,
-              Key: { PK: `WS#${workspaceId}`, SK: `CREDID#${id}` },
-            },
-          },
-        ],
-      }),
-    );
+        },
+      });
+    }
+    await client.send(new TransactWriteCommand({ TransactItems: transactItems }));
     return true;
   }
 
@@ -354,12 +470,14 @@ export class CredentialStoreDynamodb implements ICredentialStore {
   }
 
   private toRecord(item: Record<string, unknown>): CredentialRecord {
+    const type = item["type"] as CredentialType;
     return {
       id: item["id"] as string,
       workspaceId: item["workspaceId"] as string,
       provider: item["provider"] as string,
       label: item["label"] as string | undefined,
-      type: item["type"] as CredentialType,
+      type,
+      level: effectiveLevel(type, isCredentialLevel(item["level"]) ? item["level"] : undefined),
       createdBy: item["createdBy"] as string | undefined,
       createdAt: item["createdAt"] as string,
       updatedAt: item["updatedAt"] as string,
@@ -393,6 +511,7 @@ export class CredentialStoreSqlite implements ICredentialStore {
         type TEXT NOT NULL,
         payload TEXT NOT NULL,
         created_by TEXT,
+        level TEXT,
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       );
@@ -405,37 +524,60 @@ export class CredentialStoreSqlite implements ICredentialStore {
     } catch {
       // Column already exists.
     }
+    // Pre-level (IW-9 F3) databases likewise.
+    try {
+      this.database.exec(`ALTER TABLE credentials ADD COLUMN level TEXT`);
+    } catch {
+      // Column already exists.
+    }
+    // D3a: one user-oauth connection per (workspace, provider, owner) —
+    // enforced by the database, never check-then-insert.
+    this.database.exec(
+      `CREATE UNIQUE INDEX IF NOT EXISTS credentials_user_oauth_owner ON credentials(workspace_id, provider, created_by) WHERE level = 'user-oauth';`,
+    );
   }
 
   async create(
     workspaceId: string,
     input: CredentialInput,
   ): Promise<CredentialRecord> {
+    const level = resolveCreateLevel(input);
     const id = randomBytes(12).toString("hex");
     const now = new Date().toISOString();
-    this.database
-      .prepare(
-        `INSERT INTO credentials
-        (id, workspace_id, provider, label, type, payload, created_by, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .run(
-        id,
-        workspaceId,
-        input.provider,
-        input.label ?? null,
-        input.payload.type,
-        this.encrypt(input.payload),
-        input.createdBy ?? null,
-        now,
-        now,
-      );
+    try {
+      this.database
+        .prepare(
+          `INSERT INTO credentials
+          (id, workspace_id, provider, label, type, payload, created_by, level, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(
+          id,
+          workspaceId,
+          input.provider,
+          input.label ?? null,
+          input.payload.type,
+          this.encrypt(input.payload),
+          input.createdBy ?? null,
+          level,
+          now,
+          now,
+        );
+    } catch (err) {
+      // The D3a partial unique index — surface the duplicate user connection
+      // as the same friendly error the registry path throws.
+      if (err instanceof Error && (err as { code?: unknown }).code === "SQLITE_CONSTRAINT_UNIQUE") {
+        throw new CredentialResolutionError(`${input.provider} is already connected`);
+      }
+      throw err;
+    }
     return {
       id,
       workspaceId,
       provider: input.provider,
       label: input.label,
       type: input.payload.type,
+      level,
       createdBy: input.createdBy,
       createdAt: now,
       updatedAt: now,
@@ -445,7 +587,7 @@ export class CredentialStoreSqlite implements ICredentialStore {
   async list(workspaceId: string): Promise<CredentialRecord[]> {
     const rows = this.database
       .prepare(
-        `SELECT id, workspace_id, provider, label, type, created_by, created_at, updated_at
+        `SELECT id, workspace_id, provider, label, type, created_by, level, created_at, updated_at
          FROM credentials WHERE workspace_id = ? ORDER BY provider, created_at`,
       )
       .all(workspaceId) as Record<string, unknown>[];
@@ -458,7 +600,7 @@ export class CredentialStoreSqlite implements ICredentialStore {
   ): Promise<CredentialRecord | undefined> {
     const row = this.database
       .prepare(
-        `SELECT id, workspace_id, provider, label, type, created_by, created_at, updated_at
+        `SELECT id, workspace_id, provider, label, type, created_by, level, created_at, updated_at
          FROM credentials WHERE workspace_id = ? AND id = ?`,
       )
       .get(workspaceId, id);
@@ -563,12 +705,14 @@ export class CredentialStoreSqlite implements ICredentialStore {
   }
 
   private record(row: Record<string, unknown>): CredentialRecord {
+    const type = row["type"] as CredentialType;
     return {
       id: String(row["id"]),
       workspaceId: String(row["workspace_id"]),
       provider: String(row["provider"]),
       label: typeof row["label"] === "string" ? row["label"] : undefined,
-      type: row["type"] as CredentialType,
+      type,
+      level: effectiveLevel(type, isCredentialLevel(row["level"]) ? row["level"] : undefined),
       createdBy: typeof row["created_by"] === "string" ? row["created_by"] : undefined,
       createdAt: String(row["created_at"]),
       updatedAt: String(row["updated_at"]),
@@ -603,6 +747,7 @@ export class CredentialStoreRegistry implements ICredentialStore {
       provider: row.provider,
       label: row.label,
       type: row.type as CredentialType,
+      level: effectiveLevel(row.type, row.level),
       createdBy: row.createdBy,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
@@ -612,12 +757,20 @@ export class CredentialStoreRegistry implements ICredentialStore {
   async create(workspaceId: string, input: CredentialInput): Promise<CredentialRecord> {
     const storage = await this.store();
     await storage.tenants.ensure(workspaceId);
-    const row = await storage.credentials.create(workspaceId, {
+    // D3b: route through the package's CredentialService — the same
+    // construction routes/profiles.ts already uses — so the dsql backend
+    // inherits its level validation, default derivation, and user-oauth
+    // uniqueness instead of bypassing them via the raw storage primitive.
+    // The service seals the payload with the shared credential cipher itself.
+    const credentials = new CredentialService(
+      storage.credentials,
+      storage.provisionCredential,
+    );
+    const row = await credentials.create(workspaceId, input.createdBy ?? "", {
       provider: input.provider,
       ...(input.label !== undefined ? { label: input.label } : {}),
-      type: input.payload.type,
-      payload: await getCredentialCipher().encrypt(JSON.stringify(input.payload)),
-      ...(input.createdBy !== undefined ? { createdBy: input.createdBy } : {}),
+      payload: input.payload,
+      ...(input.level !== undefined ? { level: input.level } : {}),
     });
     return this.toRecord(workspaceId, row);
   }

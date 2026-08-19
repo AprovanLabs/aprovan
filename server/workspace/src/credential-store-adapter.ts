@@ -4,7 +4,12 @@
  * credential labels and validate pins without duplicating credential rows.
  */
 
-import type { CredentialRow, CredentialStore, CredentialType } from "@aprovan/registry-server";
+import type {
+  CredentialLevel,
+  CredentialRow,
+  CredentialStore,
+  CredentialType,
+} from "@aprovan/registry-server";
 import { getCredentialCipher } from "./credentialCipher.js";
 import type { CredentialPayload, ICredentialStore } from "./credentials.js";
 
@@ -19,6 +24,7 @@ export function adaptCredentialStore(store: ICredentialStore): CredentialStore {
         ...(input.label !== undefined ? { label: input.label } : {}),
         payload,
         ...(input.createdBy !== undefined ? { createdBy: input.createdBy } : {}),
+        ...(input.level !== undefined ? { level: input.level } : {}),
       });
       return toRow(tenantId, row);
     },
@@ -68,6 +74,7 @@ function toRow(
     provider: string;
     label?: string;
     type: string;
+    level: CredentialLevel;
     createdBy?: string;
     createdAt: string;
     updatedAt: string;
@@ -79,6 +86,7 @@ function toRow(
     provider: row.provider,
     ...(row.label !== undefined ? { label: row.label } : {}),
     type: row.type as CredentialType,
+    level: row.level,
     ...(row.createdBy !== undefined ? { createdBy: row.createdBy } : {}),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
