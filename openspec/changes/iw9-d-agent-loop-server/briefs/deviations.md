@@ -238,4 +238,53 @@ Deleting only the Touched store/call sites would leave those hits and fail the s
 
 **Related deviation (9.2).** Widget-edit used the tools-proxy stream (`streamChatCompletion`), not `POST /agents/chat-turn` + run SSE: a chat-turn agent run would tool-loop instead of emitting search/replace blocks. Brief allows "or an equivalent resumable run stream."
 
+**RESOLVED (execution, stream 9 re-evaluation, 2026-08-18).** The 9.4 gate was
+re-run on current `main` (post-#274) and all three parts pass; the broad-grep
+residuals were exactly the two named above, and both were cleared per this
+entry's own unblock prescription:
+
+- *(a) zero callers* — `x-llm-job|readLlmJob|writeLlmJob|pollJobUntilTerminal|resilientChatFetch`
+  over `$AAP/client`, `$AAP/server`, `$REG` (REG readable) returned only the
+  definitions about to be deleted, their tests, and the 9.3 deprecation text;
+  REG had zero symbol hits.
+- *(b) parity green, no-new-failures baseline* — server `tests/llm.test.ts`
+  8/8 and `tests/llm-jobs.test.ts` 7/7 pre-delete; client suite baseline on
+  clean HEAD was 9 failed files / 6 failed tests / 108 passed (all
+  pre-existing yjs/virtua module-resolution collect failures plus
+  `gateway.test.ts` — none job-path-related; `run-transport.test.ts` 11/11,
+  `llm-jobs.test.ts` 4/4). Post-delete: identical failing set, 104 passed
+  (108 minus the 4 deleted client `llm-jobs.test.ts` tests), server
+  `tests/llm.test.ts` 7/7 (the deleted x-llm-job/resume test was the 8th),
+  server typecheck clean, client typecheck 87 errors with an identical
+  sorted-error hash to baseline.
+- *(c) compatibility assessment* — the assessment in `briefs/09-report.md`
+  still holds: post-stream-8 chat never holds a job id; the widget-edit path
+  migrated in 9.2 never obtains one; only a pre-9.2 client already mid-flight
+  at deploy could hold one, and it observes non-OK polls until its 5-minute
+  poll timeout, then a surfaced error.
+
+**Residual-ref clearance.**
+
+1. `server/workspace/scripts/migrate-services-to-records.ts` — the
+   `llm-jobs` subsystem case was removed as **dead**: it migrated legacy
+   `.services/llm-jobs` files into the `svc#llm-jobs` record scope, whose
+   only reader (`llm-jobs.ts`) is now deleted; migrating into an unread
+   scope has no consumer.
+2. `registry/docs/local-mode.md:55` — registry repo not edited from the
+   aprovan worktree (per the re-evaluation's ground rules); the exact
+   one-line doc edit is recorded in `briefs/09-report.md` for a registry-side
+   change, and the aprovan-side gates are the deletion criterion.
+
+**Deletion performed (9.5).** `server/workspace/src/llm-jobs.ts`,
+`server/workspace/tests/llm-jobs.test.ts`, `client/web/src/lib/llm-jobs.test.ts`,
+and `client/web/src/lib/chat-transport.ts` (sole export `resilientChatFetch`,
+zero importers) deleted; `routes/llm.ts` stripped of `writeLlmJob`/`readLlmJob`,
+the `x-llm-job` header, job-record persistence, and the `/jobs/:id` route
+(streaming/first-byte/keepalive behavior of `/chat` and `/completions`
+unchanged; `/completions` keeps its legacy `{jobId}` first frame as a message
+id); `pollJobUntilTerminal` removed from `client/web/src/lib/llm.ts`. The 9.5
+gate `grep -rn "llm-jobs\|x-llm-job\|readLlmJob\|writeLlmJob" $AAP/client
+$AAP/server` returns nothing; `$REG` returns only the `docs/local-mode.md:55`
+line pending the reported registry doc edit.
+
 ---

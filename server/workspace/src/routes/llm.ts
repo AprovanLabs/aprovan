@@ -35,7 +35,6 @@ import {
   resolveInterfaceForWorkspace,
 } from "../interfaces.js";
 import { getExecutor } from "../isolate.js";
-import { readLlmJob, writeLlmJob, type LlmJobRecord } from "../llm-jobs.js";
 import { requireAuth } from "../middleware/auth.js";
 import { ServiceError } from "../service-kernel.js";
 import { rateLimitByUserId } from "../middleware/rateLimitMiddleware.js";
@@ -335,33 +334,13 @@ async function handleChat(
 
   const model = body.model || boundModel || provider.defaultModel;
 
-  // Job-backed, first-byte-immediately. Reasoning models can sit silent for
-  // 60s+ before their stream opens; CloudFront's origin read timeout (60s)
-  // kills a connection that hasn't sent a byte by then. So the response
-  // stream starts NOW — UI-stream preamble + keepalive comments — and the
-  // upstream executor call happens inside it. The job record makes the
-  // completion recoverable: a client that loses the stream polls
-  // GET /llm/jobs/:id (header `x-llm-job`) and splices in the tail.
-  const jobId = crypto.randomUUID();
-  const now = new Date().toISOString();
-  const job: LlmJobRecord = {
-    id: jobId,
-    status: "running",
-    provider: providerId,
-    model,
-    text: "",
-    createdAt: now,
-    updatedAt: now,
-  };
-  await writeLlmJob(workspaceId, job);
-
-  const persist = async (text: string, terminal: boolean, error?: string): Promise<void> => {
-    job.text = text;
-    job.status = terminal ? (error ? "failed" : "succeeded") : "running";
-    job.error = error;
-    job.updatedAt = new Date().toISOString();
-    await writeLlmJob(workspaceId, job);
-  };
+  // First-byte-immediately. Reasoning models can sit silent for 60s+ before
+  // their stream opens; CloudFront's origin read timeout (60s) kills a
+  // connection that hasn't sent a byte by then. So the response stream
+  // starts NOW — UI-stream preamble + keepalive comments — and the upstream
+  // executor call happens inside it. Durability for chat lives in run
+  // records (IW-9 D); the old llm-job splice was deleted in task 9.5.
+  const messageId = crypto.randomUUID();
 
   const execute = async (): Promise<
     { upstream: ReadableStream<Uint8Array> } | { text: string } | { error: string }
@@ -399,32 +378,23 @@ async function handleChat(
     return { text: completion?.choices?.[0]?.message?.content ?? "" };
   };
 
-  return c.newResponse(createChatUiJobStream(jobId, execute, persist), 200, {
-    ...UI_MESSAGE_STREAM_HEADERS,
-    "x-llm-job": jobId,
-  });
+  return c.newResponse(createChatUiStream(messageId, execute), 200, UI_MESSAGE_STREAM_HEADERS);
 }
 
 /**
- * The UI-message-stream twin of {@link createJobResponseStream}: same
- * independence property (upstream draining and `persist` run to a terminal
- * job record whether or not the client is still attached), but the wire
+ * The UI-message-stream twin of {@link createCompletionSseStream}: the wire
  * format is the AI SDK UI message stream `useChat` consumes, and the
  * upstream call itself happens *inside* the stream so the first bytes go
  * out before the provider has answered.
  */
-function createChatUiJobStream(
-  jobId: string,
+function createChatUiStream(
+  messageId: string,
   execute: () => Promise<
     { upstream: ReadableStream<Uint8Array> } | { text: string } | { error: string }
   >,
-  persist: (text: string, terminal: boolean, error?: string) => Promise<void>,
 ): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
   const decoder = new TextDecoder();
-  // The job id doubles as the UI message id, so a resuming client can match
-  // the polled job back to the message it was building.
-  const messageId = jobId;
 
   return new ReadableStream<Uint8Array>({
     async start(controller) {
@@ -450,15 +420,6 @@ function createChatUiJobStream(
       let text = "";
       let textOpen = false;
       let reasoningOpen = false;
-      let dirty = false;
-      let lastPersist = Date.now();
-
-      const maybePersist = async (): Promise<void> => {
-        if (!dirty || Date.now() - lastPersist < JOB_PERSIST_THROTTLE_MS) return;
-        dirty = false;
-        lastPersist = Date.now();
-        await persist(text, false);
-      };
 
       const closeParts = (): void => {
         if (reasoningOpen) {
@@ -504,8 +465,6 @@ function createChatUiJobStream(
           }
           emit({ type: "text-delta", id: `${messageId}-text`, delta: delta.content });
           text += delta.content;
-          dirty = true;
-          await maybePersist();
         }
       };
 
@@ -541,11 +500,9 @@ function createChatUiJobStream(
         failure = err instanceof Error ? err.message : String(err);
       } finally {
         clearInterval(keepalive);
-        await persist(text, true, failure);
         closeParts();
         if (failure) {
-          // The error chunk is what flips `useChat` into its error state; a
-          // resuming client's poll sees the same terminal record.
+          // The error chunk is what flips `useChat` into its error state.
           emit({ type: "error", errorText: failure });
         } else {
           emit({ type: "finish-step" });
@@ -563,11 +520,11 @@ function createChatUiJobStream(
 }
 
 // ---------------------------------------------------------------------------
-// POST /llm/:provider/completions — job-backed completion
+// POST /llm/:provider/completions — streaming completion (OpenAI-compat SSE)
 // ---------------------------------------------------------------------------
 
 interface CompletionJobRequestBody extends ChatRequestBody {
-  /** Required — opts into the job protocol; `/completions` has no other mode. */
+  /** Required — legacy wire shape; `/completions` has no other mode. */
   job?: boolean;
 }
 
@@ -578,8 +535,6 @@ const JOB_STREAM_HEADERS: Record<string, string> = {
 
 /** How often keepalive comments are written while draining the upstream. */
 const JOB_KEEPALIVE_MS = 15_000;
-/** Dirty-flag persistence throttle — plus one unconditional write on terminal. */
-const JOB_PERSIST_THROTTLE_MS = 3_000;
 
 llmRouter.post("/:provider/completions", rateLimitByUserId, async (c) => {
   const workspaceId = c.get("principal").workspaceId;
@@ -658,31 +613,15 @@ async function handleCompletionJob(
   });
 
   if (!result.success) {
-    // Failed before any jobId was issued — nothing to poll, report inline
-    // the same way /chat does.
+    // Failed before any stream was opened — report inline the same way
+    // /chat does.
     return c.json({ error: result.error ?? "Chat completion failed" }, 502);
   }
 
+  // Legacy first frame: pre-migration clients expect `{jobId}` before the
+  // deltas. The id no longer names a pollable record (the job store was
+  // deleted in IW-9 D task 9.5); it is only a message id now.
   const jobId = crypto.randomUUID();
-  const now = new Date().toISOString();
-  const job: LlmJobRecord = {
-    id: jobId,
-    status: "running",
-    provider: providerId,
-    model,
-    text: "",
-    createdAt: now,
-    updatedAt: now,
-  };
-  await writeLlmJob(workspaceId, job);
-
-  const persist = async (text: string, terminal: boolean, error?: string): Promise<void> => {
-    job.text = text;
-    job.status = terminal ? (error ? "failed" : "succeeded") : "running";
-    job.error = error;
-    job.updatedAt = new Date().toISOString();
-    await writeLlmJob(workspaceId, job);
-  };
 
   const upstream =
     result.data instanceof ReadableStream
@@ -693,12 +632,11 @@ async function handleCompletionJob(
 
   if (!upstream) {
     // Non-streaming upstream (some compat servers ignore `stream`): the
-    // completion is already done — persist it and emit it as one delta.
+    // completion is already done — emit it as one delta.
     const completion = result.data as
       | { choices?: Array<{ message?: { content?: string } }> }
       | undefined;
     const text = completion?.choices?.[0]?.message?.content ?? "";
-    await persist(text, true);
     const encoder = new TextEncoder();
     const stream = new ReadableStream<Uint8Array>({
       start(controller) {
@@ -715,22 +653,19 @@ async function handleCompletionJob(
     return c.newResponse(stream, 200, JOB_STREAM_HEADERS);
   }
 
-  return c.newResponse(createJobResponseStream(jobId, upstream, persist), 200, JOB_STREAM_HEADERS);
+  return c.newResponse(createCompletionSseStream(jobId, upstream), 200, JOB_STREAM_HEADERS);
 }
 
 /**
- * The SSE tap for a completion job. Upstream consumption (decode → accumulate
- * → throttled persist) drives the whole function; writes to `controller` are
- * a best-effort side channel that stop the moment they fail (client gone —
- * network drop, backgrounded tab, whatever) without touching the read loop.
- * That's the critical property: this function keeps running, and `persist`
- * keeps getting called, all the way to a terminal record, independent of
- * whether anything is still listening on the other end of `controller`.
+ * The SSE tap for a streaming completion: decode the upstream, pass deltas
+ * through in the same OpenAI-compat shape, and keep the connection warm with
+ * keepalive comments. Writes to `controller` are best-effort and stop the
+ * moment they fail (client gone — network drop, backgrounded tab, whatever)
+ * without touching the read loop.
  */
-function createJobResponseStream(
+function createCompletionSseStream(
   jobId: string,
   upstream: ReadableStream<Uint8Array>,
-  persist: (text: string, terminal: boolean, error?: string) => Promise<void>,
 ): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();
   const decoder = new TextDecoder();
@@ -753,17 +688,7 @@ function createJobResponseStream(
       const keepalive = setInterval(() => safeEnqueue(encoder.encode(": keepalive\n\n")), JOB_KEEPALIVE_MS);
 
       let buffered = "";
-      let text = "";
-      let dirty = false;
-      let lastPersist = Date.now();
       const reader = upstream.getReader();
-
-      const maybePersist = async (force: boolean): Promise<void> => {
-        if (!force && (!dirty || Date.now() - lastPersist < JOB_PERSIST_THROTTLE_MS)) return;
-        dirty = false;
-        lastPersist = Date.now();
-        await persist(text, false);
-      };
 
       const handleLine = async (line: string): Promise<void> => {
         if (!line.startsWith("data:")) return;
@@ -783,21 +708,17 @@ function createJobResponseStream(
           return; // Malformed upstream chunk — skip it, keep draining.
         }
         if (!delta) return;
-        // Reasoning deltas pass through (not persisted — the job record is
-        // the resumable *text*), so a thinking model shows signs of life
-        // instead of long silence before its first visible token.
+        // Reasoning deltas pass through so a thinking model shows signs of
+        // life instead of long silence before its first visible token.
         const reasoning = delta.reasoning_content ?? delta.reasoning;
         if (typeof reasoning === "string" && reasoning.length > 0) {
           emit({ choices: [{ delta: { reasoning_content: reasoning } }] });
         }
         if (typeof delta.content !== "string" || delta.content.length === 0) return;
-        text += delta.content;
-        dirty = true;
         // Passthrough in the same OpenAI-compat `{choices[0].delta.content}`
         // shape the upstream used — the client's SSE reader (sse.ts) already
         // knows how to fold that, on both the plain /chat path and here.
         emit({ choices: [{ delta: { content: delta.content } }] });
-        await maybePersist(false);
       };
 
       let failure: string | undefined;
@@ -818,13 +739,10 @@ function createJobResponseStream(
         failure = err instanceof Error ? err.message : String(err);
       } finally {
         clearInterval(keepalive);
-        await persist(text, true, failure);
-        // Surface the failure inline too: a stream that just ends at [DONE]
-        // reads as success to a client that never learns the job failed.
+        // Surface the failure inline: a stream that just ends at [DONE]
+        // reads as success to a client that never learns the request failed.
         // The client's SSE reader (readChatCompletionStream, shared with the
-        // plain /chat path) already throws on an `{error}` frame — that's
-        // what sends it to the polling fallback, where it picks up this same
-        // terminal record and re-throws with this message.
+        // plain /chat path) already throws on an `{error}` frame.
         if (failure) emit({ error: failure });
         safeEnqueue(encoder.encode("data: [DONE]\n\n"));
         try {
@@ -836,55 +754,3 @@ function createJobResponseStream(
     },
   });
 }
-
-// ---------------------------------------------------------------------------
-// GET /llm/jobs/:id — poll a completion job (DEPRECATED)
-// ---------------------------------------------------------------------------
-//
-// Removal condition (evidence gate, not a calendar window — IW-9 D task 9.4):
-// this route and the llm-jobs store may be deleted only when (a) grep across
-// both checkouts shows no in-repo callers of x-llm-job / readLlmJob /
-// writeLlmJob / pollJobUntilTerminal / resilientChatFetch beyond the
-// definitions about to be deleted and their tests, (b) parity/E2E (stream 8
-// suite + llm.test.ts + widget-edit path tests) is green with the job path
-// unused, and (c) a written compatibility assessment for clients holding a
-// job id across the deploy is recorded. Until then this endpoint stays.
-
-/** Long-poll ceiling for `?wait=1`. */
-const JOB_WAIT_MS = 20_000;
-const JOB_WAIT_POLL_MS = 1_000;
-
-const LLM_JOBS_DEPRECATION =
-  "Deprecated. Removal when: (a) no in-repo callers of x-llm-job/readLlmJob/writeLlmJob/pollJobUntilTerminal/resilientChatFetch beyond definitions+tests in both checkouts, (b) parity/E2E green without the job path, (c) compatibility assessment for in-flight job ids recorded. Not calendar-gated.";
-
-llmRouter.get("/jobs/:id", async (c) => {
-  const workspaceId = c.get("principal").workspaceId;
-  const id = c.req.param("id") ?? "";
-  const wait = c.req.query("wait") === "1";
-
-  let job = await readLlmJob(workspaceId, id);
-  if (!job) {
-    return c.json(
-      { error: `Unknown job: ${id}`, deprecated: true, deprecation: LLM_JOBS_DEPRECATION },
-      404,
-      { Deprecation: "true", Sunset: "evidence-gate" },
-    );
-  }
-
-  if (wait && job.status === "running") {
-    const deadline = Date.now() + JOB_WAIT_MS;
-    while (Date.now() < deadline) {
-      await new Promise((resolve) => setTimeout(resolve, JOB_WAIT_POLL_MS));
-      const next = await readLlmJob(workspaceId, id);
-      if (!next) break;
-      job = next;
-      if (job.status !== "running") break;
-    }
-  }
-
-  return c.json(
-    { ...job, deprecated: true, deprecation: LLM_JOBS_DEPRECATION },
-    200,
-    { Deprecation: "true", Sunset: "evidence-gate" },
-  );
-});

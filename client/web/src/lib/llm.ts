@@ -139,74 +139,15 @@ export async function streamChatCompletion(
 // Completions used by non-edit callers (session auto-title, merge combine).
 // ---------------------------------------------------------------------------
 //
-// Formerly job-backed (`POST /llm/:provider/completions` + poll
-// `GET /llm/jobs/:id`). IW-9 D stream 9 moved durability for chat onto run
+// Formerly job-backed. IW-9 D stream 9 moved durability for chat onto run
 // records; remaining short completions share {@link streamChatCompletion}
-// (tools-proxy stream, no job splice). `pollJobUntilTerminal` stays exported
-// only while `resilientChatFetch` / the server job store remain for the
-// evidence-gated deletion in task 9.5.
-
-interface LlmJobRecord {
-  id: string;
-  status: "running" | "succeeded" | "failed";
-  provider: string;
-  model?: string;
-  text: string;
-  error?: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-/** How often to poll `GET /llm/jobs/:id` after the stream itself drops. */
-const JOB_POLL_INTERVAL_MS = 3_000;
-/** Give up resuming a job after this long with no terminal status. */
-const JOB_POLL_TIMEOUT_MS = 5 * 60_000;
-
-/**
- * Poll a job to a terminal state, feeding `onDelta` with text growth (not
- * raw upstream deltas — the job record only ever holds the accumulated
- * text) so the UI keeps counting blocks the same way it does mid-stream.
- *
- * @deprecated Retained for `resilientChatFetch` until llm-jobs deletion (9.5).
- * New callers must use {@link streamChatCompletion}.
- */
-export async function pollJobUntilTerminal(
-  jobId: string,
-  knownText: string,
-  onDelta?: (delta: string, full: string) => void,
-): Promise<string> {
-  const deadline = Date.now() + JOB_POLL_TIMEOUT_MS;
-  let text = knownText;
-  for (;;) {
-    if (Date.now() > deadline) {
-      throw new Error(`Chat completion job ${jobId} did not finish within ${JOB_POLL_TIMEOUT_MS / 1000}s`);
-    }
-    await new Promise((resolve) => setTimeout(resolve, JOB_POLL_INTERVAL_MS));
-
-    let response: Response;
-    try {
-      response = await gatewayFetch(`${GATEWAY_BASE}/llm/jobs/${encodeURIComponent(jobId)}`);
-    } catch {
-      continue; // Still offline / still reconnecting — keep polling.
-    }
-    if (!response.ok) continue; // Transient gateway hiccup — keep polling.
-
-    const job = (await response.json()) as LlmJobRecord;
-    if (typeof job.text === "string" && job.text.length > text.length) {
-      const delta = job.text.slice(text.length);
-      text = job.text;
-      onDelta?.(delta, text);
-    }
-    if (job.status === "succeeded") return text;
-    if (job.status === "failed") throw new Error(job.error ?? "Chat completion job failed");
-    // status === "running" — loop and poll again.
-  }
-}
+// (tools-proxy stream, no job splice). The server job store and its polling
+// client were deleted in task 9.5.
 
 /**
  * Streaming completion for leftover non-edit callers (session title, merge).
- * Delegates to {@link streamChatCompletion}; no longer creates or polls
- * llm-jobs. Prefer calling {@link streamChatCompletion} directly.
+ * Delegates to {@link streamChatCompletion}. Prefer calling
+ * {@link streamChatCompletion} directly.
  */
 export async function runChatCompletionJob(
   providerId: string,

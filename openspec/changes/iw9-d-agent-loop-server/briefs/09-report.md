@@ -2,7 +2,7 @@
 
 **PR:** https://github.com/AprovanLabs/aprovan/pull/224
 **Base:** `origin/main` @ `bbfc3f3` (`feat(web): IW-9 D stream 8 — RunTransport default, delete legacy loop` / #223)
-**Outcome:** complete-with-blocker (9.5 does not delete)
+**Outcome:** complete-with-blocker (9.5 does not delete) — **superseded 2026-08-18: blocker resolved, deletion performed; see Addendum at the bottom**
 
 ## Verify
 
@@ -116,3 +116,92 @@ Deleting only the Touched definitions would leave those matches and fail AGENTS.
 | `lib/chat-transport.ts` | Deprecation comment on dead `resilientChatFetch` |
 | `routes/llm.ts` | Evidence-gated deprecation on `GET /jobs/:id` |
 | `llm-jobs.ts` / server `llm-jobs.test.ts` / `llm.test.ts` | Unchanged (store kept) |
+
+---
+
+## Addendum — 9.5 blocker re-evaluation and deletion (2026-08-18)
+
+The codebase moved substantially after the blocker was recorded (streams
+through #274 merged). Evidence gate 9.4 was re-run as written; all three
+parts pass and the broad-grep residuals were exactly the two named in
+`deviations.md` §7, so the deletion branch of 9.5 was taken.
+
+### 9.4 re-run (verbatim)
+
+**(a) zero callers** — `REG_readable=yes`;
+`grep -rn "x-llm-job\|readLlmJob\|writeLlmJob\|pollJobUntilTerminal\|resilientChatFetch" $AAP/client $AAP/server` (node_modules/dist/.turbo filtered)
+returned only: `client/web/src/lib/chat-transport.ts` (defs),
+`client/web/src/lib/llm.ts` (def + comments),
+`server/workspace/src/llm-jobs.ts` (defs), `server/workspace/src/routes/llm.ts`
+(call sites + 9.3 deprecation text), `server/workspace/tests/llm-jobs.test.ts`
+and `tests/llm.test.ts:172` (tests). Same grep over `$REG`: empty. **PASS.**
+
+**(b) parity green (no-new-failures baseline per tasks.md preamble)** —
+pre-delete on clean HEAD (`0226d25`): server `tests/llm.test.ts` **8/8**,
+`tests/llm-jobs.test.ts` **7/7**; client full suite **9 failed files / 6
+failed tests / 108 passed** — all pre-existing (yjs/virtua module-resolution
+collect failures in `store.test.ts`, `namespaces.test.ts`,
+`chat-artifact.test.ts`, `vfs-commits.test.ts`, `smoke.test.ts`,
+`UnknownNativeSurface.test.tsx`, `DraftBanner.test.tsx`,
+`voice-in-chat.test.ts`, plus `gateway.test.ts` 6 failures); none
+job-path-related (`run-transport.test.ts` 11/11, `lib/llm-jobs.test.ts` 4/4,
+`sse.test.ts` 10/10, `useWidgetSelfHeal.test.ts` 9/9). Client typecheck
+baseline: **87 errors**, sorted-hash `31e033ccc61d36d6bdac6cf89136e8b4`.
+**PASS** under the captured baseline.
+
+**(c) compatibility assessment** — the assessment above (this report, §9.4c)
+remains accurate on the current tree: post-stream-8 chat (RunTransport) never
+holds a job id; the 9.2-migrated widget-edit path (`streamChatCompletion`,
+tools-proxy) never obtains one; `runChatCompletionJob` aliases
+`streamChatCompletion` for the session-title/merge callers. Only a pre-9.2
+client already mid-completion at deploy could hold a job id; with the route
+gone it observes non-OK polls until the 5-minute poll timeout, then a
+surfaced stream error. **Recorded.**
+
+### Deletion performed
+
+- Deleted: `server/workspace/src/llm-jobs.ts`,
+  `server/workspace/tests/llm-jobs.test.ts`,
+  `client/web/src/lib/llm-jobs.test.ts`,
+  `client/web/src/lib/chat-transport.ts` (sole export `resilientChatFetch`,
+  zero importers).
+- `server/workspace/src/routes/llm.ts`: removed the llm-jobs import,
+  job-record creation/persistence in `/chat` and `/completions`, the
+  `x-llm-job` response header, and the `GET /jobs/:id` route (with its
+  deprecation constant). Streaming behavior is unchanged:
+  first-byte-immediately, keepalives, in-stream error frames.
+  `createChatUiJobStream` → `createChatUiStream` (message id is a plain
+  uuid), `createJobResponseStream` → `createCompletionSseStream`;
+  `/completions` keeps its legacy `{jobId}` first frame purely as a message
+  id for old clients' happy path.
+- `client/web/src/lib/llm.ts`: removed `pollJobUntilTerminal`, its
+  constants, and the local `LlmJobRecord` type; `runChatCompletionJob`
+  alias retained for out-of-Touches callers.
+- `server/workspace/tests/llm.test.ts`: removed the one test of the deleted
+  resume behavior ("exposes the backing job id and persists the text for
+  resume"); 7 remaining tests untouched.
+
+### Residual-ref clearance (the §7 blockers)
+
+1. `server/workspace/scripts/migrate-services-to-records.ts` — `llm-jobs`
+   case removed as **dead**: it migrated `.services/llm-jobs` files into the
+   `svc#llm-jobs` record scope, whose only reader was the deleted store.
+2. `registry/docs/local-mode.md:55` — **not edited from the aprovan
+   worktree**. Required registry-side one-line change:
+
+   ```
+   - | VCS, chat sessions, workflows, apps, agents, events, llm-jobs, webhooks, prompts | workspace FS | workspace FS | inherit the FS backend |
+   + | VCS, chat sessions, workflows, apps, agents, events, webhooks, prompts | workspace FS | workspace FS | inherit the FS backend |
+   ```
+
+### Post-delete gates (verbatim results)
+
+| Gate | Result |
+| --- | --- |
+| `grep -rn "llm-jobs\|x-llm-job\|readLlmJob\|writeLlmJob" $AAP/client $AAP/server` | **empty** (exit 1) |
+| Same grep over `$REG` | only `docs/local-mode.md:55` (reported above) |
+| `grep -rn "pollJobUntilTerminal\|resilientChatFetch" $AAP/client $AAP/server $REG` | **empty** (exit 1) |
+| `pnpm -C server/workspace typecheck` | clean (`effect-completeness: ok (143 tools)`) |
+| `vitest run tests/llm.test.ts` | **7/7 passed** |
+| Client full suite | 9 failed files / 6 failed tests / **104 passed** — failing set byte-identical to baseline; delta is exactly the 4 deleted `llm-jobs.test.ts` tests |
+| Client typecheck | **87 errors**, hash `31e033ccc61d36d6bdac6cf89136e8b4` — identical to baseline, no new errors |
