@@ -156,27 +156,6 @@ describe("llm chat providers", () => {
     expect(text).toContain('"errorText":"boom"');
     expect(text.trimEnd().endsWith("data: [DONE]")).toBe(true);
   });
-
-  it("exposes the backing job id and persists the text for resume", async () => {
-    stubExecutor(async () => ({
-      success: true,
-      data: sseStream([
-        '{"choices":[{"delta":{"content":"hello"}}]}',
-        "[DONE]",
-      ]),
-      durationMs: 1,
-    }));
-
-    const response = await chat("openai", { messages: uiMessages });
-    expect(response.status).toBe(200);
-    const jobId = response.headers.get("x-llm-job");
-    expect(jobId).toBeTruthy();
-    await readAll(response);
-
-    const job = await createApp().request(`/llm/jobs/${jobId}`);
-    expect(job.status).toBe(200);
-    expect(await job.json()).toMatchObject({ status: "succeeded", text: "hello" });
-  });
 });
 
 describe("toOpenAiMessages", () => {

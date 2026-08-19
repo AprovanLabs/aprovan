@@ -7,7 +7,7 @@
  *
  *   pnpm --filter @aprovan/workspace exec tsx scripts/migrate-services-to-records.ts \
  *     --workspace <id> [--chat] [--vcs] [--apps] [--agents] [--sandboxes] \
- *     [--workflows] [--webhooks] [--sync] [--events] [--llm-jobs] \
+ *     [--workflows] [--webhooks] [--sync] [--events] \
  *     [--workspace-config] [--keyvalue] [--all] [--dry-run]
  *
  * For each subsystem: read the legacy file(s) → write the equivalent
@@ -38,7 +38,6 @@ const SUBSYSTEMS = [
   "webhooks",
   "sync",
   "events",
-  "llm-jobs",
   "workspace-config",
   "keyvalue",
 ] as const;
@@ -335,11 +334,6 @@ async function migrateSubsystem(
       break;
     case "events":
       await migrateEvents(workspaceId, counts, dryRun);
-      break;
-    case "llm-jobs":
-      await migrateJsonFolder(
-        workspaceId, ".services/llm-jobs", svcScope("llm-jobs"), counts, dryRun,
-      );
       break;
     case "workspace-config":
       await migrateJsonFile(
