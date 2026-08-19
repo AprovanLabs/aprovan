@@ -112,7 +112,7 @@ External dependencies:
 
 > Depends-on: 3 | Repo: aprovan | Touches: aprovan/server/workspace/package.json, aprovan/pnpm-lock.yaml | Verify: cd /Users/jacob/Documents/Code/AprovanLabs/aprovan && grep -n "@aprovan/registry-server" server/workspace/package.json && pnpm --filter @aprovan/workspace check-types
 
-- [ ] 4.1 Bump the `@aprovan/registry-server` pin to the version
+- [x] 4.1 Bump the `@aprovan/registry-server` pin to the version
       published in 3.1 (must stay `^0.2.7`-or-later per IW-9 rule 2) in
       its own commit; `pnpm install`; confirm typecheck passes before
       any aprovan F3 code lands.
