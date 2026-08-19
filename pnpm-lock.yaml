@@ -740,8 +740,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/compiler
       '@aprovan/registry-server':
-        specifier: ^0.2.11
-        version: 0.2.11(zod@3.25.76)
+        specifier: ^0.3.0
+        version: 0.3.0(zod@3.25.76)
       '@aws-sdk/client-cognito-identity-provider':
         specifier: ^3.1077.0
         version: 3.1101.0
@@ -932,12 +932,12 @@ packages:
     peerDependencies:
       ajv: '>=8'
 
-  '@aprovan/registry-server@0.2.11':
-    resolution: {integrity: sha512-9F5KvWjQP4Jd5kXEKlf1HlAchLy0J8vjvvfoAC2MNMBfelUiDxiSHMoreenm94Js7lkL0TY6kqY8k0Aj4WdR+w==}
-    engines: {node: '>=20.0.0'}
-
   '@aprovan/registry-server@0.2.7':
     resolution: {integrity: sha512-UlB67aQzxjLnFMPzsoJcom9GxlSvY22X8FEKiwiZYxQJvOTA/biOhe4/pNGMQeDW1d+mq82zPxrnDJ7tcdNlhA==}
+    engines: {node: '>=20.0.0'}
+
+  '@aprovan/registry-server@0.3.0':
+    resolution: {integrity: sha512-lUEcJGH9QSEX4Nj9LSYIA4E5g+bJCU47sSXJJGYKp5RgpK0VT0avqKZMB4Jhn6ppacBNTr2Kz5Uz4EMV8qd2ZA==}
     engines: {node: '>=20.0.0'}
 
   '@asamuzakjp/css-color@6.0.5':
@@ -9243,7 +9243,35 @@ snapshots:
       jsonpointer: 5.0.1
       leven: 3.1.0
 
-  '@aprovan/registry-server@0.2.11(zod@3.25.76)':
+  '@aprovan/registry-server@0.2.7(zod@3.25.76)':
+    dependencies:
+      '@hono/node-server': 1.19.17(hono@4.12.33)
+      '@jitl/quickjs-wasmfile-debug-asyncify': 0.32.0
+      '@modelcontextprotocol/sdk': 1.30.0(zod@3.25.76)
+      '@opentelemetry/api': 1.9.0
+      '@opentelemetry/exporter-trace-otlp-http': 0.57.2(@opentelemetry/api@1.9.0)
+      '@opentelemetry/resources': 1.30.1(@opentelemetry/api@1.9.0)
+      '@opentelemetry/sdk-trace-base': 1.30.1(@opentelemetry/api@1.9.0)
+      '@opentelemetry/sdk-trace-node': 1.30.1(@opentelemetry/api@1.9.0)
+      '@utdk/agent': 0.2.0
+      '@utdk/clients': 0.1.1
+      '@utdk/common': 0.1.1(@opentelemetry/api@1.9.0)
+      '@utdk/llm': 0.2.0
+      '@utdk/mcp-core': 0.1.2(@opentelemetry/api@1.9.0)
+      better-sqlite3: 12.11.1
+      hono: 4.12.33
+      jose: 5.10.0
+      quickjs-emscripten-core: 0.32.0
+    optionalDependencies:
+      '@aws-sdk/client-kms': 3.1101.0
+    transitivePeerDependencies:
+      - '@cfworker/json-schema'
+      - debug
+      - pg-native
+      - supports-color
+      - zod
+
+  '@aprovan/registry-server@0.3.0(zod@3.25.76)':
     dependencies:
       '@hono/node-server': 1.19.17(hono@4.12.33)
       '@jitl/quickjs-wasmfile-debug-asyncify': 0.32.0
@@ -9272,34 +9300,6 @@ snapshots:
       - pg-native
       - supports-color
       - utf-8-validate
-      - zod
-
-  '@aprovan/registry-server@0.2.7(zod@3.25.76)':
-    dependencies:
-      '@hono/node-server': 1.19.17(hono@4.12.33)
-      '@jitl/quickjs-wasmfile-debug-asyncify': 0.32.0
-      '@modelcontextprotocol/sdk': 1.30.0(zod@3.25.76)
-      '@opentelemetry/api': 1.9.0
-      '@opentelemetry/exporter-trace-otlp-http': 0.57.2(@opentelemetry/api@1.9.0)
-      '@opentelemetry/resources': 1.30.1(@opentelemetry/api@1.9.0)
-      '@opentelemetry/sdk-trace-base': 1.30.1(@opentelemetry/api@1.9.0)
-      '@opentelemetry/sdk-trace-node': 1.30.1(@opentelemetry/api@1.9.0)
-      '@utdk/agent': 0.2.0
-      '@utdk/clients': 0.1.1
-      '@utdk/common': 0.1.1(@opentelemetry/api@1.9.0)
-      '@utdk/llm': 0.2.0
-      '@utdk/mcp-core': 0.1.2(@opentelemetry/api@1.9.0)
-      better-sqlite3: 12.11.1
-      hono: 4.12.33
-      jose: 5.10.0
-      quickjs-emscripten-core: 0.32.0
-    optionalDependencies:
-      '@aws-sdk/client-kms': 3.1101.0
-    transitivePeerDependencies:
-      - '@cfworker/json-schema'
-      - debug
-      - pg-native
-      - supports-color
       - zod
 
   '@asamuzakjp/css-color@6.0.5':
@@ -14586,14 +14586,6 @@ snapshots:
       chai: 5.3.3
       tinyrainbow: 2.0.0
 
-  '@vitest/mocker@2.1.5(vite@5.4.21(@types/node@22.19.11)(lightningcss@1.32.0)(terser@5.49.2))':
-    dependencies:
-      '@vitest/spy': 2.1.5
-      estree-walker: 3.0.3
-      magic-string: 0.30.21
-    optionalDependencies:
-      vite: 5.4.21(@types/node@22.19.11)(lightningcss@1.32.0)(terser@5.49.2)
-
   '@vitest/mocker@2.1.5(vite@5.4.21(@types/node@25.9.5)(lightningcss@1.32.0)(terser@5.49.2))':
     dependencies:
       '@vitest/spy': 2.1.5
@@ -18998,7 +18990,7 @@ snapshots:
   vitest@2.1.5(@types/node@22.19.11)(happy-dom@20.11.1)(jsdom@30.0.1(@noble/hashes@2.3.0))(lightningcss@1.32.0)(terser@5.49.2):
     dependencies:
       '@vitest/expect': 2.1.5
-      '@vitest/mocker': 2.1.5(vite@5.4.21(@types/node@22.19.11)(lightningcss@1.32.0)(terser@5.49.2))
+      '@vitest/mocker': 2.1.5(vite@5.4.21(@types/node@25.9.5)(lightningcss@1.32.0)(terser@5.49.2))
       '@vitest/pretty-format': 2.1.9
       '@vitest/runner': 2.1.5
       '@vitest/snapshot': 2.1.5
