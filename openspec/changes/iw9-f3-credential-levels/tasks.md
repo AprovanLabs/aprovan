@@ -121,7 +121,7 @@ External dependencies:
 
 > Depends-on: 4 | Repo: aprovan | Touches: aprovan/server/workspace/src/credentials.ts, aprovan/server/workspace/src/credential-store-adapter.ts, aprovan/server/workspace/tests/credential-levels.test.ts | Verify: cd /Users/jacob/Documents/Code/AprovanLabs/aprovan && pnpm --filter @aprovan/workspace test -- credential-levels && grep -n "level" server/workspace/src/credential-store-adapter.ts
 
-- [ ] 5.1 `CredentialRecord`/`CredentialInput` gain `level` (re-export
+- [x] 5.1 `CredentialRecord`/`CredentialInput` gain `level` (re-export
       `CredentialLevel`/`effectiveLevel` from the package — no local
       redeclaration, per the drift warning in credentials.ts:53-63);
       sqlite backend adds the `level` column with the try/catch `ALTER`
@@ -140,7 +140,7 @@ External dependencies:
       already does** (`new CredentialService(storage.credentials, storage.provisionCredential)`)
       so the dsql backend inherits stream 1's validation instead of
       bypassing it (tech-plan D3b).
-- [ ] 5.2 `credential-store-adapter.ts` maps `level` both directions for
+- [x] 5.2 `credential-store-adapter.ts` maps `level` both directions for
       `get`/`list`/`getWithPayload` (its `firstForProvider`'s resolution
       *primitive* migrates in stream 6, task 6.2/6.3 — `resolveWorkspaceCredential`
       does not exist yet at this point in the chain); creation-time
@@ -148,7 +148,7 @@ External dependencies:
       uniqueness via the D3a mechanisms above) applies identically on the
       sqlite/dynamo/dsql backends so behavior does not depend on
       `storeBackend()`.
-- [ ] 5.3 New test file
+- [x] 5.3 New test file
       `server/workspace/tests/credential-levels.test.ts`: level
       round-trip on all `ICredentialStore` methods on BOTH the sqlite
       backend AND the dsql backend (via `CredentialStoreRegistry`, to
