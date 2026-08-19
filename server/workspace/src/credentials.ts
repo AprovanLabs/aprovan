@@ -34,13 +34,19 @@ import { createRequire } from "node:module";
 import { join } from "node:path";
 import type { CredentialType } from "@utdk/common/auth";
 import {
+  CredentialNotConnectedError,
   CredentialService,
   credentialLevelValues,
   defaultLevelForType,
   effectiveLevel,
   isCredentialLevel,
 } from "@aprovan/registry-server";
-import type { CredentialLevel, CredentialPayload } from "@aprovan/registry-server";
+import type {
+  CredentialInvoker,
+  CredentialLevel,
+  CredentialPayload,
+  ResolvedCredential,
+} from "@aprovan/registry-server";
 import { getCredentialCipher } from "./credentialCipher.js";
 import { dynamo } from "./db/client.js";
 import { getRegistryStorage } from "./registry-storage.js";
@@ -72,13 +78,15 @@ export type { CredentialType } from "@utdk/common/auth";
 export type {
   ApiKeyPayload,
   BearerTokenPayload,
+  CredentialInvoker,
   CredentialLevel,
   CredentialPayload,
   OAuth2AuthCodePayload,
   OAuth2ClientPayload,
   OAuthClientOrigin,
+  ResolvedCredential,
 } from "@aprovan/registry-server";
-export { effectiveLevel } from "@aprovan/registry-server";
+export { CredentialNotConnectedError, effectiveLevel } from "@aprovan/registry-server";
 
 export interface CredentialInput {
   provider: string;
@@ -904,13 +912,39 @@ export function resetCredentialStore(): void {
   _store = undefined;
 }
 
+/** `ResolvedCredential` from a stream-5 record (level already effective). */
+function toResolvedCredential(
+  record: CredentialRecord,
+  payload: CredentialPayload,
+): ResolvedCredential {
+  return {
+    id: record.id,
+    level: record.level,
+    // Owner present iff the level is user-oauth (tech-plan D5 contract).
+    ...(record.level === "user-oauth" && record.createdBy !== undefined
+      ? { owner: record.createdBy }
+      : {}),
+    payload,
+  };
+}
+
 /**
  * The one credential-resolution entry point for the dispatch paths (tool
- * proxy, workflow invoke, MCP, chat).
+ * proxy, workflow invoke, MCP, chat). `invoker` is required at the type
+ * level (IW-9 F3, tech-plan D4/D6): resolution that can reach a `user-oauth`
+ * row is impossible without the invoking identity.
  *
- * With no `credentialId` this is the historical behaviour — the first
- * credential the workspace holds for the provider. With one, it is that exact
- * credential, and a mismatch is reported rather than silently falling back.
+ * Resolution order (tech-plan D4):
+ * 1. An explicit `credentialId` pin resolves exactly that row, loudly — a
+ *    missing or mismatched pin is an error, never a fallback. A pinned
+ *    `user-oauth` row whose owner is not the invoker fails closed with
+ *    `CredentialNotConnectedError` (never another user's payload, never a
+ *    downgrade to a workspace credential).
+ * 2. No pin: the invoker's own `user-oauth` row for the provider, if any.
+ * 3. Otherwise the first workspace-level row in creation order. Other users'
+ *    `user-oauth` rows are invisible; when they are ALL that exists for the
+ *    provider, fail closed with `CredentialNotConnectedError`. No rows at
+ *    all → undefined (nothing connected — the pre-existing legal outcome).
  *
  * A `profile` pin is resolved by the unified profile store before this
  * function is called (credential id on the record). Labels are display names
@@ -919,9 +953,10 @@ export function resetCredentialStore(): void {
 export async function resolveCredentialRecord(
   workspaceId: string,
   provider: string,
+  invoker: CredentialInvoker,
   credentialId?: string,
   profile?: string,
-): Promise<{ id: string; payload: CredentialPayload } | undefined> {
+): Promise<ResolvedCredential | undefined> {
   const store = getCredentialStore();
   if (credentialId && profile !== undefined) {
     throw new CredentialResolutionError(
@@ -935,19 +970,71 @@ export async function resolveCredentialRecord(
         `credential labels are display names, not identifiers`,
     );
   }
-  if (!credentialId) return store.resolveRecordForProvider(workspaceId, provider);
-  const record = await store.resolveRecordById(workspaceId, credentialId);
-  if (!record) {
-    throw new CredentialResolutionError(
-      `Credential ${credentialId} does not exist in this workspace`,
-    );
+  if (credentialId) {
+    const record = await store.resolveRecordById(workspaceId, credentialId);
+    if (!record) {
+      throw new CredentialResolutionError(
+        `Credential ${credentialId} does not exist in this workspace`,
+      );
+    }
+    if (record.provider !== provider) {
+      throw new CredentialResolutionError(
+        `Credential ${credentialId} belongs to ${record.provider}, not ${provider}`,
+      );
+    }
+    const meta = await store.get(workspaceId, credentialId);
+    if (!meta) {
+      throw new CredentialResolutionError(
+        `Credential ${credentialId} does not exist in this workspace`,
+      );
+    }
+    if (meta.level === "user-oauth" && meta.createdBy !== invoker.sub) {
+      // Pin on another user's connection: loud, never a downgrade — even
+      // when a workspace-level credential for the provider exists.
+      throw new CredentialNotConnectedError(provider);
+    }
+    return toResolvedCredential(meta, record.payload);
   }
-  if (record.provider !== provider) {
-    throw new CredentialResolutionError(
-      `Credential ${credentialId} belongs to ${record.provider}, not ${provider}`,
-    );
+  // Unpinned: D4 order over the workspace's rows for the provider.
+  // `record.level` is always present and already effective (stream 5).
+  const rows = (await store.list(workspaceId)).filter(
+    (record) => record.provider === provider,
+  );
+  if (rows.length === 0) return undefined;
+  const own = rows.find(
+    (record) => record.level === "user-oauth" && record.createdBy === invoker.sub,
+  );
+  const selected = own ?? rows.find((record) => record.level !== "user-oauth");
+  if (!selected) {
+    // Rows exist but every one is another user's connection — fail closed.
+    throw new CredentialNotConnectedError(provider);
   }
-  return { id: record.id, payload: record.payload };
+  const payload = await store.getPayload(workspaceId, selected.id);
+  if (!payload) return undefined;
+  return toResolvedCredential(selected, payload);
+}
+
+/**
+ * Workspace-only resolver for invoker-less system paths (tech-plan D6) —
+ * the ONLY resolver code without a user in scope may call. Same return
+ * shape as {@link resolveCredentialRecord}, but selection is structurally
+ * restricted to workspace-level rows: a `user-oauth` row is filtered out of
+ * the candidate set before ranking, never merely "not the one picked", so
+ * `owner` is always `undefined` on the result by construction.
+ */
+export async function resolveWorkspaceCredential(
+  workspaceId: string,
+  provider: string,
+): Promise<ResolvedCredential | undefined> {
+  const store = getCredentialStore();
+  const rows = (await store.list(workspaceId)).filter(
+    (record) => record.provider === provider && record.level !== "user-oauth",
+  );
+  const selected = rows[0];
+  if (!selected) return undefined;
+  const payload = await store.getPayload(workspaceId, selected.id);
+  if (!payload) return undefined;
+  return toResolvedCredential(selected, payload);
 }
 
 /** A pinned credential that cannot be honoured — always a configuration bug. */

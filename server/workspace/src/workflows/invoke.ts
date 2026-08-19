@@ -13,9 +13,12 @@ import {
 } from "../capability-cards.js";
 import { assertToolGranted, denyMessage, evaluateDispatch } from "../grants.js";
 import {
+  CredentialNotConnectedError,
   getCredentialStore,
   resolveCredentialRecord,
+  type CredentialInvoker,
   type CredentialPayload,
+  type ResolvedCredential,
 } from "../credentials.js";
 import { parseInterfaceNamespace, resolveInterfaceForWorkspace } from "../interfaces.js";
 import { getExecutor } from "../isolate.js";
@@ -364,6 +367,22 @@ interface ProviderDispatch {
   label: string;
 }
 
+/**
+ * The invoker for in-process dispatch (IW-9 F3): `ctx.userId` is the
+ * authenticated principal the runner/app session carries; the via-path actor
+ * is named when the context says the call is app- or workflow-originated.
+ */
+function invokerFromContext(ctx: ServiceContext): CredentialInvoker {
+  return {
+    sub: ctx.userId,
+    ...(ctx.appScope
+      ? { actor: { kind: "app" as const, id: ctx.appScope.id } }
+      : ctx.workflowDepth !== undefined && ctx.parentRunId
+        ? { actor: { kind: "workflow" as const, id: ctx.parentRunId } }
+        : {}),
+  };
+}
+
 /** Resolve a provider's workspace credential to an injectable payload. */
 async function resolveProviderCredentials(
   ctx: ServiceContext,
@@ -373,15 +392,19 @@ async function resolveProviderCredentials(
   credentialProfile?: string,
 ): Promise<CredentialPayload | undefined> {
   const store = getCredentialStore();
-  let record: { id: string; payload: CredentialPayload } | undefined;
+  let record: ResolvedCredential | undefined;
   try {
     record = await resolveCredentialRecord(
       ctx.workspaceId,
       provider,
+      invokerFromContext(ctx),
       credentialId,
       credentialProfile,
     );
   } catch (err) {
+    // Rethrow "not connected" unwrapped: it carries status 403 + code, and
+    // the HTTP boundary (routes/tools.ts embed catch) maps it verbatim.
+    if (err instanceof CredentialNotConnectedError) throw err;
     throw new ServiceError(err instanceof Error ? err.message : String(err), 400);
   }
   if (!record) return undefined;

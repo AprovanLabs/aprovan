@@ -28,7 +28,7 @@
  */
 
 import { createHash } from "node:crypto";
-import { getCredentialStore } from "../credentials.js";
+import { resolveWorkspaceCredential } from "../credentials.js";
 import { getFsStore, normalizeFsPath, type FsEntry, type FsFile, type S3 } from "../fs-store.js";
 import { ServiceError } from "../service-kernel.js";
 import { readSvcRecord, svcScope, writeSvcRecord } from "../svc-records.js";
@@ -201,10 +201,13 @@ export function githubApiBase(): string {
  * the sandbox repo-mount path, which hands it to a machine host so `git
  * clone` can reach private repos — the same credential this module's
  * read-through already uses.
+ *
+ * Mount operations have no user in scope, so this goes through the
+ * workspace-only resolver (IW-9 F3, tech-plan D6): a user's personal
+ * `user-oauth` connection is structurally unreachable here.
  */
 export async function githubToken(workspaceId: string): Promise<string | undefined> {
-  const record = await getCredentialStore()
-    .resolveRecordForProvider(workspaceId, "github")
+  const record = await resolveWorkspaceCredential(workspaceId, "github")
     .catch(() => undefined);
   const payload = record?.payload as
     | { token?: string; value?: string }
