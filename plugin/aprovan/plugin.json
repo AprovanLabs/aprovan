@@ -1,0 +1,22 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "aprovan",
+  "version": "0.1.0",
+  "description": "Connect Cursor and Claude to the Aprovan workspace MCP server — tool catalog, filesystem, telemetry, and workflows through the workspace gateway.",
+  "author": {
+    "name": "Aprovan Labs",
+    "url": "https://github.com/AprovanLabs"
+  },
+  "homepage": "https://github.com/AprovanLabs/aprovan",
+  "repository": "https://github.com/AprovanLabs/aprovan",
+  "license": "MIT",
+  "keywords": [
+    "aprovan",
+    "mcp",
+    "workspace",
+    "gateway",
+    "tools",
+    "filesystem",
+    "workflows"
+  ]
+}
