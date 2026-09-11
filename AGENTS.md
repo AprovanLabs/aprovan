@@ -21,6 +21,12 @@ startup update script, so it is not repeated here.
   resolve workspace `dist/` output.
 - `utdk` typecheck is memory-heavy: prefix with `NODE_OPTIONS=--max-old-space-size=4096`.
 
+### MCP plugin (repo root)
+- Cursor / Claude plugin manifests live at the **repository root** (`plugin.json`,
+  `mcp.json`, `.cursor-plugin/`, `.claude-plugin/`). Install with
+  `cursor --plugin-dir .` or `claude --plugin-dir .` from a clone. Validates via
+  `node scripts/validate-plugin-manifests.mjs`. See `PLUGIN.md`.
+
 ### Core product = workspace gateway + patchwork-web (local mode, no AWS/Docker)
 - Gateway: `pnpm --filter @aprovan/workspace dev`. Defaults to `WORKSPACE_MODE=local`
   (SQLite at `~/.aprovan`, auth off), listens on `http://localhost:4000`. Liveness

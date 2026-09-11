@@ -15,6 +15,9 @@
 The aprovan product repo: the workspace chat app, widget compiler/editor
 packages, and the patchwork runtime for building generative UI experiences.
 
+This repository is also packaged as a **Cursor / Claude MCP plugin** at the repo
+root (Streamable HTTP → `https://aprovan.com/api/mcp`). See [PLUGIN.md](PLUGIN.md).
+
 ## Architecture
 
 - `@aprovan/patchwork` is the MCP-only runtime client.

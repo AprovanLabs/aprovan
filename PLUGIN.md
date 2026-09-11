@@ -1,6 +1,6 @@
 # Aprovan MCP Plugin
 
-Install the live Aprovan workspace MCP server in **Cursor** and **Claude Code** without hand-wiring MCP config.
+This repository is packaged as a **Cursor** and **Claude Code** plugin at the repo root. Install by pointing your client at this directory (or publish the repo as the plugin).
 
 The plugin connects directly to the production Streamable HTTP endpoint:
 
@@ -23,21 +23,24 @@ See `server/workspace/README.md` for the hosted MCP install flow (Dynamic Client
 
 ## Install in Cursor
 
-### From the repository (local dev of the plugin itself)
+### From a clone of this repo
 
-1. Copy or symlink this directory to `~/.cursor/plugins/local/aprovan/`.
-2. Reload the Cursor window.
-3. Enable **Aprovan** under **Settings → Plugins** and complete OAuth when prompted.
+1. Clone `AprovanLabs/aprovan` (or use your existing checkout).
+2. Copy or symlink the **repository root** to `~/.cursor/plugins/local/aprovan/` (must contain `plugin.json` or `.cursor-plugin/plugin.json`).
+3. Reload the Cursor window.
+4. Enable **Aprovan** under **Settings → Plugins** and complete OAuth when prompted.
 
 Or test without installing:
 
 ```bash
-cursor --plugin-dir plugin/aprovan
+cursor --plugin-dir .
 ```
+
+Run that from the repository root.
 
 ### From a marketplace / team catalog
 
-The repo ships:
+The repo root ships:
 
 - `plugin.json` — [Agent Plugins](https://agent-plugins.org/) portable manifest
 - `.cursor-plugin/plugin.json` — Cursor-native manifest
@@ -54,10 +57,11 @@ claude plugin marketplace add AprovanLabs/aprovan
 claude plugin install aprovan@aprovan
 ```
 
-### Local plugin development
+### From a clone
 
 ```bash
-claude --plugin-dir /path/to/aprovan/plugin/aprovan
+cd /path/to/aprovan
+claude --plugin-dir .
 ```
 
 Reload after manifest changes: `/reload-plugins`.
@@ -94,17 +98,17 @@ pnpm --filter @aprovan/workspace dev
 
 Local mode runs with auth off; production at `aprovan.com` requires OAuth.
 
-## Package layout
+## Repo-root plugin layout
 
 ```
-plugin/aprovan/
+aprovan/                     # repository root = plugin root
 ├── plugin.json              # Agent Plugins manifest (portable)
 ├── mcp.json                 # MCP config (Cursor + Agent Plugins)
 ├── .mcp.json                # MCP config (Claude Code)
 ├── .cursor-plugin/plugin.json
 ├── .claude-plugin/plugin.json
-├── scripts/validate-manifests.mjs
-└── README.md
+├── PLUGIN.md                # this file
+└── scripts/validate-plugin-manifests.mjs
 ```
 
 ## Troubleshooting
@@ -118,8 +122,8 @@ plugin/aprovan/
 
 ## Development
 
-Validate manifests:
+Validate manifests from the repository root:
 
 ```bash
-node plugin/aprovan/scripts/validate-manifests.mjs
+node scripts/validate-plugin-manifests.mjs
 ```
