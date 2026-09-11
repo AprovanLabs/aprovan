@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Lightweight manifest validation for the Aprovan MCP plugin.
+ * Lightweight manifest validation for the Aprovan MCP plugin (repo root).
  * Confirms JSON parses, required fields exist, and referenced paths resolve.
  */
 import { readFileSync, existsSync } from "node:fs";
@@ -8,10 +8,10 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const PRODUCTION_MCP_URL = "https://aprovan.com/api/mcp";
-const pluginRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 function readJson(relativePath) {
-  const absolute = join(pluginRoot, relativePath);
+  const absolute = join(repoRoot, relativePath);
   if (!existsSync(absolute)) {
     throw new Error(`Missing file: ${relativePath}`);
   }

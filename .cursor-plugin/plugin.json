@@ -7,7 +7,7 @@
     "name": "Aprovan Labs",
     "url": "https://github.com/AprovanLabs"
   },
-  "homepage": "https://github.com/AprovanLabs/aprovan/tree/main/plugin/aprovan",
+  "homepage": "https://github.com/AprovanLabs/aprovan",
   "repository": "https://github.com/AprovanLabs/aprovan",
   "license": "MIT",
   "keywords": [
@@ -19,5 +19,5 @@
     "filesystem",
     "workflows"
   ],
-  "mcpServers": "./.mcp.json"
+  "mcpServers": "./mcp.json"
 }
