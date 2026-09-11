@@ -44,9 +44,10 @@ The repo root ships:
 
 - `plugin.json` — [Agent Plugins](https://agent-plugins.org/) portable manifest
 - `.cursor-plugin/plugin.json` — Cursor-native manifest
+- `.cursor-plugin/marketplace.json` — Cursor marketplace manifest (single root-level plugin)
 - `mcp.json` — Streamable HTTP config pointing at `https://aprovan.com/api/mcp`
 
-Submit to the [Cursor marketplace](https://cursor.com/marketplace/publish) when ready.
+Submit the repository to the [Cursor marketplace](https://cursor.com/marketplace/publish). The marketplace manifest lists the root plugin (`source: "."`) so Cursor can index this repo as a one-plugin marketplace.
 
 ## Install in Claude Code
 
@@ -105,7 +106,9 @@ aprovan/                     # repository root = plugin root
 ├── plugin.json              # Agent Plugins manifest (portable)
 ├── mcp.json                 # MCP config (Cursor + Agent Plugins)
 ├── .mcp.json                # MCP config (Claude Code)
-├── .cursor-plugin/plugin.json
+├── .cursor-plugin/
+│   ├── plugin.json
+│   └── marketplace.json
 ├── .claude-plugin/plugin.json
 ├── PLUGIN.md                # this file
 └── scripts/validate-plugin-manifests.mjs
