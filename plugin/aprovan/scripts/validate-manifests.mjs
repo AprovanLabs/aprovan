@@ -7,6 +7,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+const PRODUCTION_MCP_URL = "https://aprovan.com/api/mcp";
 const pluginRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 function readJson(relativePath) {
@@ -23,6 +24,13 @@ function assert(condition, message) {
   if (!condition) errors.push(message);
 }
 
+function assertRemoteMcpServer(server, label) {
+  assert(server, `${label}: aprovan server required`);
+  assert(!server.command, `${label}: must not use stdio command transport`);
+  assert(!server.args, `${label}: must not use stdio args`);
+  assert(server.url === PRODUCTION_MCP_URL, `${label}: url must be ${PRODUCTION_MCP_URL}`);
+}
+
 try {
   const portable = readJson("plugin.json");
   assert(portable.name === "aprovan", "plugin.json: name must be aprovan");
@@ -31,23 +39,17 @@ try {
   const cursor = readJson(".cursor-plugin/plugin.json");
   assert(cursor.name === "aprovan", ".cursor-plugin/plugin.json: name must be aprovan");
   assert(cursor.mcpServers, ".cursor-plugin/plugin.json: mcpServers required");
-  assert(cursor.variables?.properties?.APROVAN_MCP_URL, ".cursor-plugin: APROVAN_MCP_URL variable required");
 
   const claude = readJson(".claude-plugin/plugin.json");
   assert(claude.name === "aprovan", ".claude-plugin/plugin.json: name must be aprovan");
   assert(claude.mcpServers, ".claude-plugin/plugin.json: mcpServers required");
-  assert(claude.userConfig?.APROVAN_MCP_URL, ".claude-plugin: APROVAN_MCP_URL userConfig required");
 
   const mcp = readJson("mcp.json");
-  assert(mcp.mcpServers?.aprovan, "mcp.json: aprovan server required");
-  assert(mcp.mcpServers.aprovan.type === "stdio", "mcp.json: aprovan must use stdio transport");
-  assert(
-    mcp.mcpServers.aprovan.args?.includes("@aprovan/mcp-plugin"),
-    "mcp.json: must invoke @aprovan/mcp-plugin",
-  );
+  assertRemoteMcpServer(mcp.mcpServers?.aprovan, "mcp.json");
+  assert(mcp.mcpServers.aprovan.type === "streamable-http", "mcp.json: must use streamable-http");
 
   const claudeMcp = readJson(".mcp.json");
-  assert(claudeMcp.mcpServers?.aprovan, ".mcp.json: aprovan server required");
+  assertRemoteMcpServer(claudeMcp.mcpServers?.aprovan, ".mcp.json");
 
   const mcpServersPath =
     typeof cursor.mcpServers === "string" ? cursor.mcpServers : "./mcp.json";

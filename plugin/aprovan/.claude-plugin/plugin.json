@@ -2,7 +2,7 @@
   "name": "aprovan",
   "displayName": "Aprovan",
   "version": "0.1.0",
-  "description": "Connect to the Aprovan workspace MCP server — tool catalog, filesystem, telemetry, and workflows through the workspace gateway at /api/mcp.",
+  "description": "Connect to the live Aprovan workspace MCP server — tool catalog, filesystem, telemetry, and workflows at https://aprovan.com/api/mcp.",
   "author": {
     "name": "Aprovan Labs",
     "url": "https://github.com/AprovanLabs"
@@ -19,20 +19,5 @@
     "filesystem",
     "workflows"
   ],
-  "mcpServers": "./.mcp.json",
-  "userConfig": {
-    "APROVAN_MCP_URL": {
-      "type": "string",
-      "title": "MCP endpoint URL",
-      "description": "Streamable HTTP MCP URL for your workspace gateway (must end with /api/mcp).",
-      "default": "http://localhost:4000/api/mcp",
-      "required": true
-    },
-    "APROVAN_MCP_TOKEN": {
-      "type": "string",
-      "title": "Bearer token",
-      "description": "Optional access token for hosted gateways with auth. Leave empty for local mode (auth off).",
-      "sensitive": true
-    }
-  }
+  "mcpServers": "./.mcp.json"
 }

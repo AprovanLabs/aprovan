@@ -2,13 +2,8 @@
   "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
   "mcpServers": {
     "aprovan": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@aprovan/mcp-plugin", "serve"],
-      "env": {
-        "APROVAN_MCP_URL": "${APROVAN_MCP_URL}",
-        "APROVAN_MCP_TOKEN": "${APROVAN_MCP_TOKEN}"
-      }
+      "type": "streamable-http",
+      "url": "https://aprovan.com/api/mcp"
     }
   }
 }
