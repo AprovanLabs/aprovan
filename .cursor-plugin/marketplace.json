@@ -1,0 +1,16 @@
+{
+  "name": "aprovan",
+  "owner": {
+    "name": "Aprovan Labs"
+  },
+  "metadata": {
+    "description": "Aprovan workspace MCP plugin — tool catalog, filesystem, telemetry, and workflows via Streamable HTTP."
+  },
+  "plugins": [
+    {
+      "name": "aprovan",
+      "source": ".",
+      "description": "Connect to the live Aprovan workspace MCP server — tool catalog, filesystem, telemetry, and workflows at https://aprovan.com/api/mcp."
+    }
+  ]
+}

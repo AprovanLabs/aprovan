@@ -40,6 +40,19 @@ try {
   assert(cursor.name === "aprovan", ".cursor-plugin/plugin.json: name must be aprovan");
   assert(cursor.mcpServers, ".cursor-plugin/plugin.json: mcpServers required");
 
+  const marketplace = readJson(".cursor-plugin/marketplace.json");
+  assert(marketplace.name === "aprovan", ".cursor-plugin/marketplace.json: name must be aprovan");
+  assert(marketplace.owner?.name, ".cursor-plugin/marketplace.json: owner.name required");
+  assert(Array.isArray(marketplace.plugins) && marketplace.plugins.length > 0, ".cursor-plugin/marketplace.json: plugins array required");
+  const marketplaceEntry = marketplace.plugins.find((entry) => entry.name === "aprovan");
+  assert(marketplaceEntry, ".cursor-plugin/marketplace.json: must list aprovan plugin");
+  assert(marketplaceEntry.source === ".", ".cursor-plugin/marketplace.json: aprovan source must be .");
+  assert(marketplaceEntry.description, ".cursor-plugin/marketplace.json: aprovan description required");
+  assert(
+    existsSync(join(repoRoot, ".cursor-plugin", "plugin.json")),
+    ".cursor-plugin/marketplace.json: source . must resolve to .cursor-plugin/plugin.json",
+  );
+
   const claude = readJson(".claude-plugin/plugin.json");
   assert(claude.name === "aprovan", ".claude-plugin/plugin.json: name must be aprovan");
   assert(claude.mcpServers, ".claude-plugin/plugin.json: mcpServers required");
